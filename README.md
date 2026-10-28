@@ -22,7 +22,7 @@ hit, instead of waiting for crash statistics.
 | Second look | **Muse Spark** checks each clip: is that a person, and who (child, elderly, wheelchair user...) | `review.py` |
 | Ear witness | **Muse Wonder** listens to the original audio around each near-miss for horns, screeching brakes and shouts | `listen.py` |
 | Evidence clips | ffmpeg, pedestrian boxed cyan, vehicle red, every tracked person's head blurred on every frame so clips of children can be shared | `render.py` |
-| Fix and letter | **Muse Spark** picks a physical fix and writes the letter from the measurements only; **Muse Image** draws the fix onto the real street | `pack.py` |
+| Fix and letter | **Muse Spark** (JSON mode) picks a physical fix and writes the letter from the measurements only; code checks every number in the letter against the measurements and sends it back with the reason if one was never measured; **Muse Image** draws the fix onto the real street | `pack.py` |
 
 ## Run
 
@@ -120,7 +120,8 @@ The DUT data has no licence and was used only for internal testing; it is not in
 - A person standing still on the carriageway when a car passes within 1 m is reported as a near-miss.
 - The death-risk curve is for adults (15+) hit by a car front; children are not covered by that study.
 - Distances are only as good as the measured calibration rectangle.
-- Rates per hour from a short video are scaled, not a peak-hour count; the page says so next to PV².
+- Rates per hour from a short video are scaled, not a peak-hour count; the page says so next to PV², and shows no
+  PV² for videos under 15 minutes.
 - SAM video tracking at 10 frames a second costs about $0.20 per 1,000 frames per concept, so an hour with four
   concepts is roughly $25-30. The page prints the estimate for each video.
 - Box jitter alone gives a queued car an apparent speed of a few km/h. That is well under the 10 km/h "moving"
@@ -136,5 +137,7 @@ The DUT data has no licence and was used only for internal testing; it is not in
 
 ## Declarations
 
-All code in this repository was written during the hackathon. No third-party code or libraries; Python standard
+All code in this repository was written during the hackathon. The check-then-retry pattern for Spark's letter and the
+JSON-mode request field follow Meta's legal-agent workshop (github.com/meta-models/legal-agent-workshop, shown at a
+hackathon session); no code was copied from it. No third-party code or libraries; Python standard
 library and ffmpeg only. Test videos from YouTube were used only for local testing and are not included. The SinD sample (SOTIF-AVLab, non-commercial use) was used only for validation and is not included.
