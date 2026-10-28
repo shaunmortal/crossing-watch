@@ -182,12 +182,14 @@ def test_heads_are_blurred_inside_the_frame():
 
 
 def test_spark_verdicts_are_validated():
-    ok = review.read_verdict('Sure: {"cyan_is_a_person": false, "road_user": "not a person", "reason": "a pole"}')
+    ok = review.read_verdict('Sure: {"cyan_is_a_pedestrian": false, "road_user": "not a person", "reason": "a pole"}')
     assert ok == {"is_person": False, "road_user": "not a person", "reason": "a pole"}
-    assert review.read_verdict('{"cyan_is_a_person": "yes", "road_user": "adult"}') is None
-    assert review.read_verdict('{"cyan_is_a_person": true, "road_user": "alien"}') is None
+    assert review.read_verdict('{"cyan_is_a_pedestrian": "yes", "road_user": "adult"}') is None
+    assert review.read_verdict('{"cyan_is_a_pedestrian": true, "road_user": "alien"}') is None
     assert review.read_verdict("no json") is None and review.read_verdict("[1, 2]") is None
-    assert review.read_verdict('{"cyan_is_a_person": true, "road_user": "not a person"}')["is_person"] is False
+    assert review.read_verdict('{"cyan_is_a_pedestrian": true, "road_user": "not a person"}')["is_person"] is False
+    # someone on a motorcycle or bicycle is a rider (a vehicle, as in SinD), even if Spark calls them a person
+    assert review.read_verdict('{"cyan_is_a_pedestrian": true, "road_user": "rider"}')["is_person"] is False
 
 
 def test_pack_keeps_people_and_escapes_text():
@@ -434,6 +436,23 @@ def test_letters_quoting_unmeasured_numbers_go_back_to_spark():
     finally:
         pack.spark_plan = old
     assert stubborn["unmeasured"] == ["12"] and "12" in pack.letter_section(stubborn)
+
+
+def test_crowd_mode_can_cover_people_vehicles_or_both():
+    import analyze
+    site = {"person": "person", "vehicles": ["car", "motorcycle"]}
+    assert analyze.crowd_concepts(site) == []
+    assert analyze.crowd_concepts({**site, "person_mode": "crowd"}) == ["person"]
+    assert analyze.crowd_concepts({**site, "person_mode": "crowd", "vehicle_mode": "crowd"}) == ["person", "car", "motorcycle"]
+
+
+def test_pedestrian_pieces_shorter_than_a_second_are_dropped():
+    import analyze
+    site = {"image_points": SQUARE_IMG, "world_points": SQUARE_ROAD}
+    H = road.homography(SQUARE_IMG, SQUARE_ROAD)
+    walk = lambda frames: {f: [190, 100 + 5 * f, 210, 140 + 5 * f] for f in frames}  # 0.25 m a frame
+    people, _ = analyze.road_tracks(site, H, {"a": walk(range(20)), "b": walk(range(5))}, {}, (400, 400))
+    assert set(people) == {"a/0"}
 
 def test_sam_text_parses_into_tracks():
     text = ("<0f>0<|box;x1=1.0;y1=2.0;x2=3.0;y2=4.0;w=640;h=360|><|mask...|>1<|box;x1=5;y1=6;x2=7;y2=8;w=640;h=360|>"
