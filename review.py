@@ -64,7 +64,8 @@ def person_crop(clip, person_track, frame_size, out_path):
 
 def ask(image_path, api_key, top_down=False):
     url = "data:image/jpeg;base64," + base64.b64encode(image_path.read_bytes()).decode()
-    body = json.dumps({"model": MODEL, "reasoning": {"effort": "minimal"}, "input": [{"role": "user", "content": [
+    body = json.dumps({"model": MODEL, "reasoning": {"effort": "minimal"}, "text": {"format": {"type": "json_object"}},
+                       "input": [{"role": "user", "content": [
         {"type": "input_text", "text": PROMPT.format(view=VIEWS[top_down])},
         {"type": "input_image", "image_url": url}]}]}).encode()
     req = urllib.request.Request(sam.API_URL, data=body, headers={

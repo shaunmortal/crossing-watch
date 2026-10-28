@@ -26,11 +26,15 @@ IMAGE_EDIT_URL = "https://api.meta.ai/v1/images/edits"
 IMAGE_MODEL = "muse-image-1.0"
 TIMEOUT_S = 300
 SHOWN_EVENTS = 5
+MIN_RATE_MINUTES = 15  # shortest video scaled to hourly rates (MUTCD Warrant 4 counts 15-minute periods)
+LETTER_TRIES = 3     # Spark gets this many tries at a letter whose every number was measured
+NUMBER = re.compile(r"\d+(?:\.\d+)?")
 LETTER_PROMPT = """You help a school ask its road authority to make the crossing outside it safer.
 Below are measurements from a video of the crossing, made by Crossing Watch (SAM 3.1 tracking, road-plane geometry,
 post-encroachment time). Use ONLY these facts; never invent numbers, names, places or dates.
 Death-risk figures are for adults hit by a car front: never state a death risk for a child.
-Quote engineering numbers (PV², gaps) as given, with their caveats; never say a standard is met.
+From the engineering lines, mention at most PV² and the share of time in gaps, briefly, with their main caveat;
+never say a standard is met.
 
 {facts}
 
@@ -77,7 +81,10 @@ def engineering_lines(seen, cost):
     if not minutes:
         return []
     lines = []
-    if "crossings" in seen and "vehicles" in seen:
+    if "crossings" in seen and "vehicles" in seen and minutes < MIN_RATE_MINUTES:
+        lines.append(f"PV² and hourly rates need at least {MIN_RATE_MINUTES} minutes of video; this one is "
+                     f"{minutes:.1f}. Counted: {seen['crossings']} pedestrian crossings, {seen['vehicles']} moving vehicles.")
+    elif "crossings" in seen and "vehicles" in seen:
         shown = round(minutes, 1)
         source = (f"scaled from {shown:g} minutes of video; a formal check counts the full peak hour" if minutes < 60
                   else f"from {shown:g} minutes of video")
@@ -118,8 +125,36 @@ def limit_note(full):
     return (f'<p class="note">In {full[0]} of {full[1]} tracking requests SAM reached its {sam.MAX_OBJECTS}-object '
             "limit, so some people or vehicles were not tracked: counts and near-misses here are a minimum.</p>")
 
-def ask_spark(prompt, api_key):
-    body = json.dumps({"model": review.MODEL, "reasoning": {"effort": "low"}, "input": prompt}).encode()
+def unmeasured(text, facts_text):
+    """Numbers in `text` that appear nowhere in the measured facts: a letter to an authority must not invent any."""
+    known = {float(n) for n in NUMBER.findall(facts_text)}
+    return sorted({n for n in NUMBER.findall(text) if float(n) not in known}, key=float)
+
+
+def ask_spark(prompt, facts_text, api_key, tries=LETTER_TRIES):
+    """Spark's fix and letter, checked by code before use: an invalid reply, or a letter quoting a number that was
+    never measured, goes back to Spark with the reason (the check-then-retry pattern of Meta's legal-agent workshop).
+    If the last try still has unmeasured numbers, the letter is kept with them listed for a person to check."""
+    note, plan, bad = "", None, []
+    for attempt in range(tries):
+        try:
+            plan = spark_plan(prompt + note, api_key)
+        except ValueError as err:  # JSONDecodeError included
+            if attempt == tries - 1 and plan is None:
+                raise
+            note = f"\n\nYour previous output was invalid: {str(err)[:200]}. Reply with the JSON object only."
+            continue
+        bad = unmeasured(plan["letter"] + " " + plan["why"], facts_text)
+        if not bad:
+            return plan
+        note = (f"\n\nYour previous letter used numbers that are not in the measurements: {', '.join(bad)}. "
+                "Use only numbers given above.")
+    return {**plan, "unmeasured": bad}
+
+
+def spark_plan(prompt, api_key):
+    body = json.dumps({"model": review.MODEL, "reasoning": {"effort": "low"}, "text": {"format": {"type": "json_object"}},
+                       "input": prompt}).encode()
     req = urllib.request.Request(sam.API_URL, data=body, headers={
         "Authorization": f"Bearer {api_key}", "Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=TIMEOUT_S) as response:
@@ -221,7 +256,9 @@ def letter_section(plan):
     if not plan:
         return ""
     paragraphs = "".join(f"<p>{html.escape(p)}</p>" for p in plan["letter"].split("\n") if p.strip())
-    return f'<section><h2>Letter to the road authority</h2><div class="letter">{paragraphs}</div></section>'
+    check = (f'<p class="note">Check before sending: these numbers are not in the measurements: '
+             f'{html.escape(", ".join(plan["unmeasured"]))}.</p>' if plan.get("unmeasured") else "")
+    return f'<section><h2>Letter to the road authority</h2><div class="letter">{paragraphs}</div>{check}</section>'
 
 
 STYLE = """
@@ -295,8 +332,9 @@ def main():
     if events:
         try:
             key = sam.load_api_key()
-            plan = ask_spark(LETTER_PROMPT.format(facts=facts(site, events, seen),
-                                                  language=site.get("letter_language", "English")), key)
+            measured = facts(site, events, seen)
+            plan = ask_spark(LETTER_PROMPT.format(facts=measured, language=site.get("letter_language", "English")),
+                             measured, key)
             photo = street_photo(out_dir / "clip.mp4", out_dir / "street.jpg", site.get("person", "person"),
                                  site.get("person_mode") == "crowd")
             images = (photo.name, draw_fix(photo, plan["image_prompt"], key, out_dir / "street-fixed.jpg").name)

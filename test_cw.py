@@ -305,8 +305,10 @@ def test_pv2_and_engineering_numbers_say_when_they_are_scaled():
     assert "4 gaps" in text and "12.5% of the time" in text and "about $3.00 per hour" in text
     plain = " ".join(pack.engineering_lines(seen, {"sam_usd": 1.5}))
     assert "Meta's list price" in plain and "guessed" not in plain
+    exact = pack.engineering_lines({"minutes": 20.2, "duration_s": 1215.0, "crossings": 500, "vehicles": 2000}, None)
+    assert f"{road.pv2(500, 2000, 20.25) / 1e8:.1f} x 10^8" in exact[0]  # from the exact 20.25 min, not 20.2
     short = pack.engineering_lines({"minutes": 0.2, "duration_s": 15.0, "crossings": 5, "vehicles": 20}, None)
-    assert "276.5 x 10^8" in short[0]  # from the exact 15 s, not the rounded 0.2 min
+    assert "x 10^8" not in short[0] and "at least 15 minutes" in short[0]
     assert "guessed" in pack.engineering({"minutes": 10}, {"sam_usd": 7.2, "image_usd": 6.0})
     assert pack.engineering({"minutes": 0}, None) == ""
     assert "2 of 10" in pack.limit_note([2, 10]) and pack.limit_note([0, 10]) == pack.limit_note(None) == ""
@@ -415,6 +417,23 @@ def test_event_cards_do_not_give_a_child_or_non_car_a_car_curve_risk_unqualified
     assert "not a child&#x27;s risk" in card and "car fronts" in card
     assert "never state a death risk for a child" in pack.LETTER_PROMPT
 
+
+
+def test_letters_quoting_unmeasured_numbers_go_back_to_spark():
+    facts = '{"pet_s": 0.4, "vehicle_kmh": 27.3, "at_20_kmh_limit": {"death_risk_pct": 0.6}}'
+    assert pack.unmeasured("PET 0.4 s at 27.3 km/h; a 20 km/h limit; 3 times this week", facts) == ["3"]
+    good = {"fix": "speed table", "why": "cars at 27.3 km/h", "image_prompt": "add a speed table", "letter": "PET 0.4 s."}
+    replies, prompts = [{**good, "letter": "It happened 12 times."}, good], []
+    old = pack.spark_plan
+    pack.spark_plan = lambda prompt, key: (prompts.append(prompt), replies.pop(0))[1]
+    try:
+        assert pack.ask_spark("PROMPT", facts, "key") == good
+        assert "12" in prompts[1] and "not in the measurements" in prompts[1]
+        replies[:] = [{**good, "letter": "It happened 12 times."}] * pack.LETTER_TRIES
+        stubborn = pack.ask_spark("PROMPT", facts, "key")
+    finally:
+        pack.spark_plan = old
+    assert stubborn["unmeasured"] == ["12"] and "12" in pack.letter_section(stubborn)
 
 def test_sam_text_parses_into_tracks():
     text = ("<0f>0<|box;x1=1.0;y1=2.0;x2=3.0;y2=4.0;w=640;h=360|><|mask...|>1<|box;x1=5;y1=6;x2=7;y2=8;w=640;h=360|>"
