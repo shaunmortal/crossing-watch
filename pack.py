@@ -16,6 +16,7 @@ import urllib.request
 import uuid
 from pathlib import Path
 
+import crowd
 import render
 import review
 import road
@@ -28,6 +29,8 @@ SHOWN_EVENTS = 5
 LETTER_PROMPT = """You help a school ask its road authority to make the crossing outside it safer.
 Below are measurements from a video of the crossing, made by Crossing Watch (SAM 3.1 tracking, road-plane geometry,
 post-encroachment time). Use ONLY these facts; never invent numbers, names, places or dates.
+Death-risk figures are for adults hit by a car front: never state a death risk for a child.
+Quote engineering numbers (PV², gaps) as given, with their caveats; never say a standard is met.
 
 {facts}
 
@@ -62,8 +65,58 @@ def facts(site, events, seen):
                    "adult_death_risk_if_hit_pct": e["death_risk_pct"], "at_20_kmh_limit": e["with_limit"]["20"],
                    "road_user": (e.get("review") or {}).get("road_user", "not reviewed")} for e in worst],
         "risk_source": "Rosén & Sander 2009, adults 15+, car fronts",
+        "engineering": engineering_lines(seen, None),
     }, indent=1)
 
+
+
+def engineering_lines(seen, cost):
+    """The numbers road engineers already use, from the same tracks: PV^2 (IRC:103-2012) and gaps in traffic
+    (UK Traffic Signs Manual ch. 6), plus what the tracking cost. Rates from a short video are scaled, and say so."""
+    minutes = seen["duration_s"] / 60 if seen.get("duration_s") else seen.get("minutes") or 0
+    if not minutes:
+        return []
+    lines = []
+    if "crossings" in seen and "vehicles" in seen:
+        shown = round(minutes, 1)
+        source = (f"scaled from {shown:g} minutes of video; a formal check counts the full peak hour" if minutes < 60
+                  else f"from {shown:g} minutes of video")
+        lines.append(f"PV² = {road.pv2(seen['crossings'], seen['vehicles'], minutes) / 1e8:.1f} x 10^8: "
+                     f"{round(seen['crossings'] * 60 / minutes)} pedestrians and {round(seen['vehicles'] * 60 / minutes)} "
+                     f"moving vehicles an hour ({source}; pedestrians are people who walked 2 m or more on the marked carriageway, or "
+                     f"anywhere in view if none is marked, and broken tracks can count one twice: 1.3x the true count "
+                     f"in our drone test). IRC:103-2012 (6.7.4.1.2): a controlled crossing may be "
+                     f"warranted above {road.PV2_UNDIVIDED / 1e8:g} x 10^8 on an undivided road, "
+                     f"{road.PV2_DIVIDED / 1e8:g} x 10^8 on a divided road.")
+    if "gaps_6s" in seen:
+        lines.append(f"{seen.get('gap_6s_share_pct', '?')}% of the time was inside gaps of {road.GAP_ADULT_S:g} s or "
+                     f"more with no moving vehicle where people crossed: {seen['gaps_6s']} "
+                     f"gap{'' if seen['gaps_6s'] == 1 else 's'}, {seen['gaps_12s']} of them {road.GAP_SLOW_S:g} s or "
+                     f"more, longest {seen['longest_gap_s']} s (the first and last are cut short by the video). "
+                     f"UK Traffic Signs Manual ch. 6 (13.5.2): 4-6 s is an "
+                     f"acceptable gap at urban speeds; other groups, such as children, may need 10-12 s or longer.")
+    if cost and cost.get("sam_usd") is not None:
+        basis = (f"about ${cost['image_usd']:.2f} of it is image detection at a guessed $0.002 an image, as Meta's "
+                 "image price was not found" if cost.get("image_usd") else "at Meta's list price for SAM video")
+        lines.append(f"SAM tracking cost for this video: about ${cost['sam_usd']:.2f}, so about "
+                     f"${cost['sam_usd'] * 60 / minutes:.2f} per hour of footage ({basis}).")
+    return lines
+
+
+def engineering(seen, cost):
+    lines = engineering_lines(seen, cost)
+    if not lines:
+        return ""
+    items = "".join(f"<li>{html.escape(line)}</li>" for line in lines)
+    return f"<section><h2>Numbers road engineers use</h2><ul>{items}</ul></section>"
+
+
+def limit_note(full):
+    """Say so when SAM's per-request object limit was reached: then the counts are a minimum."""
+    if not full or not full[0]:
+        return ""
+    return (f'<p class="note">In {full[0]} of {full[1]} tracking requests SAM reached its {sam.MAX_OBJECTS}-object '
+            "limit, so some people or vehicles were not tracked: counts and near-misses here are a minimum.</p>")
 
 def ask_spark(prompt, api_key):
     body = json.dumps({"model": review.MODEL, "reasoning": {"effort": "low"}, "input": prompt}).encode()
@@ -101,11 +154,13 @@ def draw_fix(photo, instruction, api_key, out_path):
     return out_path
 
 
-def street_photo(clip, out_path, person_concept="person"):
+def street_photo(clip, out_path, person_concept="person", crowd_mode=False):
     """First frame of the clip with every head blurred (it is shown on the page and sent to Muse Image). Uses the
-    same SAM cache analyze wrote (part0/ for long videos); without it there is no photo rather than unblurred faces."""
+    same SAM cache analyze wrote (crowd mode's first image, or part0/ for long videos); without it there is no
+    photo rather than unblurred faces."""
     folder = clip.parent / "part0" if (clip.parent / "part0").is_dir() else clip.parent
-    people_file = sam.cache_path(folder, person_concept)
+    people_file = (crowd.cache_dir(clip.parent, person_concept) / f"{0:06d}.sam.txt" if crowd_mode
+                   else sam.cache_path(folder, person_concept))
     if not people_file.exists():
         raise ValueError(f"no person tracks at {people_file}; not showing an unblurred street photo")
     people = sam.parse(people_file.read_text()).values()
@@ -129,8 +184,17 @@ def event_card(i, e):
 <tr><td>As driven</td><td>{e.get("impact_kmh", e["vehicle_kmh"])} km/h</td><td>{e["death_risk_pct"]}%</td></tr>
 <tr><td>30 km/h limit</td><td>{at30["impact_kmh"]} km/h</td><td>{at30["death_risk_pct"]}%</td></tr>
 <tr><td>20 km/h limit</td><td>{at20["impact_kmh"]} km/h</td><td>{at20["death_risk_pct"]}%</td></tr></table>
-<p class="note">At {e["t_person_s"]:.1f} s in the video. Gap {e["gap_m"]} m. {html.escape(verdict.get("reason", ""))}</p>
+<p class="note">At {e["t_person_s"]:.1f} s in the video. Gap {e["gap_m"]} m. {html.escape(verdict.get("reason", ""))}
+{html.escape(risk_caveat(road_user, e["vehicle"].split("#")[0]))}</p>
 {heard_line(e.get("heard"))}</article>"""
+
+
+def risk_caveat(road_user, vehicle):
+    """The death-risk curve is for adults hit by a car front; say so where this event is neither."""
+    notes = ["The curve is for adults, so this is not a child's risk."] if road_user == "child" else []
+    if vehicle != "car":
+        notes.append(f"It was measured for car fronts; for a {vehicle} it is only a rough guide.")
+    return " ".join(notes)
 
 
 def heard_line(heard):
@@ -188,7 +252,7 @@ def stats(events, seen):
     return "".join(f"<div><b>{html.escape(str(v))}</b>{html.escape(label)}</div>" for v, label in tiles)
 
 
-def page(site, events, seen, plan, images):
+def page(site, events, seen, plan, images, cost=None, full=None):
     cards = "\n".join(event_card(i + 1, e) for i, e in enumerate(events[:SHOWN_EVENTS])) or (
         f"<p>No conflicts under {road.CLOSE_PASS_S} s in these {html.escape(str(seen.get('minutes', '?')))} minutes. "
         "A short recording can miss rare events: record more school-run periods before drawing any conclusion.</p>")
@@ -205,7 +269,8 @@ def page(site, events, seen, plan, images):
 <style>{STYLE}</style></head><body>
 <h1>Crossing Watch: near-miss evidence</h1>
 <p class="muted">{html.escape(site.get("name", ""))}</p>
-<div class="stats">{stats(events, seen)}</div>
+<div class="stats">{stats(events, seen)}</div>{limit_note(full)}
+{engineering(seen, cost)}
 <section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{letter_section(plan)}
 <section><h2>How this was measured</h2><p class="note">{html.escape(method)}</p></section></body></html>"""
 
@@ -232,12 +297,14 @@ def main():
             key = sam.load_api_key()
             plan = ask_spark(LETTER_PROMPT.format(facts=facts(site, events, seen),
                                                   language=site.get("letter_language", "English")), key)
-            photo = street_photo(out_dir / "clip.mp4", out_dir / "street.jpg", site.get("person", "person"))
+            photo = street_photo(out_dir / "clip.mp4", out_dir / "street.jpg", site.get("person", "person"),
+                                 site.get("person_mode") == "crowd")
             images = (photo.name, draw_fix(photo, plan["image_prompt"], key, out_dir / "street-fixed.jpg").name)
         except (SystemExit, OSError, ValueError, KeyError, IndexError, TypeError, AttributeError,
                 http.client.HTTPException, subprocess.CalledProcessError) as err:
             print(f"letter or fix image failed, page will show the measurements only: {err}", file=sys.stderr)
-    (out_dir / "index.html").write_text(page(site, events, seen, plan, images))
+    (out_dir / "index.html").write_text(page(site, events, seen, plan, images, data.get("cost"),
+                                                      data.get("sam_full_requests")))
     print(f"wrote {out_dir / 'index.html'}: {len(serious(events))} serious, {len(events) - len(serious(events))} close "
           f"passes, fix: {plan['fix'] if plan else 'none'}")
 

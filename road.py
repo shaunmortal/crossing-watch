@@ -24,6 +24,9 @@ RIDER_OVERLAP = 0.6       # a "person" box this much inside a vehicle box is its
 RIDER_FEET_PX = 3         # ...if their feet are not below the vehicle's (a pedestrian in front has lower feet)
 MAX_WALK_MPS = 10.0       # faster than a sprint: the track's ID has jumped to someone (or something) else
 GRID_M = 2.0              # spatial index cell; any size >= 0 gives the same answers, this one is fast
+GAP_ADULT_S = 6.0         # UK Traffic Signs Manual ch. 6, 13.5.2: an acceptable gap is 4-6 s at urban speeds...
+GAP_SLOW_S = 12.0         # ..."other groups may require larger gaps, of 10 - 12 s or longer"
+PV2_UNDIVIDED, PV2_DIVIDED = 1e8, 2e8  # IRC:103-2012 6.7.4.1.2: peak-hour PV^2 above this "may" warrant control
 SPEED_LIMITS_KMH = (30, 20)  # replayed "what if this street had a limit" scenarios
 # Both favour the driver, so replayed impact speeds are not understated: 1.5 s is a typical perception-reaction
 # time for an unexpected hazard (road design uses 2.5 s), 7 m/s^2 is hard braking on dry asphalt.
@@ -326,21 +329,56 @@ def percentile(values, share):
     return ordered[min(len(ordered) - 1, int(share * len(ordered)))] if ordered else None
 
 
-def exposure(people, vehicles, fps, frames):
-    """How much was watched, so a short or quiet video is never read as "safe": crossings (people, counted once
-    per tracked id however many pieces it was split into), moving vehicles, minutes, and the 85th-percentile
-    vehicle speed, each vehicle's speed taken while it was actually moving (the speed traffic engineers quote)."""
-    crossers = set()
-    for pid, feet in people.items():
+def crossing_cells(people, fps):
+    """The GRID_M road cells where pedestrians actually crossed (moving pieces that went MIN_CROSSING_M or more)."""
+    cells = set()
+    for feet in people.values():
         moving = moving_frames(feet, fps)
         start = moving[min(moving)] if moving else None
         if moving and max(math.dist(start, p) for p in moving.values()) >= MIN_CROSSING_M:
-            crossers.add(pid.split("/")[0])
+            cells.update((math.floor(x / GRID_M), math.floor(y / GRID_M)) for x, y in moving.values())
+    return cells
+
+
+def traffic_gaps(vehicles, fps, cells, frames):
+    """Lengths in seconds of the stretches with no moving vehicle on the crossing (any of `cells`): the gaps a
+    pedestrian could cross in. The first and last are cut short by the video, so they are lower bounds."""
+    def on_crossing(shape):
+        return any((math.floor(x / GRID_M), math.floor(y / GRID_M)) in cells for x, y in (*shape, centroid(shape)))
+    busy = {f for edges in vehicles.values() for f, v in speeds(edges, fps).items()
+            if v >= MOVING_MPS and on_crossing(edges[f])}
+    gaps, start = [], 0
+    for f in sorted(busy) + [frames]:
+        if f > start:
+            gaps.append((f - start) / fps)
+        start = f + 1
+    return gaps
+
+
+def pv2(crossings, vehicles, minutes):
+    """PV^2: pedestrians crossing per hour times vehicles per hour squared, scaled from `minutes` of video."""
+    per_hour = 60 / minutes
+    return crossings * per_hour * (vehicles * per_hour) ** 2
+
+
+def exposure(people, vehicles, fps, frames):
+    """How much was watched, so a short or quiet video is never read as "safe": crossings (people, counted once
+    per tracked id however many pieces it was split into), moving vehicles, minutes, and the 85th-percentile
+    vehicle speed, each vehicle's speed taken while it was actually moving (the speed traffic engineers quote).
+    When someone crossed, also the gaps in traffic where they crossed that are long enough to cross in."""
+    crossers = {pid.split("/")[0] for pid, feet in people.items() if crossing_cells({pid: feet}, fps)}
     vehicle_speeds = []
     for edges in vehicles.values():
         moving = [v for v in speeds(edges, fps).values() if v >= MOVING_MPS]
         if len(moving) >= fps:  # at least a second of real movement
             vehicle_speeds.append(statistics.median(moving))
     p85 = percentile(vehicle_speeds, 0.85)
-    return {"minutes": round(frames / fps / 60, 1), "crossings": len(crossers), "vehicles": len(vehicle_speeds),
+    seen = {"minutes": round(frames / fps / 60, 1), "duration_s": round(frames / fps, 1), "crossings": len(crossers), "vehicles": len(vehicle_speeds),
             "speed_85th_kmh": round(p85 * 3.6, 1) if p85 else None}
+    cells = crossing_cells(people, fps)
+    if not cells:
+        return seen
+    gaps = traffic_gaps(vehicles, fps, cells, frames)
+    return {**seen, "gaps_6s": sum(g >= GAP_ADULT_S for g in gaps), "gaps_12s": sum(g >= GAP_SLOW_S for g in gaps),
+            "longest_gap_s": round(max(gaps, default=0.0), 1),
+            "gap_6s_share_pct": round(100 * sum(g for g in gaps if g >= GAP_ADULT_S) * fps / frames, 1)}
