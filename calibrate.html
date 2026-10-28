@@ -54,6 +54,8 @@ points in the same order (1 to 4), then the two ends of the scale bar (S1, S2).<
 <label>Vehicles to track (comma separated) <input type="text" id="vehicles" value="car, motorcycle, bus, auto rickshaw" style="width: 20em"></label>
 <label><input type="checkbox" id="crowded"> Crowded: more than about 15 people in view at once (detects people
 frame by frame; costs more)</label>
+<label><input type="checkbox" id="dense"> Dense traffic: more than about 15 vehicles of one kind pass in 15 seconds,
+or many are parked in view (detects vehicles frame by frame; costs more)</label>
 <label><input type="checkbox" id="fromclip"> This frame is from the prepared <code>out/NAME/clip.mp4</code>
 (needed when the site uses <code>prep_filter</code>)</label>
 <label>Letter language <input type="text" id="lang" value="English"></label>
@@ -141,6 +143,7 @@ function render() {
     calibration_note: world.note,
     person: "person",
     ...(field("crowded").checked ? { person_mode: "crowd" } : {}),
+    ...(field("dense").checked ? { vehicle_mode: "crowd" } : {}),
     vehicles: field("vehicles").value.split(",").map(v => v.trim()).filter(Boolean),
     letter_language: field("lang").value.trim() || "English",
   };
@@ -152,7 +155,7 @@ document.querySelectorAll("input[name=mode]").forEach(radio => radio.addEventLis
   field("mapInputs").hidden = mode() !== "map";
   render();
 }));
-["w", "h", "bar", "name", "vehicles", "lang", "fromclip", "crowded"].forEach(id => field(id).addEventListener("input", render));
+["w", "h", "bar", "name", "vehicles", "lang", "fromclip", "crowded", "dense"].forEach(id => field(id).addEventListener("input", render));
 field("save").addEventListener("click", () => {
   if (!field("out").value) return;
   const link = document.createElement("a");
