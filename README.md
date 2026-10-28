@@ -28,7 +28,7 @@ hit, instead of waiting for crash statistics.
 Needs Python 3.11+ and ffmpeg. No other dependencies. Put `MODEL_API_KEY=...` (Meta Model API) in `.env`.
 
 ```
-open calibrate.html                      # mark a measured rectangle on a frame, download site.json
+open calibrate.html                      # tape-measured rectangle, or no tape: match 4 points to a satellite view
 python3 analyze.py VIDEO site.json       # tracks, near-misses, clips, Spark review -> out/VIDEO/events.json
 python3 pack.py out/VIDEO site.json      # letter, fix image, evidence page -> out/VIDEO/index.html
 python3 test_cw.py                       # self-checks

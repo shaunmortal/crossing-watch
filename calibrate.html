@@ -12,20 +12,44 @@ canvas { width: 100%; border-radius: 6px; cursor: crosshair; touch-action: manip
 label { display: block; margin: 12px 0 4px; } input[type=number], input[type=text] { font: inherit; padding: 6px; width: 10em; }
 textarea { width: 100%; height: 14em; font: 13px ui-monospace, monospace; }
 .muted { color: var(--muted); } button { font: inherit; padding: 8px 14px; margin-right: 8px; }
+fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 16px 0; } [hidden] { display: none; }
 </style>
 </head>
 <body>
 <h1>Crossing Watch: mark the road</h1>
-<p class="muted">1. Take a full frame of the video itself, not a screenshot with player bars (for example
-<code>ffmpeg -i VIDEO -frames:v 1 frame.jpg</code>); the page scales it to the 640 px analysis size.
-2. Open it here. 3. Click four corners of a rectangle on the road surface whose sides you measured
-(for example the zebra crossing), going round it in one direction.</p>
-<input type="file" id="file" accept="image/*">
-<canvas id="canvas" width="640" height="360"></canvas>
-<p id="status" class="muted">Open a frame to begin.</p>
-<button id="undo">Undo point</button>
+<p class="muted">Take a full frame of the video itself, not a screenshot with player bars (for example
+<code>ffmpeg -i VIDEO -frames:v 1 frame.jpg</code>). The page scales it to the 640 px analysis size.</p>
+
+<fieldset><legend>How do you know distances on the road?</legend>
+<label><input type="radio" name="mode" value="tape" checked> I measured a rectangle on the road with a tape</label>
+<label><input type="radio" name="mode" value="map"> No tape: match points to a satellite view (Google Maps or similar) that shows a scale bar</label>
+</fieldset>
+
+<h2>1. Video frame</h2>
+<p class="muted">Click four points on the road surface, going round an area in one direction. With a tape, use the
+corners of the rectangle you measured. With a map, use four points you can also find on the map, spread over the
+crossing: zebra corners, kerb corners, lane-line ends.</p>
+<input type="file" id="frameFile" accept="image/*">
+<canvas id="frame" width="640" height="360"></canvas>
+<p id="frameStatus" class="muted">Open a frame to begin.</p>
+<button id="frameUndo">Undo point</button>
+
+<section id="tapeInputs">
 <label>Length of side 1 → 2 (metres) <input type="number" id="w" min="0.5" step="0.1" value="3.5"></label>
 <label>Length of side 2 → 3 (metres) <input type="number" id="h" min="0.5" step="0.1" value="3.0"></label>
+</section>
+
+<section id="mapInputs" hidden>
+<h2>2. Satellite view</h2>
+<p class="muted">Open a screenshot of the same place from above, including the map's scale bar. Click the same four
+points in the same order (1 to 4), then the two ends of the scale bar (S1, S2).</p>
+<input type="file" id="mapFile" accept="image/*">
+<canvas id="map" width="640" height="360"></canvas>
+<p id="mapStatus" class="muted">Open a satellite screenshot.</p>
+<button id="mapUndo">Undo point</button>
+<label>Scale bar length (metres) <input type="number" id="bar" min="1" step="1" value="20"></label>
+</section>
+
 <label>Site name <input type="text" id="name" value="My school gate" style="width: 20em"></label>
 <label>Vehicles to track (comma separated) <input type="text" id="vehicles" value="car, motorcycle, bus, auto rickshaw" style="width: 20em"></label>
 <label><input type="checkbox" id="fromclip"> This frame is from the prepared <code>out/NAME/clip.mp4</code>
@@ -36,40 +60,83 @@ textarea { width: 100%; height: 14em; font: 13px ui-monospace, monospace; }
 <button id="save">Download SITE.json</button>
 <script>
 const ANALYSIS_WIDTH = 640;
-const canvas = document.getElementById("canvas");
-const ctx = canvas.getContext("2d");
 const field = id => document.getElementById(id);
-let image = null;
-let points = [];
+const mode = () => document.querySelector("input[name=mode]:checked").value;
 
-function draw() {
-  if (!image) return;
-  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-  ctx.strokeStyle = ctx.fillStyle = "#ff3b30";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  points.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-  if (points.length === 4) ctx.closePath();
-  ctx.stroke();
-  points.forEach(([x, y], i) => {
-    ctx.fillRect(x - 3, y - 3, 7, 7);
-    ctx.font = "bold 16px system-ui";
-    ctx.fillText(String(i + 1), x + 6, y - 6);
+// One clickable image. width: fixed canvas width in stored pixels, or null to keep the image's own pixels.
+function picker(name, labels, width) {
+  const canvas = field(name), ctx = canvas.getContext("2d");
+  const state = { image: null, points: [] };
+  const draw = () => {
+    if (!state.image) return;
+    ctx.drawImage(state.image, 0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = ctx.fillStyle = "#ff3b30";
+    ctx.lineWidth = Math.max(2, canvas.width / 320);
+    ctx.font = `bold ${Math.max(16, canvas.width / 40)}px system-ui`;
+    const corners = state.points.slice(0, 4);
+    ctx.beginPath();
+    corners.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    if (corners.length === 4) ctx.closePath();
+    ctx.stroke();
+    state.points.forEach(([x, y], i) => { ctx.fillRect(x - 3, y - 3, 7, 7); ctx.fillText(labels[i], x + 6, y - 6); });
+    const next = labels[state.points.length];
+    field(name + "Status").textContent = next ? `Click point ${next}.` : "Done.";
+    render();
+  };
+  field(name + "File").addEventListener("change", event => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const img = new Image();
+    img.onload = () => {
+      state.image = img;
+      canvas.width = width || img.naturalWidth;
+      canvas.height = width ? Math.round(img.naturalHeight * width / img.naturalWidth / 2) * 2 : img.naturalHeight;
+      state.points = [];
+      draw();
+    };
+    img.onerror = () => { field(name + "Status").textContent = "Could not open that file as an image."; };
+    img.src = URL.createObjectURL(file);
   });
-  field("status").textContent = points.length < 4 ? `Click corner ${points.length + 1} of 4.` : "Done. Check the lengths, then download.";
-  render();
+  canvas.addEventListener("click", event => {
+    if (!state.image || state.points.length === labels.length) return;
+    const box = canvas.getBoundingClientRect();
+    state.points = [...state.points, [(event.clientX - box.left) * canvas.width / box.width,
+                                      (event.clientY - box.top) * canvas.height / box.height]];
+    draw();
+  });
+  field(name + "Undo").addEventListener("click", () => { state.points = state.points.slice(0, -1); draw(); });
+  return { state, canvas };
+}
+
+const frame = picker("frame", ["1", "2", "3", "4"], ANALYSIS_WIDTH);
+const map = picker("map", ["1", "2", "3", "4", "S1", "S2"], null);
+
+// Road metres for the four frame points, and a note saying where they came from; null until complete.
+function worldPoints() {
+  if (mode() === "tape") {
+    const w = parseFloat(field("w").value), h = parseFloat(field("h").value);
+    if (!(w > 0 && h > 0)) return null;
+    return { points: [[0, 0], [w, 0], [w, h], [0, h]], note: `Rectangle ${w} m x ${h} m measured on the road with a tape.` };
+  }
+  const p = map.state.points, bar = parseFloat(field("bar").value);
+  if (p.length !== 6 || !(bar > 0)) return null;
+  const barPx = Math.hypot(p[5][0] - p[4][0], p[5][1] - p[4][1]);
+  if (barPx < 5) return null;
+  const metresPerPx = bar / barPx;
+  return { points: p.slice(0, 4).map(([x, y]) => [+(x * metresPerPx).toFixed(3), +(y * metresPerPx).toFixed(3)]),
+           note: `Points matched to a satellite view; scale from its ${bar} m scale bar. Expect errors of a few percent.` };
 }
 
 function render() {
-  const w = parseFloat(field("w").value), h = parseFloat(field("h").value);
-  if (points.length !== 4 || !(w > 0 && h > 0)) { field("out").value = ""; return; }
+  const world = worldPoints();
+  if (frame.state.points.length !== 4 || !world) { field("out").value = ""; return; }
   const site = {
     name: field("name").value.trim() || "Unnamed site",
-    frame_size: [canvas.width, canvas.height],
+    frame_size: [frame.canvas.width, frame.canvas.height],
     marked_on: field("fromclip").checked ? "clip" : "raw video frame",
-    image_points: points.map(([x, y]) => [Math.round(x), Math.round(y)]),
-    world_points: [[0, 0], [w, 0], [w, h], [0, h]],
-    calibration_note: `Rectangle ${w} m x ${h} m marked on the road; lengths measured on site.`,
+    image_points: frame.state.points.map(([x, y]) => [Math.round(x), Math.round(y)]),
+    world_points: world.points,
+    calibration_note: world.note,
     person: "person",
     vehicles: field("vehicles").value.split(",").map(v => v.trim()).filter(Boolean),
     letter_language: field("lang").value.trim() || "English",
@@ -77,30 +144,12 @@ function render() {
   field("out").value = JSON.stringify(site, null, 1);
 }
 
-field("file").addEventListener("change", event => {
-  const file = event.target.files[0];
-  if (!file) return;
-  const img = new Image();
-  img.onload = () => {
-    image = img;
-    canvas.width = ANALYSIS_WIDTH;  // points are stored in analysis-clip pixels
-    canvas.height = Math.round(img.height * ANALYSIS_WIDTH / img.width / 2) * 2;
-    points = [];
-    draw();
-  };
-  img.onerror = () => { field("status").textContent = "Could not open that file as an image."; };
-  img.src = URL.createObjectURL(file);
-});
-
-canvas.addEventListener("click", event => {
-  if (!image || points.length === 4) return;
-  const box = canvas.getBoundingClientRect();
-  points = [...points, [(event.clientX - box.left) * canvas.width / box.width, (event.clientY - box.top) * canvas.height / box.height]];
-  draw();
-});
-
-field("undo").addEventListener("click", () => { points = points.slice(0, -1); draw(); });
-["w", "h", "name", "vehicles", "lang", "fromclip"].forEach(id => field(id).addEventListener("input", render));
+document.querySelectorAll("input[name=mode]").forEach(radio => radio.addEventListener("change", () => {
+  field("tapeInputs").hidden = mode() !== "tape";
+  field("mapInputs").hidden = mode() !== "map";
+  render();
+}));
+["w", "h", "bar", "name", "vehicles", "lang", "fromclip"].forEach(id => field(id).addEventListener("input", render));
 field("save").addEventListener("click", () => {
   if (!field("out").value) return;
   const link = document.createElement("a");
