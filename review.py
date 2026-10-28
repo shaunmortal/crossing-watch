@@ -17,11 +17,13 @@ TIMEOUT_S = 120
 CROP_FACTOR = 3     # crop this many box-sizes around the person
 MIN_CROP_PX = 80
 CROP_OUT_PX = 384   # upscaled so a small person is visible
-ROAD_USERS = {"child", "adult", "elderly", "wheelchair user", "cyclist", "not a person", "unclear"}
+ROAD_USERS = {"child", "adult", "elderly", "wheelchair user", "rider", "cyclist", "not a person", "unclear"}
+NOT_PEDESTRIANS = {"not a person", "rider", "cyclist"}  # riders are vehicles here, as bicycles are in SinD
 VIEWS = {False: "a traffic camera looking down at a street crossing at an angle",
          True: "a drone looking straight down on a street crossing; people look like small heads and shoulders from above"}
-PROMPT = ('Zoomed crop from {view}. Is the thing in the thin CYAN box a person (pedestrian)? Reply JSON only: '
-          '{{"cyan_is_a_person": true|false, "road_user": "child"|"adult"|"elderly"|"wheelchair user"|"cyclist"|'
+PROMPT = ('Zoomed crop from {view}. Is the thing in the thin CYAN box a pedestrian on foot? Someone riding or sitting '
+          'on a bicycle, motorcycle or scooter, or in a vehicle, is a "rider", not a pedestrian. Reply JSON only: '
+          '{{"cyan_is_a_pedestrian": true|false, "road_user": "child"|"adult"|"elderly"|"wheelchair user"|"rider"|'
           '"not a person"|"unclear", "reason": "<one sentence>"}}')
 
 
@@ -34,10 +36,10 @@ def read_verdict(text):
         data = json.loads(match[0])
     except json.JSONDecodeError:
         return None
-    if not isinstance(data, dict) or not isinstance(data.get("cyan_is_a_person"), bool) \
+    if not isinstance(data, dict) or not isinstance(data.get("cyan_is_a_pedestrian"), bool) \
             or data.get("road_user") not in ROAD_USERS:
         return None
-    is_person = data["cyan_is_a_person"] and data["road_user"] != "not a person"  # contradictions count as no
+    is_person = data["cyan_is_a_pedestrian"] and data["road_user"] not in NOT_PEDESTRIANS  # contradictions: no
     return {"is_person": is_person, "road_user": data["road_user"],
             "reason": str(data.get("reason", ""))[:200]}
 
