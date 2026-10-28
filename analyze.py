@@ -11,6 +11,7 @@ import statistics
 import subprocess
 from pathlib import Path
 
+import crowd
 import listen
 import render
 import review
@@ -26,6 +27,7 @@ OVERLAP_FRAMES = 20   # consecutive parts share 2 s, so someone crossing the cut
 TILE_OVERLAP = 0.15   # neighbouring person tiles share this much of the frame
 LINK_SHARE = 0.6      # two tracks are one object when, on shared frames, the smaller box lies this much inside the other
 SAM_USD_PER_1K_FRAMES = 0.20
+SAM_USD_PER_IMAGE_GUESS = 0.002  # crowd mode; Meta's per-image price was not found, this is a third-party rate
 MAX_COST_USD = 10.0  # above this estimate, --allow-cost is required
 PREP_FILTER = re.compile(r"^((crop|scale|transpose|hflip|vflip)(=[\w.*:+\-/]+)?)(,(crop|scale|transpose|hflip|vflip)(=[\w.*:+\-/]+)?)*$")
 
@@ -51,6 +53,8 @@ def load_site(path):
         raise SystemExit(f"{path}: zone_m must be [x_min, y_min, x_max, y_max] in metres")
     if "roadway_m" in site and not numeric_points(site["roadway_m"]):
         raise SystemExit(f"{path}: roadway_m must be a polygon of at least three [x, y] points in metres")
+    if site.get("person_mode", "video") not in ("video", "crowd"):
+        raise SystemExit(f"{path}: person_mode must be \"video\" or \"crowd\" (frame-by-frame detection for dense crowds)")
     if site.get("person_grid", 1) not in (1, 2, 3):
         raise SystemExit(f"{path}: person_grid must be 1, 2 or 3 (use 2 or 3 when more than ~16 people are in view)")
     if site.get("view", "oblique") not in ("oblique", "top-down"):
@@ -148,13 +152,14 @@ def tile_clip(piece, folder, rect, frame_size):
     return clip, sub
 
 
-def check_cost(pieces, plan, frame_size, total, allow):
+def check_cost(pieces, plan, frame_size, total, allow, images=0):
     """Refuse a surprise bill: estimate the SAM cost of the requests not already cached. `plan` is
-    [(concept, grid)]; each tile of each part is one request."""
+    [(concept, grid)]; each tile of each part is one request; `images` uncached crowd-mode image requests."""
     units = [(folder, rect, concept) for _, _, folder in pieces for concept, grid in plan for rect in tiles(frame_size, grid)]
     todo = sum(1 for folder, rect, concept in units if not sam.cache_path(tile_folder(folder, rect, frame_size), concept).exists())
-    usd = todo / len(units) * total * len(units) / len(pieces) / 1000 * SAM_USD_PER_1K_FRAMES
-    print(f"{total / FPS / 60:.1f} min of video, {len(pieces)} part(s), {len(units)} SAM request(s); "
+    usd = todo * total / len(pieces) / 1000 * SAM_USD_PER_1K_FRAMES + images * SAM_USD_PER_IMAGE_GUESS
+    print(f"{total / FPS / 60:.1f} min of video, {len(pieces)} part(s), {len(units)} SAM video request(s), "
+          f"{images} image request(s); "
           f"SAM cost about ${usd:.2f}", flush=True)
     if usd > MAX_COST_USD and not allow:
         raise SystemExit(f"estimated SAM cost ${usd:.2f} is over ${MAX_COST_USD:.0f}; re-run with --allow-cost")
@@ -303,9 +308,15 @@ def main():
     total = frame_count(clip)
     pieces = parts(clip, out_dir, total)
     person_concept, grid = site.get("person", "person"), site.get("person_grid", 1)
-    check_cost(pieces, [(person_concept, grid)] + [(c, 1) for c in site["vehicles"]], frame_size, total, args.allow_cost)
+    crowd_mode = site.get("person_mode") == "crowd"
+    crowd_dir = out_dir / f"crowd-{sam.cache_path(out_dir, person_concept).stem.split('.')[0]}"
+    step = max(1, round(FPS / crowd.CROWD_FPS))
+    images = sum(1 for f in range(0, total, step) if not (crowd_dir / f"{f:06d}.sam.txt").exists()) if crowd_mode else 0
+    video_plan = ([] if crowd_mode else [(person_concept, grid)]) + [(c, 1) for c in site["vehicles"]]
+    check_cost(pieces, video_plan, frame_size, total, args.allow_cost, images)
 
-    person_boxes = track_all(pieces, person_concept, key, frame_size, grid)
+    person_boxes = (crowd.track(clip, total, FPS, person_concept, key, crowd_dir) if crowd_mode
+                    else track_all(pieces, person_concept, key, frame_size, grid))
     vehicle_boxes = {f"{concept}#{vid}": t for concept in site["vehicles"]
                      for vid, t in track_all(pieces, concept, key, frame_size).items()}
     top_down = site.get("view") == "top-down"
