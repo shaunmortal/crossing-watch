@@ -81,6 +81,12 @@ to set it.
 
 - **Crowd mode over all 8 clips:** 29 of 36 conflicts found. Every miss is a threshold case, and 2 of the 11 false
   alarms are not.
+- **What the 2 real false alarms are** (both clip 09, checked frame by frame): one is a real person in yellow whom
+  the dataset stops tracking after 1.8 s while they keep walking along the kerb, so it may be a gap in the ground
+  truth. The other is a person standing still at the road edge for the whole clip; the dataset does not label them.
+  Dropping standing people would also drop a true conflict in clip 12, so they stay.
+- **ID fragmentation:** across the 8 clips the dataset's 301 pedestrians are followed by our tracks for 297 of them,
+  with a median of 1 track per pedestrian (at most 5).
 - **"At a threshold" defined:** a disagreement the other side also finds once each threshold is widened by about our
   measured error (speed ±1.5 km/h around the 10 km/h "moving" bar, gap +0.3 m, PET +0.3 s). For example, a car the
   dataset has at 8.6 km/h and we measured at 10.1 km/h.
@@ -96,7 +102,9 @@ The DUT data has no licence and was used only for internal testing; it is not in
 ## Limits, stated
 
 - A vehicle's lower box edge stands in for its footprint.
-- SAM 3.1 tracks up to 16 objects per frame per concept, so dense crowds are undercounted. The tool is for crossings, not crowds.
+- SAM 3.1 video tracking keeps up to 16 objects per frame per concept, so crowded sites need crowd mode, which costs
+  more (one image request per 0.2 s).
+- A person standing still on the carriageway when a car passes within 1 m is reported as a near-miss.
 - The death-risk curve is for adults (15+) hit by a car front; children are not covered by that study.
 - Distances are only as good as the measured calibration rectangle.
 - Box jitter alone gives a queued car an apparent speed of a few km/h. That is well under the 10 km/h "moving"

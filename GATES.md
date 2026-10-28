@@ -106,3 +106,7 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
   - Crowded DUT clips: 21 of 25 found (100% of non-threshold conflicts), 2 real false alarms.
   - Held-out clips: 8 of 11 found, 0 real false alarms.
   - The tracker rule (constant velocity, match within one body size) was set from physics before the held-out run.
+- Crowd-mode audit (cached data, no new API calls):
+  - The 2 real false alarms: a walker the dataset stops tracking after 1.8 s, and an unlabelled person standing at the road edge.
+  - Not filtering standing people: that would also remove a true conflict in clip 12.
+  - 297 of 301 dataset pedestrians followed; median 1 of our tracks per pedestrian, at most 5.
