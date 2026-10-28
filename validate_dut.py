@@ -126,7 +126,7 @@ def check_clip(repo, videos, clip, out, grid=1, mode="video"):
     pieces = analyze.parts(clip_file, clip_out, analyze.frame_count(clip_file))  # all cached by the run above
     our_people, our_vehicles = analyze.road_tracks(
         site, road.homography(site["image_points"], site["world_points"]),
-        (crowd.track(clip_file, analyze.frame_count(clip_file), analyze.FPS, "person", None, clip_out / "crowd-person")
+        (crowd.track(clip_file, analyze.frame_count(clip_file), analyze.FPS, "person", None, crowd.cache_dir(clip_out, "person"))
          if mode == "crowd" else analyze.track_all(pieces, "person", None, frame_size, site.get("person_grid", 1))),
         {f"car#{k}": t for k, t in analyze.track_all(pieces, "car", None, frame_size).items()}, frame_size)
     person_ids = identities(our_people, people, PERSON_ID_DIST_M)
@@ -134,7 +134,8 @@ def check_clip(repo, videos, clip, out, grid=1, mode="video"):
     pairs, missed, extra = match(truth, found, person_ids, vehicle_ids)
     missed_b, extra_b = boundary_flags(missed, extra, people, vehicles, our_people, our_vehicles, person_ids, vehicle_ids)
     return {"clip": clip, "truth": {"pedestrians": len(people), "conflicts": len(truth),
-                                    "serious": sum(e["tier"] == "serious" for e in truth)},
+                                    "serious": sum(e["tier"] == "serious" for e in truth),
+                                    "exposure": road.exposure(people, vehicles, analyze.FPS, analyze.frame_count(clip_file))},
             "pipeline": {"exposure": data.get("exposure"), "conflicts": len(found),
                          "serious": sum(e["tier"] == "serious" for e in found)},
             "matched": len(pairs), "missed": len(missed), "extra": len(extra),

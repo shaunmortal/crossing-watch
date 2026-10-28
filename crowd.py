@@ -123,7 +123,26 @@ def associate(detections, clip_fps):
     return tracks
 
 
+def filled(track):
+    """The track with a box on every frame between its samples, moved linearly: render blurs and boxes only the
+    frames that have one, so a gap would show a face."""
+    frames = sorted(track)
+    out = dict(track)
+    for f, g in zip(frames, frames[1:]):
+        for h in range(f + 1, g):
+            k = (h - f) / (g - f)
+            out[h] = [a + (b - a) * k for a, b in zip(track[f], track[g])]
+    return dict(sorted(out.items()))
+
+
+def cache_dir(out_dir, concept):
+    """Where crowd mode keeps its per-frame SAM replies for one concept."""
+    return out_dir / f"crowd-{sam.cache_path(out_dir, concept).stem.split('.')[0]}"
+
+
 def track(clip, total_frames, clip_fps, concept, api_key, cache_dir, sample_fps=CROWD_FPS):
-    """Pedestrian tracks for a crowded clip: SAM image detection every 1/sample_fps s, IDs from `associate`."""
+    """Pedestrian tracks for a crowded clip: SAM image detection every 1/sample_fps s, IDs from `associate`,
+    boxes filled in between samples."""
     step = max(1, round(clip_fps / sample_fps))
-    return associate(detect(clip, range(0, total_frames, step), concept, api_key, cache_dir, clip_fps), clip_fps)
+    tracks = associate(detect(clip, range(0, total_frames, step), concept, api_key, cache_dir, clip_fps), clip_fps)
+    return {tid: filled(t) for tid, t in tracks.items()}
