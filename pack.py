@@ -33,7 +33,7 @@ LETTER_MODEL = os.environ.get("LETTER_MODEL", "Muse Glimmer 30B")  # Glimmer; em
 WRITER = f"{LETTER_MODEL} (open weights, self-hosted)" if LETTER_URL else "Muse Spark"
 OPEN_MODEL_TIMEOUT_S = 900  # a 30B model on two T4s writes a letter in minutes, not seconds
 LETTER_TRIES = 3     # Spark gets this many tries at a letter whose every number was measured
-NUMBER = re.compile(r"\d+(?:\.\d+)?")
+NUMBER = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?")  # 1,200 is one number
 LETTER_PROMPT = """You help a school ask its road authority to make the crossing outside it safer.
 Below are measurements from a video of the crossing, made by Crossing Watch (SAM 3.1 tracking, road-plane geometry,
 post-encroachment time). Use ONLY these facts; never invent numbers, names, places or dates.
@@ -75,7 +75,7 @@ def facts(site, events, seen):
                    "road_user": (e.get("review") or {}).get("road_user", "not reviewed")} for e in worst],
         "risk_source": "Rosén & Sander 2009, adults 15+, car fronts",
         "engineering": engineering_lines(seen, None),
-    }, indent=1)
+    }, indent=1, ensure_ascii=False)  # \u escapes would add digits the number check counts as measured
 
 
 
@@ -132,8 +132,9 @@ def limit_note(full):
 
 def unmeasured(text, facts_text):
     """Numbers in `text` that appear nowhere in the measured facts: a letter to an authority must not invent any."""
-    known = {float(n) for n in NUMBER.findall(facts_text)}
-    return sorted({n for n in NUMBER.findall(text) if float(n) not in known}, key=float)
+    value = lambda n: float(n.replace(",", ""))
+    known = {value(n) for n in NUMBER.findall(facts_text)}
+    return sorted({n for n in NUMBER.findall(text) if value(n) not in known}, key=value)
 
 
 def ask_plan(prompt, facts_text, api_key, photo=None, tries=LETTER_TRIES):
@@ -375,10 +376,9 @@ def main():
             photo = None
         try:
             key = optional_key()
-            measured = facts(site, events, seen)
-            plan = ask_plan(LETTER_PROMPT.format(facts=measured, language=site.get("letter_language", "English")),
-                            measured, key, photo)
-            if photo and key:  # Muse Image draws the fix; without a key the page shows the photo only
+            prompt = LETTER_PROMPT.format(facts=facts(site, events, seen), language=site.get("letter_language", "English"))
+            plan = ask_plan(prompt, prompt, key, photo)  # numbers anywhere in the prompt (e.g. "SAM 3.1") are given
+            if photo and key:  # Muse Image draws the fix; without a key there is no street image on the page
                 images = (photo.name, draw_fix(photo, plan["image_prompt"], key, out_dir / "street-fixed.jpg").name)
         except (SystemExit, OSError, ValueError, KeyError, IndexError, TypeError, AttributeError,
                 http.client.HTTPException, subprocess.CalledProcessError) as err:
