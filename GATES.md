@@ -123,3 +123,6 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
   cost called a Meta price; child and non-car events showed the adult car-front risk without a caveat; pedestrian
   count includes pavement walkers when no carriageway is marked (stated).
 - DUT re-run after both changes (`validate_dut.py ... --mode crowd --out out/dut-15s`): 29 of 36 found, 3 real false alarms (was 2).
+- Vehicle crowd mode: DUT 35 of 36 (4 real false alarms); dense Indian clip coverage 6 -> 20 vehicles a frame. Found and
+  fixed on the way: one-frame pedestrian fragments (543 -> 83 events) and riders accepted as pedestrians by Spark
+  (83 -> 18 after review). Speed on that clip is untestable (guessed calibration); G2 on real footage still pending.

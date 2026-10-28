@@ -85,6 +85,14 @@ to set it.
 - **Crowd mode over all 8 clips:** 29 of 36 conflicts found. Every miss is a threshold case, and 2 of the 11 false
   alarms are not. Re-run with 15-second SAM parts and filled crowd boxes: still 29 of 36, all misses at a threshold,
   and 3 of 11 false alarms not at a threshold (one event in clip 10 moved from matched to extra).
+- **Vehicles in crowd mode too** (`"vehicle_mode": "crowd"`, for dense traffic that fills SAM's 16 objects): 35 of 36
+  found, the one miss at a threshold; 19 false alarms, 15 of them at a threshold. Car speed error: median 0.9 km/h,
+  at most 3.5 km/h (0.3 and 2.0 with SAM video). Pedestrian pieces shorter than 1 s are dropped and Spark now calls
+  people on motorcycles and bicycles riders; neither changed any DUT result.
+- **Dense Indian intersection** (42 s, no ground truth, calibration guessed): SAM video saw on average 1.6 people and
+  6 vehicles a frame, crowd mode 14.9 people and 20 vehicles. Before the two fixes above it reported 543 serious
+  near-misses, nearly all one-frame track fragments and riders; after them, 18 events survive Spark's review (6
+  serious). Speeds there are not trustworthy (up to 88 km/h) because nothing was measured on that road.
 - **What the 2 real false alarms are** (both clip 09, checked frame by frame): one is a real person in yellow whom
   the dataset stops tracking after 1.8 s while they keep walking along the kerb, so it may be a gap in the ground
   truth. The other is a person standing still at the road edge for the whole clip; the dataset does not label them.
