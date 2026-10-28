@@ -13,7 +13,7 @@ hit, instead of waiting for crash statistics.
 
 | Step | Model or method | File |
 |---|---|---|
-| Track every pedestrian and vehicle through the video | **SAM 3.1** (one concept per request: person, car, motorcycle, auto rickshaw...) | `sam.py` |
+| Track every pedestrian and vehicle through the video | **SAM 3.1** (one concept per request: person, car, motorcycle, auto rickshaw...); in crowds, SAM image detection 5 times a second plus our tracker | `sam.py`, `crowd.py` |
 | Pixels to metres on the road | 4-point homography from a rectangle marked on the road | `road.py`, `calibrate.html` |
 | Clean the tracks | Drop riders inside vehicle boxes, split tracks where the ID jumps, ignore static objects, cut-off boxes and teleport speeds | `road.py` |
 | Near-miss | Post-encroachment time (PET) under 1.5 s, within 1 m, vehicle over 10 km/h | `road.py` |
@@ -60,28 +60,36 @@ This checks the measurement layer on true positions.
 ### End to end, against ground truth (DUT)
 
 `validate_dut.py` runs the whole pipeline (SAM 3.1, metres, near-misses, Muse Spark) on 8 drone clips of a campus
-crosswalk full of students (DUT dataset, top-down view, 11 to 58 people in view). It then matches each of our
+crosswalk full of students (DUT dataset, top-down view, 11 to 113 people per clip). It then matches each of our
 conflicts to the dataset's own tracked people and cars by identity: same person, same car.
 
-| | True conflicts | Found | Missed | False alarms |
-|---|---|---|---|---|
-| Whole frame (`person_grid` 1) | 36 | 14 | 22 (4 at a threshold) | 0 |
-| 2 x 2 tiles (`person_grid` 2) | 36 | 19 | 17 (5 at a threshold) | 12 (8 at a threshold) |
+SAM 3.1 tracks at most 16 objects per frame in a video, but on a single image it returns every match (71 people on
+one crowded frame). So **crowd mode** (`"person_mode": "crowd"`) has SAM detect people on images 5 times a second.
+`crowd.py` then keeps their IDs with a small tracker: constant-velocity prediction, a match within one body size,
+and a 1 s grace period for people hidden behind others.
 
-Leaving out threshold cases, the 2 x 2 tiles find 19 of 31 true conflicts (61%), and 19 of 23 of our events are
-true (83%). The whole frame finds 14 of 32 (44%) with no false alarms.
+| Clips | People per clip | Mode | True conflicts | Found | Missed (at a threshold) | False alarms (at a threshold) |
+|---|---|---|---|---|---|---|
+| 04 09 10 12 (crowded) | 24–113 | video, whole frame | 25 | 7 | 18 (2) | 0 (0) |
+| | | video, 2 x 2 tiles | 25 | 10 | 15 (3) | 11 (7) |
+| | | **crowd mode** | 25 | **21** | 4 (4) | 10 (8) |
+| 15 01 03 16 (held out) | 11–21 | video, whole frame | 11 | 7 | 4 (2) | 0 (0) |
+| | | **crowd mode** | 11 | 8 | 3 (3) | 1 (1) |
 
+The crowd tracker rule was fixed once from walking speed versus body size. The four held-out clips were not used
+to set it.
+
+- **Crowd mode over all 8 clips:** 29 of 36 conflicts found. Every miss is a threshold case, and 2 of the 11 false
+  alarms are not.
 - **"At a threshold" defined:** a disagreement the other side also finds once each threshold is widened by about our
   measured error (speed ±1.5 km/h around the 10 km/h "moving" bar, gap +0.3 m, PET +0.3 s). For example, a car the
   dataset has at 8.6 km/h and we measured at 10.1 km/h.
-- **Crowds are the limit.** SAM 3.1 returns at most 16 objects per frame and request, so clips with 50+ people in view
-  lose most conflicts on the whole frame. Tiling (`person_grid` 2 or 3) helps; the 4 remaining false alarms are in
-  the two most crowded clips.
 - **Accuracy on matched events:** speed is usually within 1 km/h (2 km/h at worst). PET is within about 1 s.
-- **Spark review:** it now judges a zoomed crop of each person's clearest frame. A full-frame snapshot had rejected
-  real students who were a few pixels wide.
+- **Spark review:** it judges a zoomed crop of each person's clearest frame. A full-frame snapshot had rejected real
+  students who were a few pixels wide.
 - **Caveats:** this is still a small sample. The true conflicts assume a 4.6 x 1.8 m car (DUT gives only centre and
-  heading). The view is top-down, not a phone at an angle.
+  heading). The view is top-down, not a phone at an angle. Meta's per-image price was not found; cost estimates
+  use $0.002 per image.
 
 The DUT data has no licence and was used only for internal testing; it is not included.
 

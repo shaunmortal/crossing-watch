@@ -102,3 +102,7 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
   - Excluding threshold cases, tiles give 61% recall and 83% precision.
   - Crowds (50+ in view) remain the weak spot.
 - Parts now overlap by 2 s and IDs are joined across cuts; crowded frames can be tiled (`person_grid`). Tests cover both.
+- **Crowd mode** (`person_mode: crowd`, SAM image detection plus our tracker):
+  - Crowded DUT clips: 21 of 25 found (100% of non-threshold conflicts), 2 real false alarms.
+  - Held-out clips: 8 of 11 found, 0 real false alarms.
+  - The tracker rule (constant velocity, match within one body size) was set from physics before the held-out run.
