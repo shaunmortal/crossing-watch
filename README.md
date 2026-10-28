@@ -48,7 +48,8 @@ estimated first, and a run over $10 needs `--allow-cost`.
 Set `LETTER_MODEL_URL` to any OpenAI-compatible server and the fix and letter come from that model instead of Muse
 Spark, with the same number check. `<removed-run-record>` runs Meta's official 4-bit **Muse Glimmer 30B**
 (`meta-models/Muse-Glimmer-30B-GGUF`, Apache 2.0) with llama.cpp on Kaggle's free 2 x T4, shows it the blurred
-street photo, and writes the evidence page. Everything after SAM can then run on hardware the school controls.
+street photo, and writes the evidence page. Status: tested against a stand-in local server only; not yet run
+end to end with Glimmer.
 `sample/` is a synthetic example (made-up tracks, no video) for trying the letter step anywhere.
 
 ```
