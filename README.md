@@ -49,9 +49,10 @@ estimated first, and a run over $10 needs `--allow-cost`.
 Set `LETTER_MODEL_URL` to any OpenAI-compatible server and the fix and letter come from that model instead of Muse
 Spark, with the same number check. `<removed-run-record>` runs Meta's official 4-bit **Muse Glimmer 30B**
 (`meta-models/Muse-Glimmer-30B-GGUF`, Apache 2.0) with llama.cpp on Kaggle's free 2 x T4, shows it the blurred
-street photo, and writes the evidence page. Run end to end on Kaggle's 2 x T4 with the synthetic sample: Glimmer
-proposed a raised zebra crossing and wrote a letter whose every number passed the code check, in 627 s (Muse
-Spark: about 20 s). Its letter was correct but stiff, so Muse Spark stays the default writer.
+street photo when there is one, and writes the evidence page. Run end to end twice on Kaggle's 2 x T4 with the
+synthetic sample: both times Glimmer proposed a raised zebra crossing and wrote a letter whose every number passed
+the code check, in 627 s and 592 s (Muse Spark: about 20 s). The committed run's log and Glimmer's text are in
+[`<removed-run-record>`](<removed-run-record>). Its letter was correct but stiff, so Muse Spark stays the default writer.
 `sample/` is a synthetic example (made-up tracks, no video) for trying the letter step anywhere.
 
 ```
