@@ -11,7 +11,7 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 
 **Scope cut if G3 fails:** report the closest approach in metres plus vehicle speed (no PET). The evidence pack and letter still ship.
 
-**Known limits (stated, not hidden):** a vehicle's lower box edge stands in for its footprint; up to 16 objects per frame per concept; one concept per SAM request; calibration lengths on the news clip are assumed.
+**Known limits (stated, not hidden):** a vehicle's lower box edge stands in for its footprint; up to 16 objects per SAM video request (found later: in all, not per frame); one concept per SAM request; calibration lengths on the news clip are assumed.
 
 ## Status (Wed 28 Oct, evening, written by the agent)
 
@@ -56,7 +56,7 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 - Both test clips now report 0 near-misses from geometry alone. The pole's long still stretch is dropped before Spark sees it.
 - New:
   - head blur in evidence clips and the street photo;
-  - long videos in 5-minute SAM parts with a cost guard;
+  - long videos in SAM parts with a cost guard (5 minutes then; 15 s since the 16-object finding);
   - Muse Wonder ear-witness (`listen.py`). On the user's college clip it heard brakes at 14.5–15.4 s on two separate calls, and a spectrogram shows tonal squeal energy at 1.75–3.75 s into that window. Corroborated, not ground truth.
 - 25 self-checks pass.
 - Added after the judge-side critique (JUDGE_REPORT.md):
@@ -110,3 +110,16 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
   - The 2 real false alarms: a walker the dataset stops tracking after 1.8 s, and an unlabelled person standing at the road edge.
   - Not filtering standing people: that would also remove a true conflict in clip 12.
   - 297 of 301 dataset pedestrians followed; median 1 of our tracks per pedestrian, at most 5.
+- Engineering numbers (PV², gaps where people crossed), checked against DUT ground truth with the same definitions:
+  vehicles right on 8 of 8 clips, 6 s gap count right on 7 of 8, pedestrian count 1.3x too high (stated on the page).
+  The first version measured gaps in the calibration rectangle; on the kids clip that is one lane, so no car ever
+  entered it. Gaps are now timed where pedestrians actually crossed.
+- SAM 3.1's 16-object limit is per video request, not per frame (54 cached replies: none above 16, no new ID after
+  16). Parts cut from 5 min to 15 s; on the kids clip 2 of 8 requests still fill, on the dense Indian clip all 12.
+  Full requests are counted and the page says counts are a minimum.
+- Fourth review (3 reviewers, each finding checked by a skeptic), 10 confirmed and fixed: crowd-mode clips left heads
+  unblurred on every other frame (boxes now filled between samples); PV² and rates used minutes rounded to 0.1;
+  gap rate per minute read backwards for empty roads (now share of time); crowd-mode street photo missing; image
+  cost called a Meta price; child and non-car events showed the adult car-front risk without a caveat; pedestrian
+  count includes pavement walkers when no carriageway is marked (stated).
+- DUT re-run after both changes (`validate_dut.py ... --mode crowd --out out/dut-15s`): 29 of 36 found, 3 real false alarms (was 2).

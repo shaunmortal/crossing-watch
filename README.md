@@ -18,9 +18,10 @@ hit, instead of waiting for crash statistics.
 | Clean the tracks | Drop riders inside vehicle boxes, split tracks where the ID jumps, ignore static objects, cut-off boxes and teleport speeds | `road.py` |
 | Near-miss | Post-encroachment time (PET) under 1.5 s, within 1 m, vehicle over 10 km/h | `road.py` |
 | Severity | Adult death risk at that speed, Rosén & Sander (2009); replay under 30 and 20 km/h limits | `road.py` |
+| Numbers road engineers use | Pedestrians and vehicles an hour, PV² (IRC:103-2012), 85th-percentile speed, and gaps in traffic of 6 s and 12 s where people actually crossed (UK Traffic Signs Manual ch. 6) | `road.py`, `pack.py` |
 | Second look | **Muse Spark** checks each clip: is that a person, and who (child, elderly, wheelchair user...) | `review.py` |
 | Ear witness | **Muse Wonder** listens to the original audio around each near-miss for horns, screeching brakes and shouts | `listen.py` |
-| Evidence clips | ffmpeg, pedestrian boxed cyan, vehicle red, every person's head blurred so clips of children can be shared | `render.py` |
+| Evidence clips | ffmpeg, pedestrian boxed cyan, vehicle red, every tracked person's head blurred on every frame so clips of children can be shared | `render.py` |
 | Fix and letter | **Muse Spark** picks a physical fix and writes the letter from the measurements only; **Muse Image** draws the fix onto the real street | `pack.py` |
 
 ## Run
@@ -35,8 +36,10 @@ python3 test_cw.py                       # self-checks
 ```
 
 SAM replies are cached per output folder, so re-running costs nothing. An output folder refuses a different video.
-Long recordings (for example an hour of a school's CCTV) are sent to SAM in 5-minute parts that overlap by
-2 s, so a person crossing a cut keeps one ID. For crowds, set `"person_grid": 2` in the site file: people are
+Videos are sent to SAM in 15-second parts that overlap by 2 s, so a person crossing a cut keeps one ID. Parts are
+short because one SAM 3.1 video request tracks at most 16 objects **in all**: once 16 IDs are taken, later arrivals
+are never picked up (none of 54 replies had more, and none gained an ID after filling). Any request that still hits
+the limit is counted, and the page says its counts are a minimum. For crowds, set `"person_grid": 2` in the site file: people are
 tracked in 4 overlapping tiles (SAM returns at most 16 objects per request) and joined where the tiles meet. The SAM cost is
 estimated first, and a run over $10 needs `--allow-cost`.
 
@@ -63,7 +66,7 @@ This checks the measurement layer on true positions.
 crosswalk full of students (DUT dataset, top-down view, 11 to 113 people per clip). It then matches each of our
 conflicts to the dataset's own tracked people and cars by identity: same person, same car.
 
-SAM 3.1 tracks at most 16 objects per frame in a video, but on a single image it returns every match (71 people on
+SAM 3.1 tracks at most 16 objects per video request, but on a single image it returns every match (71 people on
 one crowded frame). So **crowd mode** (`"person_mode": "crowd"`) has SAM detect people on images 5 times a second.
 `crowd.py` then keeps their IDs with a small tracker: constant-velocity prediction, a match within one body size,
 and a 1 s grace period for people hidden behind others.
@@ -80,7 +83,8 @@ The crowd tracker rule was fixed once from walking speed versus body size. The f
 to set it.
 
 - **Crowd mode over all 8 clips:** 29 of 36 conflicts found. Every miss is a threshold case, and 2 of the 11 false
-  alarms are not.
+  alarms are not. Re-run with 15-second SAM parts and filled crowd boxes: still 29 of 36, all misses at a threshold,
+  and 3 of 11 false alarms not at a threshold (one event in clip 10 moved from matched to extra).
 - **What the 2 real false alarms are** (both clip 09, checked frame by frame): one is a real person in yellow whom
   the dataset stops tracking after 1.8 s while they keep walking along the kerb, so it may be a gap in the ground
   truth. The other is a person standing still at the road edge for the whole clip; the dataset does not label them.
@@ -97,16 +101,28 @@ to set it.
   heading). The view is top-down, not a phone at an angle. Meta's per-image price was not found; cost estimates
   use $0.002 per image.
 
+- **Engineering numbers against ground truth** (same definitions applied to the dataset's own tracks):
+  - Moving vehicles counted: right on 8 of 8 clips.
+  - Gaps of 6 s or more where people crossed: right on 7 of 8; the other has the car at 10.1 km/h, on the threshold.
+  - Longest gap: within 0.5 s on 6 of 8.
+  - Pedestrian crossings: ours run high, 374 against 280 (1.3x), because a broken track counts a person twice. PV²
+    scales with this count, so the page says so.
+
 The DUT data has no licence and was used only for internal testing; it is not included.
 
 ## Limits, stated
 
 - A vehicle's lower box edge stands in for its footprint.
-- SAM 3.1 video tracking keeps up to 16 objects per frame per concept, so crowded sites need crowd mode, which costs
-  more (one image request per 0.2 s).
+- SAM 3.1 video tracking keeps at most 16 objects per request, so crowded sites need crowd mode, which costs more
+  (one image request per 0.2 s). Dense traffic fills even a 15-second part: on our Indian intersection clip every
+  vehicle concept hit the limit within 2 s, so there vehicle counts are a minimum. People SAM did not track are also
+  not blurred.
 - A person standing still on the carriageway when a car passes within 1 m is reported as a near-miss.
 - The death-risk curve is for adults (15+) hit by a car front; children are not covered by that study.
 - Distances are only as good as the measured calibration rectangle.
+- Rates per hour from a short video are scaled, not a peak-hour count; the page says so next to PV².
+- SAM video tracking at 10 frames a second costs about $0.20 per 1,000 frames per concept, so an hour with four
+  concepts is roughly $25-30. The page prints the estimate for each video.
 - Box jitter alone gives a queued car an apparent speed of a few km/h. That is well under the 10 km/h "moving"
   threshold, so it does not create events, but very slow vehicles are not measured precisely.
 
@@ -114,6 +130,8 @@ The DUT data has no licence and was used only for internal testing; it is not in
 
 - Rosén E, Sander U (2009). Pedestrian fatality risk as a function of car impact speed. *Accident Analysis & Prevention* 41(3):536–542. doi:10.1016/j.aap.2009.02.002
 - Allen BL, Shin BT, Cooper PJ (1978). Analysis of traffic conflicts and collisions. *Transportation Research Record* 667:67–74. (post-encroachment time)
+- Indian Roads Congress, IRC:103-2012, Guidelines for Pedestrian Facilities, clause 6.7.4.1.2 (PV²).
+- UK Department for Transport (2019), Traffic Signs Manual chapter 6, section 13.5 (gaps in traffic).
 - Tefft BC (2013). Impact speed and a pedestrian's risk of severe injury or death. *Accident Analysis & Prevention* 50:871–878. doi:10.1016/j.aap.2012.07.022 (checked; higher risks than Rosén & Sander, which we use to avoid overstating)
 
 ## Declarations

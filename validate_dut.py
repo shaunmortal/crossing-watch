@@ -155,8 +155,9 @@ def main():
     parser.add_argument("clips", nargs="+")
     parser.add_argument("--grid", type=int, default=1, help="person_grid: tile crowded frames for SAM")
     parser.add_argument("--mode", choices=("video", "crowd"), default="video", help="person_mode")
+    parser.add_argument("--out", type=Path, default=Path("out/dut"), help="output folder")
     args = parser.parse_args()
-    out = Path("out/dut")
+    out = args.out
     out.mkdir(parents=True, exist_ok=True)
     results = [check_clip(args.repo, args.videos, clip, out, args.grid, args.mode) for clip in args.clips]
     (out / "validation.json").write_text(json.dumps(results, indent=1))
