@@ -1,0 +1,346 @@
+"""Road-plane geometry for Crossing Watch: image pixels to metres on the road, and near-misses between
+pedestrians and moving vehicles measured as post-encroachment time (PET).
+
+Map frame: metres on the road surface, set by four calibration points the user marks on the video.
+"""
+import math
+import statistics
+
+CONFLICT_RADIUS_M = 1.0   # a vehicle edge this close to where a pedestrian stood counts as the same spot
+PET_MAX_S = 1.5           # traffic-conflict studies treat PET under ~1.5 s as a serious conflict
+CLOSE_PASS_S = 3.0        # 1.5-3 s is reported as a "close pass": never let a short video read as "safe"
+MIN_CROSSING_M = 2.0      # a pedestrian piece that moves this far counts as one crossing (exposure)
+MOVING_MPS = 10 / 3.6     # slower than this the vehicle is parked, queued or creeping, not a serious threat
+SPEED_WINDOW_S = 1.0
+STATIC_SPREAD_M = 0.75    # a "pedestrian" that stays this close to one spot is a pole, sign or someone waiting
+STATIC_WINDOW_S = 3.0     # stillness is judged per window of this length
+STILL_RUN_S = 15.0        # still this long in one spot: a pole, sign or someone waiting; those frames are dropped
+MAX_GAP_FRAMES = 5        # across longer tracking gaps, judge a jump as if it happened within this many frames
+MAX_PLAUSIBLE_MPS = 120 / 3.6  # faster than this at a crossing is a tracking or geometry glitch, not a car
+ZONE_MARGIN_M = 10.0      # analyse only this far around the calibration points; far pixels blow up into huge metres
+BORDER_PX = 1             # a box touching the frame edge is cut off, so its lower edge is not the vehicle's
+MIN_SPEED_STEPS = 3       # a speed needs this many frame-to-frame steps in its window; one jump is noise
+RIDER_OVERLAP = 0.6       # a "person" box this much inside a vehicle box is its rider or driver, not a pedestrian
+RIDER_FEET_PX = 3         # ...if their feet are not below the vehicle's (a pedestrian in front has lower feet)
+MAX_WALK_MPS = 10.0       # faster than a sprint: the track's ID has jumped to someone (or something) else
+GRID_M = 2.0              # spatial index cell; any size >= 0 gives the same answers, this one is fast
+SPEED_LIMITS_KMH = (30, 20)  # replayed "what if this street had a limit" scenarios
+# Both favour the driver, so replayed impact speeds are not understated: 1.5 s is a typical perception-reaction
+# time for an unexpected hazard (road design uses 2.5 s), 7 m/s^2 is hard braking on dry asphalt.
+REACTION_S = 1.5
+BRAKING_MPS2 = 7.0
+# Rosén & Sander 2009, Accid Anal Prev 41(3):536-542, Eq. 2: P(death) = 1 / (1 + exp(6.9 - 0.090 v)), v in km/h.
+# Adults 15+ hit by a car front (German GIDAS data); the lower of the two curves we checked (Tefft 2013 is higher),
+# so risks are not overstated. Children are not covered by the study.
+DEATH_RISK_INTERCEPT = 6.9
+DEATH_RISK_PER_KMH = 0.090
+
+
+def solve(rows, rhs):
+    """Solve a small square linear system by Gauss-Jordan elimination with partial pivoting."""
+    n = len(rhs)
+    m = [row[:] + [rhs[i]] for i, row in enumerate(rows)]
+    for col in range(n):
+        pivot = max(range(col, n), key=lambda r: abs(m[r][col]))
+        if abs(m[pivot][col]) < 1e-12:
+            raise ValueError("calibration points must not lie on one line")
+        m[col], m[pivot] = m[pivot], m[col]
+        for r in range(n):
+            if r != col:
+                f = m[r][col] / m[col][col]
+                m[r] = [a - f * c for a, c in zip(m[r], m[col])]
+    return [m[i][n] / m[i][i] for i in range(n)]
+
+
+def homography(image_points, world_points):
+    """3x3 matrix taking image (x, y) to road (x, y) metres, from four point pairs."""
+    rows, rhs = [], []
+    for (x, y), (u, v) in zip(image_points, world_points):
+        rows += [[x, y, 1, 0, 0, 0, -u * x, -u * y], [0, 0, 0, x, y, 1, -v * x, -v * y]]
+        rhs += [u, v]
+    h = solve(rows, rhs) + [1.0]
+    # Scale is free; pick the sign that puts the calibration points on the visible side of the horizon (w > 0).
+    x, y = image_points[0]
+    sign = 1.0 if h[6] * x + h[7] * y + h[8] > 0 else -1.0
+    H = [[sign * v for v in h[i:i + 3]] for i in (0, 3, 6)]
+    for (x, y), want in zip(image_points, world_points):
+        got = to_ground(H, x, y)
+        if got is None or math.dist(got, want) > 1e-3:
+            raise ValueError("calibration points are out of order: list them going round the area in one direction")
+    return H
+
+
+def to_ground(H, x, y):
+    """Road point under image pixel (x, y), or None when the pixel is at or above the horizon."""
+    w = H[2][0] * x + H[2][1] * y + H[2][2]
+    if w <= 0:
+        return None
+    return ((H[0][0] * x + H[0][1] * y + H[0][2]) / w, (H[1][0] * x + H[1][1] * y + H[1][2]) / w)
+
+
+def zone_around(world_points, margin=ZONE_MARGIN_M):
+    """(x_min, y_min, x_max, y_max) in road metres: the calibration area plus a margin."""
+    xs, ys = [p[0] for p in world_points], [p[1] for p in world_points]
+    return (min(xs) - margin, min(ys) - margin, max(xs) + margin, max(ys) + margin)
+
+
+def in_zone(p, zone):
+    return p is not None and (zone is None or (zone[0] <= p[0] <= zone[2] and zone[1] <= p[1] <= zone[3]))
+
+
+def in_polygon(p, polygon):
+    """Even-odd rule point-in-polygon test, polygon as [[x, y], ...] in road metres."""
+    inside = False
+    for (x1, y1), (x2, y2) in zip(polygon, polygon[1:] + polygon[:1]):
+        if (y1 > p[1]) != (y2 > p[1]) and p[0] < x1 + (p[1] - y1) * (x2 - x1) / (y2 - y1):
+            inside = not inside
+    return inside
+
+
+def inside_share(inner, outer):
+    """Fraction of box `inner` covered by box `outer` (pixels)."""
+    w = max(0.0, min(inner[2], outer[2]) - max(inner[0], outer[0]))
+    h = max(0.0, min(inner[3], outer[3]) - max(inner[1], outer[1]))
+    return w * h / ((inner[2] - inner[0]) * (inner[3] - inner[1]))
+
+
+def without_riders(person_track, vehicle_tracks, share=RIDER_OVERLAP):
+    """The person track minus frames where the box sits inside some vehicle's box with the feet no lower than the
+    vehicle's: a rider or driver. Someone crossing in front of a bus overlaps it too, but stands lower in the frame."""
+    return {f: b for f, b in person_track.items()
+            if not any(f in v and inside_share(b, v[f]) >= share and b[3] <= v[f][3] + RIDER_FEET_PX
+                       for v in vehicle_tracks)}
+
+
+def person_points(track, H, zone=None, roadway=None, frame_size=None, top_down=False):
+    """frame -> road point under a pedestrian's feet (bottom centre of the box; the box centre when the camera looks
+    straight down), inside the zone and, when the site marks the carriageway, on it (people waiting on the pavement
+    are not in a vehicle's path). Boxes cut off at the bottom of the frame are skipped: their feet are out of view."""
+    feet = {f: to_ground(H, (b[0] + b[2]) / 2, (b[1] + b[3]) / 2 if top_down else b[3]) for f, b in track.items()
+            if not (frame_size and (b[3] >= frame_size[1] - 1 - BORDER_PX or (top_down and b[1] <= BORDER_PX)))}
+    return {f: p for f, p in feet.items() if in_zone(p, zone) and (roadway is None or in_polygon(p, roadway))}
+
+
+def split_at_jumps(feet, fps, max_mps=MAX_WALK_MPS):
+    """A pedestrian track cut wherever it moves faster than anyone can, i.e. where SAM moved the ID to another
+    object; each piece is then judged on its own."""
+    pieces, current, last = [], {}, None
+    for f in sorted(feet):
+        if last is not None and math.dist(feet[last], feet[f]) * fps / min(f - last, MAX_GAP_FRAMES) > max_mps:
+            pieces.append(current)
+            current = {}
+        current[f] = feet[f]
+        last = f
+    return [p for p in pieces + [current] if p]
+
+
+def median_point(points):
+    return (statistics.median(p[0] for p in points), statistics.median(p[1] for p in points))
+
+
+def moving_frames(feet, fps, spread_m=STATIC_SPREAD_M, window_s=STATIC_WINDOW_S, still_run_s=STILL_RUN_S):
+    """The track minus its long still stretches: runs of consecutive windows, `still_run_s` or longer in total,
+    where 90% of the points stay within `spread_m` of the window's median spot. SAM sometimes tracks a pole as a
+    person, and a pedestrian waiting at the kerb is in no vehicle's path; a person who then crosses keeps the
+    crossing frames, and short pauses are kept."""
+    # ponytail: also drops someone standing still in the road for 15 s or more; revisit if that case matters
+    size = max(1, round(window_s * fps))
+    windows = {}
+    for f in sorted(feet):
+        windows.setdefault(f // size, []).append(f)
+
+    def still(frames):
+        if len(frames) < size // 2:
+            return False
+        centre = median_point([feet[f] for f in frames])
+        spread = sorted(math.dist(centre, feet[f]) for f in frames)
+        return spread[int(0.9 * (len(spread) - 1))] < spread_m
+
+    dropped, run = set(), []
+    for w in sorted(windows) + [None]:  # None closes the last run
+        if w is not None and still(windows[w]) and (not run or w == run[-1] + 1):
+            run.append(w)
+            continue
+        if len(run) * window_s >= still_run_s:
+            dropped.update(f for r in run for f in windows[r])
+        run = [w] if w is not None and still(windows[w]) else []
+    return {f: p for f, p in feet.items() if f not in dropped}
+
+
+def vehicle_edges(track, H, zone=None, frame_size=None, top_down=False):
+    """frame -> road shape of the vehicle inside the zone: the segment under its lower box edge, or, when the camera
+    looks straight down, the whole box (it is the footprint). Boxes cut off by the frame edge are skipped, since
+    their edge is the frame's, not the vehicle's."""
+    # ponytail: lower box edge only stands in for the footprint; use mask ground contact if misses show up
+    edges = {}
+    for f, b in track.items():
+        if frame_size and (b[0] <= BORDER_PX or b[2] >= frame_size[0] - 1 - BORDER_PX
+                           or b[3] >= frame_size[1] - 1 - BORDER_PX or (top_down and b[1] <= BORDER_PX)):
+            continue
+        corners = ((b[0], b[3]), (b[2], b[3])) + (((b[2], b[1]), (b[0], b[1])) if top_down else ())
+        shape = tuple(to_ground(H, x, y) for x, y in corners)
+        if all(in_zone(q, zone) for q in shape):
+            edges[f] = shape
+    return edges
+
+
+def segment_distance(p, a, b):
+    ax, ay = b[0] - a[0], b[1] - a[1]
+    length2 = ax * ax + ay * ay
+    t = 0.0 if length2 == 0 else max(0.0, min(1.0, ((p[0] - a[0]) * ax + (p[1] - a[1]) * ay) / length2))
+    return math.dist(p, (a[0] + t * ax, a[1] + t * ay))
+
+
+def footprint_distance(p, shape):
+    """Distance from p to a vehicle shape: a segment (its lower box edge) or a polygon (a full footprint, 0 inside)."""
+    if len(shape) > 2 and in_polygon(p, list(shape)):
+        return 0.0
+    sides = [shape] if len(shape) == 2 else list(zip(shape, shape[1:] + shape[:1]))
+    return min(segment_distance(p, a, b) for a, b in sides)
+
+
+def centroid(shape):
+    return (sum(q[0] for q in shape) / len(shape), sum(q[1] for q in shape) / len(shape))
+
+
+def speeds(edges, fps, window_s=SPEED_WINDOW_S):
+    """frame -> vehicle speed in m/s: the median step speed of the edge midpoint over about `window_s`.
+    Steps faster than MAX_PLAUSIBLE_MPS are SAM swapping the ID onto another vehicle, and are ignored."""
+    mid = {f: centroid(shape) for f, shape in edges.items()}
+    frames = sorted(mid)
+    steps, plausible = {}, set()
+    for f, g in zip(frames, frames[1:]):
+        mps = math.dist(mid[f], mid[g]) * fps / (g - f)
+        if mps <= MAX_PLAUSIBLE_MPS:
+            steps[f] = mps
+            plausible.update((f, g))
+    half = max(1, round(window_s * fps / 2))
+    out = {}
+    for f in plausible:  # a frame both of whose steps were teleports is on another vehicle: no speed
+        near = [steps[g] for g in range(f - half, f + half) if g in steps]
+        if len(near) >= MIN_SPEED_STEPS:
+            out[f] = statistics.median(near)
+    return out
+
+
+def impact_mps(speed_mps, distance_m, reaction_s=REACTION_S, braking=BRAKING_MPS2):
+    """Speed when reaching an obstacle `distance_m` ahead, after reacting and then braking hard."""
+    braking_m = max(0.0, distance_m - speed_mps * reaction_s)
+    return math.sqrt(max(0.0, speed_mps ** 2 - 2 * braking * braking_m))
+
+
+def death_risk(impact_kmh):
+    """Probability an adult pedestrian dies when hit by a car front at this speed (Rosén & Sander 2009)."""
+    if impact_kmh <= 0:
+        return 0.0
+    return 1 / (1 + math.exp(DEATH_RISK_INTERCEPT - DEATH_RISK_PER_KMH * impact_kmh))
+
+
+def with_limits(speed_mps, pet_s, limits_kmh=SPEED_LIMITS_KMH):
+    """Replay of the event under each speed limit: the same vehicle, at the same place when the pedestrian was on
+    the spot (speed * PET metres away), but no faster than the limit. Had the pedestrian still been there, how hard
+    would it have hit?"""
+    distance_m = speed_mps * pet_s
+    out = {}
+    for limit in limits_kmh:
+        hit_kmh = impact_mps(min(speed_mps, limit / 3.6), distance_m) * 3.6
+        out[str(limit)] = {"impact_kmh": round(hit_kmh, 1), "death_risk_pct": round(100 * death_risk(hit_kmh), 1)}
+    return out
+
+
+def build_index(vehicles, fps, radius, bucket, min_speed=MOVING_MPS):
+    """(index, speeds): (grid cell x, cell y, time bucket) -> [(frame, vehicle id)] for every moving vehicle frame,
+    registered in every cell its shape (grown by `radius`) touches; so a pedestrian point only checks nearby
+    vehicles at nearby times. Same answers as checking every pair, fast enough for hours of footage."""
+    index, speed_of = {}, {}
+    for vid, shapes in vehicles.items():
+        speed_of[vid] = speeds(shapes, fps)
+        for f, shape in shapes.items():
+            if speed_of[vid].get(f, 0.0) < min_speed:
+                continue
+            xs, ys = [q[0] for q in shape], [q[1] for q in shape]
+            for cx in range(math.floor((min(xs) - radius) / GRID_M), math.floor((max(xs) + radius) / GRID_M) + 1):
+                for cy in range(math.floor((min(ys) - radius) / GRID_M), math.floor((max(ys) + radius) / GRID_M) + 1):
+                    index.setdefault((cx, cy, f // bucket), []).append((f, vid))
+    return index, speed_of
+
+
+def best_passes(feet, vehicles, index, speed_of, fps, bucket, radius=CONFLICT_RADIUS_M, pet_max=PET_MAX_S):
+    """vehicle id -> the most dangerous moment between this pedestrian and that moving vehicle.
+
+    PET here: the time between the pedestrian standing on a spot and the moving vehicle passing within
+    `radius` of it (either order), strictly under `pet_max`. 0 s means both were there at once.
+    """
+    reach = round(pet_max * fps)
+    best = {}
+    for fp, p in feet.items():
+        cell = (math.floor(p[0] / GRID_M), math.floor(p[1] / GRID_M))
+        for b in range(fp // bucket - 1, fp // bucket + 2):
+            for fv, vid in index.get((*cell, b), ()):
+                frames = abs(fv - fp)
+                if frames >= reach:
+                    continue
+                gap = footprint_distance(p, vehicles[vid][fv])
+                if gap > radius:
+                    continue
+                if vid not in best or (frames, gap) < best[vid][0]:
+                    best[vid] = ((frames, gap), fp, fv, gap, speed_of[vid][fv])
+    return {vid: event_fields(b, fps) for vid, b in best.items()}
+
+
+def event_fields(best, fps):
+    (frames, _), fp, fv, gap, mps = best
+    # Same model as the limit replay: the vehicle was speed * PET metres away; under REACTION_S (every serious
+    # event) there is no time to brake, so the hit would be at full speed.
+    impact_kmh = impact_mps(mps, mps * frames / fps) * 3.6
+    return {"pet_s": frames / fps, "t_person_s": fp / fps, "t_vehicle_s": fv / fps,
+            "gap_m": round(gap, 2), "vehicle_kmh": round(mps * 3.6, 1), "impact_kmh": round(impact_kmh, 1),
+            "death_risk_pct": round(100 * death_risk(impact_kmh), 1), "with_limit": with_limits(mps, frames / fps)}
+
+
+def closest_pass(feet, edges, fps, radius=CONFLICT_RADIUS_M, pet_max=PET_MAX_S, min_speed=MOVING_MPS):
+    """The most dangerous moment between one pedestrian and one moving vehicle, or None."""
+    bucket = max(1, round(pet_max * fps))
+    index, speed_of = build_index({"v": edges}, fps, radius, bucket, min_speed)
+    return best_passes(feet, {"v": edges}, index, speed_of, fps, bucket, radius, pet_max).get("v")
+
+
+def conflicts(people, vehicles, fps, pet_max=CLOSE_PASS_S, radius=CONFLICT_RADIUS_M, min_speed=MOVING_MPS):
+    """All pedestrian-vehicle conflicts up to `pet_max`: serious ones (PET < PET_MAX_S) first, then close passes;
+    within each tier the highest death risk, then the lowest PET."""
+    bucket = max(1, round(pet_max * fps))
+    index, speed_of = build_index(vehicles, fps, radius, bucket, min_speed)
+    events = []
+    for pid, feet in people.items():
+        feet = moving_frames(feet, fps)
+        for vid, hit in best_passes(feet, vehicles, index, speed_of, fps, bucket, radius, pet_max).items():
+            tier = "serious" if hit["pet_s"] < PET_MAX_S else "close pass"
+            events.append({"person": pid, "vehicle": vid, "tier": tier, **hit})
+    order = sorted(events, key=lambda e: (e["tier"] != "serious", -e["death_risk_pct"], e["pet_s"], e["gap_m"]))
+    seen = set()  # one event per real person and vehicle, even when the person's track was split into pieces
+    return [e for e in order if (key := (e["person"].split("/")[0], e["vehicle"])) not in seen and not seen.add(key)]
+
+
+def percentile(values, share):
+    ordered = sorted(values)
+    return ordered[min(len(ordered) - 1, int(share * len(ordered)))] if ordered else None
+
+
+def exposure(people, vehicles, fps, frames):
+    """How much was watched, so a short or quiet video is never read as "safe": crossings (people, counted once
+    per tracked id however many pieces it was split into), moving vehicles, minutes, and the 85th-percentile
+    vehicle speed, each vehicle's speed taken while it was actually moving (the speed traffic engineers quote)."""
+    crossers = set()
+    for pid, feet in people.items():
+        moving = moving_frames(feet, fps)
+        start = moving[min(moving)] if moving else None
+        if moving and max(math.dist(start, p) for p in moving.values()) >= MIN_CROSSING_M:
+            crossers.add(pid.split("/")[0])
+    vehicle_speeds = []
+    for edges in vehicles.values():
+        moving = [v for v in speeds(edges, fps).values() if v >= MOVING_MPS]
+        if len(moving) >= fps:  # at least a second of real movement
+            vehicle_speeds.append(statistics.median(moving))
+    p85 = percentile(vehicle_speeds, 0.85)
+    return {"minutes": round(frames / fps / 60, 1), "crossings": len(crossers), "vehicles": len(vehicle_speeds),
+            "speed_85th_kmh": round(p85 * 3.6, 1) if p85 else None}

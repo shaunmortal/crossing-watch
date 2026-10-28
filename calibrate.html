@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crossing Watch calibration</title>
+<style>
+:root { --bg: #fafaf7; --ink: #1d1d1b; --muted: #66665f; --line: #deded6; --accent: #c0392b; }
+@media (prefers-color-scheme: dark) { :root { --bg: #161614; --ink: #ecece6; --muted: #a3a39a; --line: #34342f; --accent: #ff6b5b; } }
+body { margin: 0 auto; max-width: 900px; padding: 24px 16px 64px; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, sans-serif; }
+canvas { width: 100%; border-radius: 6px; cursor: crosshair; touch-action: manipulation; }
+label { display: block; margin: 12px 0 4px; } input[type=number], input[type=text] { font: inherit; padding: 6px; width: 10em; }
+textarea { width: 100%; height: 14em; font: 13px ui-monospace, monospace; }
+.muted { color: var(--muted); } button { font: inherit; padding: 8px 14px; margin-right: 8px; }
+</style>
+</head>
+<body>
+<h1>Crossing Watch: mark the road</h1>
+<p class="muted">1. Take a full frame of the video itself, not a screenshot with player bars (for example
+<code>ffmpeg -i VIDEO -frames:v 1 frame.jpg</code>); the page scales it to the 640 px analysis size.
+2. Open it here. 3. Click four corners of a rectangle on the road surface whose sides you measured
+(for example the zebra crossing), going round it in one direction.</p>
+<input type="file" id="file" accept="image/*">
+<canvas id="canvas" width="640" height="360"></canvas>
+<p id="status" class="muted">Open a frame to begin.</p>
+<button id="undo">Undo point</button>
+<label>Length of side 1 → 2 (metres) <input type="number" id="w" min="0.5" step="0.1" value="3.5"></label>
+<label>Length of side 2 → 3 (metres) <input type="number" id="h" min="0.5" step="0.1" value="3.0"></label>
+<label>Site name <input type="text" id="name" value="My school gate" style="width: 20em"></label>
+<label>Vehicles to track (comma separated) <input type="text" id="vehicles" value="car, motorcycle, bus, auto rickshaw" style="width: 20em"></label>
+<label><input type="checkbox" id="fromclip"> This frame is from the prepared <code>out/NAME/clip.mp4</code>
+(needed when the site uses <code>prep_filter</code>)</label>
+<label>Letter language <input type="text" id="lang" value="English"></label>
+<h2>SITE.json</h2>
+<textarea id="out" readonly></textarea>
+<button id="save">Download SITE.json</button>
+<script>
+const ANALYSIS_WIDTH = 640;
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const field = id => document.getElementById(id);
+let image = null;
+let points = [];
+
+function draw() {
+  if (!image) return;
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = ctx.fillStyle = "#ff3b30";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  points.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  if (points.length === 4) ctx.closePath();
+  ctx.stroke();
+  points.forEach(([x, y], i) => {
+    ctx.fillRect(x - 3, y - 3, 7, 7);
+    ctx.font = "bold 16px system-ui";
+    ctx.fillText(String(i + 1), x + 6, y - 6);
+  });
+  field("status").textContent = points.length < 4 ? `Click corner ${points.length + 1} of 4.` : "Done. Check the lengths, then download.";
+  render();
+}
+
+function render() {
+  const w = parseFloat(field("w").value), h = parseFloat(field("h").value);
+  if (points.length !== 4 || !(w > 0 && h > 0)) { field("out").value = ""; return; }
+  const site = {
+    name: field("name").value.trim() || "Unnamed site",
+    frame_size: [canvas.width, canvas.height],
+    marked_on: field("fromclip").checked ? "clip" : "raw video frame",
+    image_points: points.map(([x, y]) => [Math.round(x), Math.round(y)]),
+    world_points: [[0, 0], [w, 0], [w, h], [0, h]],
+    calibration_note: `Rectangle ${w} m x ${h} m marked on the road; lengths measured on site.`,
+    person: "person",
+    vehicles: field("vehicles").value.split(",").map(v => v.trim()).filter(Boolean),
+    letter_language: field("lang").value.trim() || "English",
+  };
+  field("out").value = JSON.stringify(site, null, 1);
+}
+
+field("file").addEventListener("change", event => {
+  const file = event.target.files[0];
+  if (!file) return;
+  const img = new Image();
+  img.onload = () => {
+    image = img;
+    canvas.width = ANALYSIS_WIDTH;  // points are stored in analysis-clip pixels
+    canvas.height = Math.round(img.height * ANALYSIS_WIDTH / img.width / 2) * 2;
+    points = [];
+    draw();
+  };
+  img.onerror = () => { field("status").textContent = "Could not open that file as an image."; };
+  img.src = URL.createObjectURL(file);
+});
+
+canvas.addEventListener("click", event => {
+  if (!image || points.length === 4) return;
+  const box = canvas.getBoundingClientRect();
+  points = [...points, [(event.clientX - box.left) * canvas.width / box.width, (event.clientY - box.top) * canvas.height / box.height]];
+  draw();
+});
+
+field("undo").addEventListener("click", () => { points = points.slice(0, -1); draw(); });
+["w", "h", "name", "vehicles", "lang", "fromclip"].forEach(id => field(id).addEventListener("input", render));
+field("save").addEventListener("click", () => {
+  if (!field("out").value) return;
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([field("out").value], { type: "application/json" }));
+  link.download = "site.json";
+  link.click();
+});
+</script>
+</body>
+</html>

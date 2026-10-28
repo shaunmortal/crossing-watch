@@ -1,0 +1,7 @@
+.env
+out/
+__pycache__/
+*.mp4
+test-videos/
+data/
+.DS_Store
