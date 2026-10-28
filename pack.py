@@ -9,6 +9,7 @@ import base64
 import html
 import http.client
 import json
+import os
 import re
 import subprocess
 import sys
@@ -27,6 +28,10 @@ IMAGE_MODEL = "muse-image-1.0"
 TIMEOUT_S = 300
 SHOWN_EVENTS = 5
 MIN_RATE_MINUTES = 15  # shortest video scaled to hourly rates (MUTCD Warrant 4 counts 15-minute periods)
+LETTER_URL = os.environ.get("LETTER_MODEL_URL", "")  # an OpenAI-compatible server, e.g. llama-server with Muse
+LETTER_MODEL = os.environ.get("LETTER_MODEL", "Muse Glimmer 30B")  # Glimmer; empty: Muse Spark writes the letter
+WRITER = f"{LETTER_MODEL} (open weights, self-hosted)" if LETTER_URL else "Muse Spark"
+OPEN_MODEL_TIMEOUT_S = 900  # a 30B model on two T4s writes a letter in minutes, not seconds
 LETTER_TRIES = 3     # Spark gets this many tries at a letter whose every number was measured
 NUMBER = re.compile(r"\d+(?:\.\d+)?")
 LETTER_PROMPT = """You help a school ask its road authority to make the crossing outside it safer.
@@ -131,14 +136,14 @@ def unmeasured(text, facts_text):
     return sorted({n for n in NUMBER.findall(text) if float(n) not in known}, key=float)
 
 
-def ask_spark(prompt, facts_text, api_key, tries=LETTER_TRIES):
-    """Spark's fix and letter, checked by code before use: an invalid reply, or a letter quoting a number that was
-    never measured, goes back to Spark with the reason (the check-then-retry pattern of Meta's legal-agent workshop).
+def ask_plan(prompt, facts_text, api_key, photo=None, tries=LETTER_TRIES):
+    """The model's fix and letter, checked by code before use: an invalid reply, or a letter quoting a number that
+    was never measured, goes back with the reason (the check-then-retry pattern of Meta's legal-agent workshop).
     If the last try still has unmeasured numbers, the letter is kept with them listed for a person to check."""
     note, plan, bad = "", None, []
     for attempt in range(tries):
         try:
-            plan = spark_plan(prompt + note, api_key)
+            plan = model_plan(prompt + note, api_key, photo)
         except ValueError as err:  # JSONDecodeError included
             if attempt == tries - 1 and plan is None:
                 raise
@@ -146,26 +151,48 @@ def ask_spark(prompt, facts_text, api_key, tries=LETTER_TRIES):
             continue
         bad = unmeasured(plan["letter"] + " " + plan["why"], facts_text)
         if not bad:
-            return plan
+            return {**plan, "writer": WRITER}
         note = (f"\n\nYour previous letter used numbers that are not in the measurements: {', '.join(bad)}. "
                 "Use only numbers given above.")
-    return {**plan, "unmeasured": bad}
+    return {**plan, "writer": WRITER, "unmeasured": bad}
 
 
-def spark_plan(prompt, api_key):
+def model_plan(prompt, api_key, photo=None):
+    """One reply from the letter model, Muse Spark or (with LETTER_MODEL_URL) an open-weights model, parsed into
+    the plan. The blurred street photo, when there is one, lets the model see the street it is fixing."""
+    image = "data:image/jpeg;base64," + base64.b64encode(photo.read_bytes()).decode() if photo else None
+    text = open_model_reply(prompt, image) if LETTER_URL else spark_reply(prompt, image, api_key)
+    match = re.search(r"\{.*\}", text, re.S)
+    plan = json.loads(match[0], strict=False) if match else {}  # a letter may hold raw newlines
+    if not isinstance(plan, dict) or not all(isinstance(plan.get(k), str) and plan[k].strip() for k in ("fix", "why", "image_prompt", "letter")):
+        raise ValueError(f"the plan is incomplete: {text[:200]!r}")
+    return plan
+
+
+def spark_reply(prompt, image, api_key):
+    if not api_key:
+        raise ValueError("no MODEL_API_KEY for Muse Spark (or set LETTER_MODEL_URL for an open-weights model)")
+    content = [{"type": "input_text", "text": prompt}] + ([{"type": "input_image", "image_url": image}] if image else [])
     body = json.dumps({"model": review.MODEL, "reasoning": {"effort": "low"}, "text": {"format": {"type": "json_object"}},
-                       "input": prompt}).encode()
+                       "input": [{"role": "user", "content": content}]}).encode()
     req = urllib.request.Request(sam.API_URL, data=body, headers={
         "Authorization": f"Bearer {api_key}", "Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=TIMEOUT_S) as response:
         reply = json.load(response)
-    text = "".join(c.get("text", "") for o in reply.get("output", []) if o.get("type") == "message"
+    return "".join(c.get("text", "") for o in reply.get("output", []) if o.get("type") == "message"
                    for c in o.get("content", []))
-    match = re.search(r"\{.*\}", text, re.S)
-    plan = json.loads(match[0], strict=False) if match else {}  # Spark's letter may hold raw newlines
-    if not isinstance(plan, dict) or not all(isinstance(plan.get(k), str) and plan[k].strip() for k in ("fix", "why", "image_prompt", "letter")):
-        raise ValueError(f"Spark's plan is incomplete: {text[:200]!r}")
-    return plan
+
+
+def open_model_reply(prompt, image):
+    """Chat completion from an OpenAI-compatible server, e.g. llama-server running Muse Glimmer 30B on a GPU."""
+    content = [{"type": "text", "text": prompt}] + ([{"type": "image_url", "image_url": {"url": image}}] if image else [])
+    body = json.dumps({"model": LETTER_MODEL, "messages": [{"role": "user", "content": content}],
+                       "response_format": {"type": "json_object"}}).encode()
+    req = urllib.request.Request(LETTER_URL.rstrip("/") + "/chat/completions", data=body,
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=OPEN_MODEL_TIMEOUT_S) as response:
+        reply = json.load(response)
+    return reply["choices"][0]["message"]["content"]
 
 
 def draw_fix(photo, instruction, api_key, out_path):
@@ -258,7 +285,9 @@ def letter_section(plan):
     paragraphs = "".join(f"<p>{html.escape(p)}</p>" for p in plan["letter"].split("\n") if p.strip())
     check = (f'<p class="note">Check before sending: these numbers are not in the measurements: '
              f'{html.escape(", ".join(plan["unmeasured"]))}.</p>' if plan.get("unmeasured") else "")
-    return f'<section><h2>Letter to the road authority</h2><div class="letter">{paragraphs}</div>{check}</section>'
+    writer = f'<p class="note">Fix and letter written by {html.escape(plan["writer"])}.</p>' if plan.get("writer") else ""
+    return (f'<section><h2>Letter to the road authority</h2>{writer}<div class="letter">{paragraphs}</div>{check}'
+            '</section>')
 
 
 STYLE = """
@@ -319,6 +348,14 @@ def clip_minutes(clip, fps):
     return int(frames) / fps / 60
 
 
+
+def optional_key():
+    """The Meta API key, or None: an open-weights letter model can run without one."""
+    try:
+        return sam.load_api_key()
+    except SystemExit:
+        return None
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("out_dir")
@@ -331,13 +368,18 @@ def main():
     plan, images = None, None
     if events:
         try:
-            key = sam.load_api_key()
-            measured = facts(site, events, seen)
-            plan = ask_spark(LETTER_PROMPT.format(facts=measured, language=site.get("letter_language", "English")),
-                             measured, key)
             photo = street_photo(out_dir / "clip.mp4", out_dir / "street.jpg", site.get("person", "person"),
                                  site.get("person_mode") == "crowd")
-            images = (photo.name, draw_fix(photo, plan["image_prompt"], key, out_dir / "street-fixed.jpg").name)
+        except (ValueError, OSError, subprocess.CalledProcessError) as err:
+            print(f"no street photo: {err}", file=sys.stderr)
+            photo = None
+        try:
+            key = optional_key()
+            measured = facts(site, events, seen)
+            plan = ask_plan(LETTER_PROMPT.format(facts=measured, language=site.get("letter_language", "English")),
+                            measured, key, photo)
+            if photo and key:  # Muse Image draws the fix; without a key the page shows the photo only
+                images = (photo.name, draw_fix(photo, plan["image_prompt"], key, out_dir / "street-fixed.jpg").name)
         except (SystemExit, OSError, ValueError, KeyError, IndexError, TypeError, AttributeError,
                 http.client.HTTPException, subprocess.CalledProcessError) as err:
             print(f"letter or fix image failed, page will show the measurements only: {err}", file=sys.stderr)

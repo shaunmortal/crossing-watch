@@ -1,4 +1,5 @@
 """Self-check for road geometry, PET and SAM parsing. Run: python3 test_cw.py"""
+import json
 import math
 
 import listen
@@ -426,15 +427,15 @@ def test_letters_quoting_unmeasured_numbers_go_back_to_spark():
     assert pack.unmeasured("PET 0.4 s at 27.3 km/h; a 20 km/h limit; 3 times this week", facts) == ["3"]
     good = {"fix": "speed table", "why": "cars at 27.3 km/h", "image_prompt": "add a speed table", "letter": "PET 0.4 s."}
     replies, prompts = [{**good, "letter": "It happened 12 times."}, good], []
-    old = pack.spark_plan
-    pack.spark_plan = lambda prompt, key: (prompts.append(prompt), replies.pop(0))[1]
+    old = pack.model_plan
+    pack.model_plan = lambda prompt, key, photo=None: (prompts.append(prompt), replies.pop(0))[1]
     try:
-        assert pack.ask_spark("PROMPT", facts, "key") == good
+        assert pack.ask_plan("PROMPT", facts, "key") == {**good, "writer": pack.WRITER}
         assert "12" in prompts[1] and "not in the measurements" in prompts[1]
         replies[:] = [{**good, "letter": "It happened 12 times."}] * pack.LETTER_TRIES
-        stubborn = pack.ask_spark("PROMPT", facts, "key")
+        stubborn = pack.ask_plan("PROMPT", facts, "key")
     finally:
-        pack.spark_plan = old
+        pack.model_plan = old
     assert stubborn["unmeasured"] == ["12"] and "12" in pack.letter_section(stubborn)
 
 
@@ -453,6 +454,45 @@ def test_pedestrian_pieces_shorter_than_a_second_are_dropped():
     walk = lambda frames: {f: [190, 100 + 5 * f, 210, 140 + 5 * f] for f in frames}  # 0.25 m a frame
     people, _ = analyze.road_tracks(site, H, {"a": walk(range(20)), "b": walk(range(5))}, {}, (400, 400))
     assert set(people) == {"a/0"}
+
+
+def test_open_weights_letter_writer_gets_the_prompt_and_street_photo():
+    """With LETTER_MODEL_URL set, the plan comes from an OpenAI-compatible server (llama-server running Muse Glimmer)."""
+    import tempfile, threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from pathlib import Path
+    seen = {}
+    plan = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "l"}
+
+    class Fake(BaseHTTPRequestHandler):
+        def do_POST(self):
+            seen["path"] = self.path
+            seen["body"] = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            reply = json.dumps({"choices": [{"message": {"content": json.dumps(plan)}}]}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(reply)
+
+        def log_message(self, *args):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), Fake)
+    threading.Thread(target=server.handle_request, daemon=True).start()
+    old = pack.LETTER_URL
+    pack.LETTER_URL = f"http://127.0.0.1:{server.server_port}/v1"
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            photo = Path(tmp) / "street.jpg"
+            photo.write_bytes(b"\xff\xd8jpeg")
+            assert pack.model_plan("PROMPT", None, photo) == plan
+    finally:
+        pack.LETTER_URL = old
+        server.server_close()
+    content = seen["body"]["messages"][0]["content"]
+    assert seen["path"] == "/v1/chat/completions" and seen["body"]["response_format"] == {"type": "json_object"}
+    assert content[0] == {"type": "text", "text": "PROMPT"} and content[1]["image_url"]["url"].startswith("data:image/jpeg")
+    assert "Muse Glimmer" in pack.letter_section({**plan, "writer": "Muse Glimmer 30B (open weights)"})
 
 def test_sam_text_parses_into_tracks():
     text = ("<0f>0<|box;x1=1.0;y1=2.0;x2=3.0;y2=4.0;w=640;h=360|><|mask...|>1<|box;x1=5;y1=6;x2=7;y2=8;w=640;h=360|>"
