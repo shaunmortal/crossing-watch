@@ -494,6 +494,51 @@ def test_open_weights_letter_writer_gets_the_prompt_and_street_photo():
     assert content[0] == {"type": "text", "text": "PROMPT"} and content[1]["image_url"]["url"].startswith("data:image/jpeg")
     assert "Muse Glimmer" in pack.letter_section({**plan, "writer": "Muse Glimmer 30B (open weights)"})
 
+
+def test_map_draws_each_event_where_it_happened():
+    import roadmap
+    walk = {f: (0.0, -3 + 0.15 * f) for f in range(40)}
+    path = roadmap.path_around(walk, 20, 10)
+    assert path[0] == [0.0, -3.0] and path[-1] == [0.0, 2.7] and len(path) == 20  # 2 s each side (to the track's end), every 2nd frame
+    events = [{"tier": "serious", "vehicle": "car#1", "vehicle_kmh": 30.0, "pet_s": 0.4, "where": [0.0, 0.0],
+               "path_person": path, "path_vehicle": [[-5.0, 0.0], [5.0, 0.0]]},
+              {"tier": "close pass", "vehicle": "bus#2", "vehicle_kmh": 20.0, "pet_s": 2.0, "where": [3.0, 1.0]},
+              {"tier": "serious", "vehicle": "car#3", "vehicle_kmh": 9.0, "pet_s": 1.0}]  # no position: left out
+    svg = roadmap.svg(events, [[-2, -2], [2, -2], [2, 2], [-2, 2]])
+    assert svg.count("<circle") == 2 and svg.count('class="hit"') == 1 and svg.count('class="near"') == 1
+    assert "#1" in svg and "#2" in svg and "car at 30.0 km/h" in svg and svg.count("<polyline") == 2
+    assert roadmap.svg([], [[0, 0], [1, 0], [1, 1], [0, 1]]) == ""
+
+
+def test_fast_two_wheelers_keep_one_track_in_vehicle_crowd_mode():
+    import crowd, analyze
+    site = {"person": "person", "vehicles": ["motorcycle"], "person_mode": "crowd", "vehicle_mode": "crowd"}
+    step = analyze.crowd_frames(site, "motorcycle", 60).step
+    bike = lambda f: [f * 40 / 3.6 * 2, 100, f * 40 / 3.6 * 2 + 40, 120]  # 2 m long (40 px), 40 km/h at 20 px/m
+    tracks = crowd.associate({f: [bike(f)] for f in range(0, 60, step)}, analyze.FPS)
+    assert len(tracks) == 1 and analyze.crowd_frames(site, "person", 60).step == 2
+
+
+def test_site_concepts_must_not_share_a_cache_name():
+    import analyze, tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "site.json"
+        path.write_text(json.dumps({"image_points": SQUARE_IMG, "world_points": SQUARE_ROAD,
+                                    "vehicles": ["auto rickshaw", "Auto-Rickshaw"]}))
+        try:
+            analyze.load_site(path)
+            raise AssertionError("duplicate concepts accepted")
+        except SystemExit as err:
+            assert "same cache name" in str(err)
+
+
+def test_number_check_reads_grouped_numbers_and_non_english_facts():
+    facts = json.dumps({"vehicles_per_hour": 1200, "site": "स्कूल गेट"}, ensure_ascii=False)
+    assert pack.unmeasured("1,200 vehicles an hour", facts) == []
+    assert pack.unmeasured("about 2,000 an hour", facts) == ["2,000"]
+    assert "0921" not in pack.facts({"name": "स्कूल"}, [], {"minutes": 1})  # no \\u escapes to hide digits in
+
 def test_sam_text_parses_into_tracks():
     text = ("<0f>0<|box;x1=1.0;y1=2.0;x2=3.0;y2=4.0;w=640;h=360|><|mask...|>1<|box;x1=5;y1=6;x2=7;y2=8;w=640;h=360|>"
             "<1f>0<|box;x1=1.5;y1=2.5;x2=3.5;y2=4.5;w=640;h=360|>")
