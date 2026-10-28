@@ -508,6 +508,8 @@ def test_map_draws_each_event_where_it_happened():
     assert svg.count("<circle") == 2 and svg.count('class="hit"') == 1 and svg.count('class="near"') == 1
     assert "#1" in svg and "#2" in svg and "car at 30.0 km/h" in svg and svg.count("<polyline") == 2
     assert roadmap.svg([], [[0, 0], [1, 0], [1, 1], [0, 1]]) == ""
+    site = {"world_points": [[-2, -2], [2, -2], [2, 2], [-2, 2]]}
+    assert "Where it happened" in pack.map_section(events, site) and pack.map_section(events[2:], site) == ""
 
 
 def test_fast_two_wheelers_keep_one_track_in_vehicle_crowd_mode():

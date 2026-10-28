@@ -20,6 +20,7 @@ from pathlib import Path
 import crowd
 import render
 import review
+import roadmap
 import road
 import sam
 
@@ -268,6 +269,16 @@ def heard_line(heard):
     return f'<p class="note">Heard (Muse Wonder): {", ".join(parts)}.</p>'
 
 
+
+def map_section(events, site):
+    drawn = roadmap.svg(events, site["world_points"], SHOWN_EVENTS)
+    if not drawn:
+        return ""
+    return (f"<section><h2>Where it happened</h2>{drawn}<p class=\"note\">Seen from above, in metres on the road "
+            "(grid every 5 m; dashed: the measured area). Blue: the pedestrian, red: the vehicle, 2 s either side. "
+            "Filled dots: serious near-misses; rings: close passes.</p></section>")
+
+
 def fix_section(plan, images):
     if not plan:
         return ""
@@ -333,12 +344,12 @@ def page(site, events, seen, plan, images, cost=None, full=None):
               f"{road.BRAKING_MPS2} m/s² braking. {site.get('calibration_note', '')}")
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Crossing Watch evidence</title>
-<style>{STYLE}</style></head><body>
+<style>{STYLE}{roadmap.STYLE}</style></head><body>
 <h1>Crossing Watch: near-miss evidence</h1>
 <p class="muted">{html.escape(site.get("name", ""))}</p>
 <div class="stats">{stats(events, seen)}</div>{limit_note(full)}
 {engineering(seen, cost)}
-<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{letter_section(plan)}
+{map_section(events, site)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{letter_section(plan)}
 <section><h2>How this was measured</h2><p class="note">{html.escape(method)}</p></section></body></html>"""
 
 

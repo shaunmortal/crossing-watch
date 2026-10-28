@@ -15,6 +15,7 @@ import crowd
 import listen
 import render
 import review
+import roadmap
 import road
 import sam
 
@@ -278,6 +279,19 @@ def road_tracks(site, H, person_boxes, vehicle_boxes, frame_size):
     return people, vehicles
 
 
+
+def placed(events, people, vehicles):
+    """The events with where each happened and both paths around the moment, in road metres, for the map."""
+    out = []
+    for e in events:
+        fp, fv = round(e["t_person_s"] * FPS), round(e["t_vehicle_s"] * FPS)
+        feet = people[e["person"]]
+        centres = {f: road.centroid(shape) for f, shape in vehicles[e["vehicle"]].items()}
+        out.append({**e, "where": [round(c, 1) for c in feet[fp]] if fp in feet else None,
+                    "path_person": roadmap.path_around(feet, fp, FPS), "path_vehicle": roadmap.path_around(centres, fv, FPS)})
+    return out
+
+
 def piece_boxes(person_boxes, people, pid):
     """SAM boxes of just the track piece `pid` ("<sam id>/<piece>") that made an event."""
     boxes = person_boxes[pid.split("/")[0]]
@@ -364,7 +378,7 @@ def main():
     vehicle_boxes = {f"{concept}#{vid}": t for concept in site["vehicles"] for vid, t in tracks_of(concept).items()}
     top_down = site.get("view") == "top-down"
     people, vehicles = road_tracks(site, H, person_boxes, vehicle_boxes, frame_size)
-    events = road.conflicts(people, vehicles, FPS)
+    events = placed(road.conflicts(people, vehicles, FPS), people, vehicles)
     seen = road.exposure(people, vehicles, FPS, total)
     full = full_requests(pieces, video_plan, frame_size)
     if full[0]:

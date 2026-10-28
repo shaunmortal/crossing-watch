@@ -21,6 +21,7 @@ hit, instead of waiting for crash statistics.
 | Numbers road engineers use | Pedestrians and vehicles an hour, PV² (IRC:103-2012), 85th-percentile speed, and gaps in traffic of 6 s and 12 s where people actually crossed (UK Traffic Signs Manual ch. 6) | `road.py`, `pack.py` |
 | Second look | **Muse Spark** checks each clip: is that a person, and who (child, elderly, wheelchair user...) | `review.py` |
 | Ear witness | **Muse Wonder** listens to the original audio around each near-miss for horns, screeching brakes and shouts | `listen.py` |
+| Where it happened | A bird's-eye map in road metres: each near-miss where it happened, with both paths 2 s either side | `roadmap.py` |
 | Evidence clips | ffmpeg, pedestrian boxed cyan, vehicle red, every tracked person's head blurred on every frame so clips of children can be shared | `render.py` |
 | Fix and letter | **Muse Spark** (JSON mode) picks a physical fix and writes the letter from the measurements only; code checks every number in the letter against the measurements and sends it back with the reason if one was never measured; **Muse Image** draws the fix onto the real street | `pack.py` |
 
