@@ -229,6 +229,20 @@ def test_long_videos_are_tracked_in_overlapping_parts_and_ids_joined():
     assert set(tracks) == {"0.0:0", "2.0:1"} and sorted(tracks["0.0:0"]) == list(range(15, 23))
 
 
+
+def test_sam_requests_that_hit_the_object_limit_are_counted():
+    import tempfile
+    from pathlib import Path
+    import analyze
+    box = "<|box;x1=1;y1=1;x2=5;y2=5;w=64;h=48|>"
+    with tempfile.TemporaryDirectory() as tmp:
+        a, b = Path(tmp) / "a", Path(tmp) / "b"
+        a.mkdir(), b.mkdir()
+        sam.cache_path(a, "car").write_text("<0f>" + "".join(f"{i}{box}" for i in range(sam.MAX_OBJECTS)))
+        sam.cache_path(b, "car").write_text("<0f>0" + box)
+        pieces = [(0, None, a), (130, None, b)]
+        assert analyze.full_requests(pieces, [("car", 1)], (64, 48)) == (1, 2)
+
 def test_crowds_are_tiled_and_cut_boxes_joined():
     import analyze
     assert analyze.tiles((640, 360), 1) == [(0, 0, 640, 360)]
@@ -263,10 +277,39 @@ def test_close_passes_and_exposure_never_read_as_safe():
     events = road.conflicts({"p": late}, {"car#1": car}, fps)
     assert events and events[0]["tier"] == "close pass" and 1.5 <= events[0]["pet_s"] < 3.0
     seen = road.exposure({"p": walking_across(40)}, {"car#1": edges_along_x(8.0, fps, frames)}, fps, 600)
-    assert seen == {"minutes": 1.0, "crossings": 1, "vehicles": 1, "speed_85th_kmh": 28.8}
+    assert {k: seen[k] for k in ("minutes", "crossings", "vehicles", "speed_85th_kmh")} == {
+        "minutes": 1.0, "crossings": 1, "vehicles": 1, "speed_85th_kmh": 28.8}
     tiles = pack.stats([], seen)
     assert "pedestrian crossings watched" in tiles and "85% of vehicles" in tiles and "conflicts per 100" in tiles
 
+
+
+def test_traffic_gaps_are_measured_where_people_crossed():
+    cells = road.crossing_cells({"p": walking_across(40)}, 10)  # the column of 2 m cells at x = 0..2
+    moving = edges_along_x(8.0, 10, 60)  # some point of it in those cells on frames 29-33
+    parked = {f: ((-1.0, 2.0), (1.0, 2.0)) for f in range(600)}
+    gaps = road.traffic_gaps({"car#1": moving, "car#2": parked}, 10, cells, 600)
+    assert [round(g, 1) for g in gaps] == [2.9, 56.6]
+    seen = road.exposure({"p": walking_across(40)}, {"car#1": moving}, 10, 600)
+    assert seen["gaps_6s"] == 1 and seen["gaps_12s"] == 1 and seen["longest_gap_s"] == 56.6
+    assert seen["gap_6s_share_pct"] == 94.3 and seen["duration_s"] == 60.0
+    assert "gaps_6s" not in road.exposure({}, {"car#1": moving}, 10, 600)  # nobody crossed: no crossing to time
+
+
+def test_pv2_and_engineering_numbers_say_when_they_are_scaled():
+    assert road.pv2(crossings=100, vehicles=500, minutes=30) == 2e8  # 200/h x 1000/h squared
+    seen = {"minutes": 30, "crossings": 100, "vehicles": 500, "gaps_6s": 4, "gaps_12s": 1, "longest_gap_s": 14.0,
+            "gap_6s_share_pct": 12.5}
+    text = pack.engineering(seen, {"sam_usd": 1.5})
+    assert "2.0 x 10^8" in text and "IRC:103-2012" in text and "scaled from 30 minutes" in text
+    assert "4 gaps" in text and "12.5% of the time" in text and "about $3.00 per hour" in text
+    plain = " ".join(pack.engineering_lines(seen, {"sam_usd": 1.5}))
+    assert "Meta's list price" in plain and "guessed" not in plain
+    short = pack.engineering_lines({"minutes": 0.2, "duration_s": 15.0, "crossings": 5, "vehicles": 20}, None)
+    assert "276.5 x 10^8" in short[0]  # from the exact 15 s, not the rounded 0.2 min
+    assert "guessed" in pack.engineering({"minutes": 10}, {"sam_usd": 7.2, "image_usd": 6.0})
+    assert pack.engineering({"minutes": 0}, None) == ""
+    assert "2 of 10" in pack.limit_note([2, 10]) and pack.limit_note([0, 10]) == pack.limit_note(None) == ""
 
 def brute_force_pet(feet, shapes, fps, pet_max):
     """Reference: every pedestrian frame against every vehicle frame, no index."""
@@ -357,6 +400,20 @@ def test_crowd_tracker_keeps_ids_through_a_short_gap_and_apart_from_neighbours()
     far = crowd.associate({0: [[0, 0, 10, 40]], 2: [[200, 0, 210, 40]]}, 10)
     assert len(far) == 2  # too far to be the same person
     assert abs(crowd.iou([0, 0, 10, 10], [5, 0, 15, 10]) - 1 / 3) < 1e-9
+    # every frame between samples gets a box, so evidence clips blur heads on all frames
+    assert crowd.filled({0: [0, 0, 10, 10], 2: [2, 0, 12, 10], 6: [6, 0, 16, 10]}) == {
+        0: [0, 0, 10, 10], 1: [1.0, 0.0, 11.0, 10.0], 2: [2, 0, 12, 10], 3: [3.0, 0.0, 13.0, 10.0],
+        4: [4.0, 0.0, 14.0, 10.0], 5: [5.0, 0.0, 15.0, 10.0], 6: [6, 0, 16, 10]}
+
+
+def test_event_cards_do_not_give_a_child_or_non_car_a_car_curve_risk_unqualified():
+    e = {"person": "p/0", "vehicle": "motorcycle#3", "tier": "serious", "pet_s": 0.5, "vehicle_kmh": 30.0,
+         "impact_kmh": 30.0, "death_risk_pct": 1.5, "t_person_s": 2.0, "gap_m": 0.5,
+         "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5}, "20": {"impact_kmh": 20.0, "death_risk_pct": 0.6}},
+         "review": {"is_person": True, "road_user": "child", "reason": ""}}
+    card = pack.event_card(1, e)
+    assert "not a child&#x27;s risk" in card and "car fronts" in card
+    assert "never state a death risk for a child" in pack.LETTER_PROMPT
 
 
 def test_sam_text_parses_into_tracks():
