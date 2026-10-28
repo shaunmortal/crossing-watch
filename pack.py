@@ -33,6 +33,17 @@ LETTER_URL = os.environ.get("LETTER_MODEL_URL", "")  # an OpenAI-compatible serv
 LETTER_MODEL = os.environ.get("LETTER_MODEL", "Muse Glimmer 30B")  # Glimmer; empty: Muse Spark writes the letter
 WRITER = f"{LETTER_MODEL} (open weights, self-hosted)" if LETTER_URL else "Muse Spark"
 OPEN_MODEL_TIMEOUT_S = 900  # a 30B model on two T4s writes a letter in minutes, not seconds
+JUDGE = "Muse Spark (a separate reviewer)"
+JUDGE_PROMPT = """You review a letter before a school sends it to its road authority. MEASUREMENTS are the only facts.
+List every problem: a claim or number the measurements do not support; saying a standard or warrant is met; a death
+risk stated for a child; blaming a named person. Tone, wording and the choice of fix are not problems.
+Reply JSON only: {{"problems": ["<one short sentence each>"]}}, with [] if there are none.
+
+MEASUREMENTS:
+{facts}
+
+LETTER:
+{letter}"""
 LETTER_TRIES = 3     # Spark gets this many tries at a letter whose every number was measured
 NUMBER = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?")  # 1,200 is one number
 LETTER_PROMPT = """You help a school ask its road authority to make the crossing outside it safer.
@@ -138,11 +149,12 @@ def unmeasured(text, facts_text):
     return sorted({n for n in NUMBER.findall(text) if value(n) not in known}, key=value)
 
 
-def ask_plan(prompt, facts_text, api_key, photo=None, tries=LETTER_TRIES):
-    """The model's fix and letter, checked by code before use: an invalid reply, or a letter quoting a number that
-    was never measured, goes back with the reason (the check-then-retry pattern of Meta's legal-agent workshop).
-    If the last try still has unmeasured numbers, the letter is kept with them listed for a person to check."""
-    note, plan, bad = "", None, []
+def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES):
+    """The model's fix and letter, verified before use in two layers (Meta's verifiable-agents workshop): code
+    checks that every number was measured, then Muse Spark as a separate reviewer (LLM as judge) lists claims the
+    measurements do not support. An invalid reply or either objection goes back with the reason; after the last try
+    the letter is kept with what remains listed for a person to check before sending."""
+    note, plan, bad, problems = "", None, [], []
     for attempt in range(tries):
         try:
             plan = model_plan(prompt + note, api_key, photo)
@@ -151,12 +163,33 @@ def ask_plan(prompt, facts_text, api_key, photo=None, tries=LETTER_TRIES):
                 raise
             note = f"\n\nYour previous output was invalid: {str(err)[:200]}. Reply with the JSON object only."
             continue
-        bad = unmeasured(plan["letter"] + " " + plan["why"], facts_text)
-        if not bad:
-            return {**plan, "writer": WRITER}
+        bad = unmeasured(plan["letter"] + " " + plan["why"], prompt + "\n" + measured)
+        problems = [] if bad or not api_key else judge_problems(plan["letter"], measured, api_key)
+        if not bad and not problems:
+            return {**plan, "writer": WRITER, **({"judged_by": JUDGE} if api_key else {})}
         note = (f"\n\nYour previous letter used numbers that are not in the measurements: {', '.join(bad)}. "
-                "Use only numbers given above.")
-    return {**plan, "writer": WRITER, "unmeasured": bad}
+                "Use only numbers given above." if bad else
+                "\n\nA reviewer found claims in your previous letter that the measurements do not support: "
+                + " ".join(problems) + " Fix them.")
+    return {**plan, "writer": WRITER, "unmeasured": bad, "unsupported": problems}
+
+
+def judge_problems(letter, measured, api_key):
+    """Muse Spark, as a reviewer separate from the writer, lists the letter's unsupported claims ([] if none). A
+    reply it cannot read counts as one problem, so a broken judge never passes a letter silently."""
+    problems = read_problems(spark_reply(JUDGE_PROMPT.format(facts=measured, letter=letter), None, api_key))
+    return ["The reviewer's reply could not be read."] if problems is None else problems
+
+
+def read_problems(text):
+    match = re.search(r"\{.*\}", text, re.S)
+    try:
+        data = json.loads(match[0]) if match else None
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict) or not isinstance(data.get("problems"), list):
+        return None
+    return [str(p)[:300] for p in data["problems"] if isinstance(p, str) and p.strip()]
 
 
 def model_plan(prompt, api_key, photo=None):
@@ -295,8 +328,12 @@ def letter_section(plan):
     if not plan:
         return ""
     paragraphs = "".join(f"<p>{html.escape(p)}</p>" for p in plan["letter"].split("\n") if p.strip())
-    check = (f'<p class="note">Check before sending: these numbers are not in the measurements: '
-             f'{html.escape(", ".join(plan["unmeasured"]))}.</p>' if plan.get("unmeasured") else "")
+    check = "".join(f'<p class="note">Check before sending: {html.escape(text)}</p>' for text in (
+        [f'these numbers are not in the measurements: {", ".join(plan["unmeasured"])}.'] if plan.get("unmeasured") else [])
+        + [f"the reviewer says: {p}" for p in plan.get("unsupported", [])])
+    checked = (f"Every number was checked against the measurements by code, and the claims by {plan['judged_by']}."
+               if plan.get("judged_by") else "Every number was checked against the measurements by code.")
+    check += f'<p class="note">{html.escape(checked)}</p>' if not plan.get("unmeasured") and not plan.get("unsupported") else ""
     writer = f'<p class="note">Fix and letter written by {html.escape(plan["writer"])}.</p>' if plan.get("writer") else ""
     return (f'<section><h2>Letter to the road authority</h2>{writer}<div class="letter">{paragraphs}</div>{check}'
             '</section>')
@@ -387,8 +424,9 @@ def main():
             photo = None
         try:
             key = optional_key()
-            prompt = LETTER_PROMPT.format(facts=facts(site, events, seen), language=site.get("letter_language", "English"))
-            plan = ask_plan(prompt, prompt, key, photo)  # numbers anywhere in the prompt (e.g. "SAM 3.1") are given
+            measured = facts(site, events, seen)
+            prompt = LETTER_PROMPT.format(facts=measured, language=site.get("letter_language", "English"))
+            plan = ask_plan(prompt, measured, key, photo)
             if photo and key:  # Muse Image draws the fix; without a key there is no street image on the page
                 images = (photo.name, draw_fix(photo, plan["image_prompt"], key, out_dir / "street-fixed.jpg").name)
         except (SystemExit, OSError, ValueError, KeyError, IndexError, TypeError, AttributeError,

@@ -427,16 +427,41 @@ def test_letters_quoting_unmeasured_numbers_go_back_to_spark():
     assert pack.unmeasured("PET 0.4 s at 27.3 km/h; a 20 km/h limit; 3 times this week", facts) == ["3"]
     good = {"fix": "speed table", "why": "cars at 27.3 km/h", "image_prompt": "add a speed table", "letter": "PET 0.4 s."}
     replies, prompts = [{**good, "letter": "It happened 12 times."}, good], []
-    old = pack.model_plan
+    old = pack.model_plan, pack.judge_problems
     pack.model_plan = lambda prompt, key, photo=None: (prompts.append(prompt), replies.pop(0))[1]
+    pack.judge_problems = lambda letter, measured, key: []
     try:
-        assert pack.ask_plan("PROMPT", facts, "key") == {**good, "writer": pack.WRITER}
+        assert pack.ask_plan("PROMPT", facts, "key") == {**good, "writer": pack.WRITER, "judged_by": pack.JUDGE}
         assert "12" in prompts[1] and "not in the measurements" in prompts[1]
         replies[:] = [{**good, "letter": "It happened 12 times."}] * pack.LETTER_TRIES
         stubborn = pack.ask_plan("PROMPT", facts, "key")
     finally:
-        pack.model_plan = old
+        pack.model_plan, pack.judge_problems = old
     assert stubborn["unmeasured"] == ["12"] and "12" in pack.letter_section(stubborn)
+
+
+def test_a_second_model_judges_the_letter_and_its_objections_go_back():
+    """The workshop's second layer: after the code check, Muse Spark as a separate reviewer (LLM as judge)."""
+    good = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "Cars passed close to children."}
+    bad = {**good, "letter": "This crossing meets the IRC warrant."}
+    replies, prompts, judged = [bad, good], [], []
+    def judge(letter, measured, key):
+        judged.append(letter)
+        return ["Says a warrant is met."] if "warrant" in letter else []
+    old = pack.model_plan, pack.judge_problems
+    pack.model_plan = lambda prompt, key, photo=None: (prompts.append(prompt), replies.pop(0))[1]
+    pack.judge_problems = judge
+    try:
+        plan = pack.ask_plan("PROMPT", "{}", "key")
+        assert plan["letter"] == good["letter"] and "Says a warrant is met." in prompts[1] and len(judged) == 2
+        replies[:] = [bad] * pack.LETTER_TRIES
+        stubborn = pack.ask_plan("PROMPT", "{}", "key")
+        assert stubborn["unsupported"] == ["Says a warrant is met."] and "warrant is met" in pack.letter_section(stubborn)
+        replies[:] = [good]
+        assert "judged_by" not in pack.ask_plan("PROMPT", "{}", None)  # no key: no judge, and the page says so
+    finally:
+        pack.model_plan, pack.judge_problems = old
+    assert pack.read_problems('{"problems": ["a", 3, ""]}') == ["a"] and pack.read_problems("nonsense") is None
 
 
 def test_crowd_mode_can_cover_people_vehicles_or_both():

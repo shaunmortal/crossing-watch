@@ -23,7 +23,7 @@ hit, instead of waiting for crash statistics.
 | Ear witness | **Muse Wonder** listens to the original audio around each near-miss for horns, screeching brakes and shouts | `listen.py` |
 | Where it happened | A bird's-eye map in road metres: each near-miss where it happened, with both paths 2 s either side | `roadmap.py` |
 | Evidence clips | ffmpeg, pedestrian boxed cyan, vehicle red, every tracked person's head blurred on every frame so clips of children can be shared | `render.py` |
-| Fix and letter | **Muse Spark** (JSON mode) picks a physical fix and writes the letter from the measurements only; code checks every number in the letter against the measurements and sends it back with the reason if one was never measured; **Muse Image** draws the fix onto the real street | `pack.py` |
+| Fix and letter | **Muse Spark** (JSON mode) picks a physical fix and writes the letter from the measurements only; verified in two layers before use: code checks every number against the measurements, then **Muse Spark as a separate reviewer** (LLM as judge) lists unsupported claims (a warrant said to be met, a death risk for a child); either objection sends the letter back with the reason, and after 3 tries what remains is shown for a person to check; **Muse Image** draws the fix onto the real street | `pack.py` |
 
 ## Run
 
