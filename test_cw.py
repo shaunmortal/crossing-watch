@@ -346,6 +346,19 @@ def test_review_three_fixes_hold():
             raise AssertionError("expected ValueError")
 
 
+def test_crowd_tracker_keeps_ids_through_a_short_gap_and_apart_from_neighbours():
+    import crowd
+    walker = lambda x0: {f: [x0 + 2 * f, 100, x0 + 2 * f + 20, 160] for f in range(0, 40, 2)}
+    a, b = walker(0), walker(200)
+    detections = {f: [box for box in (a.get(f), b.get(f)) if box] for f in range(0, 40, 2)}
+    detections[20] = [b[20]]  # a is hidden for one sample
+    tracks = crowd.associate(detections, 10)
+    assert len(tracks) == 2 and sorted(len(t) for t in tracks.values()) == [19, 20]
+    far = crowd.associate({0: [[0, 0, 10, 40]], 2: [[200, 0, 210, 40]]}, 10)
+    assert len(far) == 2  # too far to be the same person
+    assert abs(crowd.iou([0, 0, 10, 10], [5, 0, 15, 10]) - 1 / 3) < 1e-9
+
+
 def test_sam_text_parses_into_tracks():
     text = ("<0f>0<|box;x1=1.0;y1=2.0;x2=3.0;y2=4.0;w=640;h=360|><|mask...|>1<|box;x1=5;y1=6;x2=7;y2=8;w=640;h=360|>"
             "<1f>0<|box;x1=1.5;y1=2.5;x2=3.5;y2=4.5;w=640;h=360|>")
