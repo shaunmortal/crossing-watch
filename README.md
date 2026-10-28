@@ -43,6 +43,18 @@ the limit is counted, and the page says its counts are a minimum. For crowds, se
 tracked in 4 overlapping tiles (SAM returns at most 16 objects per request) and joined where the tiles meet. The SAM cost is
 estimated first, and a run over $10 needs `--allow-cost`.
 
+### Open weights: Muse Glimmer writes the letter
+
+Set `LETTER_MODEL_URL` to any OpenAI-compatible server and the fix and letter come from that model instead of Muse
+Spark, with the same number check. `<removed-run-record>` runs Meta's official 4-bit **Muse Glimmer 30B**
+(`meta-models/Muse-Glimmer-30B-GGUF`, Apache 2.0) with llama.cpp on Kaggle's free 2 x T4, shows it the blurred
+street photo, and writes the evidence page. Everything after SAM can then run on hardware the school controls.
+`sample/` is a synthetic example (made-up tracks, no video) for trying the letter step anywhere.
+
+```
+LETTER_MODEL_URL=http://127.0.0.1:8080/v1 python3 pack.py out/VIDEO site.json
+```
+
 ## Validation on ground-truth trajectories
 
 `validate_sind.py` runs the near-miss maths on the SinD public sample: 20 minutes of drone-measured trajectories in

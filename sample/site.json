@@ -1,0 +1,44 @@
+{
+ "name": "Synthetic example crossing (made-up tracks, no video)",
+ "image_points": [
+  [
+   0,
+   0
+  ],
+  [
+   1,
+   0
+  ],
+  [
+   1,
+   1
+  ],
+  [
+   0,
+   1
+  ]
+ ],
+ "world_points": [
+  [
+   0,
+   0
+  ],
+  [
+   1,
+   0
+  ],
+  [
+   1,
+   1
+  ],
+  [
+   0,
+   1
+  ]
+ ],
+ "person": "person",
+ "vehicles": [
+  "car"
+ ],
+ "letter_language": "English"
+}

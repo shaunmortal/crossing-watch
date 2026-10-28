@@ -5,3 +5,4 @@ __pycache__/
 test-videos/
 data/
 .DS_Store
+sample/index.html

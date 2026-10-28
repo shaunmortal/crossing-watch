@@ -1,0 +1,61 @@
+{
+ "site": "Synthetic example crossing (made-up tracks, no video)",
+ "fps": 10,
+ "exposure": {
+  "minutes": 2.0,
+  "duration_s": 120.0,
+  "crossings": 3,
+  "vehicles": 3,
+  "speed_85th_kmh": 45.0,
+  "gaps_6s": 4,
+  "gaps_12s": 4,
+  "longest_gap_s": 48.3,
+  "gap_6s_share_pct": 99.0
+ },
+ "events": [
+  {
+   "person": "p1/0",
+   "vehicle": "car#1",
+   "tier": "serious",
+   "pet_s": 0.0,
+   "t_person_s": 14.3,
+   "t_vehicle_s": 14.3,
+   "gap_m": 0.82,
+   "vehicle_kmh": 38.0,
+   "impact_kmh": 38.0,
+   "death_risk_pct": 3.0,
+   "with_limit": {
+    "30": {
+     "impact_kmh": 30.0,
+     "death_risk_pct": 1.5
+    },
+    "20": {
+     "impact_kmh": 20.0,
+     "death_risk_pct": 0.6
+    }
+   }
+  },
+  {
+   "person": "p2/0",
+   "vehicle": "car#2",
+   "tier": "serious",
+   "pet_s": 0.0,
+   "t_person_s": 43.8,
+   "t_vehicle_s": 43.8,
+   "gap_m": 0.39,
+   "vehicle_kmh": 29.0,
+   "impact_kmh": 29.0,
+   "death_risk_pct": 1.4,
+   "with_limit": {
+    "30": {
+     "impact_kmh": 29.0,
+     "death_risk_pct": 1.4
+    },
+    "20": {
+     "impact_kmh": 20.0,
+     "death_risk_pct": 0.6
+    }
+   }
+  }
+ ]
+}
