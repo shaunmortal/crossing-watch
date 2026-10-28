@@ -22,6 +22,7 @@ BORDER_PX = 1             # a box touching the frame edge is cut off, so its low
 MIN_SPEED_STEPS = 3       # a speed needs this many frame-to-frame steps in its window; one jump is noise
 RIDER_OVERLAP = 0.6       # a "person" box this much inside a vehicle box is its rider or driver, not a pedestrian
 RIDER_FEET_PX = 3         # ...if their feet are not below the vehicle's (a pedestrian in front has lower feet)
+MIN_PIECE_S = 1.0         # a pedestrian piece shorter than this has no trustworthy path or timing
 MAX_WALK_MPS = 10.0       # faster than a sprint: the track's ID has jumped to someone (or something) else
 GRID_M = 2.0              # spatial index cell; any size >= 0 gives the same answers, this one is fast
 GAP_ADULT_S = 6.0         # UK Traffic Signs Manual ch. 6, 13.5.2: an acceptable gap is 4-6 s at urban speeds...
