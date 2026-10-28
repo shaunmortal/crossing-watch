@@ -22,7 +22,7 @@ EVIDENCE_CLIPS = 5
 MAX_REVIEWS = 40  # Spark looks at no more pedestrians than this per run
 FPS = 10
 WIDTH = 640
-CHUNK_FRAMES = 3_000  # 5 min per SAM request (SAM 3.1 takes up to 15,000 frames; smaller keeps uploads modest)
+CHUNK_FRAMES = 150    # 15 s per SAM request: one request tracks at most sam.MAX_OBJECTS objects in all
 OVERLAP_FRAMES = 20   # consecutive parts share 2 s, so someone crossing the cut keeps one ID
 TILE_OVERLAP = 0.15   # neighbouring person tiles share this much of the frame
 LINK_SHARE = 0.6      # two tracks are one object when, on shared frames, the smaller box lies this much inside the other
@@ -152,18 +152,31 @@ def tile_clip(piece, folder, rect, frame_size):
     return clip, sub
 
 
-def check_cost(pieces, plan, frame_size, total, allow, images=0):
+def check_cost(pieces, plan, frame_size, total, allow, images=0, all_images=0):
     """Refuse a surprise bill: estimate the SAM cost of the requests not already cached. `plan` is
-    [(concept, grid)]; each tile of each part is one request; `images` uncached crowd-mode image requests."""
+    [(concept, grid)]; each tile of each part is one request; `images` uncached crowd-mode image requests out of
+    `all_images`. Returns the estimated cost of the whole video, cached or not."""
     units = [(folder, rect, concept) for _, _, folder in pieces for concept, grid in plan for rect in tiles(frame_size, grid)]
     todo = sum(1 for folder, rect, concept in units if not sam.cache_path(tile_folder(folder, rect, frame_size), concept).exists())
-    usd = todo * total / len(pieces) / 1000 * SAM_USD_PER_1K_FRAMES + images * SAM_USD_PER_IMAGE_GUESS
+    def usd_for(requests, image_requests):
+        return requests * total / len(pieces) / 1000 * SAM_USD_PER_1K_FRAMES + image_requests * SAM_USD_PER_IMAGE_GUESS
+    usd = usd_for(todo, images)
     print(f"{total / FPS / 60:.1f} min of video, {len(pieces)} part(s), {len(units)} SAM video request(s), "
           f"{images} image request(s); "
           f"SAM cost about ${usd:.2f}", flush=True)
     if usd > MAX_COST_USD and not allow:
         raise SystemExit(f"estimated SAM cost ${usd:.2f} is over ${MAX_COST_USD:.0f}; re-run with --allow-cost")
+    return usd_for(len(units), all_images)
 
+
+
+def full_requests(pieces, plan, frame_size):
+    """(requests that hit SAM's object limit, all requests) among the cached replies: in a full one, people or
+    vehicles that arrived later were not tracked."""
+    replies = [sam.cache_path(tile_folder(folder, rect, frame_size), concept)
+               for _, _, folder in pieces for concept, grid in plan for rect in tiles(frame_size, grid)]
+    found = [len(sam.parse(r.read_text())) for r in replies if r.exists()]
+    return sum(n >= sam.MAX_OBJECTS for n in found), len(found)
 
 def box_area(b):
     return (b[2] - b[0]) * (b[3] - b[1])
@@ -217,8 +230,10 @@ def probe(path, entries, *extra):
                            "-of", "csv=p=0", str(path)], check=True, capture_output=True, text=True).stdout.strip()
 
 
-def write_events(out_dir, site, events, seen):
+def write_events(out_dir, site, events, seen, cost, full):
     (out_dir / "events.json").write_text(json.dumps({"site": site.get("name", ""), "fps": FPS, "exposure": seen,
+                                                     "cost": cost,
+                                                     "sam_full_requests": full,
                                                      "events": events}, indent=1))
 
 
@@ -309,11 +324,13 @@ def main():
     pieces = parts(clip, out_dir, total)
     person_concept, grid = site.get("person", "person"), site.get("person_grid", 1)
     crowd_mode = site.get("person_mode") == "crowd"
-    crowd_dir = out_dir / f"crowd-{sam.cache_path(out_dir, person_concept).stem.split('.')[0]}"
+    crowd_dir = crowd.cache_dir(out_dir, person_concept)
     step = max(1, round(FPS / crowd.CROWD_FPS))
-    images = sum(1 for f in range(0, total, step) if not (crowd_dir / f"{f:06d}.sam.txt").exists()) if crowd_mode else 0
+    sampled = range(0, total, step) if crowd_mode else range(0)
+    images = sum(1 for f in sampled if not (crowd_dir / f"{f:06d}.sam.txt").exists())
     video_plan = ([] if crowd_mode else [(person_concept, grid)]) + [(c, 1) for c in site["vehicles"]]
-    check_cost(pieces, video_plan, frame_size, total, args.allow_cost, images)
+    cost = {"sam_usd": round(check_cost(pieces, video_plan, frame_size, total, args.allow_cost, images, len(sampled)), 2),
+            "image_usd": round(len(sampled) * SAM_USD_PER_IMAGE_GUESS, 2)}
 
     person_boxes = (crowd.track(clip, total, FPS, person_concept, key, crowd_dir) if crowd_mode
                     else track_all(pieces, person_concept, key, frame_size, grid))
@@ -323,11 +340,15 @@ def main():
     people, vehicles = road_tracks(site, H, person_boxes, vehicle_boxes, frame_size)
     events = road.conflicts(people, vehicles, FPS)
     seen = road.exposure(people, vehicles, FPS, total)
+    full = full_requests(pieces, video_plan, frame_size)
+    if full[0]:
+        print(f"warning: {full[0]} of {full[1]} SAM requests hit the {sam.MAX_OBJECTS}-object limit; later arrivals "
+              "in those parts were not tracked (crowds of people: use crowd mode)", flush=True)
 
-    write_events(out_dir, site, events, seen)  # saved before the slower, network-bound evidence step
+    write_events(out_dir, site, events, seen, cost, full)  # saved before the slower, network-bound evidence step
     review_people(clip, out_dir, events, people, person_boxes, key, frame_size, top_down)
     add_evidence(args.video, clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size)
-    write_events(out_dir, site, events, seen)
+    write_events(out_dir, site, events, seen, cost, full)
     report(seen, events)
 
 

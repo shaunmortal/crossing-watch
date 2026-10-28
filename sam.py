@@ -10,6 +10,8 @@ from pathlib import Path
 API_URL = "https://api.meta.ai/v1/responses"
 MODEL = "sam-3.1"
 TIMEOUT_S = 600
+MAX_OBJECTS = 16  # one video request tracks at most this many objects in all; once they are taken, later
+                  # arrivals are never picked up (no reply among 54 had more, and none gained an ID after filling)
 ENV_FILE = Path(__file__).parent / ".env"
 FRAME = re.compile(r"<(\d+)f>")
 BOX = re.compile(r"(\d+)<\|box;x1=([\d.]+);y1=([\d.]+);x2=([\d.]+);y2=([\d.]+)")
