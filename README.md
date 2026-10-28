@@ -98,9 +98,12 @@ to set it.
 - **Crowd mode over all 8 clips:** 29 of 36 conflicts found. Every miss is a threshold case, and 2 of the 11 false
   alarms are not. Re-run with 15-second SAM parts and filled crowd boxes: still 29 of 36, all misses at a threshold,
   and 3 of 11 false alarms not at a threshold (one event in clip 10 moved from matched to extra).
-- **Vehicles in crowd mode too** (`"vehicle_mode": "crowd"`, for dense traffic that fills SAM's 16 objects): 35 of 36
-  found, the one miss at a threshold; 19 false alarms, 15 of them at a threshold. Car speed error: median 0.9 km/h,
-  at most 3.5 km/h (0.3 and 2.0 with SAM video). Pedestrian pieces shorter than 1 s are dropped and Spark now calls
+- **Vehicles in crowd mode too** (`"vehicle_mode": "crowd"`, for dense traffic that fills SAM's 16 objects). Vehicles
+  are detected on every frame (10 a second): at 5 a second a review showed motorcycles over ~36 km/h outran the
+  tracker's one-body-size match and vanished. Result: speed bias against the dataset's own velocities fell from
+  +0.9 to +0.2 km/h, and 12 of 36 conflicts are found. All 24 misses and 2 of the 3 false alarms are at a threshold:
+  DUT's cars crawl at about 10 km/h, right on the "moving" bar, so ±1 km/h decides most of them. (At 5 a second the
+  +0.9 km/h bias had pushed those cases over the bar: 35 of 36.) Every conflict clear of a threshold is found. Pedestrian pieces shorter than 1 s are dropped and Spark now calls
   people on motorcycles and bicycles riders; neither changed any DUT result.
 - **Dense Indian intersection** (42 s, no ground truth, calibration guessed): SAM video saw on average 1.6 people and
   6 vehicles a frame, crowd mode 14.9 people and 20 vehicles. Before the two fixes above it reported 543 serious

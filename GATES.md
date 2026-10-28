@@ -126,3 +126,7 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 - Vehicle crowd mode: DUT 35 of 36 (4 real false alarms); dense Indian clip coverage 6 -> 20 vehicles a frame. Found and
   fixed on the way: one-frame pedestrian fragments (543 -> 83 events) and riders accepted as pedestrians by Spark
   (83 -> 18 after review). Speed on that clip is untestable (guessed calibration); G2 on real footage still pending.
+- Fifth review (2 reviewers, findings checked): crowd-mode vehicles over ~36 km/h were lost at 5 samples a second (now
+  10); synonym concepts shared one cache (now refused); letter check missed non-English facts and comma numbers, and
+  flagged "SAM 3.1" from the prompt (fixed). DUT with vehicles at 10 a second: 12 of 36, every miss at the 10 km/h
+  bar, speed bias +0.2 km/h; all non-threshold conflicts found, 1 real false alarm.
