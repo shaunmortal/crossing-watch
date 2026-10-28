@@ -203,26 +203,41 @@ def test_pack_keeps_people_and_escapes_text():
     assert "from a pedestrian" in pack.event_card(2, base | {"review": {"is_person": True, "road_user": "unclear"}})
 
 
-def test_long_videos_are_tracked_in_parts_with_frames_shifted_back():
+def test_long_videos_are_tracked_in_overlapping_parts_and_ids_joined():
     import subprocess, tempfile
     from pathlib import Path
     import analyze
+    box = "<|box;x1=10;y1=10;x2=20;y2=30;w=64;h=48|>"
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp)
         clip = out / "clip.mp4"
         subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=64x48:rate=10:duration=5",
                         "-pix_fmt", "yuv420p", str(clip)], check=True)
-        old = analyze.CHUNK_FRAMES
-        analyze.CHUNK_FRAMES = 20
+        old = analyze.CHUNK_FRAMES, analyze.OVERLAP_FRAMES
+        analyze.CHUNK_FRAMES, analyze.OVERLAP_FRAMES = 20, 5
         try:
             pieces = analyze.parts(clip, out, analyze.frame_count(clip))
-            for _, _, folder in pieces:  # pretend SAM already answered: one box on each part's first frame
-                sam.cache_path(folder, "person").write_text("<0f>0<|box;x1=1;y1=2;x2=3;y2=4;w=64;h=48|>")
-            tracks = analyze.track_all(pieces, "person", "unused-key")
+            # part 0 sees a person on its last 5 frames; part 1 sees the same person on its first 5 (the overlap);
+            # part 2 sees someone else, elsewhere
+            sam.cache_path(pieces[0][2], "person").write_text("".join(f"<{f}f>0{box}" for f in range(15, 20)))
+            sam.cache_path(pieces[1][2], "person").write_text("".join(f"<{f}f>3{box}" for f in range(0, 8)))
+            sam.cache_path(pieces[2][2], "person").write_text("<0f>1<|box;x1=40;y1=10;x2=50;y2=30;w=64;h=48|>")
+            tracks = analyze.track_all(pieces, "person", "unused-key", (64, 48))
         finally:
-            analyze.CHUNK_FRAMES = old
-    assert [p[0] for p in pieces] == [0, 20, 40]
-    assert tracks == {"0:0": {0: [1.0, 2.0, 3.0, 4.0]}, "1:0": {20: [1.0, 2.0, 3.0, 4.0]}, "2:0": {40: [1.0, 2.0, 3.0, 4.0]}}
+            analyze.CHUNK_FRAMES, analyze.OVERLAP_FRAMES = old
+    assert [p[0] for p in pieces] == [0, 15, 30]
+    assert set(tracks) == {"0.0:0", "2.0:1"} and sorted(tracks["0.0:0"]) == list(range(15, 23))
+
+
+def test_crowds_are_tiled_and_cut_boxes_joined():
+    import analyze
+    assert analyze.tiles((640, 360), 1) == [(0, 0, 640, 360)]
+    assert analyze.tiles((640, 360), 2) == [(0, 0, 368, 206), (272, 0, 368, 206), (0, 154, 368, 206), (272, 154, 368, 206)]
+    full, cut = {5: [300, 100, 330, 160]}, {5: [300, 100, 310, 160]}  # the same person, cut by a tile edge
+    joined = analyze.link({"a": full}, {"b": cut})
+    assert joined == {"a": {5: [300, 100, 330, 160]}}
+    apart = analyze.link({"a": full}, {"c": {5: [100, 100, 130, 160]}})
+    assert set(apart) == {"a", "c"}
 
 
 def test_wonder_sounds_are_validated_and_silent_videos_skipped():

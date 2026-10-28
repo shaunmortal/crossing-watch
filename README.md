@@ -35,7 +35,9 @@ python3 test_cw.py                       # self-checks
 ```
 
 SAM replies are cached per output folder, so re-running costs nothing. An output folder refuses a different video.
-Long recordings (for example an hour of a school's CCTV) are sent to SAM in 5-minute parts. The SAM cost is
+Long recordings (for example an hour of a school's CCTV) are sent to SAM in 5-minute parts that overlap by
+2 s, so a person crossing a cut keeps one ID. For crowds, set `"person_grid": 2` in the site file: people are
+tracked in 4 overlapping tiles (SAM returns at most 16 objects per request) and joined where the tiles meet. The SAM cost is
 estimated first, and a run over $10 needs `--allow-cost`.
 
 ## Validation on ground-truth trajectories
@@ -57,27 +59,29 @@ This checks the measurement layer on true positions.
 
 ### End to end, against ground truth (DUT)
 
-`validate_dut.py` runs the whole pipeline (SAM 3.1, metres, near-misses, Muse Spark) on drone clips of a campus
-crosswalk full of students (DUT dataset, top-down view). It then matches each of our conflicts to the dataset's own
-tracked people and cars.
+`validate_dut.py` runs the whole pipeline (SAM 3.1, metres, near-misses, Muse Spark) on 8 drone clips of a campus
+crosswalk full of students (DUT dataset, top-down view, 11 to 58 people in view). It then matches each of our
+conflicts to the dataset's own tracked people and cars by identity: same person, same car.
 
-| Clip | True conflicts | We found (same person and car) | Missed | False alarms |
+| | True conflicts | Found | Missed | False alarms |
 |---|---|---|---|---|
-| 15 | 8 | 6 | 2 | 0 |
-| 01 | 2 | 0 | 2 | 0 |
-| 03 | 0 | 0 | 0 | 0 |
-| **All** | **10** | **6** | **4** | **0** |
+| Whole frame (`person_grid` 1) | 36 | 14 | 22 (4 at a threshold) | 0 |
+| 2 x 2 tiles (`person_grid` 2) | 36 | 19 | 17 (5 at a threshold) | 12 (8 at a threshold) |
 
-- **Tracking:** SAM's pedestrian positions were 2–16 cm from the dataset's.
-- **Errors on matched events:** speed within ±0.8 km/h; PET 0–1.4 s off (mean 0.7 s).
-- **Why 4 were missed:** 2 people were not yet tracked in the first 0.4 s of a clip. 2 had the car measured at
-  9.5 km/h against the dataset's 10.5 km/h, just under our pre-set 10 km/h "moving" threshold. We did not move the
-  threshold to fit the test.
-- **What this run changed:** Spark at first rejected 4 real students as "not a person", because they were a few
-  pixels wide and half hidden by the car. It now judges a zoomed crop of the frame where each person is clearest.
-  Boxes on empty road, a pole and part of a car are still rejected.
-- **Caveats:** this is a small sample (10 events). The true conflicts assume a 4.6 x 1.8 m car (DUT gives only the
-  car's centre and heading). The view is top-down, not a phone at an angle.
+Leaving out threshold cases, the 2 x 2 tiles find 19 of 31 true conflicts (61%), and 19 of 23 of our events are
+true (83%). The whole frame finds 14 of 32 (44%) with no false alarms.
+
+- **"At a threshold" defined:** a disagreement the other side also finds once each threshold is widened by about our
+  measured error (speed ±1.5 km/h around the 10 km/h "moving" bar, gap +0.3 m, PET +0.3 s). For example, a car the
+  dataset has at 8.6 km/h and we measured at 10.1 km/h.
+- **Crowds are the limit.** SAM 3.1 returns at most 16 objects per frame and request, so clips with 50+ people in view
+  lose most conflicts on the whole frame. Tiling (`person_grid` 2 or 3) helps; the 4 remaining false alarms are in
+  the two most crowded clips.
+- **Accuracy on matched events:** speed is usually within 1 km/h (2 km/h at worst). PET is within about 1 s.
+- **Spark review:** it now judges a zoomed crop of each person's clearest frame. A full-frame snapshot had rejected
+  real students who were a few pixels wide.
+- **Caveats:** this is still a small sample. The true conflicts assume a 4.6 x 1.8 m car (DUT gives only centre and
+  heading). The view is top-down, not a phone at an angle.
 
 The DUT data has no licence and was used only for internal testing; it is not included.
 
@@ -87,8 +91,6 @@ The DUT data has no licence and was used only for internal testing; it is not in
 - SAM 3.1 tracks up to 16 objects per frame per concept, so dense crowds are undercounted. The tool is for crossings, not crowds.
 - The death-risk curve is for adults (15+) hit by a car front; children are not covered by that study.
 - Distances are only as good as the measured calibration rectangle.
-- In long recordings sent to SAM in 5-minute parts, a person or vehicle crossing a part boundary gets a new ID, so
-  exposure counts (and rarely an event) can be counted twice at the boundaries.
 - Box jitter alone gives a queued car an apparent speed of a few km/h. That is well under the 10 km/h "moving"
   threshold, so it does not create events, but very slow vehicles are not measured precisely.
 

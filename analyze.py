@@ -7,6 +7,7 @@ Writes DIR/events.json and prints the most dangerous moments first.
 import argparse
 import json
 import re
+import statistics
 import subprocess
 from pathlib import Path
 
@@ -21,6 +22,9 @@ MAX_REVIEWS = 40  # Spark looks at no more pedestrians than this per run
 FPS = 10
 WIDTH = 640
 CHUNK_FRAMES = 3_000  # 5 min per SAM request (SAM 3.1 takes up to 15,000 frames; smaller keeps uploads modest)
+OVERLAP_FRAMES = 20   # consecutive parts share 2 s, so someone crossing the cut keeps one ID
+TILE_OVERLAP = 0.15   # neighbouring person tiles share this much of the frame
+LINK_SHARE = 0.6      # two tracks are one object when, on shared frames, the smaller box lies this much inside the other
 SAM_USD_PER_1K_FRAMES = 0.20
 MAX_COST_USD = 10.0  # above this estimate, --allow-cost is required
 PREP_FILTER = re.compile(r"^((crop|scale|transpose|hflip|vflip)(=[\w.*:+\-/]+)?)(,(crop|scale|transpose|hflip|vflip)(=[\w.*:+\-/]+)?)*$")
@@ -47,6 +51,8 @@ def load_site(path):
         raise SystemExit(f"{path}: zone_m must be [x_min, y_min, x_max, y_max] in metres")
     if "roadway_m" in site and not numeric_points(site["roadway_m"]):
         raise SystemExit(f"{path}: roadway_m must be a polygon of at least three [x, y] points in metres")
+    if site.get("person_grid", 1) not in (1, 2, 3):
+        raise SystemExit(f"{path}: person_grid must be 1, 2 or 3 (use 2 or 3 when more than ~16 people are in view)")
     if site.get("view", "oblique") not in ("oblique", "top-down"):
         raise SystemExit(f"{path}: view must be \"oblique\" (a phone up high, looking across) or \"top-down\" (drone)")
     if not PREP_FILTER.match(site.get("prep_filter", "") or "crop"):
@@ -58,7 +64,7 @@ def check_source(video, out_dir, prep_filter):
     """Refuse to reuse an output folder (its clip and paid SAM replies) made from another video or settings."""
     stat = Path(video).stat()
     stamp = {"video": str(Path(video).resolve()), "bytes": stat.st_size, "prep_filter": prep_filter, "fps": FPS,
-             "width": WIDTH, "chunk_frames": CHUNK_FRAMES}
+             "width": WIDTH, "chunk_frames": CHUNK_FRAMES, "overlap_frames": OVERLAP_FRAMES}
     stamp_file = out_dir / "source.json"
     if stamp_file.exists() and json.loads(stamp_file.read_text()) != stamp:
         raise SystemExit(f"{out_dir} was made from a different video or settings; pass a new --out folder")
@@ -85,39 +91,119 @@ def frame_count(clip):
     return int(probe(clip, "stream=nb_read_packets", "-count_packets"))
 
 
+def encode(source, out_path, *ffmpeg_args):
+    """Re-encode `source` to an H.264 faststart clip SAM accepts, written atomically."""
+    partial = out_path.with_name(out_path.stem + ".part.mp4")
+    subprocess.run(["ffmpeg", "-v", "error", "-y", *ffmpeg_args[:2], "-i", str(source), *ffmpeg_args[2:], "-an",
+                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(partial)], check=True)
+    partial.replace(out_path)
+    return out_path
+
+
 def parts(clip, out_dir, total):
-    """(first frame, clip, cache folder) per SAM request; long videos are cut into CHUNK_FRAMES pieces."""
+    """(first frame, clip, cache folder) per SAM request; long videos are cut into CHUNK_FRAMES pieces that
+    overlap by OVERLAP_FRAMES."""
     if total <= CHUNK_FRAMES:
         return [(0, clip, out_dir)]
     pieces = []
-    for first in range(0, total, CHUNK_FRAMES):
-        folder = out_dir / f"part{first // CHUNK_FRAMES}"
+    for k, first in enumerate(range(0, total - OVERLAP_FRAMES, CHUNK_FRAMES - OVERLAP_FRAMES)):
+        folder = out_dir / f"part{k}"
         folder.mkdir(exist_ok=True)
-        piece, partial = folder / "clip.mp4", folder / "clip.part.mp4"
+        piece = folder / "clip.mp4"
         if not piece.exists():
-            subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{first / FPS:.3f}", "-i", str(clip), "-frames:v",
-                            str(CHUNK_FRAMES), "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-                            str(partial)], check=True)
-            partial.replace(piece)
+            encode(clip, piece, "-ss", f"{first / FPS:.3f}", "-frames:v", str(CHUNK_FRAMES))
         pieces.append((first, piece, folder))
     return pieces
 
 
-def check_cost(pieces, concepts, total, allow):
-    """Refuse a surprise bill: estimate the SAM cost of the requests not already cached."""
-    todo = sum(1 for _, _, folder in pieces for c in concepts if not sam.cache_path(folder, c).exists())
-    usd = todo / max(1, len(pieces) * len(concepts)) * total * len(concepts) / 1000 * SAM_USD_PER_1K_FRAMES
-    print(f"{total / FPS / 60:.1f} min of video, {len(pieces)} part(s); SAM cost about ${usd:.2f}", flush=True)
+def even(v):
+    return int(v) // 2 * 2
+
+
+def tiles(frame_size, grid):
+    """(x, y, w, h) crops: the whole frame for grid 1, else a grid x grid layout whose neighbours overlap by
+    TILE_OVERLAP. SAM 3.1 returns at most 16 objects per frame and request, so crowds need tiles."""
+    width, height = frame_size
+    if grid == 1:
+        return [(0, 0, width, height)]
+    w, h = even(width / grid * (1 + TILE_OVERLAP)), even(height / grid * (1 + TILE_OVERLAP))
+    xs = [even((width - w) * i / (grid - 1)) for i in range(grid)]
+    ys = [even((height - h) * i / (grid - 1)) for i in range(grid)]
+    return [(x, y, w, h) for y in ys for x in xs]
+
+
+def tile_folder(folder, rect, frame_size):
+    return folder if rect == (0, 0, *frame_size) else folder / f"tile{rect[0]}_{rect[1]}"
+
+
+def tile_clip(piece, folder, rect, frame_size):
+    """(clip, cache folder) for one crop of a part; the whole part when the crop is the whole frame."""
+    sub = tile_folder(folder, rect, frame_size)
+    if sub == folder:
+        return piece, folder
+    sub.mkdir(exist_ok=True)
+    clip = sub / "clip.mp4"
+    if not clip.exists():
+        encode(piece, clip, "-ss", "0", "-vf", "crop={2}:{3}:{0}:{1}".format(*rect))
+    return clip, sub
+
+
+def check_cost(pieces, plan, frame_size, total, allow):
+    """Refuse a surprise bill: estimate the SAM cost of the requests not already cached. `plan` is
+    [(concept, grid)]; each tile of each part is one request."""
+    units = [(folder, rect, concept) for _, _, folder in pieces for concept, grid in plan for rect in tiles(frame_size, grid)]
+    todo = sum(1 for folder, rect, concept in units if not sam.cache_path(tile_folder(folder, rect, frame_size), concept).exists())
+    usd = todo / len(units) * total * len(units) / len(pieces) / 1000 * SAM_USD_PER_1K_FRAMES
+    print(f"{total / FPS / 60:.1f} min of video, {len(pieces)} part(s), {len(units)} SAM request(s); "
+          f"SAM cost about ${usd:.2f}", flush=True)
     if usd > MAX_COST_USD and not allow:
         raise SystemExit(f"estimated SAM cost ${usd:.2f} is over ${MAX_COST_USD:.0f}; re-run with --allow-cost")
 
 
-def track_all(pieces, concept, key):
-    """One concept's tracks over all parts, frame numbers shifted back to the whole clip."""
+def box_area(b):
+    return (b[2] - b[0]) * (b[3] - b[1])
+
+
+def link(merged, new, share=LINK_SHARE):
+    """`merged` plus the `new` tracks ({name: {frame: box}}). A new track that sits on an existing one over their
+    shared frames (overlapping tiles, or the overlap of two parts) joins it, keeping the larger box per frame,
+    since a box cut by a tile edge is the smaller one; the rest are added under their own names."""
+    scores = []
+    for nid, track in new.items():
+        for mid, old in merged.items():
+            shared = track.keys() & old.keys()
+            if shared:
+                score = statistics.mean(road.inside_share(*sorted((track[f], old[f]), key=box_area)) for f in shared)
+                if score >= share:
+                    scores.append((score, nid, mid))
+    out = {name: dict(track) for name, track in merged.items()}
+    joined = set()
+    for _, nid, mid in sorted(scores, reverse=True):
+        if nid in joined or mid in joined:
+            continue
+        joined.update((nid, mid))
+        for f, b in new[nid].items():
+            if f not in out[mid] or box_area(b) > box_area(out[mid][f]):
+                out[mid][f] = b
+    out.update({nid: dict(track) for nid, track in new.items() if nid not in joined})
+    return out
+
+
+def track_all(pieces, concept, key, frame_size=None, grid=1):
+    """One concept's tracks over all parts (and tiles), in whole-clip frames and pixels, with an object seen
+    by two tiles or across a part boundary joined into one track."""
+    single = len(pieces) == 1 and grid == 1
     merged = {}
     for k, (first, piece, folder) in enumerate(pieces):
-        for obj, track in sam.track(piece, concept, key, folder).items():
-            merged[f"{k}:{obj}" if len(pieces) > 1 else obj] = {first + f: b for f, b in track.items()}
+        part = {}
+        for t, rect in enumerate(tiles(frame_size, grid) if grid > 1 else [None]):
+            clip, cache = (piece, folder) if rect is None else tile_clip(piece, folder, rect, frame_size)
+            dx, dy = (0, 0) if rect is None else rect[:2]
+            found = {(obj if single else f"{k}.{t}:{obj}"): {first + f: [b[0] + dx, b[1] + dy, b[2] + dx, b[3] + dy]
+                                                            for f, b in track.items()}
+                     for obj, track in sam.track(clip, concept, key, cache).items()}
+            part = link(part, found)
+        merged = link(merged, part)
     return merged
 
 
@@ -216,12 +302,12 @@ def main():
     key = sam.load_api_key()
     total = frame_count(clip)
     pieces = parts(clip, out_dir, total)
-    person_concept = site.get("person", "person")
-    check_cost(pieces, [person_concept, *site["vehicles"]], total, args.allow_cost)
+    person_concept, grid = site.get("person", "person"), site.get("person_grid", 1)
+    check_cost(pieces, [(person_concept, grid)] + [(c, 1) for c in site["vehicles"]], frame_size, total, args.allow_cost)
 
-    person_boxes = track_all(pieces, person_concept, key)
+    person_boxes = track_all(pieces, person_concept, key, frame_size, grid)
     vehicle_boxes = {f"{concept}#{vid}": t for concept in site["vehicles"]
-                     for vid, t in track_all(pieces, concept, key).items()}
+                     for vid, t in track_all(pieces, concept, key, frame_size).items()}
     top_down = site.get("view") == "top-down"
     people, vehicles = road_tracks(site, H, person_boxes, vehicle_boxes, frame_size)
     events = road.conflicts(people, vehicles, FPS)

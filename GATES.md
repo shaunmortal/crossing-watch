@@ -96,3 +96,9 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
   - the fix text is now shown even if the image fails;
   - a missing API key now gives a measurements-only page.
   - 31 self-checks pass; DUT result unchanged (6 of 10, 0 false alarms).
+- **DUT, 8 clips, judged by identity, with threshold cases split out:**
+  - Whole frame: 14 of 36 found, 0 false alarms.
+  - 2 x 2 person tiles: 19 of 36 found; 12 extra, of which 8 are threshold cases (e.g. car 8.6 vs 10.1 km/h).
+  - Excluding threshold cases, tiles give 61% recall and 83% precision.
+  - Crowds (50+ in view) remain the weak spot.
+- Parts now overlap by 2 s and IDs are joined across cuts; crowded frames can be tiled (`person_grid`). Tests cover both.
