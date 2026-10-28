@@ -11,7 +11,9 @@ from concurrent.futures import ThreadPoolExecutor
 
 import sam
 
-CROWD_FPS = 5        # frames a second sent as images; a walker moves ~30 cm between them
+CROWD_FPS = 5        # people: frames a second sent as images; a walker moves ~30 cm between them
+VEHICLE_FPS = 10     # vehicles: a 2 m motorcycle at 60 km/h moves 0.8 of its length between samples (at 5 a
+                     # second, anything over ~36 km/h outran the one-body-size match and was lost)
 WORKERS = 6          # parallel image requests
 MATCH_IOU = 0.3      # a detection continues a track when it overlaps the predicted box this much...
 MATCH_SIZES = 1.0    # ...or when its centre is within one box size (the larger side) of the predicted centre:
@@ -140,9 +142,12 @@ def cache_dir(out_dir, concept):
     return out_dir / f"crowd-{sam.cache_path(out_dir, concept).stem.split('.')[0]}"
 
 
-def track(clip, total_frames, clip_fps, concept, api_key, cache_dir, sample_fps=CROWD_FPS):
-    """Tracks of one concept in a crowded clip: SAM image detection every 1/sample_fps s, IDs from `associate`,
-    boxes filled in between samples."""
-    step = max(1, round(clip_fps / sample_fps))
-    tracks = associate(detect(clip, range(0, total_frames, step), concept, api_key, cache_dir, clip_fps), clip_fps)
+def sample_frames(total_frames, clip_fps, sample_fps):
+    return range(0, total_frames, max(1, round(clip_fps / sample_fps)))
+
+
+def track(clip, frames, clip_fps, concept, api_key, cache_dir):
+    """Tracks of one concept in a crowded clip: SAM image detection on `frames` (see sample_frames), IDs from
+    `associate`, boxes filled in between samples."""
+    tracks = associate(detect(clip, frames, concept, api_key, cache_dir, clip_fps), clip_fps)
     return {tid: filled(t) for tid, t in tracks.items()}

@@ -45,6 +45,9 @@ def load_site(path):
     vehicles = site.get("vehicles")
     if not (isinstance(vehicles, list) and vehicles and all(isinstance(v, str) and v.strip() for v in vehicles)):
         raise SystemExit(f"{path}: 'vehicles' must be a list of concept names, e.g. [\"car\", \"motorcycle\"]")
+    names = [sam.cache_path(Path("."), c).name.lower() for c in [site.get("person", "person"), *vehicles]]
+    if len(set(names)) < len(names):
+        raise SystemExit(f"{path}: two concepts have the same cache name (only letters and digits count, any case)")
     if not isinstance(site.get("person", "person"), str):
         raise SystemExit(f"{path}: 'person' must be a concept name")
     zone = site.get("zone_m")
@@ -235,10 +238,16 @@ def crowd_concepts(site):
             + (list(site["vehicles"]) if site.get("vehicle_mode") == "crowd" else []))
 
 
+def crowd_frames(site, concept, total):
+    """The clip frames crowd mode sends as images for `concept`: people at crowd.CROWD_FPS, vehicles faster."""
+    rate = crowd.CROWD_FPS if concept == site.get("person", "person") else crowd.VEHICLE_FPS
+    return crowd.sample_frames(total, FPS, rate)
+
+
 def concept_tracks(site, concept, clip, total, pieces, out_dir, key, frame_size, grid=1):
     """One concept's tracks in whole-clip frames and pixels, by crowd mode or SAM video as the site asks."""
     if concept in crowd_concepts(site):
-        return crowd.track(clip, total, FPS, concept, key, crowd.cache_dir(out_dir, concept))
+        return crowd.track(clip, crowd_frames(site, concept, total), FPS, concept, key, crowd.cache_dir(out_dir, concept))
     return track_all(pieces, concept, key, frame_size, grid)
 
 
@@ -343,10 +352,10 @@ def main():
     pieces = parts(clip, out_dir, total)
     person_concept, grid = site.get("person", "person"), site.get("person_grid", 1)
     crowded = crowd_concepts(site)
-    sampled = range(0, total, max(1, round(FPS / crowd.CROWD_FPS))) if crowded else range(0)
-    images = sum(1 for c in crowded for f in sampled if not (crowd.cache_dir(out_dir, c) / f"{f:06d}.sam.txt").exists())
+    images = sum(1 for c in crowded for f in crowd_frames(site, c, total)
+                 if not (crowd.cache_dir(out_dir, c) / f"{f:06d}.sam.txt").exists())
     video_plan = [(c, g) for c, g in [(person_concept, grid)] + [(c, 1) for c in site["vehicles"]] if c not in crowded]
-    all_images = len(sampled) * len(crowded)
+    all_images = sum(len(crowd_frames(site, c, total)) for c in crowded)
     cost = {"sam_usd": round(check_cost(pieces, video_plan, frame_size, total, args.allow_cost, images, all_images), 2),
             "image_usd": round(all_images * SAM_USD_PER_IMAGE_GUESS, 2)}
 
@@ -360,7 +369,8 @@ def main():
     full = full_requests(pieces, video_plan, frame_size)
     if full[0]:
         print(f"warning: {full[0]} of {full[1]} SAM requests hit the {sam.MAX_OBJECTS}-object limit; later arrivals "
-              "in those parts were not tracked (crowds of people: use crowd mode)", flush=True)
+              "in those parts were not tracked (use person_mode / vehicle_mode \"crowd\": the Crowded and Dense "
+              "traffic boxes on the calibration page)", flush=True)
 
     write_events(out_dir, site, events, seen, cost, full)  # saved before the slower, network-bound evidence step
     review_people(clip, out_dir, events, people, person_boxes, key, frame_size, top_down)
