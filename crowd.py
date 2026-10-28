@@ -1,4 +1,4 @@
-"""Crowd mode for pedestrians (opt-in: "person_mode": "crowd" in the site file). SAM 3.1 video tracking keeps at
+"""Crowd mode (opt-in: "person_mode": "crowd" for people, "vehicle_mode": "crowd" for dense traffic). SAM 3.1 video tracking keeps at
 most 16 objects per frame, but on a single image it returns every match (71 people on one crowded DUT frame). So in
 crowds SAM detects people frame by frame as images, and a small tracker here keeps their IDs.
 """
@@ -141,7 +141,7 @@ def cache_dir(out_dir, concept):
 
 
 def track(clip, total_frames, clip_fps, concept, api_key, cache_dir, sample_fps=CROWD_FPS):
-    """Pedestrian tracks for a crowded clip: SAM image detection every 1/sample_fps s, IDs from `associate`,
+    """Tracks of one concept in a crowded clip: SAM image detection every 1/sample_fps s, IDs from `associate`,
     boxes filled in between samples."""
     step = max(1, round(clip_fps / sample_fps))
     tracks = associate(detect(clip, range(0, total_frames, step), concept, api_key, cache_dir, clip_fps), clip_fps)

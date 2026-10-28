@@ -55,6 +55,8 @@ def load_site(path):
         raise SystemExit(f"{path}: roadway_m must be a polygon of at least three [x, y] points in metres")
     if site.get("person_mode", "video") not in ("video", "crowd"):
         raise SystemExit(f"{path}: person_mode must be \"video\" or \"crowd\" (frame-by-frame detection for dense crowds)")
+    if site.get("vehicle_mode", "video") not in ("video", "crowd"):
+        raise SystemExit(f"{path}: vehicle_mode must be \"video\" or \"crowd\" (frame-by-frame detection for dense traffic)")
     if site.get("person_grid", 1) not in (1, 2, 3):
         raise SystemExit(f"{path}: person_grid must be 1, 2 or 3 (use 2 or 3 when more than ~16 people are in view)")
     if site.get("view", "oblique") not in ("oblique", "top-down"):
@@ -225,6 +227,21 @@ def track_all(pieces, concept, key, frame_size=None, grid=1):
     return merged
 
 
+
+def crowd_concepts(site):
+    """Concepts detected frame by frame on images (crowd mode) instead of tracked by SAM video, which keeps at most
+    sam.MAX_OBJECTS per request: people with "person_mode": "crowd", vehicles with "vehicle_mode": "crowd"."""
+    return (([site.get("person", "person")] if site.get("person_mode") == "crowd" else [])
+            + (list(site["vehicles"]) if site.get("vehicle_mode") == "crowd" else []))
+
+
+def concept_tracks(site, concept, clip, total, pieces, out_dir, key, frame_size, grid=1):
+    """One concept's tracks in whole-clip frames and pixels, by crowd mode or SAM video as the site asks."""
+    if concept in crowd_concepts(site):
+        return crowd.track(clip, total, FPS, concept, key, crowd.cache_dir(out_dir, concept))
+    return track_all(pieces, concept, key, frame_size, grid)
+
+
 def probe(path, entries, *extra):
     return subprocess.run(["ffprobe", "-v", "error", *extra, "-select_streams", "v:0", "-show_entries", entries,
                            "-of", "csv=p=0", str(path)], check=True, capture_output=True, text=True).stdout.strip()
@@ -239,13 +256,15 @@ def write_events(out_dir, site, events, seen, cost, full):
 
 def road_tracks(site, H, person_boxes, vehicle_boxes, frame_size):
     """SAM boxes -> (pedestrian track pieces, vehicle shapes) in road metres, cleaned: riders dropped, tracks split
-    where the ID jumps, only the analysis zone (and carriageway, if marked) kept."""
+    where the ID jumps, pieces under road.MIN_PIECE_S dropped, only the analysis zone (and carriageway, if marked)
+    kept."""
     zone = site.get("zone_m") or road.zone_around(site["world_points"])
     top_down = site.get("view") == "top-down"
     walkers = {pid: road.without_riders(t, vehicle_boxes.values()) for pid, t in person_boxes.items()}
     people = {f"{pid}/{k}": piece for pid, t in walkers.items()
               for k, piece in enumerate(road.split_at_jumps(road.moving_frames(  # stillness judged before cutting
-                  road.person_points(t, H, zone, site.get("roadway_m"), frame_size, top_down), FPS), FPS))}
+                  road.person_points(t, H, zone, site.get("roadway_m"), frame_size, top_down), FPS), FPS))
+              if len(piece) >= road.MIN_PIECE_S * FPS}
     vehicles = {vid: road.vehicle_edges(t, H, zone, frame_size, top_down) for vid, t in vehicle_boxes.items()}
     return people, vehicles
 
@@ -323,19 +342,17 @@ def main():
     total = frame_count(clip)
     pieces = parts(clip, out_dir, total)
     person_concept, grid = site.get("person", "person"), site.get("person_grid", 1)
-    crowd_mode = site.get("person_mode") == "crowd"
-    crowd_dir = crowd.cache_dir(out_dir, person_concept)
-    step = max(1, round(FPS / crowd.CROWD_FPS))
-    sampled = range(0, total, step) if crowd_mode else range(0)
-    images = sum(1 for f in sampled if not (crowd_dir / f"{f:06d}.sam.txt").exists())
-    video_plan = ([] if crowd_mode else [(person_concept, grid)]) + [(c, 1) for c in site["vehicles"]]
-    cost = {"sam_usd": round(check_cost(pieces, video_plan, frame_size, total, args.allow_cost, images, len(sampled)), 2),
-            "image_usd": round(len(sampled) * SAM_USD_PER_IMAGE_GUESS, 2)}
+    crowded = crowd_concepts(site)
+    sampled = range(0, total, max(1, round(FPS / crowd.CROWD_FPS))) if crowded else range(0)
+    images = sum(1 for c in crowded for f in sampled if not (crowd.cache_dir(out_dir, c) / f"{f:06d}.sam.txt").exists())
+    video_plan = [(c, g) for c, g in [(person_concept, grid)] + [(c, 1) for c in site["vehicles"]] if c not in crowded]
+    all_images = len(sampled) * len(crowded)
+    cost = {"sam_usd": round(check_cost(pieces, video_plan, frame_size, total, args.allow_cost, images, all_images), 2),
+            "image_usd": round(all_images * SAM_USD_PER_IMAGE_GUESS, 2)}
 
-    person_boxes = (crowd.track(clip, total, FPS, person_concept, key, crowd_dir) if crowd_mode
-                    else track_all(pieces, person_concept, key, frame_size, grid))
-    vehicle_boxes = {f"{concept}#{vid}": t for concept in site["vehicles"]
-                     for vid, t in track_all(pieces, concept, key, frame_size).items()}
+    tracks_of = lambda concept, g=1: concept_tracks(site, concept, clip, total, pieces, out_dir, key, frame_size, g)
+    person_boxes = tracks_of(person_concept, grid)
+    vehicle_boxes = {f"{concept}#{vid}": t for concept in site["vehicles"] for vid, t in tracks_of(concept).items()}
     top_down = site.get("view") == "top-down"
     people, vehicles = road_tracks(site, H, person_boxes, vehicle_boxes, frame_size)
     events = road.conflicts(people, vehicles, FPS)

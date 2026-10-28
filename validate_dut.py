@@ -13,7 +13,6 @@ import subprocess
 from pathlib import Path
 
 import analyze
-import crowd
 import pack
 import road
 
@@ -45,7 +44,7 @@ def ground_truth(repo, clip):
     return people, vehicles
 
 
-def site_for(repo, video, clip, out, grid=1, mode="video"):
+def site_for(repo, video, clip, out, grid=1, mode="video", vehicle_mode="video"):
     """Top-down site file: the clip frame's corners in clip pixels, in metres from the dataset's pixel ratio."""
     width, height = (int(v) for v in analyze.probe(video, "stream=width,height").split(","))
     ratio = float((repo / "data" / "ratios" / f"intersection_{clip}_ratio_pixel2meter.txt").read_text())
@@ -54,7 +53,7 @@ def site_for(repo, video, clip, out, grid=1, mode="video"):
     site = {"name": f"DUT crosswalk {clip} (drone, ground-truth test)", "view": "top-down",
             "image_points": image, "world_points": [[x * width / clip_w / ratio, y * height / clip_h / ratio] for x, y in image],
             "calibration_note": "From the dataset's measured pixel-to-metre ratio.", "person": "person", "vehicles": ["car"],
-            "person_grid": grid, "person_mode": mode}
+            "person_grid": grid, "person_mode": mode, "vehicle_mode": vehicle_mode}
     path = out / f"site-{clip}.json"
     path.write_text(json.dumps(site, indent=1))
     return path
@@ -111,10 +110,10 @@ def boundary_flags(missed, extra, people, vehicles, our_people, our_vehicles, pe
     return missed_b, extra_b
 
 
-def check_clip(repo, videos, clip, out, grid=1, mode="video"):
+def check_clip(repo, videos, clip, out, grid=1, mode="video", vehicle_mode="video"):
     video = videos / f"intersection_{clip}_roi.mp4"
     clip_out = out / clip
-    subprocess.run(["python3", "analyze.py", str(video), str(site_for(repo, video, clip, out, grid, mode)), "--out", str(clip_out)],
+    subprocess.run(["python3", "analyze.py", str(video), str(site_for(repo, video, clip, out, grid, mode, vehicle_mode)), "--out", str(clip_out)],
                    check=True)
     data = json.loads((clip_out / "events.json").read_text())
     found = pack.confirmed(data["events"])
@@ -124,11 +123,11 @@ def check_clip(repo, videos, clip, out, grid=1, mode="video"):
     frame_size = tuple(int(v) for v in analyze.probe(clip_out / "clip.mp4", "stream=width,height").split(","))
     clip_file = clip_out / "clip.mp4"
     pieces = analyze.parts(clip_file, clip_out, analyze.frame_count(clip_file))  # all cached by the run above
+    tracks_of = lambda concept, g=1: analyze.concept_tracks(site, concept, clip_file, analyze.frame_count(clip_file),
+                                                            pieces, clip_out, None, frame_size, g)
     our_people, our_vehicles = analyze.road_tracks(
         site, road.homography(site["image_points"], site["world_points"]),
-        (crowd.track(clip_file, analyze.frame_count(clip_file), analyze.FPS, "person", None, crowd.cache_dir(clip_out, "person"))
-         if mode == "crowd" else analyze.track_all(pieces, "person", None, frame_size, site.get("person_grid", 1))),
-        {f"car#{k}": t for k, t in analyze.track_all(pieces, "car", None, frame_size).items()}, frame_size)
+        tracks_of("person", site.get("person_grid", 1)), {f"car#{k}": t for k, t in tracks_of("car").items()}, frame_size)
     person_ids = identities(our_people, people, PERSON_ID_DIST_M)
     vehicle_ids = identities(our_vehicles, vehicles, VEHICLE_ID_DIST_M)
     pairs, missed, extra = match(truth, found, person_ids, vehicle_ids)
@@ -155,11 +154,12 @@ def main():
     parser.add_argument("clips", nargs="+")
     parser.add_argument("--grid", type=int, default=1, help="person_grid: tile crowded frames for SAM")
     parser.add_argument("--mode", choices=("video", "crowd"), default="video", help="person_mode")
+    parser.add_argument("--vehicle-mode", choices=("video", "crowd"), default="video", help="vehicle_mode")
     parser.add_argument("--out", type=Path, default=Path("out/dut"), help="output folder")
     args = parser.parse_args()
     out = args.out
     out.mkdir(parents=True, exist_ok=True)
-    results = [check_clip(args.repo, args.videos, clip, out, args.grid, args.mode) for clip in args.clips]
+    results = [check_clip(args.repo, args.videos, clip, out, args.grid, args.mode, args.vehicle_mode) for clip in args.clips]
     (out / "validation.json").write_text(json.dumps(results, indent=1))
     print(json.dumps(results, indent=1))
 
