@@ -3438,6 +3438,16 @@ def test_spark_removals_are_printed_without_digits_or_crop_paths():
     assert out.getvalue() == review.said("7/0", pole) + "\n" and ".jpg" not in out.getvalue()  # once per track
 
 
+def test_exposure_counts_vehicles_over_indias_school_zone_speed():
+    """over_25_kmh: the moving vehicles whose median speed is over road.IN_SCHOOL_KMH (reg. 16(5)), 0 included."""
+    fps, frames = 10, 60
+    fast, slow = edges_along_x(8.0, fps, frames), edges_along_x(6.0, fps, frames, y=5.0)  # 28.8 and 21.6 km/h
+    seen = road.exposure({}, {"car#1": fast, "car#2": slow}, fps, 600)
+    assert seen["vehicles"] == 2 and seen["over_25_kmh"] == 1
+    assert road.exposure({}, {"car#2": slow}, fps, 600)["over_25_kmh"] == 0
+    assert road.exposure({}, {}, fps, 600)["over_25_kmh"] == 0
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):

@@ -35,6 +35,8 @@ GAP_ADULT_S = 6.0         # UK Traffic Signs Manual ch. 6, 13.5.2: an acceptable
 GAP_SLOW_S = 12.0         # ..."other groups may require larger gaps, of 10 - 12 s or longer"
 PV2_UNDIVIDED, PV2_DIVIDED = 1e8, 2e8  # IRC:103-2012 6.7.4.1.2: peak-hour PV^2 above this "may" warrant control
 SPEED_LIMITS_KMH = (30, 20)  # replayed "what if this street had a limit" scenarios
+IN_SCHOOL_KMH = 25        # India: Motor Vehicles (Driving) Regulations 2017, reg. 16(5), past schools and hospitals
+                          # where signed (exposure counts the moving vehicles faster than this: over_25_kmh)
 # Both favour the driver, so replayed impact speeds are not understated: 1.5 s is a typical perception-reaction
 # time for an unexpected hazard (road design uses 2.5 s), 7 m/s^2 is hard braking on dry asphalt.
 REACTION_S = 1.5
@@ -577,7 +579,8 @@ def pv2(crossings, vehicles, minutes):
 def exposure(people, vehicles, fps, frames):
     """How much was watched, so a short or quiet video is never read as "safe": crossings (people, counted once
     per tracked id however many pieces it was split into), moving vehicles, minutes, and the 85th-percentile
-    vehicle speed, each vehicle's speed taken while it was actually moving (the speed traffic engineers quote).
+    vehicle speed, each vehicle's speed taken while it was actually moving (the speed traffic engineers quote), and
+    how many of those medians were over IN_SCHOOL_KMH.
     When someone crossed, also the gaps in traffic where they crossed that are long enough to cross in, and who
     crossed (sorted ids), so a count of people in conflicts can stay inside this one."""
     crossers = {pid.split("/")[0] for pid, feet in people.items() if crossing_cells({pid: feet}, fps)}
@@ -588,7 +591,8 @@ def exposure(people, vehicles, fps, frames):
             vehicle_speeds.append(statistics.median(moving))
     p85 = percentile(vehicle_speeds, 0.85)
     seen = {"minutes": round(frames / fps / 60, 1), "duration_s": round(frames / fps, 1), "crossings": len(crossers), "vehicles": len(vehicle_speeds),
-            "speed_85th_kmh": round(p85 * 3.6, 1) if p85 else None, "crossers": sorted(crossers)}
+            "speed_85th_kmh": round(p85 * 3.6, 1) if p85 else None,
+            "over_25_kmh": sum(v * 3.6 > IN_SCHOOL_KMH for v in vehicle_speeds), "crossers": sorted(crossers)}
     cells = crossing_cells(people, fps)
     if not cells:
         return seen
