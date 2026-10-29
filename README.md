@@ -53,7 +53,7 @@ Without a key the page shows the measurements only; the fix and the letter need 
 - **Run:** `analyze.py` (video to events.json) with `sam.py`, `crowd.py`, `road.py`, `pace.py`, `review.py`,
   `listen.py`, `render.py`, `masks.py` and `seal.py`; before filming, `calibrate.html` and `filmcheck.py`.
 - **Page and letter:** `pack.py` with `summary.py`, `roadmap.py`, `overlay.py`, `fixband.py`, `ailabel.py`,
-  `openweights.py` and `passmark.py`.
+  `openweights.py`, `passmark.py` and `gazette.py`.
 - **Case agent:** `agent.py`.
 - **Checks:** `test_cw.py`; `validate_sind.py`, `validate_dut.py` and `validate_offline.py` (ground truth);
   `validate_gate.py` (G6, G8); `blind_set.py` and `score_humans.py` (G5); `judge_bench.py`; `vehicle_test.py`.
