@@ -10,6 +10,7 @@ college is open, else Mon 2 Nov. Agree the backup with the filmer now.
 ## Before the day
 
 - Written OK from the college office to film and to publish blurred clips.
+- Ask the office two numbers for the site file: school days a year (`"school_days"`) and how long dismissal lasts (`"dismissal_minutes"`). With both and 15 minutes of video, the page adds a school-year line.
 - Print an A3 notice and tape it at the gate: "Road-safety study by [student], [college]. Vehicles are measured.
   Every face is blurred before anything is shared. Raw video is deleted after processing. Contact: ___."
   Film the notice for 3 seconds at the start of the recording.

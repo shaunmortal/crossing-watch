@@ -141,3 +141,18 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
   worst were all serious" in dut-15s; both letters say "SAM 3.1", and 3.1 is not in their measurements, so both
   would now go back; neither mixes two near-misses. Against today's events.json, 3 and 6 of their numbers become
   clip links.
+
+## One number replaces "conflicts per 100 crossings" (Thu 29 Oct)
+
+- The tile divided conflicts (person-vehicle pairs) by crossings (people), so one person passed by several vehicles
+  counted several times, and it could pass 100. `road.exposure()` now also returns who crossed, and the page's first
+  line (and the letter's first fact) counts each person once: "k of n crossings (1 in N)" within 3 s and within
+  1.5 s, with exact 95% ranges (Clopper-Pearson for the share, Garwood's Poisson range for the count).
+- Offline recomputes (cached tracks or ground truth, no API calls; SAM requests were stubbed to fail on a cache miss):
+  - SinD ground truth, 20 min: 37 of 63 crossings (1 in 1.7) within 3 s, 25 of 63 within 1.5 s. Old tile: 103.2.
+  - Dense Indian clip, crowd cache (the recompute matches the stored 83 events pair for pair and its 15 crossings;
+    Spark's stored verdicts leave 18): 5 of 15 (1 in 3) within 3 s, 2 of 15 (1 in 7.5) within 1.5 s; 95% ranges
+    11.8-61.6% and 1.7-40.5%. Old tile: 120.0.
+  - Kids 15-second parts: 0 of 7, 95% range 0.0-41.0%, up to 3.7 people in a recording this long.
+- Pages built from an events.json written before this change show no headline, rather than a count that could hold
+  someone twice.
