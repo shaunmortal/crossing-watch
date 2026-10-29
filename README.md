@@ -78,8 +78,8 @@ Without a key the page shows the measurements only; the fix and the letter need 
 | Evidence clips | ffmpeg, SAM silhouettes (boxes where no mask is cached): pedestrian cyan, vehicle red, every tracked person's head and the bottom quarter of every tracked vehicle (its number plate) blurred on every frame so clips of children can be shared; when a SAM video request for people is full, SAM image search finds the people it missed every 0.2 s of every published clip, with boxes filled in between, and the page says how many (check every public frame by eye) | `render.py`, `masks.py`, `analyze.py` |
 | The near-miss in one picture | A StroMotion still cut from the blurred clip: copies of the vehicle, then the pedestrian, every 0.5 s (1 s for a car), so wider spacing means faster | `render.py` |
 | Hero shot for the video | The blurred clip beside the same frames seen from above in road metres: footsteps, the vehicle's footprint, the 1 m ring and the gap clock. One SVG tile per frame, screenshotted once by headless Chrome, stepped through by ffmpeg | `video/split.py` |
-| Fix and letter | **Muse Spark** (JSON mode) picks a physical fix and writes the letter from the measurements only; verified in two layers before use: code checks every number against the measurements (and sends back numbers in words, speeds in mph, and a sentence that puts one near-miss's speed beside another's time gap), then **Muse Spark as a separate reviewer** (LLM as judge) lists unsupported claims (a warrant said to be met, a death risk for a child); either objection sends the letter back with the reason, and after 3 tries what remains is shown for a person to check, and code adds an AI-draft line for a named person to sign; **Muse Image** draws the fix onto the real street, kept only inside the strip where people were measured crossing (every other pixel stays the real, blurred street), or on the whole photo when no path was measured (there, for a raised crossing, code adds the IRC size: 4 m wide, a speed hump 10-20 m before it) | `pack.py`, `ailabel.py`, `openweights.py` |
-| Why the authority can act (India) | With `"country": "IN"` in the site file, code (never a model) quotes the Supreme Court's order of 7 Oct 2025, 2025 INSC 1189: para 35.5 (in school zones, identify high-risk stretches "using accident data") and para 35.11 (an online grievance mechanism that takes "suggestions for pedestrian crossing"), each linked to its page. Para 35.6 is added when the site's `"city"` is one of the 50 in Annexure 46 of MoRTH's Road Accidents in India 2023. The page says near-misses are not accident data | `pack.py` |
+| Fix and letter | **Muse Spark** (JSON mode) picks a physical fix and writes the letter from the measurements only; verified in two layers before use: code checks every number against the measurements (and sends back numbers in words, speeds in mph, a sentence that puts one near-miss's speed beside another's time gap, and a sentence of the letter or its reason that says someone broke a rule: illegal, unlawful, violat-, breach or broke, which a video cannot show), then **Muse Spark as a separate reviewer** (LLM as judge) lists unsupported claims (a warrant said to be met, a death risk for a child); the judge is asked only when code has no objection; either objection sends the letter back with the reason, and after 3 tries what remains is shown for a person to check (a sentence still saying someone broke a rule is flagged "which a video cannot show"), and code adds an AI-draft line for a named person to sign; **Muse Image** draws the fix onto the real street, kept only inside the strip where people were measured crossing (every other pixel stays the real, blurred street), or on the whole photo when no path was measured (there, for a raised crossing, code adds the IRC size: 4 m wide, a speed hump 10-20 m before it) | `pack.py`, `ailabel.py`, `openweights.py` |
+| Why the authority can act (India) | With `"country": "IN"` in the site file, code (never a model) quotes the Supreme Court's order of 7 Oct 2025, 2025 INSC 1189: para 35.5 (in school zones, identify high-risk stretches "using accident data") and para 35.11 (an online grievance mechanism that takes "suggestions for pedestrian crossing"), each linked to its page. Para 35.6 is added when the site's `"city"` is one of the 50 in Annexure 46 of MoRTH's Road Accidents in India 2023. The page says near-misses are not accident data. Code also quotes the Motor Vehicles (Driving) Regulations 2017 word for word: reg. 16(5) with "This rule applies where signs show it; we do not say any driver broke it.", plus reg. 39(1) when the site sets `zebra_m` | `pack.py`, `gazette.py` |
 
 ## Run
 
@@ -102,7 +102,8 @@ came from. A re-run from the same measurements, language and letter model reuses
 same fix: no new Spark or Muse Image call. Other measurements ask for a new letter; to ask again anyway, delete
 `plan.json`. A letter that has been signed is replaced only with `pack.py OUT SITE --new-letter`, and the signed one
 is kept as `plan-<sha8>.json`. `pack.py` also stops in an `agent.py` case folder (`case/progress.json`) and says to
-sign with `agent.py --approve`.
+sign with `agent.py --approve`. Likewise `agent.py` refuses to start a new case in a folder where `pack.py` signed a
+letter (`signoff.json`) and asks for its own `--out` folder.
 
 - `--notes FILE` sends the principal's notes back with the letter: "change only the sentences the notes ask for". The
   revised letter goes through both checks again (the legal-agent workshop's "Reject with notes"). The notes reach
@@ -347,7 +348,9 @@ everything, so its 24 of 24 shows little, and Muse Spark stays the default judge
 problem; whether it named the planted one is not checked. Both are Muse models, so neither is an independent judge of
 Muse letters, and 8 controls are few. No reply was unreadable (0 of 64 from Spark, 0 of 32 from Glimmer); one that
 cannot be read is counted on its own, never as a catch. Glimmer's figures are from the Kaggle log
-([`<removed-run-record>`](<removed-run-record>)); its output files are not downloaded yet.
+([`<removed-run-record>`](<removed-run-record>)); its output files are not downloaded yet. Code's
+rule-broken check came after these runs; neither base letter nor any added sentence has its words, and the judge's
+prompt is unchanged, so the numbers stand as measured.
 
 ```
 python3 judge_bench.py --out out/judge-bench.json             # build the letters, score the code check
@@ -626,8 +629,9 @@ Measuring near-misses from video is not new, in India either. Each line says onl
   of 7 October 2025, 2025 INSC 1189, paras 35.5, 35.6 and 35.11. https://www.livelaw.in/pdf_upload/2037620122025-10-07-624635.pdf
 - Ministry of Road Transport and Highways (MoRTH), Road Accidents in India 2023, Annexure 46 (the 50 million-plus
   cities). The morth.nic.in link no longer serves the PDF; mirror: https://data.opencity.in/dataset/road-accidents-in-india-2023
-- Motor Vehicles (Driving) Regulations, 2017, regulation 16(5). Gazette of India Extraordinary No. 525, 23 June
-  2017, G.S.R. 634(E): https://keralapolice.gov.in/storage/orders/iaps/cir-15-2018.pdf
+- Motor Vehicles (Driving) Regulations, 2017, regulations 16(5) and 39(1). Gazette of India Extraordinary No. 525,
+  23 June 2017, G.S.R. 634(E): https://keralapolice.gov.in/storage/orders/iaps/cir-15-2018.pdf (16(5) on PDF page
+  10, 39(1) on page 15; page 1 is Kerala Police's covering Circular No. 15/2018, the Gazette starts on page 2)
 - UK Department for Transport (2019), Traffic Signs Manual chapter 6, section 13.5 (gaps in traffic).
 - Traffic Conflict Technique (TCT) toolkit, school zones (CDC/FIA), one-pager:
   https://www.childhealthinitiative.org/media/v5bntgmp/tct-toolkit__one-pager_final_508_updated.pdf
