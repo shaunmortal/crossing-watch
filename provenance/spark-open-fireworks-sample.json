@@ -20,5 +20,7 @@
  "timings": null,
  "response_format": "json_schema",
  "tries": 1,
- "letter_sha256": "a721a428b83db1fc85ee4be25a3ea1003b164ffc0c7f54ce697908ad4b185262"
+ "judged_by": "Muse Spark (a separate reviewer)",
+ "letter_sha256": "a721a428b83db1fc85ee4be25a3ea1003b164ffc0c7f54ce697908ad4b185262",
+ "note": "judged_by added afterwards from that run's plan.json (same letter sha256), which said so; pack.py did not record it in letter-provenance.json then."
 }

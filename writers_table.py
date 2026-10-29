@@ -68,6 +68,14 @@ def number_check(letter, tries):
     return "passed (kept before the last try)" if isinstance(tries, int) and tries < pack.LETTER_TRIES else "NOT RECORDED"
 
 
+def judge_check(letter):
+    """Who passed the letter, "none ran", or what a judge left on a letter kept after the last try."""
+    if "judged_by" in letter:
+        return letter["judged_by"] or "none ran"
+    left = letter.get("unsupported")
+    return f"failed: {len(left)} left" if left else "NOT RECORDED"
+
+
 def row(record):
     letter = record.get("letter", record)  # the Kaggle record keeps the letter's run under "letter"
     model = record.get("model", {}).get("repo") if isinstance(record.get("model"), dict) else record.get("model")
@@ -76,10 +84,9 @@ def row(record):
     prompt, cached, completion, reasoning = tokens(usage)
     show = lambda n: "not reported" if n is None else f"{n:,}"
     seconds = record.get("pack_py_s", record.get("wall_s"))
-    judge = ("NOT RECORDED" if "judged_by" not in letter else letter["judged_by"] or "none ran")
     return (f"| {name} | {'no' if record.get('host') == META_HOST else 'yes'} | {where(record)} "
             f"| {'not reported' if seconds is None else seconds} | {show(prompt)} ({show(cached)}) | {show(completion)} "
-            f"| {show(reasoning)} | {letter.get('tries', '?')} | {number_check(letter, letter.get('tries'))} | {judge} "
+            f"| {show(reasoning)} | {letter.get('tries', '?')} | {number_check(letter, letter.get('tries'))} | {judge_check(letter)} "
             f"| {cost(record, usage)} |")
 
 

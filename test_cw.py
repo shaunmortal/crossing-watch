@@ -2065,7 +2065,7 @@ def test_rejected_json_schema_retries_once_as_json_object_and_the_run_record_say
     kept = json.loads(record)
     assert kept == {"model": SPARK_OPEN, "host": "127.0.0.1", "request_id": "fw-req-9", "usage": usage,
                     "wall_s": kept["wall_s"], "timings": None, "response_format": "json_object", "tries": 1,
-                    "letter_sha256": pack.sha256(good["letter"])} and isinstance(kept["wall_s"], float)
+                    "judged_by": None, "letter_sha256": pack.sha256(good["letter"])} and isinstance(kept["wall_s"], float)
     assert "Muse Spark Open wrote this in 2 s on Fireworks (open weights)." in footer
 
 def test_glimmer_notebook_is_pinned_hash_checked_and_records_its_run():
@@ -4307,6 +4307,43 @@ def test_case_agent_asks_a_person_when_the_same_tool_fails_twice_in_a_row():
     assert stopped["turn"] == 2 and request["kind"] == "tool_failed" and request["answer"] is None
     assert "track failed" in request["question"] and "no video" in request["question"]
     assert kept_going["turn"] == 3 and kept_going["requests"] == [] and kept_going["failures"] == 1
+
+
+def test_letter_provenance_records_the_judge_or_what_the_checks_left():
+    """letter-provenance.json keeps who judged a letter that passed, and what the checks left on one kept after the
+    last try, so writers_table no longer prints NOT RECORDED for a judged run."""
+    import contextlib, io, tempfile
+    from pathlib import Path
+    import writers_table
+    good = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "PET 0.4 s."}
+    reply = {"id": "fw-1", "usage": {"prompt_tokens": 9, "completion_tokens": 3},
+             "choices": [{"message": {"content": json.dumps(good)}, "finish_reason": "stop"}]}
+    server, _ = fake_open_model([reply] * (1 + pack.LETTER_TRIES))
+    verdicts = ['{"problems": []}'] + ['{"problems": ["Says a warrant is met."]}'] * pack.LETTER_TRIES
+    names = "LETTER_URL", "LETTER_MODEL", "LETTER_KEY", "JUDGE_URL", "spark_reply"
+    old = [getattr(pack, n) for n in names]
+    pack.LETTER_URL, pack.LETTER_MODEL, pack.LETTER_KEY, pack.JUDGE_URL = (
+        f"http://127.0.0.1:{server.server_port}/v1", SPARK_OPEN, "", "")
+    pack.spark_reply = lambda prompt, image, key: verdicts.pop(0)
+    records = []
+    try:
+        for _ in range(2):
+            with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stderr(io.StringIO()):
+                pack.new_plan(Path(tmp), "PROMPT", '{"pet_s": 0.4}', "key", None)
+                records.append(json.loads((Path(tmp) / pack.PROVENANCE).read_text()))
+    finally:
+        for n, value in zip(names, old):
+            setattr(pack, n, value)
+        server.shutdown()
+        server.server_close()
+    passed, kept = records
+    assert passed["judged_by"] == pack.JUDGE and "unsupported" not in passed
+    assert "judged_by" not in kept and kept["tries"] == pack.LETTER_TRIES
+    assert (kept["unmeasured"], kept["mixed"], kept["unsupported"]) == ([], [], ["Says a warrant is met."])
+    assert writers_table.judge_check(passed) == pack.JUDGE and writers_table.judge_check(kept) == "failed: 1 left"
+    assert writers_table.judge_check({"tries": 1}) == "NOT RECORDED"
+    sample = json.loads(Path(__file__).with_name("provenance").joinpath("spark-open-fireworks-sample.json").read_text())
+    assert sample["judged_by"] == pack.JUDGE  # from that run's plan.json, same letter sha256
 
 if __name__ == "__main__":
     for name, check in list(globals().items()):

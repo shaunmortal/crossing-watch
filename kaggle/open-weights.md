@@ -17,9 +17,10 @@ of 8 clean letters (`<removed-run-record>`): too jumpy alone, hence the 2-vote r
 letter `provenance/spark-open-sample-letter.txt`, its sha256 in the record). It proves the open model writes a letter
 that passes every check on the first try, through a partner's serverless API: request id
 `chatcmpl-9e68cb0170d84c348eb29b1687354a4f`, 55.5 s, about one cent. The record (pack.py's `letter-provenance.json`)
-keeps the tries but not the checks, hence "NOT RECORDED" for its judge below; the run's `plan.json` (about `sample/`,
-kept outside the repo) says `"judged_by": "Muse Spark (a separate reviewer)"` with no number left unmeasured, and a
-letter kept on try 1 of 3 is one no check objected to (`pack.ask_plan` returns early only then).
+kept the tries but not the checks when it ran; its `judged_by` was added afterwards from the run's `plan.json` (about
+`sample/`, kept outside the repo, same letter sha256), which says `"judged_by": "Muse Spark (a separate reviewer)"`
+with no number left unmeasured, and a letter kept on try 1 of 3 is one no check objected to (`pack.ask_plan` returns
+early only then). pack.py's records now keep the judge, and on a letter kept after the last try what the checks left.
 
 ## Writers table
 
@@ -29,7 +30,7 @@ committed records:
 | Writer | Open weights | Where it ran | Wall s | Prompt tokens (cached) | Completion tokens | Reasoning tokens | Tries | Number check | Passed by judge | Cost per letter |
 |---|---|---|---|---|---|---|---|---|---|---|
 | Muse Glimmer 30B | yes | Kaggle, 2 x Tesla T4, self-hosted | 313 | 962 (926) | 2,263 | not reported | 2 | passed | none ran | $0 (free Kaggle GPU quota) |
-| Muse Spark Open | yes | Fireworks (serverless) | 55.5 | 1,019 (960) | 2,732 | 2,140 | 1 | passed (kept before the last try) | NOT RECORDED | $0.0118 |
+| Muse Spark Open | yes | Fireworks (serverless) | 55.5 | 1,019 (960) | 2,732 | 2,140 | 1 | passed (kept before the last try) | Muse Spark (a separate reviewer) | $0.0118 |
 
 Prices, USD per 1M tokens input / cached input / output, read 29 Oct 2026: Muse Spark Open 1.25 / 0.15 / 4.25 (https://fireworks.ai/models/fireworks/muse-spark-open); Muse Spark 1.25 / 0.15 / 4.25 (https://dev.meta.ai/docs/pricing-rate-limits.md). Tokens are the kept reply's; wall seconds are the whole pack.py run where the record has it (Kaggle), else the reply's.
 

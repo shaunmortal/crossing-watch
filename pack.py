@@ -71,6 +71,7 @@ WRITER = writer_label(LETTER_URL)
 LETTER_HOST = sam.env_value("LETTER_MODEL_HOST")  # where it ran, e.g. "Kaggle 2 x T4" (the notebook reads nvidia-smi)
 PROVENANCE = "letter-provenance.json"  # beside plan.json: what an open-weights server ran, measured; never a key
 RUN_KEYS = ("request_id", "usage", "wall_s", "timings", "response_format")  # openweights.reply's record
+CHECK_KEYS = ("unmeasured", "mixed", "unsupported")  # what ask_plan's checks left on a letter kept after the last try
 JUDGE = "Muse Spark (a separate reviewer)"
 JUDGE_PROMPT = """You review a letter before a school sends it to its road authority. MEASUREMENTS are the only facts.
 List every problem: a claim or number the measurements do not support; a number above one written in words, not in
@@ -1280,15 +1281,23 @@ def write_plan(out_dir, plan):
     """plan.json, the paid-for letter, after copying the letter it held to plan-<first 8 of its sha256>.json, so no
     paid-for or signed letter is ever lost (signoff.json's letter_sha256 names its file); pack and the case agent both
     write through here. Beside it, when an open-weights server wrote it, PROVENANCE: the model id, host, request id,
-    usage, wall seconds and the letter's sha256 (never the key)."""
+    usage, wall seconds, the checks (letter_checks) and the letter's sha256 (never the key)."""
     path, old = out_dir / "plan.json", read_json(out_dir / "plan.json")
     if isinstance(old, dict) and isinstance(old.get("letter"), str):
         shutil.copyfile(path, out_dir / PLAN_BACKUP.format(sha8=sha256(old["letter"])[:8]))
     path.write_text(json.dumps(plan, indent=1, ensure_ascii=False))
     if LETTER_URL and "wall_s" in plan:
         record = {"model": LETTER_MODEL, "host": openweights.host(LETTER_URL), **{k: plan.get(k) for k in RUN_KEYS},
-                  "tries": plan.get("tries"), "letter_sha256": sha256(plan["letter"])}
+                  "tries": plan.get("tries"), **letter_checks(plan), "letter_sha256": sha256(plan["letter"])}
         (out_dir / PROVENANCE).write_text(json.dumps(record, indent=1))
+
+
+def letter_checks(plan):
+    """What the checks said, for PROVENANCE: on a letter that passed them, who judged it (None: no judge ran); on one
+    kept after the last try, ask_plan's lists of what was left (which judges ran then is not in the plan)."""
+    if "unmeasured" not in plan:
+        return {"judged_by": plan.get("judged_by")}
+    return {k: plan.get(k, []) for k in CHECK_KEYS}
 
 
 def placeholders(letter):
