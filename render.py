@@ -82,6 +82,16 @@ def window(event, fps):
     return max(0, round(min(times) * fps) - round(PAD_S * fps)), round(max(times) * fps) + round(PAD_S * fps)
 
 
+def replay(event, feet, shapes, fps):
+    """Where the two were in road metres on each frame of the event's clip (window()), for the hero split shot:
+    [{"frame", "person": [x, y], "vehicle": [[x, y], ...]}], None where one was not measured on that frame. `feet`
+    is the pedestrian piece's {frame: point}, `shapes` the vehicle's {frame: shape} (road.vehicle_edges)."""
+    first, last = window(event, fps)
+    metres = lambda points: [[round(x, 2), round(y, 2)] for x, y in points]
+    return [{"frame": f, "person": metres([feet[f]])[0] if f in feet else None,
+             "vehicle": metres(shapes[f]) if f in shapes else None} for f in range(first, last + 1)]
+
+
 def shapes(track, found, first, last):
     """{frame: (x, y, mask rows)} for frames first..last: the SAM mask under the track's box (from masks.find), or
     one within HOLD_FRAMES moved to this frame's box; frames with neither are left out and keep their box."""

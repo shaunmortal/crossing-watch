@@ -291,6 +291,61 @@ def test_stromotion_still_copies_both_at_a_fixed_step_and_skips_piled_up_copies(
     assert still == {"image": "event1-strobe.jpg", "moments": 5, "step_s": 1.0} and size.strip() == "320,180"
 
 
+def test_evidence_clips_save_one_road_position_per_clip_frame_for_the_hero_split():
+    import analyze, subprocess, tempfile
+    from pathlib import Path
+    e = {"person": "p/0", "vehicle": "car#1", "t_person_s": 2.0, "t_vehicle_s": 2.4}
+    feet = {f: (0.1 * f, 5.0) for f in range(0, 40, 2)}  # crowd mode: people every 2nd frame
+    shapes = {f: ((20 - 0.5 * f, 4.0), (20 - 0.5 * f, 6.0)) for f in range(10, 50)}
+    boxes = {f: [10 + 2 * f, 40, 30 + 2 * f, 100] for f in feet}
+    old = analyze.listen.listen
+    analyze.listen.listen = lambda *args: []  # no Wonder call
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            clip = Path(tmp) / "clip.mp4"
+            subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=10:duration=8",
+                            "-pix_fmt", "yuv420p", str(clip)], check=True)
+            analyze.add_evidence(clip, clip, Path(tmp), [e], {"p/0": feet}, {"car#1": shapes}, {"p": boxes},
+                                 {"car#1": {}}, None, (320, 180))
+            frames = analyze.frame_count(Path(tmp) / e["clip"])
+    finally:
+        analyze.listen.listen = old
+    assert len(e["replay"]) == frames == 45  # 2 s before she was on the spot to 2 s after the car was
+    assert e["replay"][0] == {"frame": 0, "person": [0.0, 5.0], "vehicle": None} and e["replay"][1]["person"] is None
+    assert e["replay"][24]["vehicle"] == [[8.0, 4.0], [8.0, 6.0]]
+
+
+def test_hero_split_steps_one_map_tile_per_clip_frame_beside_the_clip():
+    import subprocess, tempfile
+    from pathlib import Path
+    from video import split
+    replay = [{"frame": f, "person": [0.1 * f, 5.0] if f % 2 == 0 and f <= 40 else None,
+               "vehicle": [[20 - 0.5 * f, 4.0], [20 - 0.5 * f, 6.0]] if f >= 10 else None} for f in range(45)]
+    e = {"vehicle": "car#1", "tier": "serious", "pet_s": 0.4, "t_person_s": 2.0, "t_vehicle_s": 2.4, "where": [2.0, 5.0],
+         "replay": replay}
+    assert split.clock(e, -0.1) is None and split.clock(e, 0.25) == ("0.2 s", False)
+    assert split.clock(e, 0.39) == ("0.4 s, serious near-miss, under 1.5 s", True)  # freezes on the page clock's frame
+    tiles = split.page(e, 10).split("<svg")[1:]
+    assert len(tiles) == 45 and 'class="ring"' not in tiles[19] and 'class="ring"' in tiles[20]  # from her arrival
+    assert "frozen" not in tiles[23] and "0.3 s" in tiles[23] and "frozen" in tiles[24]
+    assert 'class="feet"' in tiles[41] and 'class="feet"' not in tiles[42]  # a missing frame borrows one, not two
+    with tempfile.TemporaryDirectory() as tmp:
+        clip, sheet, hero = (Path(tmp) / name for name in ("event1.mp4", "tiles.png", "hero.mp4"))
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=10:duration=2",
+                        "-pix_fmt", "yuv420p", str(clip)], check=True)
+        (w, h), cols, grey = split.TILE, split.COLS, lambda k: f"{20 + 18 * k:02x}" * 3
+        shades = ",".join(f"drawbox=x={k % cols * w}:y={k // cols * h}:w={w}:h={h}:color=0x{grey(k)}:t=fill"
+                          for k in range(12))  # tile k a flat grey, lighter each frame
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", f"color=black:size={cols * w}x{2 * h}",
+                        "-vf", shades, "-frames:v", "1", str(sheet)], check=True)
+        split.stack(clip, sheet, 12, 10, hero)
+        size = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=width,height", "-of", "csv=p=0",
+                               str(hero)], check=True, capture_output=True, text=True).stdout.strip()
+        levels = subprocess.run(["ffmpeg", "-v", "error", "-i", str(hero), "-vf", f"crop={w}:{h}:{w}:0,scale=1:1,format=gray",
+                                 "-f", "rawvideo", "-"], check=True, capture_output=True).stdout
+    assert size == f"{2 * w},{h}" and len(levels) == 12 and all(b - a > 10 for a, b in zip(levels, levels[1:]))
+
+
 def test_spark_verdicts_are_validated():
     ok = review.read_verdict('Sure: {"cyan_is_a_pedestrian": false, "road_user": "not a person", "reason": "a pole"}')
     assert ok == {"is_person": False, "road_user": "not a person", "reason": "a pole"}

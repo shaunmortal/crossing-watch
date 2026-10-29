@@ -319,16 +319,17 @@ def review_people(clip, out_dir, events, people, person_boxes, key, frame_size, 
         e["review"] = verdicts.get(pid)
 
 
-def add_evidence(video, clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size):
+def add_evidence(video, clip, out_dir, events, people, vehicles, person_boxes, vehicle_boxes, key, frame_size):
     """Evidence clip and sound check for the top events Spark did not reject; one failure costs that event's
     evidence, not the run. Only the frames of the track piece that made the event are drawn (SAM silhouettes, boxes
-    where no mask is cached)."""
+    where no mask is cached). Each clip's frames are also saved in road metres, for video/split.py."""
     kept = [e for e in events if (e.get("review") or {}).get("is_person", True)]
     for i, e in enumerate(kept[:EVIDENCE_CLIPS]):
         pair = piece_boxes(person_boxes, people, e["person"]), vehicle_boxes[e["vehicle"]]
         try:
             e["clip"] = render.render(clip, e, *pair, FPS, out_dir / f"event{i + 1}.mp4",
                                       everyone=list(person_boxes.values()), frame_size=frame_size).name
+            e["replay"] = render.replay(e, people[e["person"]], vehicles[e["vehicle"]], FPS)  # frame for frame
             e["heard"] = listen.listen(video, e, out_dir / f"event{i + 1}.wav", key)
             e["strobe"] = render.strobe(out_dir / e["clip"], e, *pair, FPS, frame_size,
                                         out_dir / f"event{i + 1}-strobe.jpg")  # the whole near-miss in one picture
@@ -398,7 +399,7 @@ def main():
 
     write_events(out_dir, site, events, seen, cost, full, timeline, paths)  # saved before the slower, network-bound evidence step
     review_people(clip, out_dir, events, people, person_boxes, key, frame_size, top_down)
-    add_evidence(args.video, clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size)
+    add_evidence(args.video, clip, out_dir, events, people, vehicles, person_boxes, vehicle_boxes, key, frame_size)
     write_events(out_dir, site, events, seen, cost, full, timeline, paths)
     report(seen, events)
 
