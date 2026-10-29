@@ -2812,6 +2812,22 @@ def test_case_agent_page_is_the_pack_page_with_its_privacy_note_and_gap_barcode(
     assert "up to 2 found by SAM image search" in page and "Gaps in traffic" in page
 
 
+def test_case_agent_page_names_the_tracks_spark_removed():
+    """The agent's page gets pack's note on the tracks Spark's review removed, from events.json's unfiltered events
+    (the page's cards show only the kept ones), with no digit-bearing reason."""
+    import agent, html, tempfile
+    with tempfile.TemporaryDirectory() as folder:
+        out, site, e = agent_case(folder)
+        pole = {**e, "person": "2/0", "review": {"is_person": False, "road_user": "not a person", "reason": "a pole"}}
+        plate = {**e, "person": "3/0", "review": {"is_person": False, "road_user": "rider", "reason": "plate MP04 AB"}}
+        data = {"fps": 10, "exposure": {"minutes": 0.3}, "events": [e, pole, plate]}
+        (out / "events.json").write_text(json.dumps(data))
+        agent.write_page({"site": str(out / "site.json"), "out": str(out), "letter": None})
+        page = (out / "index.html").read_text()
+    note = 'Removed by Muse Spark: 2 tracks (track 2/0, not a person ("a pole"); track 3/0, rider). Spark can be wrong.'
+    assert html.escape(note) in page and "MP04" not in page
+
+
 def test_case_agent_sign_off_draws_the_fix_in_the_measured_band_once():
     """--approve: Muse Image (stubbed) draws only inside the measured band, as pack.main does, the share/ folder holds
     the band picture under SHA256SUMS, and writing the page again after sign-off pays for no new picture."""
