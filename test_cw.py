@@ -704,6 +704,39 @@ def test_paths_and_other_arrays_never_reach_the_letter_facts():
     assert '"crossings": 4' in text and '"vehicle_kmh": 30.0' in text
 
 
+def test_filmcheck_flags_settings_that_break_speeds_or_metres():
+    import filmcheck
+    phone = [{"codec_type": "video", "width": 1920, "height": 1080, "r_frame_rate": "30/1", "avg_frame_rate": "30/1"},
+             {"codec_type": "audio"}]
+
+    def shot(**change):
+        return [{**phone[0], **change}, phone[1]]
+    assert filmcheck.problems(phone) == []
+    assert filmcheck.problems(shot(r_frame_rate="30000/1001", avg_frame_rate="315600/10529")) == []  # 29.97 fps
+    assert filmcheck.problems(shot(side_data_list=[{"rotation": 180}])) == []  # landscape the other way up
+    for bad in (shot(r_frame_rate="24000/1001", avg_frame_rate="24000/1001"),  # Cinematic, Action mode, Auto FPS
+                shot(avg_frame_rate="27/1"),                                  # the rate changed while recording
+                shot(side_data_list=[{"rotation": -90}]), shot(tags={"rotate": "90"}),  # portrait
+                shot(width=848, height=478), shot(width=3840, height=2160),  # a WhatsApp copy, 4K
+                phone[:1]):                                                   # no sound
+        assert len(filmcheck.problems(bad)) == 1, bad
+    assert filmcheck.problems(phone[1:]) == ["no video stream"]
+
+
+def test_filmcheck_reads_a_real_ffprobe_reply():
+    import filmcheck, subprocess, tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as tmp:
+        clip = Path(tmp) / "test.mp4"
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=1920x1080:rate=30:d=0.5", "-f", "lavfi",
+                        "-i", "sine=d=0.5", "-c:v", "libx264", "-preset", "ultrafast", "-shortest", str(clip)], check=True)
+        assert filmcheck.problems(filmcheck.probe(clip)) == []
+        upright = Path(tmp) / "portrait.mp4"
+        subprocess.run(["ffmpeg", "-v", "error", "-display_rotation", "90", "-i", str(clip), "-c", "copy", str(upright)],
+                       check=True)
+        assert filmcheck.problems(filmcheck.probe(upright))[0].startswith("shown 1080x1920")
+
+
 def test_sam_text_parses_into_tracks():
     text = ("<0f>0<|box;x1=1.0;y1=2.0;x2=3.0;y2=4.0;w=640;h=360|><|mask...|>1<|box;x1=5;y1=6;x2=7;y2=8;w=640;h=360|>"
             "<1f>0<|box;x1=1.5;y1=2.5;x2=3.5;y2=4.5;w=640;h=360|>")
