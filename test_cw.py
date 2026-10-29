@@ -656,9 +656,11 @@ def test_map_draws_each_event_where_it_happened():
     svg = roadmap.svg(events, [[-2, -2], [2, -2], [2, 2], [-2, 2]])
     assert svg.count("<circle") == 2 and svg.count('class="hit"') == 1 and svg.count('class="near"') == 1
     assert "#1" in svg and "#2" in svg and "car at 30.0 km/h" in svg and svg.count("<polyline") == 2
-    assert roadmap.svg([], [[0, 0], [1, 0], [1, 1], [0, 1]]) == ""
+    empty = roadmap.svg([], [[0, 0], [1, 0], [1, 1], [0, 1]])
+    assert 'class="area"' in empty and "<circle" not in empty  # never empty: at least the measured area
     site = {"world_points": [[-2, -2], [2, -2], [2, 2], [-2, 2]]}
-    assert "Where it happened" in pack.map_section(events, site) and pack.map_section(events[2:], site) == ""
+    assert "Where it happened" in pack.map_section(events, site)
+    assert "Where people crossed" in pack.map_section(events[2:], site)  # no near-miss placed: still a map
 
 
 def test_busy_spans_give_the_gaps_and_the_longest_wait_for_one():
@@ -729,7 +731,7 @@ def test_map_ground_is_the_photo_seen_from_above():
         assert "standing objects lean" in pack.map_section(events, site, (picture, rect))
         assert "standing objects lean" not in pack.map_section(events, site)
         assert roadmap.ground(photo, site | {"view": "top-down"}, events, out) is None  # already seen from above
-        assert roadmap.ground(photo, site, [{"tier": "serious"}], out) is None  # nothing placed: no map
+        assert roadmap.ground(photo, site, [{"tier": "serious"}], out)[1] == rect  # nothing placed: the area's ground
         with contextlib.redirect_stderr(io.StringIO()) as said:
             assert roadmap.ground(out / "missing.jpg", site, events, out) is None
         assert "no street photo under the map" in said.getvalue()
@@ -824,6 +826,15 @@ def test_site_concepts_must_not_share_a_cache_name():
             raise AssertionError("duplicate concepts accepted")
         except SystemExit as err:
             assert "same cache name" in str(err)
+        base = {"image_points": SQUARE_IMG, "world_points": SQUARE_ROAD, "vehicles": ["car"]}
+        for extra, ok in (({"zebra_m": []}, True), ({"zebra_m": SQUARE_ROAD, "gate_m": [[0, 0], [2, 0]]}, True),
+                          ({"zebra_m": [[0, 0]]}, False), ({"gate_m": [[0, 0], [2, 0], [4, 0]]}, False),
+                          ({"gate_m": [[0, "a"], [2, 0]]}, False)):
+            path.write_text(json.dumps(base | extra))
+            try:
+                assert analyze.load_site(path)["vehicles"] == ["car"] and ok, extra
+            except SystemExit as err:
+                assert not ok and ("zebra_m" in str(err) or "gate_m" in str(err)), extra
 
 
 def test_number_check_reads_grouped_numbers_and_non_english_facts():
@@ -843,6 +854,76 @@ def test_paths_and_other_arrays_never_reach_the_letter_facts():
     array_numbers = "41.7 63.2 57.9 88.4 77.3 12.6 71.1 72.2 13.7 19.3 23.9 31.7 44.4 55.5"
     assert pack.unmeasured(array_numbers, text) == sorted(array_numbers.split(), key=float)
     assert '"crossings": 4' in text and '"vehicle_kmh": 30.0' in text
+
+
+DESIRE = {"a": [[[0.3, -3.7], [0.3, 3.9]]], "b": [[[1.1, -3.7], [1.1, 3.9]]], "c": [[[1.7, 3.9], [1.7, -3.7]]],
+          "d": [[[9.4, -3.7], [9.4, 3.9]]]}  # four people across a road along x; a, b and c within 2 m
+
+
+def test_desire_lines_are_crossings_not_pavement_walks():
+    import analyze, tempfile
+    from pathlib import Path
+    fps, car = 10, edges_along_x(8.0, 10, 60)  # the road runs along x
+    people = {"a/0": walking_across(40), "a/1": {f: (4.0, 1.5 * (f - 60) / 10) for f in range(60, 100)},
+              "b/0": {f: (-6 + 0.15 * f, -3.0) for f in range(40)},  # 6 m along the pavement
+              "c/0": {f: (8.0, 0.01 * (f % 3)) for f in range(40)}}  # waits in one spot
+    paths = road.crossing_paths(people, {"car#1": car}, fps)
+    assert list(paths) == ["a"] and len(paths["a"]) == 2  # one person, both pieces; the pavement walk is not a crossing
+    assert paths["a"][0][:2] == [[0.0, -3.0], [0.0, -2.2]] and len(paths["a"][0]) == 8  # a point every 0.5 s
+    assert set(road.crossing_paths(people, {}, fps)) == {"a", "b"}  # no vehicle, no road axis: every crossing stays
+    tilt = lambda deg: {f: tuple((x * math.cos(math.radians(deg)), x * math.sin(math.radians(deg))) for x, _ in e)
+                        for f, e in car.items()}
+    axis = road.road_axis({"car#1": tilt(1), "car#2": tilt(-1)}, fps)  # headings 1 and 179 degrees: the road is x
+    assert abs(axis[1]) < 1e-9 and abs(abs(axis[0]) - 1) < 1e-9
+    with tempfile.TemporaryDirectory() as folder:  # analyze keeps the paths apart from the facts' exposure
+        analyze.write_events(Path(folder), {}, [], {"minutes": 1}, None, None, None, DESIRE)
+        assert json.loads((Path(folder) / "events.json").read_text())["paths"] == DESIRE
+
+
+def test_desire_lines_count_crossings_against_the_zebra_or_the_gate():
+    import roadmap
+    zebra, gate = [[8.6, -3.0], [11.2, -3.0], [11.2, 3.0], [8.6, 3.0]], [[-1.0, -3.5], [1.0, -3.5]]
+    lines = roadmap.desire_lines(DESIRE, {})
+    assert lines[0] == ("Where people crossed: 4 people walked 2 m or more, mostly across the road; 3 of them within "
+                        "the busiest 2 m stretch of road.")
+    assert len(lines) == 2 and "6.1.9.2 (iii)" in lines[1] and "shortest possible direct route" in lines[1]
+    assert "3 of 4 (75%) crossed more than 2 m outside the marked crossing." in roadmap.desire_lines(DESIRE, {"zebra_m": zebra})
+    assert "No marked crossing; 3 of 4 crossed straight out of the gate" in roadmap.desire_lines(
+        DESIRE, {"zebra_m": [], "gate_m": gate})[1]
+    assert len(roadmap.desire_lines(DESIRE, {"gate_m": gate})) == 2  # a zebra not stated either way: no claim
+    assert roadmap.desire_lines(None, {}) == [] and roadmap.desire_lines({}, {}) == []
+    text = pack.facts({"name": "gate", "zebra_m": zebra}, [], {"minutes": 1}, DESIRE)
+    assert '"desire_lines": "Where people crossed: 4 people' in text and "(75%)" in text
+    assert pack.unmeasured("9.4 1.7 3.7 3.9", text) == ["1.7", "3.7", "3.9", "9.4"]  # never the paths' coordinates
+    svg = roadmap.svg([], SQUARE_ROAD, paths=DESIRE)
+    assert svg.count('class="trail"') == 4 and roadmap.extent([], SQUARE_ROAD, DESIRE) == (-2.0, -5.7, 12.0, 12.0)
+    section = pack.map_section([], {"world_points": SQUARE_ROAD, "zebra_m": zebra}, paths=DESIRE)
+    assert "Where people crossed" in section and "Faint blue" in section and "(75%)" in section
+
+
+def test_a_clip_without_near_misses_still_gets_its_letter_from_the_desire_lines():
+    import contextlib, io, sys, tempfile
+    from pathlib import Path
+    plan = {"fix": "raised zebra", "why": "w", "image_prompt": "i", "letter": "3 of 4.", "writer": "Muse Spark"}
+    asked = []
+    with tempfile.TemporaryDirectory() as folder:
+        out = Path(folder)
+        (out / "site.json").write_text(json.dumps({"name": "gate", "world_points": SQUARE_ROAD}))
+        old = sys.argv, pack.optional_key, pack.street_photo, pack.ask_plan
+        sys.argv = ["pack.py", folder, str(out / "site.json")]
+        pack.optional_key, pack.street_photo = lambda: None, lambda *args: None  # no key, no network, no photo
+        pack.ask_plan = lambda prompt, measured, key, photo: asked.append(measured) or plan
+        try:
+            for paths in ({}, DESIRE):
+                (out / "events.json").write_text(json.dumps({"fps": 10, "exposure": {"minutes": 0.3}, "events": [],
+                                                             "paths": paths}))
+                with contextlib.redirect_stdout(io.StringIO()):
+                    pack.main()
+                assert (out / "plan.json").exists() == bool(paths)  # nobody crossed: nothing to write a letter on
+        finally:
+            sys.argv, pack.optional_key, pack.street_photo, pack.ask_plan = old
+        page = (out / "index.html").read_text()
+        assert len(asked) == 1 and "desire_lines" in asked[0] and "Where people crossed" in page and "raised zebra" in page
 
 
 def test_sam_text_parses_into_tracks():

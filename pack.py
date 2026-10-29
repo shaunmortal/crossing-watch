@@ -53,7 +53,7 @@ Below are measurements from a video of the crossing, made by Crossing Watch (SAM
 post-encroachment time). Use ONLY these facts; never invent numbers, names, places or dates.
 Death-risk figures are for adults hit by a car front: never state a death risk for a child.
 From the engineering lines, mention at most PV² and the share of time in gaps, briefly, with their main caveat;
-never say a standard is met.
+never say a standard is met. If desire_lines is given, you may say where people crossed and quote its IRC:103-2012 words.
 
 {facts}
 
@@ -77,10 +77,11 @@ def serious(events):
     return [e for e in events if e.get("tier", "serious") == "serious"]
 
 
-def facts(site, events, seen):
+def facts(site, events, seen, paths=None):
     """The measurements a letter may quote, as JSON. Arrays (paths, spans, replays) never enter: they are not facts
-    for a letter, and their many numbers would let almost any number in a letter pass the measured-number check."""
-    worst = events[:SHOWN_EVENTS]
+    for a letter, and their many numbers would let almost any number in a letter pass the measured-number check.
+    The desire lines (`paths`) enter only as roadmap.desire_lines()' counts."""
+    worst, desire = events[:SHOWN_EVENTS], roadmap.desire_lines(paths, site)
     return json.dumps({
         "site": site.get("name", ""), "observed": {k: v for k, v in seen.items() if not isinstance(v, (list, tuple, set))},
         "serious_near_misses": len(serious(events)), "close_passes": len(events) - len(serious(events)),
@@ -91,6 +92,7 @@ def facts(site, events, seen):
                    "road_user": (e.get("review") or {}).get("road_user", "not reviewed")} for e in worst],
         "risk_source": "Rosén & Sander 2009, adults 15+, car fronts",
         "engineering": engineering_lines(seen, None),
+        **({"desire_lines": " ".join(desire)} if desire else {}),
     }, indent=1, ensure_ascii=False)  # \u escapes would add digits the number check counts as measured
 
 
@@ -314,15 +316,21 @@ def heard_line(heard):
 
 
 
-def map_section(events, site, ground=None):
-    drawn = roadmap.svg(events, site["world_points"], SHOWN_EVENTS, ground)
-    if not drawn:
-        return ""
+def map_section(events, site, ground=None, paths=None):
+    """The map, drawn even with no near-miss: then it shows where people crossed (the desire lines)."""
+    placed = any(e.get("where") for e in events)
+    trails = (f" Faint blue: where each person crossed, a point every {road.DESIRE_STEP_S:g} s." if paths else "")
+    near = (" Blue: the pedestrian, red: the vehicle, 2 s either side. Filled dots: serious near-misses; rings: close "
+            "passes." if placed else "")
     under = (" Under it, the street photo seen from above: the road surface is to scale, standing objects lean, and "
-             "the dots are measured positions." if ground else "")
-    return (f"<section><h2>Where it happened</h2>{drawn}<p class=\"note\">Seen from above, in metres on the road "
-            "(grid every 5 m; dashed: the measured area). Blue: the pedestrian, red: the vehicle, 2 s either side. "
-            f"Filled dots: serious near-misses; rings: close passes.{under}</p></section>")
+             f"the {'dots' if placed else 'lines'} are measured positions." if ground else "")
+    lines = roadmap.desire_lines(paths, site)  # the counts, then IRC:103-2012's words, shown as a note
+    desire = "".join(f"<p>{html.escape(line)}</p>" for line in lines[:-1]) + "".join(
+        f'<p class="note">{html.escape(line)}</p>' for line in lines[-1:])
+    return (f"<section><h2>{'Where it happened' if placed else 'Where people crossed'}</h2>"
+            f"{roadmap.svg(events, site['world_points'], SHOWN_EVENTS, ground, paths)}<p class=\"note\">Seen from "
+            f"above, in metres on the road (grid every 5 m; dashed: the measured area).{trails}{near}{under}</p>"
+            f"{desire}</section>")
 
 
 def fix_section(plan, images):
@@ -380,7 +388,7 @@ def stats(events, seen):
     return "".join(f"<div><b>{html.escape(str(v))}</b>{html.escape(label)}</div>" for v, label in tiles)
 
 
-def page(site, events, seen, plan, images, fps, cost=None, full=None, timeline=None, ground=None):
+def page(site, events, seen, plan, images, fps, cost=None, full=None, timeline=None, ground=None, paths=None):
     cards = "\n".join(event_card(i + 1, e, fps, overlay.strip(e, site, events[:SHOWN_EVENTS]))
                       for i, e in enumerate(events[:SHOWN_EVENTS])) or (
         f"<p>No conflicts under {road.CLOSE_PASS_S} s in these {html.escape(str(seen.get('minutes', '?')))} minutes. "
@@ -400,7 +408,7 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None, timeline=N
 <p class="muted">{html.escape(site.get("name", ""))}</p>
 <div class="stats">{stats(events, seen)}</div>{limit_note(full)}
 {engineering(seen, cost)}{roadmap.gap_strip(timeline, events, SHOWN_EVENTS, full)}
-{map_section(events, site, ground)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{fixband.figure(images)}{letter_section(plan)}
+{map_section(events, site, ground, paths)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{fixband.figure(images)}{letter_section(plan)}
 <section><h2>How this was measured</h2><p class="note">{html.escape(method)}</p></section>{overlay.SCRIPT}</body></html>"""
 
 
@@ -428,18 +436,19 @@ def main():
     data = json.loads((out_dir / "events.json").read_text())
     events = confirmed(data["events"])
     seen = data.get("exposure") or {"minutes": round(clip_minutes(out_dir / "clip.mp4", data["fps"]), 1)}
+    paths = data.get("paths") or {}  # desire lines: with them a 0-event clip still gets its photo, fix and letter
     plan, images, ground = None, None, None
-    if events:
+    if events or paths:
         try:
             photo = street_photo(out_dir / "clip.mp4", out_dir / "street.jpg", site.get("person", "person"),
                                  site.get("person_mode") == "crowd")
         except (ValueError, OSError, subprocess.CalledProcessError) as err:
             print(f"no street photo: {err}", file=sys.stderr)
             photo = None
-        ground = roadmap.ground(photo, site, events, out_dir) if photo else None  # the street seen from above
+        ground = roadmap.ground(photo, site, events, out_dir, paths) if photo else None  # the street seen from above
         try:
             key = optional_key()
-            measured = facts(site, events, seen)
+            measured = facts(site, events, seen, paths)
             prompt = LETTER_PROMPT.format(facts=measured, language=site.get("letter_language", "English"))
             plan = ask_plan(prompt, measured, key, photo)
             (out_dir / "plan.json").write_text(json.dumps(plan, indent=1, ensure_ascii=False))  # the paid-for letter
@@ -451,7 +460,7 @@ def main():
                 http.client.HTTPException, subprocess.CalledProcessError) as err:
             print(f"letter or fix image failed, page will show the measurements only: {err}", file=sys.stderr)
     (out_dir / "index.html").write_text(page(site, events, seen, plan, images, data["fps"], data.get("cost"),
-                                             data.get("sam_full_requests"), data.get("timeline"), ground))
+                                             data.get("sam_full_requests"), data.get("timeline"), ground, paths))
     print(f"wrote {out_dir / 'index.html'}: {len(serious(events))} serious, {len(events) - len(serious(events))} close "
           f"passes, fix: {plan['fix'] if plan else 'none'}")
 

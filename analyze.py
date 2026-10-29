@@ -57,6 +57,11 @@ def load_site(path):
         raise SystemExit(f"{path}: zone_m must be [x_min, y_min, x_max, y_max] in metres")
     if "roadway_m" in site and not numeric_points(site["roadway_m"]):
         raise SystemExit(f"{path}: roadway_m must be a polygon of at least three [x, y] points in metres")
+    if "zebra_m" in site and site["zebra_m"] != [] and not numeric_points(site["zebra_m"]):
+        raise SystemExit(f"{path}: zebra_m must be the marked crossing's corners as [x, y] points in metres, or [] for none")
+    if "gate_m" in site and not (isinstance(site["gate_m"], list) and len(site["gate_m"]) == 2
+                                 and numeric_points(site["gate_m"] * 2)):  # numeric_points wants three or more
+        raise SystemExit(f"{path}: gate_m must be the gate's two posts as [x, y] points in metres")
     if site.get("person_mode", "video") not in ("video", "crowd"):
         raise SystemExit(f"{path}: person_mode must be \"video\" or \"crowd\" (frame-by-frame detection for dense crowds)")
     if site.get("vehicle_mode", "video") not in ("video", "crowd"):
@@ -257,11 +262,11 @@ def probe(path, entries, *extra):
                            "-of", "csv=p=0", str(path)], check=True, capture_output=True, text=True).stdout.strip()
 
 
-def write_events(out_dir, site, events, seen, cost, full, timeline=None):
+def write_events(out_dir, site, events, seen, cost, full, timeline=None, paths=None):
     (out_dir / "events.json").write_text(json.dumps({"site": site.get("name", ""), "fps": FPS, "exposure": seen,
                                                      "cost": cost,
                                                      "sam_full_requests": full, "timeline": timeline,
-                                                     "events": events}, indent=1))
+                                                     "paths": paths, "events": events}, indent=1))
 
 
 def road_tracks(site, H, person_boxes, vehicle_boxes, frame_size):
@@ -381,16 +386,17 @@ def main():
     events = placed(road.conflicts(people, vehicles, FPS), people, vehicles)
     seen = road.exposure(people, vehicles, FPS, total)
     timeline = road.timeline(people, vehicles, FPS, total)  # the gap barcode's spans, kept out of `seen`
+    paths = road.crossing_paths(people, vehicles, FPS)  # the desire lines, kept out of `seen` too
     full = full_requests(pieces, video_plan, frame_size)
     if full[0]:
         print(f"warning: {full[0]} of {full[1]} SAM requests hit the {sam.MAX_OBJECTS}-object limit; later arrivals "
               "in those parts were not tracked (use person_mode / vehicle_mode \"crowd\": the Crowded and Dense "
               "traffic boxes on the calibration page)", flush=True)
 
-    write_events(out_dir, site, events, seen, cost, full, timeline)  # saved before the slower, network-bound evidence step
+    write_events(out_dir, site, events, seen, cost, full, timeline, paths)  # saved before the slower, network-bound evidence step
     review_people(clip, out_dir, events, people, person_boxes, key, frame_size, top_down)
     add_evidence(args.video, clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size)
-    write_events(out_dir, site, events, seen, cost, full, timeline)
+    write_events(out_dir, site, events, seen, cost, full, timeline, paths)
     report(seen, events)
 
 

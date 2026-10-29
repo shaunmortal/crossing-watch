@@ -38,6 +38,8 @@ BRAKING_MPS2 = 7.0
 # so risks are not overstated. Children are not covered by the study.
 DEATH_RISK_INTERCEPT = 6.9
 DEATH_RISK_PER_KMH = 0.090
+DESIRE_ACROSS = 0.6       # a desire line runs at least this share of its way across the road, not along a pavement
+DESIRE_STEP_S = 0.5       # desire lines keep one point every this many seconds
 
 
 def solve(rows, rhs):
@@ -413,3 +415,47 @@ def exposure(people, vehicles, fps, frames):
             "longest_gap_s": round(max(gaps, default=0.0), 1),
             "gap_6s_share_pct": round(100 * sum(g for g in gaps if g >= GAP_ADULT_S) * fps / frames, 1),
             "longest_without_6s_gap_s": longest_without(gaps_at, frames / fps)}
+
+
+def road_axis(vehicles, fps):
+    """Unit vector along the road: the median heading of the moving vehicles, either way counted the same; None
+    without a vehicle that moved MIN_CROSSING_M or more."""
+    angles = []
+    for edges in vehicles.values():
+        moving = sorted(f for f, v in speeds(edges, fps).items() if v >= MOVING_MPS)
+        if not moving:
+            continue
+        a, b = centroid(edges[moving[0]]), centroid(edges[moving[-1]])
+        if math.dist(a, b) >= MIN_CROSSING_M:
+            angles.append(math.atan2(b[1] - a[1], b[0] - a[0]) % math.pi)
+    if not angles:
+        return None
+    # headings wrap at 180 degrees, so each is measured from their doubled-angle mean before taking the median
+    mean = math.atan2(sum(math.sin(2 * a) for a in angles), sum(math.cos(2 * a) for a in angles)) / 2
+    axis = mean + statistics.median((a - mean + math.pi / 2) % math.pi - math.pi / 2 for a in angles)
+    return math.cos(axis), math.sin(axis)
+
+
+def crossing_paths(people, vehicles, fps, across=DESIRE_ACROSS, step_s=DESIRE_STEP_S):
+    """Desire lines, {person id: [[[x, y], ...] per piece]}: the moving pieces that crossed (the crossing_cells rule)
+    and went at least `across` of their way across the road axis (any way when no vehicle moved), a point every
+    `step_s`, grouped per person like exposure()'s crossings. Their own key in events.json, never in exposure()."""
+    # ponytail: one road axis, so at a junction people crossing the other road read as pavement walks
+    axis, step = road_axis(vehicles, fps), max(1, round(step_s * fps))
+    out = {}
+    for pid, feet in people.items():
+        if not crossing_cells({pid: feet}, fps):
+            continue
+        moving = moving_frames(feet, fps)
+        first, last = moving[min(moving)], moving[max(moving)]
+        dx, dy = last[0] - first[0], last[1] - first[1]
+        if axis and abs(dx * axis[1] - dy * axis[0]) < across * math.hypot(dx, dy):
+            continue
+        path, kept = [], None
+        for f in sorted(moving):
+            if kept is None or f - kept >= step:  # by frame gap, so sparse crowd-mode frames keep their rate
+                path.append([round(moving[f][0], 1), round(moving[f][1], 1)])
+                kept = f
+        if len(path) > 1:
+            out.setdefault(pid.split("/")[0], []).append(path)
+    return out
