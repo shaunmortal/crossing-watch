@@ -480,6 +480,16 @@ Both judges have now run on the bench above: 24 letters with one planted lie eac
 In the rows per kind a cell counts runs; every other cell counts letters, one flagged if any of its readable runs
 flagged it.
 
+## Wording: the at-a-threshold bands are not our error (Thu 29 Oct 2026)
+
+- README called the bands that define "at a threshold" (PET +0.3 s, gap +0.3 m, speed ±1.5 km/h) "about our
+  measured error". They are `validate_dut.py`'s bands, and PET +0.3 s is only about our median PET error. Re-scored
+  at $0 on 29 Oct from the cached DUT runs and Spark's stored verdicts, on the events matched after review: median
+  absolute PET error 0.2 s in vehicle crowd mode (45 matched) and 0.25 s in crowd mode (44); 90th percentile 1.0 and
+  1.1 s; within 0.3 s on 29 of 45 and 26 of 44; mean signed error -0.16 and -0.24 s (ours a little short).
+- `PET_BAND_S` stays 0.3, so no "at a threshold" count moves; only the README's words changed. Its SinD line
+  "errs on the side of not overstating" now says "on SinD": on DUT our PET reads a little short.
+
 ## Window rule, pre-registered (Thu 29 Oct 2026, before the rehearsal or the main recording is filmed)
 
 Which seconds of a gate recording are analysed (the site file's `window_s`) is fixed by this rule, so the window

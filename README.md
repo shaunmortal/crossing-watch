@@ -293,7 +293,7 @@ tricycles, buses, trucks). It needs no Meta API. Re-scored on 29 Oct after the s
 - **Speed:** ours, from positions, against SinD's own velocity: mean error 0.24 km/h, 95th percentile 0.91 km/h.
 - **PET:** 66 conflicts under 3 s (42 serious). An independent textbook PET over a conflict area (Allen et al.
   1978) agrees within 0.5 s on 53 of 66 and gives the same tier on 57. In every disagreement the area method gives
-  the lower PET, because its conflict area is broader, so ours errs on the side of not overstating.
+  the lower PET, because its conflict area is broader, so on SinD ours errs on the side of not overstating.
 - **Pairs only the textbook flagged** as serious: 9, the same 9 pairs as before the speed fix, and each was checked.
   2 were stopped cars beside a person; we exclude vehicles under 10 km/h on purpose. 4 never came within 3 m at the
   same moment, an artefact of the broad area. 3 were cycles under 10 km/h passing 1.2–1.6 m away, at our thresholds'
@@ -389,9 +389,10 @@ to set it.
   rider, kept by the rider gate because DUT tracks no bikes, so none can be found under anyone.
 - **ID fragmentation:** across the 8 clips the dataset's 301 pedestrians are followed by our tracks for 296 of them,
   with a median of 1 track per pedestrian (at most 4).
-- **"At a threshold" defined:** a disagreement the other side also finds once each threshold is widened by about our
-  measured error (speed ±1.5 km/h around the 10 km/h "moving" bar, gap +0.3 m, PET +0.3 s). For example, a car the
-  dataset has at 10.1 km/h and we measured at 10.0 km/h.
+- **"At a threshold" defined:** a disagreement the other side also finds once each threshold is widened by
+  validate_dut's at-a-threshold bands (speed ±1.5 km/h around the 10 km/h "moving" bar, gap +0.3 m, PET +0.3 s). PET
+  +0.3 s is about our median matched PET error (0.2-0.25 s), not its spread: the 90th percentile is 1.0-1.1 s. For
+  example, a car the dataset has at 10.1 km/h and we measured at 10.0 km/h.
 - **Accuracy on matched events** (crowd mode): speed within 1 km/h on 41 of 44 (2.0 km/h at worst); PET within 1 s
   on 38 of 44 (2.5 s at worst).
 - **Spark review:** it judges a zoomed crop of each person's clearest frame. A full-frame snapshot had rejected real
