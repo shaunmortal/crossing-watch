@@ -3370,6 +3370,44 @@ def test_feet_on_a_vehicle_box_are_not_on_the_road_at_an_angle():
     assert pieces({**site, "view": "top-down"}) == {"r/0"}  # a drone sees box centres: untouched
 
 
+def test_spark_unclear_keeps_the_person_and_is_never_a_decoy():
+    """Only a sure "no" rejects: "unclear" with the cyan box called not a pedestrian keeps the person, marked
+    review_unclear, while "not a person" still rejects; a blind-set decoy is never someone Spark was unsure of."""
+    import blind_set
+    kept = review.gated({"is_person": False, "road_user": "unclear", "reason": "too small to tell"}, {}, [])
+    assert kept["is_person"] is True and kept["review_unclear"] is True
+    pole = {"is_person": False, "road_user": "not a person", "reason": "a pole"}
+    assert review.gated(pole, {}, []) == pole
+    sure = {"is_person": True, "road_user": "unclear", "reason": ""}
+    assert review.gated(sure, {}, []) == sure  # a pedestrian, only not which kind: nothing overturned
+    assert pack.confirmed([{"person": "1/0", "review": kept}, {"person": "2/0", "review": pole}]) == [
+        {"person": "1/0", "review": kept}]
+    pair = {"person": "1/0", "vehicle": "car#1", "pet_s": 6.0, "t_person_s": 1.0, "t_vehicle_s": 7.0}
+    assert blind_set.decoys([pair], lambda pid: kept, 1, 200) == []
+    assert blind_set.decoys([pair], lambda pid: {"is_person": True, "road_user": "adult"}, 1, 200) == [pair]
+
+
+def test_spark_crop_draws_its_box_after_upscaling_outside_the_person():
+    """The cyan box is drawn on the upscaled crop, BOX_PAD_PX outside the person's box, so no cyan lies on them."""
+    import subprocess, tempfile
+    from pathlib import Path
+    box = [100, 100, 110, 130]  # 10 x 30 px: a 90 px crop at (60, 70), upscaled 4.27x
+    assert review.outline(box, *review.crop_window(box, (640, 360))) == "drawbox=x=167:y=124:w=51:h=136:color=cyan:t=2"
+    with tempfile.TemporaryDirectory() as tmp:
+        clip, crop = Path(tmp, "clip.mp4"), Path(tmp, "person.jpg")
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=gray:size=640x360:rate=10:duration=1",
+                        "-vf", "drawbox=x=100:y=100:w=10:h=30:color=white:t=fill", "-pix_fmt", "yuv420p", str(clip)],
+                       check=True)
+        review.person_crop(clip, {3: box}, (640, 360), crop)
+        rgb = subprocess.run(["ffmpeg", "-v", "error", "-i", str(crop), "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                             check=True, capture_output=True).stdout
+    pixel = lambda x, y: rgb[3 * (review.CROP_OUT_PX * y + x):3 * (review.CROP_OUT_PX * y + x) + 3]
+    assert len(rgb) == 3 * review.CROP_OUT_PX ** 2
+    r, g, b = pixel(188, 124)  # on the box's top line
+    assert r < 60 and g > 200 and b > 200
+    assert min(pixel(172, 192)) > 220  # just inside the person's left edge: white, where a 1 px box drawn first was cyan
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):

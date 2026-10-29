@@ -19,6 +19,8 @@ TIMEOUT_S = 120
 CROP_FACTOR = 3     # crop this many box-sizes around the person
 MIN_CROP_PX = 80
 CROP_OUT_PX = 384   # upscaled so a small person is visible
+BOX_PX = 2          # the cyan box is drawn after upscaling, this thick...
+BOX_PAD_PX = 4      # ...and this far outside the person, so no cyan smears onto them
 ROAD_USERS = {"child", "adult", "elderly", "wheelchair user", "rider", "cyclist", "not a person", "unclear"}
 NOT_PEDESTRIANS = {"not a person", "rider", "cyclist"}  # riders are vehicles here, as bicycles are in SinD
 RIDER_VERDICTS = {"rider", "cyclist"}
@@ -53,8 +55,11 @@ def read_verdict(text):
 def gated(verdict, person_boxes, rideables, walk_kmh=None):
     """Spark's verdict, except that "rider" or "cyclist" rejects the person only when SAM found a rideable vehicle
     under them: their box RIDER_GATE_SHARE or more inside its box on the same frame. Otherwise they stay a
-    pedestrian, marked rider_unconfirmed (on the DUT drone test Spark called walking students riders). "not a
-    person" always stands: a shadow moves at walking pace too."""
+    pedestrian, marked rider_unconfirmed (on the DUT drone test Spark called walking students riders). "unclear"
+    keeps the person too, marked review_unclear: only a sure "no" rejects (a rule set after seeing 3 DUT cases, not
+    checked on held-out data). "not a person" always stands: a shadow moves at walking pace too."""
+    if verdict and not verdict["is_person"] and verdict["road_user"] == "unclear":
+        return {**verdict, "is_person": True, "review_unclear": True}
     if not verdict or verdict["is_person"] or verdict["road_user"] not in RIDER_VERDICTS:
         return verdict
     share = max((road.inside_share(b, w[f]) for w in rideables for f, b in person_boxes.items() if f in w), default=0.0)
@@ -81,14 +86,23 @@ def crop_window(box, frame_size):
 
 
 def person_crop(clip, person_track, frame_size, out_path):
-    """JPEG crop of the frame where the person's box is largest, the box drawn in cyan."""
+    """JPEG crop of the frame where the person's box is largest, upscaled, then the box drawn in cyan."""
     frame, box = max(person_track.items(), key=lambda kv: (kv[1][2] - kv[1][0]) * (kv[1][3] - kv[1][1]))
     x, y, side = crop_window(box, frame_size)
-    outline = f"drawbox=x={box[0] - x:.0f}:y={box[1] - y:.0f}:w={box[2] - box[0]:.0f}:h={box[3] - box[1]:.0f}:color=cyan:t=1"
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(clip), "-vf",
-                    f"select=eq(n\\,{frame}),crop={side}:{side}:{x}:{y},{outline},"
-                    f"scale={CROP_OUT_PX}:{CROP_OUT_PX}:flags=lanczos", "-frames:v", "1", str(out_path)], check=True)
+                    f"select=eq(n\\,{frame}),crop={side}:{side}:{x}:{y},"
+                    f"scale={CROP_OUT_PX}:{CROP_OUT_PX}:flags=lanczos,{outline(box, x, y, side)}",
+                    "-frames:v", "1", str(out_path)], check=True)
     return out_path
+
+
+def outline(box, x, y, side):
+    """ffmpeg drawbox for `box` (frame pixels) on the (x, y, side) crop once upscaled to CROP_OUT_PX: BOX_PX thick,
+    BOX_PAD_PX outside the person. Drawn before upscaling, a 1 px line grew into a thick, blurred band on their edges."""
+    k = CROP_OUT_PX / side
+    left, top = (box[0] - x) * k - BOX_PAD_PX, (box[1] - y) * k - BOX_PAD_PX
+    width, height = (box[2] - box[0]) * k + 2 * BOX_PAD_PX, (box[3] - box[1]) * k + 2 * BOX_PAD_PX
+    return f"drawbox=x={left:.0f}:y={top:.0f}:w={width:.0f}:h={height:.0f}:color=cyan:t={BOX_PX}"
 
 
 def ask(image_path, api_key, top_down=False):
