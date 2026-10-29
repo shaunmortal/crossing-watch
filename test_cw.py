@@ -3831,6 +3831,15 @@ def test_a_folder_is_refused_after_a_crowd_sampling_rate_changes_but_not_for_the
             crowd.VEHICLE_FPS = old
 
 
+def test_spark_rider_call_needs_the_feet_no_lower_than_the_bike():
+    """review.gated uses road's feet rule: a walker passing in front of a parked bike has feet below its box."""
+    rider = {"is_person": False, "road_user": "rider", "reason": "on a bike"}
+    person = {5: [100, 100, 110, 130]}
+    assert review.gated(rider, person, [{5: [95, 110, 115, 130 - road.RIDER_FEET_PX]}]) == rider  # feet at the limit
+    walker = review.gated(rider, person, [{5: [95, 110, 115, 129 - road.RIDER_FEET_PX]}])  # feet 1 px lower: in front
+    assert walker["is_person"] and walker["rider_unconfirmed"]
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):

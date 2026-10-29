@@ -57,15 +57,17 @@ def read_verdict(text):
 
 def gated(verdict, person_boxes, rideables, walk_kmh=None):
     """Spark's verdict, except that "rider" or "cyclist" rejects the person only when SAM found a rideable vehicle
-    under them: their box RIDER_GATE_SHARE or more inside its box on the same frame. Otherwise they stay a
-    pedestrian, marked rider_unconfirmed (on the DUT drone test Spark called walking students riders). "unclear"
-    keeps the person too, marked review_unclear: only a sure "no" rejects (a rule set after seeing 3 DUT cases, not
-    checked on held-out data). "not a person" always stands: a shadow moves at walking pace too."""
+    under them: their box RIDER_GATE_SHARE or more inside its box on the same frame, feet no lower than its bottom
+    plus road.RIDER_FEET_PX (road.without_riders' rule: a walker passing in front of a parked bike has lower feet).
+    Otherwise they stay a pedestrian, marked rider_unconfirmed (on the DUT drone test Spark called walking students
+    riders). "unclear" keeps the person too, marked review_unclear: only a sure "no" rejects (a rule set after seeing
+    3 DUT cases, not checked on held-out data). "not a person" always stands: a shadow moves at walking pace too."""
     if verdict and not verdict["is_person"] and verdict["road_user"] == "unclear":
         return {**verdict, "is_person": True, "review_unclear": True}
     if not verdict or verdict["is_person"] or verdict["road_user"] not in RIDER_VERDICTS:
         return verdict
-    share = max((road.inside_share(b, w[f]) for w in rideables for f, b in person_boxes.items() if f in w), default=0.0)
+    share = max((road.inside_share(b, w[f]) for w in rideables for f, b in person_boxes.items()
+                 if f in w and b[3] <= w[f][3] + road.RIDER_FEET_PX), default=0.0)
     if share >= RIDER_GATE_SHARE:
         return verdict
     return {**verdict, "is_person": True, "rider_unconfirmed": True, "walk_kmh": walk_kmh}
