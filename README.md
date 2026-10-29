@@ -87,50 +87,70 @@ one crowded frame). So **crowd mode** (`"person_mode": "crowd"`) has SAM detect 
 `crowd.py` then keeps their IDs with a small tracker: constant-velocity prediction, a match within one body size,
 and a 1 s grace period for people hidden behind others.
 
+Every DUT number here was re-scored on 29 Oct with today's code, at $0, from the cached SAM replies and Spark's
+stored verdicts: `python3 validate_offline.py DUT_REPO out/dut-15s out/dut-vcrowd` (the video rows: the 28 Oct
+folder with `--site '{"person_mode": "video", "person_grid": 1}'`, or 2 for tiles). The speed fix below moved the
+ground truth too: the dataset's own tracks now give 52 conflicts, not 36 (GATES.md, 29 Oct, shows old and new side
+by side). Found by the geometry, before Spark's review:
+
 | Clips | People per clip | Mode | True conflicts | Found | Missed (at a threshold) | False alarms (at a threshold) |
 |---|---|---|---|---|---|---|
-| 04 09 10 12 (crowded) | 24–113 | video, whole frame | 25 | 7 | 18 (2) | 0 (0) |
-| | | video, 2 x 2 tiles | 25 | 10 | 15 (3) | 11 (7) |
-| | | **crowd mode** | 25 | **21** | 4 (4) | 10 (8) |
-| 15 01 03 16 (held out) | 11–21 | video, whole frame | 11 | 7 | 4 (2) | 0 (0) |
-| | | **crowd mode** | 11 | 8 | 3 (3) | 1 (1) |
+| 04 09 10 12 (crowded) | 24–113 | video, whole frame | 37 | 9 | 28 (1) | 1 (1) |
+| | | video, 2 x 2 tiles | 37 | 19 | 18 (1) | 7 (2) |
+| | | **crowd mode** | 37 | **34** | 3 (3) | 5 (1) |
+| 15 01 03 16 (held out) | 11–21 | video, whole frame | 15 | 13 | 2 (0) | 0 (0) |
+| | | **crowd mode** | 15 | **15** | 0 (0) | 1 (1) |
 
+The video rows are the 28 Oct runs, one SAM request per clip; Spark's verdicts for them were not kept.
 The crowd tracker rule was fixed once from walking speed versus body size. The four held-out clips were not used
 to set it.
 
-- **Crowd mode over all 8 clips:** 29 of 36 conflicts found. Every miss is a threshold case, and 2 of the 11 false
-  alarms are not. Re-run with 15-second SAM parts and filled crowd boxes: still 29 of 36, all misses at a threshold,
-  and 3 of 11 false alarms not at a threshold (one event in clip 10 moved from matched to extra).
+- **Crowd mode over all 8 clips:** the geometry finds 49 of 52 conflicts, every miss a threshold case; 4 of its 6
+  false alarms are not. After Spark's review: 44 of 52 found, 3 real false alarms. Spark called 5 pedestrians in
+  true conflicts "not a person". 8 events come from track pieces Spark has not seen yet (new with today's code); they
+  stay in, as unreviewed events do on the page. If Spark rejected all of them it would be 37 of 52.
 - **Vehicles in crowd mode too** (`"vehicle_mode": "crowd"`, for dense traffic that fills SAM's 16 objects). Vehicles
   are detected on every frame (10 a second): at 5 a second a review showed motorcycles over ~36 km/h outran the
-  tracker's one-body-size match and vanished. Result: speed bias against the dataset's own velocities fell from
-  +0.9 to +0.2 km/h, and 12 of 36 conflicts are found. All 24 misses and 2 of the 3 false alarms are at a threshold:
-  DUT's cars crawl at about 10 km/h, right on the "moving" bar, so ±1 km/h decides most of them. (At 5 a second the
-  +0.9 km/h bias had pushed those cases over the bar: 35 of 36.) Every conflict clear of a threshold is found. Pedestrian pieces shorter than 1 s are dropped and Spark now calls
-  people on motorcycles and bicycles riders; neither changed any DUT result.
-- **Dense Indian intersection** (42 s, no ground truth, calibration guessed): SAM video saw on average 1.6 people and
-  6 vehicles a frame, crowd mode 14.9 people and 20 vehicles. Before the two fixes above it reported 543 serious
-  near-misses, nearly all one-frame track fragments and riders; after them, 18 events survive Spark's review (6
-  serious). Speeds there are not trustworthy (up to 88 km/h) because nothing was measured on that road.
-- **What the 2 real false alarms are** (both clip 09, checked frame by frame): one is a real person in yellow whom
-  the dataset stops tracking after 1.8 s while they keep walking along the kerb, so it may be a gap in the ground
-  truth. The other is a person standing still at the road edge for the whole clip; the dataset does not label them.
-  Dropping standing people would also drop a true conflict in clip 12, so they stay.
-- **ID fragmentation:** across the 8 clips the dataset's 301 pedestrians are followed by our tracks for 297 of them,
-  with a median of 1 track per pedestrian (at most 5).
+  tracker's one-body-size match and vanished. The geometry finds 48 of 52, all 4 misses at a threshold. After
+  Spark's review: 45 of 52 found and 4 real false alarms; Spark called 3 pedestrians in true conflicts "unclear", and
+  17 events come from pieces it has not seen (30 of 52 if it rejected them all).
+- **Spark's rider calls:** Spark called walking students "rider" or "cyclist", though DUT tracks no bikes. In vehicle
+  crowd mode that cost 17 true conflicts (28 of 52 found). So a rider call now stands only when SAM finds a
+  motorcycle, bicycle, scooter or auto rickshaw box under the person (`review.gated`); otherwise they stay a
+  pedestrian, and the card says Spark thought "rider" and gives their measured walking speed. Pedestrian pieces
+  shorter than 1 s are also dropped.
+- **Speed** against the dataset's positions at their own 23.976 fps (vehicle crowd mode, 2,079 frames): mean error
+  0.16 km/h, 95th percentile 0.55 km/h. The old median of frame-to-frame steps read a 24 fps source slow (0.83 x in
+  the self-check): 0.52 and 1.89 km/h. DUT's cars crawl at about 10 km/h, right on the "moving" bar, so this decides
+  which conflicts exist: of the frames with the car at 7–13 km/h, 7.5% still land on the wrong side of the bar (28%
+  before).
+- **Dense Indian intersection** (39 s, no ground truth, calibration guessed): SAM video saw on average 1.6 people and
+  6 vehicles a frame, crowd mode 14.9 people and 20 vehicles. Before the fixes above it reported 543 serious
+  near-misses, nearly all one-frame track fragments and riders; re-scored from its cache, 10 events survive Spark's
+  review (5 serious; 2 from pieces Spark has not seen). Speeds there are not trustworthy (up to 57 km/h) because
+  nothing was measured on that road.
+- **What the real false alarms are:** two are in clip 09 and were checked frame by frame on 28 Oct. One is a real
+  person in yellow whom the dataset stops tracking after 1.8 s while they keep walking along the kerb, so it may be a
+  gap in the ground truth. The other is a person standing still at the road edge for the whole clip; the dataset
+  does not label them. Dropping standing people would also drop a true conflict in clip 12, so they stay. The third,
+  a close pass in clip 10, is not checked yet. Vehicle crowd mode adds a fourth in clip 09: someone Spark called a
+  rider, kept by the rider gate because DUT tracks no bikes, so none can be found under anyone.
+- **ID fragmentation:** across the 8 clips the dataset's 301 pedestrians are followed by our tracks for 296 of them,
+  with a median of 1 track per pedestrian (at most 4).
 - **"At a threshold" defined:** a disagreement the other side also finds once each threshold is widened by about our
   measured error (speed ±1.5 km/h around the 10 km/h "moving" bar, gap +0.3 m, PET +0.3 s). For example, a car the
-  dataset has at 8.6 km/h and we measured at 10.1 km/h.
-- **Accuracy on matched events:** speed is usually within 1 km/h (2 km/h at worst). PET is within about 1 s.
+  dataset has at 10.1 km/h and we measured at 10.0 km/h.
+- **Accuracy on matched events** (crowd mode): speed within 1 km/h on 41 of 44 (2.0 km/h at worst); PET within 1 s
+  on 38 of 44 (2.5 s at worst).
 - **Spark review:** it judges a zoomed crop of each person's clearest frame. A full-frame snapshot had rejected real
   students who were a few pixels wide.
 - **Caveats:** this is still a small sample. The true conflicts assume a 4.6 x 1.8 m car (DUT gives only centre and
   heading). The view is top-down, not a phone at an angle. Meta's per-image price was not found; cost estimates
   use $0.002 per image.
 
-- **Engineering numbers against ground truth** (same definitions applied to the dataset's own tracks):
+- **Engineering numbers against ground truth** (crowd mode; same definitions applied to the dataset's own tracks):
   - Moving vehicles counted: right on 8 of 8 clips.
-  - Gaps of 6 s or more where people crossed: right on 7 of 8; the other has the car at 10.1 km/h, on the threshold.
+  - Gaps of 6 s or more where people crossed: right on 8 of 8.
   - Longest gap: within 0.5 s on 6 of 8.
   - Pedestrian crossings: ours run high, 374 against 280 (1.3x), because a broken track counts a person twice. PV²
     scales with this count, so the page says so.

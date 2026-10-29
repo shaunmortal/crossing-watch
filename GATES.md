@@ -123,10 +123,60 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
   cost called a Meta price; child and non-car events showed the adult car-front risk without a caveat; pedestrian
   count includes pavement walkers when no carriageway is marked (stated).
 - DUT re-run after both changes (`validate_dut.py ... --mode crowd --out out/dut-15s`): 29 of 36 found, 3 real false alarms (was 2).
+  *Corrected 29 Oct: stale. Clip 15's events.json was rewritten after this validation.json; scored as stored, the run gives 26 of 36.*
 - Vehicle crowd mode: DUT 35 of 36 (4 real false alarms); dense Indian clip coverage 6 -> 20 vehicles a frame. Found and
   fixed on the way: one-frame pedestrian fragments (543 -> 83 events) and riders accepted as pedestrians by Spark
   (83 -> 18 after review). Speed on that clip is untestable (guessed calibration); G2 on real footage still pending.
 - Fifth review (2 reviewers, findings checked): crowd-mode vehicles over ~36 km/h were lost at 5 samples a second (now
   10); synonym concepts shared one cache (now refused); letter check missed non-English facts and comma numbers, and
-  flagged "SAM 3.1" from the prompt (fixed). DUT with vehicles at 10 a second: 12 of 36, every miss at the 10 km/h
-  bar, speed bias +0.2 km/h; all non-threshold conflicts found, 1 real false alarm.
+  flagged "SAM 3.1" from the prompt (fixed). DUT with vehicles at 10 a second: 12 of 36, speed bias +0.2 km/h, 1 real
+  false alarm. *Corrected 29 Oct: the misses were not at the 10 km/h bar. 20 of the 24 were Spark's review (17 of them
+  "rider" or "cyclist" calls on walking students) and 4 were at a threshold.*
+
+## Status update (Thu 29 Oct): DUT re-scored after the speed fix and the rider gate
+
+- **Truth pass.** Every DUT number in the README was recomputed once, at $0, with the code as it now stands, from
+  the cached SAM replies and Spark's stored verdicts: `python3 validate_offline.py DUT_REPO out/dut-15s
+  out/dut-vcrowd` (it writes nothing; a cache miss stops it). The two lines above marked *Corrected 29 Oct* were
+  wrong, and so was the README's "neither changed any DUT result": Spark's rider calls had cost 17 conflicts.
+- **Why the numbers moved:**
+  1. **Speed fix (a9ef24b).** DUT's source runs at 23.976 fps. Resampled to 10 fps it steps 2,2,3,2,3 source
+     frames, and the old median of steps read 0.83 x the true speed: our tracks and the dataset's own tracks (resampled
+     the same way for scoring) were both read slow. With a least-squares slope, cars at about 10 km/h now count as
+     moving, so the truth set grows from 36 to 52 conflicts (24 to 34 serious). This is the "moving" bar being read
+     right, not better detection. The same commit's phantom-speed guard leaves the Indian clip with no event above
+     57 km/h (88 before).
+  2. **Rider gate (b54d1ab).** Spark called walking students "rider" or "cyclist". DUT tracks no bikes, so no bike box
+     is ever under them and every such call is now overruled.
+  3. **New events.** Today's code finds conflicts in track pieces Spark never saw: 8 events in crowd mode, 17 in
+     vehicle crowd mode. They stay in, as unreviewed events do on the page. The low end of each range below assumes
+     Spark would reject all of them; a Spark re-run settles it (SAM is cached).
+- **Old and new side by side.** Old = as published before today. Crowd mode = people in crowd mode, cars by SAM video
+  in 15 s parts.
+
+| Number | Old | New (29 Oct) |
+|---|---|---|
+| True conflicts in the dataset's own tracks | 36 (24 serious) | 52 (34 serious) |
+| Crowd mode, found after Spark's review | 29 of 36 | 44 of 52 (37 to 44) |
+| ... crowded / held-out clips | 21 of 25 / 8 of 11 | 29 of 37 / 15 of 15 |
+| ... with 15 s parts | "29 of 36" (stale: 26 as stored) | the same run: 44 of 52 |
+| Crowd mode, found by the geometry alone | not published | 49 of 52, every miss at a threshold |
+| Crowd mode, real false alarms | 2 (3 with 15 s parts) | 3 |
+| Vehicle crowd mode, found after review | 12 of 36 | 45 of 52 (30 to 45; 28 without the rider gate) |
+| Vehicle crowd mode, misses | 24, "every miss at the 10 km/h bar" (in fact 20 by Spark's review, 4 at a threshold) | 7: 4 at a threshold, 3 that Spark called "unclear" |
+| Vehicle crowd mode, real false alarms | 1 | 4 |
+| Whole frame / 2 x 2 tiles | 14 / 19 of 36, after review | 22 / 34 of 52, by the geometry (their verdicts were not kept) |
+| Speed against the dataset's native-rate positions, vehicle crowd mode (mean / 95th percentile error) | 0.52 / 1.89 km/h | 0.16 / 0.55 km/h |
+| Frames with the car at 7-13 km/h put on the wrong side of the 10 km/h bar | 28% | 7.5% |
+| Matched events, speed | usually within 1 km/h, 2 at worst | 41 of 44 within 1 km/h, 2.0 at worst |
+| Matched events, PET | within about 1 s | 38 of 44 within 1 s, 2.5 s at worst |
+| Gaps of 6 s or more where people crossed | right on 7 of 8 clips | right on 8 of 8 |
+| Dataset pedestrians followed by our tracks | 297 of 301, at most 5 tracks each | 296 of 301, at most 4 |
+| Indian crowd clip (no ground truth), after review | 18 events (6 serious), up to 88 km/h | 10 events (5 serious, 2 not yet reviewed), up to 57 km/h |
+
+- Unchanged: moving vehicles counted right on 8 of 8 clips, longest gap within 0.5 s on 6 of 8, pedestrian crossings
+  374 against the dataset's 280.
+- How the old column was checked: the stored events re-scored with the code from before the speed fix give the
+  same 12 of 36 (24 misses: 20 by Spark's review, 4 at a threshold) and 26 of 36 for the 15 s run; the same speed
+  check on that code gives 0.52 / 1.89 km/h and 28%.
+- 58 self-checks pass.
