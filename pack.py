@@ -34,11 +34,13 @@ MIN_RATE_MINUTES = 15  # shortest video scaled to hourly rates (MUTCD Warrant 4 
 LETTER_URL = os.environ.get("LETTER_MODEL_URL", "")  # an OpenAI-compatible server, e.g. llama-server with Muse
 LETTER_MODEL = os.environ.get("LETTER_MODEL", "Muse Glimmer 30B")  # Glimmer; empty: Muse Spark writes the letter
 LETTER_KEY = os.environ.get("LETTER_MODEL_KEY", "")  # sent as a Bearer token, for a letter server that needs one
+JUDGE_URL = os.environ.get("JUDGE_MODEL_URL", "")  # an OpenAI-compatible server whose model also judges the letter
 LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")  # a letter server here runs on the machine that ran pack.py
 
 
 def writer_label(url):
-    """Who writes the letter. "Self-hosted" only when the server is this machine; a remote URL could be anyone's."""
+    """Who runs at `url`, the letter's writer or its open-weights judge. "Self-hosted" only when the server is this
+    machine; a remote URL could be anyone's."""
     if not url:
         return "Muse Spark"
     local = urllib.parse.urlsplit(url).hostname in LOCAL_HOSTS
@@ -59,6 +61,8 @@ MEASUREMENTS:
 
 LETTER:
 {letter}"""
+PROBLEMS_SCHEMA = {"type": "object", "properties": {"problems": {"type": "array", "items": {"type": "string"}}},
+                   "required": ["problems"], "additionalProperties": False}  # the judge's reply, for a JUDGE_MODEL_URL server
 LETTER_TRIES = 3     # Spark gets this many tries at a letter whose every number was measured
 NUMBER = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?")  # 1,200 is one number
 PLAN_KEYS = ("fix", "why", "image_prompt", "letter")
@@ -213,9 +217,9 @@ def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES):
             note = f"\n\nYour previous output was invalid: {str(err)[:200]}. Reply with the JSON object only."
             continue
         bad = unmeasured(plan["letter"] + " " + plan["why"], known)
-        problems = [] if bad or not api_key else judge_problems(plan["letter"], measured, api_key)
+        problems = [] if bad or not (api_key or JUDGE_URL) else judge_problems(plan["letter"], measured, api_key)
         if not bad and not problems:
-            return {**plan, "writer": WRITER, **({"judged_by": JUDGE} if api_key else {})}
+            return {**plan, "writer": WRITER, **({"judged_by": judges(api_key)} if api_key or JUDGE_URL else {})}
         note = (f"\n\nYour previous letter used numbers that are not in the measurements: {', '.join(bad)}. "
                 "Use only numbers given above." if bad else
                 "\n\nA reviewer found claims in your previous letter that the measurements do not support: "
@@ -223,11 +227,20 @@ def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES):
     return {**plan, "writer": WRITER, "unmeasured": bad, "unsupported": problems}
 
 
+def judges(api_key):
+    """The judges that run, by name: Muse Spark with a key, the JUDGE_MODEL_URL model with that URL."""
+    return " and ".join(([JUDGE] if api_key else []) + ([writer_label(JUDGE_URL)] if JUDGE_URL else []))
+
+
 def judge_problems(letter, measured, api_key):
-    """Muse Spark, as a reviewer separate from the writer, lists the letter's unsupported claims ([] if none). A
-    reply it cannot read counts as one problem, so a broken judge never passes a letter silently."""
-    problems = read_problems(spark_reply(JUDGE_PROMPT.format(facts=measured, letter=letter), None, api_key))
-    return ["The reviewer's reply could not be read."] if problems is None else problems
+    """Each judge, Muse Spark with a key and the JUDGE_MODEL_URL model with that URL, separate from the writer's call,
+    lists the letter's unsupported claims ([] if none). A reply it cannot read counts as one problem, so a broken judge
+    never passes a letter silently."""
+    prompt = JUDGE_PROMPT.format(facts=measured, letter=letter)
+    replies = (([spark_reply(prompt, None, api_key)] if api_key else [])
+               + ([open_model_reply(prompt, None, PROBLEMS_SCHEMA, JUDGE_URL)[0]] if JUDGE_URL else []))
+    found = [read_problems(text) for text in replies]
+    return [p for problems in found for p in (["The reviewer's reply could not be read."] if problems is None else problems)]
 
 
 def read_problems(text):
@@ -269,15 +282,18 @@ def spark_reply(prompt, image, api_key):
                    for c in o.get("content", []))
 
 
-def open_model_reply(prompt, image, schema):
+def open_model_reply(prompt, image, schema, url=None):
     """Chat completion from an OpenAI-compatible server, e.g. llama-server running Muse Glimmer 30B on a GPU, held to
-    a JSON schema: the text, and the server's own timings and token usage (kept in plan.json for the run record)."""
+    a JSON schema: the text, and the server's own timings and token usage (kept in plan.json for the run record).
+    `url` defaults to LETTER_MODEL_URL, read at call time; LETTER_MODEL_KEY goes to that server only."""
+    url = url or LETTER_URL
     content = [{"type": "text", "text": prompt}] + ([{"type": "image_url", "image_url": {"url": image}}] if image else [])
     schema_format = {"type": "json_schema", "json_schema": {"name": "plan", "schema": schema}}
     body = json.dumps({"model": LETTER_MODEL, "messages": [{"role": "user", "content": content}],
                        "response_format": schema_format}).encode()
-    headers = {"Content-Type": "application/json", **({"Authorization": f"Bearer {LETTER_KEY}"} if LETTER_KEY else {})}
-    req = urllib.request.Request(LETTER_URL.rstrip("/") + "/chat/completions", data=body, headers=headers)
+    key = LETTER_KEY if url == LETTER_URL else ""  # never the letter server's key to a judge on another server
+    headers = {"Content-Type": "application/json", **({"Authorization": f"Bearer {key}"} if key else {})}
+    req = urllib.request.Request(url.rstrip("/") + "/chat/completions", data=body, headers=headers)
     with urllib.request.urlopen(req, timeout=OPEN_MODEL_TIMEOUT_S) as response:
         reply = json.load(response)
     choice = reply["choices"][0]

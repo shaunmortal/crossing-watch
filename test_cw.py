@@ -694,6 +694,37 @@ def test_open_model_letters_still_face_the_number_check_and_the_judge():
     assert plan["letter"] == good["letter"] and judged == [good["letter"]] and plan["judged_by"] == pack.JUDGE
 
 
+def test_glimmer_judges_through_its_own_url_and_judged_by_names_only_the_judges_that_ran():
+    """JUDGE_MODEL_URL makes the open-weights model a judge, with Spark or alone; its objection goes back like Spark's,
+    an unreadable reply is a problem, and the letter server's key never goes to a judge on another server."""
+    import contextlib, io
+    good = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "Cars passed close to children."}
+    as_reply = lambda content: {"choices": [{"message": {"content": content}, "finish_reason": "stop"}]}
+    server, seen = fake_open_model([as_reply('{"problems": ["Says a warrant is met."]}'), as_reply('{"problems": []}'),
+                                    as_reply('{"problems": []}'), as_reply("no JSON here")])
+    url, prompts, sparks = f"http://127.0.0.1:{server.server_port}/v1", [], []
+    old = pack.model_plan, pack.spark_reply, pack.JUDGE_URL, pack.LETTER_URL, pack.LETTER_KEY
+    pack.model_plan = lambda prompt, key, photo=None, known=None: prompts.append(prompt) or good
+    pack.spark_reply = lambda prompt, image, key: sparks.append(prompt) or '{"problems": []}'
+    pack.JUDGE_URL, pack.LETTER_URL, pack.LETTER_KEY = url, "http://127.0.0.1:9/v1", "letter-key"  # writer elsewhere
+    try:
+        with contextlib.redirect_stderr(io.StringIO()):
+            alone = pack.ask_plan("PROMPT", "{}", None)  # no Meta key: Glimmer judges alone, objects once, then passes
+            both = pack.ask_plan("PROMPT", "{}", "key")
+            unreadable = pack.judge_problems("letter", "{}", None)
+    finally:
+        pack.model_plan, pack.spark_reply, pack.JUDGE_URL, pack.LETTER_URL, pack.LETTER_KEY = old
+        server.shutdown()
+        server.server_close()
+    glimmer = pack.writer_label(url)
+    assert alone["judged_by"] == glimmer and "Says a warrant is met." in prompts[1] and len(sparks) == 1
+    assert both["judged_by"] == f"{pack.JUDGE} and {glimmer}" and unreadable == ["The reviewer's reply could not be read."]
+    assert "and the claims by Muse Spark (a separate reviewer) and Muse Glimmer" in pack.letter_section(both)
+    path, body, headers = seen[0]
+    assert path == "/v1/chat/completions" and body["response_format"]["json_schema"]["schema"] == pack.PROBLEMS_SCHEMA
+    assert good["letter"] in body["messages"][0]["content"][0]["text"] and "Authorization" not in headers
+
+
 def test_glimmer_notebook_is_pinned_hash_checked_and_records_its_run():
     """The Kaggle notebook runs unattended for 40 minutes, so its pins and its Python are checked here first."""
     import ast, re
