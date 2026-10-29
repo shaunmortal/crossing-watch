@@ -624,12 +624,17 @@ def street_photo(clip, out_path, person_concept="person", vehicles=()):
     return out_path
 
 
+def article(word):
+    """`word` after "a" or "an", by its first letter: "an auto rickshaw", "a motorcycle"."""
+    return ("an " if word.lower().startswith(tuple("aeiou")) else "a ") + word
+
+
 def passed(e):
     """Who the vehicle passed, by Spark's review: the road user and, escaped, "a ..." / "an ..."."""
     verdict = e.get("review") or {}
     road_user = verdict.get("road_user", "pedestrian (not reviewed by Spark)")
     road_user = review.unconfirmed_rider(verdict) or ("pedestrian" if road_user == "unclear" else road_user)
-    return road_user, html.escape(("an " if road_user[0] in "aeiou" else "a ") + road_user)
+    return road_user, html.escape(article(road_user))
 
 
 def video_tag(e):
@@ -677,7 +682,7 @@ def risk_caveat(road_user, vehicle):
     """The death-risk curve is for adults hit by a car front; say so where this event is neither."""
     notes = ["The curve is for adults, so this is not a child's risk."] if road_user == "child" else []
     if vehicle != "car":
-        notes.append(f"It was measured for car fronts; for a {vehicle} it is only a rough guide.")
+        notes.append(f"It was measured for car fronts; for {article(vehicle)} it is only a rough guide.")
     return " ".join(notes)
 
 
@@ -992,7 +997,7 @@ def stats(events, seen, measured=True):
     measurements."""
     n_serious, crossings = len(serious(events)), seen.get("crossings") or 0
     watched = [(crossings, "pedestrian crossings watched"), (seen.get("vehicles", "?"), "moving vehicles"),
-               (seen.get("minutes", "?"), "minutes of video")]
+               (summary.minutes(seen), "minutes of video")]
     near = [(n_serious, f"serious near-misses (under {road.PET_MAX_S} s)", "serious"),
             (len(events) - n_serious, f"close passes ({road.PET_MAX_S}-{road.CLOSE_PASS_S} s)", "close")]
     speed = [(seen["speed_85th_kmh"], "km/h, 85% of vehicles at or below")] if seen.get("speed_85th_kmh") else []
@@ -1038,7 +1043,7 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None, privacy=No
     cards = "\n".join(tracked_card(i + 1, e) if warning else
                       event_card(i + 1, e, fps, overlay.strip(e, site, events[:SHOWN_EVENTS]))
                       for i, e in enumerate(events[:SHOWN_EVENTS])) or (
-        f"<p>No conflicts under {road.CLOSE_PASS_S} s in these {html.escape(str(seen.get('minutes', '?')))} minutes. "
+        f"<p>No conflicts under {road.CLOSE_PASS_S} s in these {html.escape(summary.minutes(seen))} minutes. "
         "A short recording can miss rare events: record more school-run periods before drawing any conclusion.</p>")
     method = (f"SAM 3.1 tracked every pedestrian and vehicle. Four points on the road turned pixels into metres. "
               f"A near-miss is a pedestrian and a moving vehicle on the same spot (within {road.CONFLICT_RADIUS_M} m) "

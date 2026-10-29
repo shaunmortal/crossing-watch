@@ -1258,6 +1258,7 @@ def test_event_cards_do_not_give_a_child_or_non_car_a_car_curve_risk_unqualified
     card = pack.event_card(1, e, 10)
     assert "not a child&#x27;s risk" in card and "car fronts" in card
     assert "never state a death risk for a child" in pack.LETTER_PROMPT
+    assert "for an auto rickshaw" in pack.risk_caveat("pedestrian", "auto rickshaw")
 
 
 
@@ -2998,6 +2999,25 @@ def test_share_folder_holds_the_first_clips_poster_and_never_clip_mp4():
         page = pack.page({"name": "gate", "world_points": SQUARE_ROAD}, [e], {"minutes": 1}, None, None, 10)
         shared = sorted(f.name for f in pack.share(out, page).iterdir())
     assert 'poster="event1-strobe.jpg"' in page and shared == ["event1-strobe.jpg", "event1.mp4", "index.html"]
+
+def test_page_reads_without_colour_and_on_a_phone():
+    """The gap strip tells busy from gap by height as well as colour, long gaps blue like the map's people; its labels
+    and the map's card numbers are 18 px on phones, the numbers drawn over every dot; minutes read 22, not 22.0."""
+    import roadmap, summary
+    strip = roadmap.gap_strip({"duration_s": 60.0, "busy_s": [[2.0, 3.0], [24.0, 25.0]]}, [])
+    assert f'class="busy" x="21.3" y="{roadmap.DOTS_PX}" height="{roadmap.BAR_PX}"' in strip
+    assert (f'class="gap12" x="32.0" y="{roadmap.DOTS_PX + roadmap.GAP_INSET_PX}" '
+            f'height="{roadmap.BAR_PX - 2 * roadmap.GAP_INSET_PX}"') in strip
+    assert "Blue: a gap of 12 s or more" in strip and "Green" not in strip
+    assert ".gaps .gap12 { fill: #2f7de1; }" in roadmap.STYLE and ".gaps .near { fill: none; stroke: #c27a00;" in roadmap.STYLE
+    assert "@media (max-width: 600px) { .gaps text, .map text { font-size: 18px; } }" in roadmap.STYLE
+    near = {"tier": "serious", "vehicle": "car#1", "vehicle_kmh": 30.0, "pet_s": 0.4, "where": [0.0, 0.0]}
+    svg = roadmap.svg([near, near | {"where": [0.5, -0.4]}], [[-2, -2], [2, -2], [2, 2], [-2, 2]])
+    assert svg.rindex("<circle") < svg.index(">#1</text>")  # card 2's dot never covers card 1's number
+    assert pack.article("auto rickshaw") == "an auto rickshaw" and pack.article("motorcycle") == "a motorcycle"
+    assert [summary.minutes(seen) for seen in ({"minutes": 22.0}, {"minutes": 12.5}, {})] == ["22", "12.5", "?"]
+    assert "22 minutes of video" in pack.stats([], {"minutes": 22.0, "vehicles": 3})[1]
+
 
 if __name__ == "__main__":
     for name, check in list(globals().items()):

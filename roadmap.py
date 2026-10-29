@@ -22,6 +22,7 @@ GROUND = "map-ground.jpg"  # the street photo seen from above, written next to t
 GROUND_ZOOM = 2     # ground pixels per map pixel, sharp on high-density screens
 BISECT_STEPS = 20   # halvings when fitting the ground into the photo: a millionth of the map
 DOTS_PX, BAR_PX, AXIS_PX = 16, 24, 16  # the gap barcode's rows: near-miss dots, the bar, time labels
+GAP_INSET_PX = 6    # gaps are drawn this much short of the bar top and bottom, so busy and gap differ by height too
 LABEL_STEPS_S = (5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600)  # time labels every so many seconds...
 MAX_LABELS = 8      # ...the first step that needs no more labels than this
 STRIP_M = 2.0       # desire lines are counted in stretches of road this long, and "outside" a marked crossing past it
@@ -84,6 +85,7 @@ def svg(events, area, shown=5, ground=None, paths=None, measured=True):
                 marks.append(f'<polyline class="{cls}" pathLength="1" points="{" ".join(at(p) for p in e[key])}"/>')
         if e.get("footprint"):  # the vehicle's footprint (or lower box edge) at its moment
             marks.append(f'<polygon class="foot" points="{" ".join(at(p) for p in e["footprint"])}"/>')
+    numbers = []  # drawn last, so no later dot covers a card's number
     for i, e in enumerate(events):  # dots on top of every path, numbered like the cards even when one has no "where"
         if not e.get("where"):
             continue
@@ -94,7 +96,8 @@ def svg(events, area, shown=5, ground=None, paths=None, measured=True):
         marks.append(f'<circle class="{"hit" if serious else "near"}" cx="{x}" cy="{y}" r="{6 if serious else 4}">'
                      f'<title>{label}</title></circle>')
         if i < shown:
-            marks.append(f'<text x="{float(x) + 8:.1f}" y="{float(y) - 6:.1f}">#{i + 1}</text>')
+            numbers.append(f'<text x="{float(x) + 8:.1f}" y="{float(y) - 6:.1f}">#{i + 1}</text>')
+    marks += numbers
     scale_bar = (f'<line class="bar" x1="10" y1="{height - 12}" x2="{10 + GRID_M * scale:.1f}" y2="{height - 12}"/>'
                  f'<text x="10" y="{height - 18}">{GRID_M:g} m</text>')
     return (f'<svg class="map" viewBox="0 0 {WIDTH_PX} {height}" role="img" aria-label="Map of where people crossed '
@@ -218,27 +221,29 @@ def strip_caption(total, gaps, n_events, shown, full):
               if full and full[0] else "")
     dots = (f" Dots: near-misses (filled: serious; rings: close passes); the first {min(shown, n_events)} link to "
             "their cards below." if n_events else "")
-    return (f"The whole {clock(total)} of video, left to right. Red: a moving vehicle where people crossed. Green: a "
-            f"gap of {road.GAP_SLOW_S:g} s or more; amber: {road.GAP_ADULT_S:g}-{road.GAP_SLOW_S:g} s (see the UK "
-            f"Traffic Signs Manual line above). Hatched: cut short by the start or end of the video.{dots} Longest "
-            f"stretch with no gap of {road.GAP_ADULT_S:g} s: {longest:g} s{whole}.{missed}")
+    return (f"The whole {clock(total)} of video, left to right. Red, full height: a moving vehicle where people "
+            f"crossed. Blue: a gap of {road.GAP_SLOW_S:g} s or more; amber: {road.GAP_ADULT_S:g}-{road.GAP_SLOW_S:g} s "
+            f"(see the UK Traffic Signs Manual line above). Hatched: cut short by the start or end of the video.{dots} "
+            f"Longest stretch with no gap of {road.GAP_ADULT_S:g} s: {longest:g} s{whole}.{missed}")
 
 
 def gap_strip(timeline, events, shown=5, full=None):
-    """The whole recording as one bar: red while a moving vehicle was on the crossing, gaps of road.GAP_SLOW_S or
-    more green, of road.GAP_ADULT_S or more amber, the first and last gaps hatched (the video cut them short), and a
-    dot per near-miss, the first `shown` linked to their cards. '' without a timeline (older events.json files)."""
+    """The whole recording as one bar: red and full height while a moving vehicle was on the crossing, gaps shorter
+    (for colour-blind readers), of road.GAP_SLOW_S or more blue (people's time, as on the map), of road.GAP_ADULT_S or
+    more amber, the first and last gaps hatched (the video cut them short), and a dot per near-miss, the first `shown`
+    linked to their cards. '' without a timeline (older events.json files)."""
     if not timeline or not timeline.get("duration_s"):
         return ""
     total, spans = timeline["duration_s"], timeline["busy_s"]
     gaps = road.gaps_between(spans, total)
     at = lambda t: f"{min(max(t, 0), total) * WIDTH_PX / total:.1f}"
     length = lambda a, b: round(b - a, 2)
-    bar = lambda a, b, cls: (f'<rect class="{cls}" x="{at(a)}" y="{DOTS_PX}" height="{BAR_PX}" '
-                             f'width="{max(1.0, length(a, b) * WIDTH_PX / total):.1f}"/>')  # a tenth of a second shows
+    bar = lambda a, b, cls, inset=GAP_INSET_PX: (
+        f'<rect class="{cls}" x="{at(a)}" y="{DOTS_PX + inset}" height="{BAR_PX - 2 * inset}" '
+        f'width="{max(1.0, length(a, b) * WIDTH_PX / total):.1f}"/>')  # a tenth of a second shows
     marks = [bar(a, b, "gap12" if length(a, b) >= road.GAP_SLOW_S else "gap6")
              for a, b in gaps if length(a, b) >= road.GAP_ADULT_S]
-    marks += [bar(a, b, "busy") for a, b in spans] + [bar(a, b, "cut") for a, b in gaps if a == 0 or b == total]
+    marks += [bar(a, b, "busy", 0) for a, b in spans] + [bar(a, b, "cut") for a, b in gaps if a == 0 or b == total]
     for i, e in reversed(list(enumerate(events))):  # the linked first few drawn last, on top
         tier = e.get("tier", "serious")
         label = html.escape(f'#{i + 1}, {tier} at {e["t_person_s"]:.1f} s: {e["vehicle"].split("#")[0]}, '
@@ -269,13 +274,14 @@ STYLE = """
 .map .ped, .map .veh { stroke-dasharray: 1; animation: map-draw 4s linear infinite; }
 @keyframes map-draw { from { stroke-dashoffset: 1; } 60%, to { stroke-dashoffset: 0; } }
 @media (prefers-reduced-motion: reduce) { .map .ped, .map .veh { animation: none; } }
-.map .hit { fill: var(--accent); } .map .near { fill: none; stroke: #d98a00; stroke-width: 2.5; }
+.map .hit { fill: var(--accent); } .map .near { fill: none; stroke: #c27a00; stroke-width: 2.5; }
 .map text { fill: var(--ink); font: 12px system-ui, sans-serif; }
 .map text { paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
 .map .bar { stroke: var(--ink); stroke-width: 2; }
 .gaps { width: 100%; height: auto; } .gaps .base { fill: var(--line); } .gaps .busy { fill: var(--accent); }
-.gaps .gap12 { fill: #2e9e5b; } .gaps .gap6 { fill: #d98a00; } .gaps .cut { fill: url(#gap-cut); }
+.gaps .gap12 { fill: #2f7de1; } .gaps .gap6 { fill: #d98a00; } .gaps .cut { fill: url(#gap-cut); }
 .gaps pattern line { stroke: var(--bg); stroke-width: 2; opacity: 0.7; }
-.gaps .hit { fill: var(--accent); } .gaps .near { fill: none; stroke: #d98a00; stroke-width: 2; }
+.gaps .hit { fill: var(--accent); } .gaps .near { fill: none; stroke: #c27a00; stroke-width: 2; }
 .gaps text { fill: var(--muted); font: 11px system-ui, sans-serif; }
+@media (max-width: 600px) { .gaps text, .map text { font-size: 18px; } }
 """

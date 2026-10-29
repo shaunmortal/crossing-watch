@@ -65,12 +65,18 @@ def header(site, seen, lead, video, tiles, line, limit, asked, filed):
     headline or the pace warning), then `video` (clip()) beside the count `tiles`, the other counts as one muted
     `line`, SAM's `limit` note that qualifies them, the ask box (`asked`) and the blur badge."""
     once = " of one school dismissal" if site.get("dismissal_minutes") else ""
-    minutes = html.escape(str(seen.get("minutes", "?")))
+    shown = html.escape(minutes(seen))
     counts = f'<p class="note">{html.escape(line)}</p>' if line else ""
-    return (f'<header><p class="kicker">Crossing Watch &middot; near-miss evidence &middot; {minutes} minutes of '
+    return (f'<header><p class="kicker">Crossing Watch &middot; near-miss evidence &middot; {shown} minutes of '
             f'video{once}</p><h1>{html.escape(site.get("name") or "This crossing")}</h1>{filed}{lead}'
             f'<div class="hero{" two" if video else ""}">{video}<div><div class="stats">{tiles}</div>{counts}{limit}'
             f'{asked}<p class="note">{BLURRED}</p></div></div></header>')
+
+
+def minutes(seen):
+    """The minutes of video as the page shows them: 22.0 as "22", "?" when not counted."""
+    value = seen.get("minutes", "?")
+    return f"{value:g}" if isinstance(value, (int, float)) else str(value)
 
 
 def jump_bar(body):
