@@ -36,6 +36,7 @@ SAM_USD_PER_1K_FRAMES = 0.20  # SAM video, Meta's list price
 SAM_MIN_FRAMES = 50           # ...which bills at least this many frames per request
 SAM_USD_PER_IMAGE = 0.0025    # crowd mode: SAM images, Meta's list price of $2.50 per 1,000 images
 MAX_COST_USD = 10.0  # above this estimate, --allow-cost (or a --budget) is required
+MIN_WINDOW_S = 900   # a shorter window_s gets no hourly rates, PV² or school-year line on the page (pack.MIN_RATE_MINUTES)
 MODES = ("video", "crowd", "auto")  # person_mode / vehicle_mode values
 PREP_FILTER = re.compile(r"^((crop|scale|transpose|hflip|vflip)(=[\w.*:+\-/]+)?)(,(crop|scale|transpose|hflip|vflip)(=[\w.*:+\-/]+)?)*$")
 
@@ -85,6 +86,14 @@ def load_site(path):
                          "metres, length first, e.g. {\"car\": [3.9, 1.7]}")
     if not PREP_FILTER.match(site.get("prep_filter", "") or "crop"):
         raise SystemExit(f"{path}: prep_filter may only use crop, scale, transpose, hflip or vflip")
+    window = site.get("window_s")
+    if window is not None and not (isinstance(window, list) and len(window) == 2
+                                   and all(isinstance(v, (int, float)) for v in window) and 0 <= window[0] < window[1]):
+        raise SystemExit(f"{path}: window_s must be [start, end], the seconds of the recording to analyse (e.g. "
+                         "[45, 945]: after the set-up, through the rush); the whole recording is still hashed")
+    if window and window[1] - window[0] < MIN_WINDOW_S:
+        print(f"warning: {path}: window_s is {window[1] - window[0]:g} s; under {MIN_WINDOW_S // 60} minutes the page "
+              "gives no hourly rates, PV² or school-year line", flush=True)
     trap = site.get("trap")
     if trap is not None and not (isinstance(trap, dict) and numeric_points(trap.get("image_points"), 4)
                                  and isinstance(trap.get("distance_m"), (int, float)) and trap["distance_m"] > 0):
@@ -94,12 +103,13 @@ def load_site(path):
     return site
 
 
-def check_source(video, out_dir, prep_filter, sha256=None):
+def check_source(video, out_dir, prep_filter, sha256=None, window=None):
     """Refuse to reuse an output folder (its clip and paid SAM replies) made from another video or settings. The
     video is known by its bytes and SHA-256, not its path: the same file moved or renamed keeps its paid replies."""
     stat = Path(video).stat()
     stamp = {"video": str(Path(video).resolve()), "bytes": stat.st_size, "sha256": sha256, "prep_filter": prep_filter,
-             "fps": FPS, "width": WIDTH, "chunk_frames": CHUNK_FRAMES, "overlap_frames": OVERLAP_FRAMES}
+             "fps": FPS, "width": WIDTH, "chunk_frames": CHUNK_FRAMES, "overlap_frames": OVERLAP_FRAMES,
+             **({"window_s": window} if window else {})}  # absent when unset, so older folders still match
     stamp_file = out_dir / "source.json"
     old = json.loads(stamp_file.read_text()) if stamp_file.exists() else None
     settings = lambda s: {k: v for k, v in s.items() if k not in ("video", "sha256")}
@@ -108,15 +118,17 @@ def check_source(video, out_dir, prep_filter, sha256=None):
     stamp_file.write_text(json.dumps(stamp, indent=1))
 
 
-def prepare(video, out_dir, extra_filter=""):
-    """Re-encode to what SAM wants: H.264 with faststart, FPS frames a second, WIDTH pixels wide."""
+def prepare(video, out_dir, extra_filter="", window=None):
+    """Re-encode to what SAM wants: H.264 with faststart, FPS frames a second, WIDTH pixels wide; only the seconds
+    `window` [start, end] of the video when given (clip time 0 is then the video's `start`)."""
     clip = out_dir / "clip.mp4"
     if clip.exists():
         return clip
     partial = out_dir / "clip.part.mp4"
     filters = ",".join(f for f in (extra_filter, f"fps={FPS}", f"scale={WIDTH}:-2") if f)
+    cut = ["-ss", f"{window[0]:.3f}", "-t", f"{window[1] - window[0]:.3f}"] if window else []
     try:
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(video), "-vf", filters, "-an", "-c:v", "libx264",
+        subprocess.run(["ffmpeg", "-v", "error", "-y", *cut, "-i", str(video), "-vf", filters, "-an", "-c:v", "libx264",
                         "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(partial)], check=True)
         partial.replace(clip)
     finally:
@@ -529,18 +541,18 @@ def heads(person_boxes, found, frames):
 
 
 def add_evidence(video, clip, out_dir, events, people, vehicles, person_boxes, vehicle_boxes, key, frame_size,
-                 everyone):
+                 everyone, offset_s=0.0):
     """Evidence clip and sound check for evidence_events; one failure costs that event's evidence, not the run. Only
     the frames of the track piece that made the event are drawn (SAM silhouettes, boxes where no mask is cached); the
     heads of `everyone` and every number plate are blurred. Each clip's frames are also saved in road metres, for
-    video/split.py."""
+    video/split.py. `offset_s`: where the clip starts in the video (window_s), as the sound is cut from the video."""
     for i, e in enumerate(evidence_events(events)):
         pair = piece_boxes(person_boxes, people, e["person"]), vehicle_boxes[e["vehicle"]]
         try:
             e["clip"] = render.render(clip, e, *pair, FPS, out_dir / f"event{i + 1}.mp4", everyone=everyone,
                                       frame_size=frame_size, vehicles=list(vehicle_boxes.values())).name
             e["replay"] = render.replay(e, people[e["person"]], vehicles[e["vehicle"]], FPS)  # frame for frame
-            e["heard"] = listen.listen(video, e, out_dir / f"event{i + 1}.wav", key)
+            e["heard"] = listen.listen(video, e, out_dir / f"event{i + 1}.wav", key, offset_s)
             e["strobe"] = render.strobe(out_dir / e["clip"], e, *pair, FPS, frame_size,
                                         out_dir / f"event{i + 1}-strobe.jpg")  # the whole near-miss in one picture
         except (subprocess.CalledProcessError, OSError) as err:
@@ -578,9 +590,13 @@ def main():
     site = load_site(args.site)
     out_dir = Path(args.out or Path("out") / Path(args.video).stem)
     out_dir.mkdir(parents=True, exist_ok=True)
+    window = site.get("window_s")
+    if window and window[1] > float(probe(args.video, "format=duration")) + 1 / FPS:  # ffmpeg -t stops at the end
+        raise SystemExit(f"window_s ends at {window[1]:g} s but {args.video} is shorter: the page would claim seconds "
+                         "that were never analysed")
     started, source, before = time.monotonic(), seal.file_sha256(args.video), sam_replies(out_dir)  # pack receipt
-    check_source(args.video, out_dir, site.get("prep_filter", ""), source)
-    clip = prepare(args.video, out_dir, site.get("prep_filter", ""))
+    check_source(args.video, out_dir, site.get("prep_filter", ""), source, window)
+    clip = prepare(args.video, out_dir, site.get("prep_filter", ""), window)
     frame_size = tuple(int(v) for v in probe(clip, "stream=width,height").split(","))
     if site.get("frame_size") and tuple(site["frame_size"]) != frame_size:
         raise SystemExit(f"calibration was marked on a {site['frame_size']} frame but the clip is {list(frame_size)}: "
@@ -620,7 +636,8 @@ def main():
     people, vehicles = road_tracks(site, H, person_boxes, vehicle_boxes, frame_size)
     events = with_unseen(placed(road.conflicts(people, vehicles, FPS), people, vehicles), person_detected,
                          vehicle_detected)
-    seen = road.exposure(people, vehicles, FPS, total)
+    # window_s is a list, so pack.facts leaves it out: the letter's prompt and hash stay the same
+    seen = {**road.exposure(people, vehicles, FPS, total), **({"window_s": window} if window else {})}
     timeline = road.timeline(people, vehicles, FPS, total)  # the gap barcode's spans, kept out of `seen`
     paths = road.crossing_paths(people, vehicles, FPS)  # the desire lines, kept out of `seen` too
     walk = pace.walking(people, FPS)  # people are the clock: a time-lapse or a wrong scale shows in their pace
@@ -642,7 +659,7 @@ def main():
         found, searched = search_heads(site, clip, out_dir, events, total, pieces, key, cap - spent)
         everyone, privacy = heads(person_boxes, found, searched)
     add_evidence(args.video, clip, out_dir, events, people, vehicles, person_boxes, vehicle_boxes, key, frame_size,
-                 everyone)
+                 everyone, (window or [0.0])[0])
     write_events(out_dir, site, events, seen, cost(len(searched)), full, privacy, source,
                  run_record(out_dir, started, before), timeline, paths, walk)
     report(seen, events, untrusted)

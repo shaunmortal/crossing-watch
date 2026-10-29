@@ -49,10 +49,10 @@ def audio_around(video, t_s, out_path):
     return (out_path if out_path.stat().st_size >= MIN_WAV_BYTES else None), start
 
 
-def listen(video, event, out_path, api_key):
+def listen(video, event, out_path, api_key, offset_s=0.0):
     """Sounds heard around the event, times relative to the near-miss (negative = before); None if there is no
-    audio or the call failed."""
-    t_s = min(event["t_person_s"], event["t_vehicle_s"])
+    audio or the call failed. `offset_s`: where the analysed clip starts in `video` (window_s)."""
+    t_s = min(event["t_person_s"], event["t_vehicle_s"]) + offset_s
     wav, start = audio_around(video, t_s, out_path)
     if wav is None:
         return None

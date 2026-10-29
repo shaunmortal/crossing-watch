@@ -2961,6 +2961,34 @@ def test_video_requests_go_out_together_once_and_the_auto_bill_is_shown_first():
         sam.request = old
 
 
+
+def test_window_s_prepares_only_those_seconds_of_the_recording():
+    import analyze, contextlib, io, subprocess, tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as tmp:
+        video = Path(tmp, "rec.mp4")
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=160x90:rate=30", "-t", "40",
+                        "-c:v", "libx264", "-pix_fmt", "yuv420p", str(video)], check=True)
+        clip = analyze.prepare(video, Path(tmp), "", [10, 25])
+        assert analyze.frame_count(clip) == 15 * analyze.FPS
+        site = Path(tmp, "site.json")
+        square = [[0, 0], [1, 0], [1, 1], [0, 1]]
+        for bad in ([25, 10], [-1, 5], [5], "10-25"):
+            site.write_text(json.dumps({"image_points": square, "world_points": square, "vehicles": ["car"],
+                                        "window_s": bad}))
+            try:
+                analyze.load_site(site)
+                raise AssertionError(f"window_s {bad} accepted")
+            except SystemExit:
+                pass
+        site.write_text(json.dumps({"image_points": square, "world_points": square, "vehicles": ["car"],
+                                    "window_s": [10, 25]}))
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            assert analyze.load_site(site)["window_s"] == [10, 25]
+        assert "under 15 minutes" in printed.getvalue()  # the page will give no hourly rates
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):

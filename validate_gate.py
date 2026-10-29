@@ -6,7 +6,7 @@ calibrate.html marks a rectangle (line A near kerb, line B near kerb, line B far
 taped distance between the two lines:  "trap": {"image_points": [[x, y], [x, y], [x, y], [x, y]], "distance_m": 15}
 The log is a CSV with the columns line_a_s and line_b_s (others are ignored), one row per vehicle: the seconds into
 the video given to analyze.py, read on that file at its own frame rate (never on clip.mp4), when the vehicle's front
-wheel touched line A and line B, in either order.
+wheel touched line A and line B, in either order. With the site's window_s, only rows inside the window count.
 $0: the run's tracks are rebuilt from its cached SAM replies (validate_dut.our_tracks); a cache miss stops the check.
 Run: python3 validate_gate.py SITE.json OUT_DIR TRAP.csv     (OUT_DIR: the analyze.py run's --out folder)
 """
@@ -147,7 +147,9 @@ def main():
     lines = trap_lines(site, road.homography(site["image_points"], site["world_points"]))
     *_, vehicles, _ = validate_dut.our_tracks(site, args.out)
     distance_m = site["trap"]["distance_m"]
-    report(check(vehicles, lines, distance_m, read_log(args.log)), lines_apart(*lines), distance_m)
+    start, end = site.get("window_s") or [0, math.inf]  # the log is timed on the recording; the clip starts at start
+    log = [(a - start, b - start) for a, b in read_log(args.log) if start <= min(a, b) and max(a, b) <= end]
+    report(check(vehicles, lines, distance_m, log), lines_apart(*lines), distance_m)
 
 
 if __name__ == "__main__":
