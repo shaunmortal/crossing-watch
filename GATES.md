@@ -151,8 +151,12 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 - Offline recomputes (cached tracks or ground truth, no API calls; SAM requests were stubbed to fail on a cache miss):
   - SinD ground truth, 20 min: 37 of 63 crossings (1 in 1.7) within 3 s, 25 of 63 within 1.5 s. Old tile: 103.2.
   - Dense Indian clip, crowd cache (the recompute matches the stored 83 events pair for pair and its 15 crossings;
-    Spark's stored verdicts leave 18): 5 of 15 (1 in 3) within 3 s, 2 of 15 (1 in 7.5) within 1.5 s; 95% ranges
-    11.8-61.6% and 1.7-40.5%. Old tile: 120.0.
+    Spark's stored verdicts leave 18 events): Spark rejected 10 of the 15 tracked crossers as not people (8 riders,
+    2 "not a person"), so the clip has only 5 real crossers and the ranges are wide: 5 of 5 (1 in 1) within 3 s,
+    2 of 5 (1 in 2.5) within 1.5 s; 95% ranges 47.8-100.0% and 5.3-85.3%. Old tile: 120.0 (18 events over all 15
+    crossers).
+  - Review fix: the first version kept Spark's rejected crossers in n but not in k, which printed 5 of 15 here, 3x
+    too low. `pack.real_crossers` now drops them from n by person (one with any piece still confirmed stays).
   - Kids 15-second parts: 0 of 7, 95% range 0.0-41.0%, up to 3.7 people in a recording this long.
 - Pages built from an events.json written before this change show no headline, rather than a count that could hold
   someone twice.

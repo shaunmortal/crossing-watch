@@ -125,6 +125,17 @@ def confirmed(events):
     return [e for e in events if e["person"] not in rejected]
 
 
+def real_crossers(events, seen):
+    """exposure without the crossers Spark rejected as 'not a person', so the headline's n holds the same people as
+    its k (a rider or a moved pole must not count as a crossing nobody was hit in). By person, not piece: one with
+    any piece left in confirmed(events) stays."""
+    if not seen.get("crossers"):
+        return seen
+    kept = {e["person"].split("/")[0] for e in confirmed(events)}
+    rejected = {e["person"].split("/")[0] for e in events if (e.get("review") or {}).get("is_person") is False} - kept
+    return {**seen, "crossers": [c for c in seen["crossers"] if c not in rejected]}
+
+
 def serious(events):
     return [e for e in events if e.get("tier", "serious") == "serious"]
 
@@ -679,7 +690,8 @@ def main():
     out_dir, site = Path(args.out_dir), json.loads(Path(args.site).read_text())
     data = json.loads((out_dir / "events.json").read_text())
     events = confirmed(data["events"])
-    seen = data.get("exposure") or {"minutes": round(clip_minutes(out_dir / "clip.mp4", data["fps"]), 1)}
+    seen = real_crossers(data["events"],
+                         data.get("exposure") or {"minutes": round(clip_minutes(out_dir / "clip.mp4", data["fps"]), 1)})
     plan, images = None, None
     if events:
         try:

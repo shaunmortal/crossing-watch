@@ -354,6 +354,18 @@ def test_headline_counts_each_person_who_crossed_once():
     assert "headline" not in pack.facts({"name": "gate"}, events, {"crossings": 9, "minutes": 1.0})
 
 
+def test_headline_leaves_out_crossers_spark_rejected():
+    """A crosser Spark called 'not a person' leaves n as well as k; one with any piece still confirmed stays."""
+    hit = lambda person, verdict: {"person": person, "vehicle": "car#1", "pet_s": 0.4, "tier": "serious",
+                                   **({"review": {"is_person": verdict}} if verdict is not None else {})}
+    events = [hit("c1/0", True), hit("rider/0", False), hit("c2/0", False), hit("c2/1", None)]
+    seen = {"minutes": 1.0, "crossings": 4, "crossers": ["c1", "c2", "c3", "rider"]}
+    kept = pack.real_crossers(events, seen)
+    assert kept["crossers"] == ["c1", "c2", "c3"] and seen["crossers"][-1] == "rider" and kept["crossings"] == 4
+    assert pack.headline(pack.confirmed(events), kept, {})[0].startswith("2 of 3 crossings")
+    assert pack.real_crossers(events, {"minutes": 1.0}) == {"minutes": 1.0}  # an older events.json
+
+
 def test_school_year_line_needs_both_site_keys_and_15_minutes():
     events = [{"person": "c1/0", "vehicle": "car#1", "pet_s": 0.5, "tier": "serious"}]
     seen = {"minutes": 20.0, "duration_s": 1200.0, "crossings": 40, "crossers": [f"c{i}" for i in range(40)]}
