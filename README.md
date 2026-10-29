@@ -24,6 +24,7 @@ hit, instead of waiting for crash statistics.
 | Where it happened | A bird's-eye map in road metres: each near-miss where it happened, with both paths 2 s either side | `roadmap.py` |
 | Evidence clips | ffmpeg, SAM silhouettes (boxes where no mask is cached): pedestrian cyan, vehicle red, every tracked person's head blurred on every frame so clips of children can be shared | `render.py`, `masks.py` |
 | The near-miss in one picture | A StroMotion still cut from the blurred clip: copies of the vehicle, then the pedestrian, every 0.5 s (1 s for a car), so wider spacing means faster | `render.py` |
+| Hero shot for the video | The blurred clip beside the same frames seen from above in road metres: footsteps, the vehicle's footprint, the 1 m ring and the gap clock. One SVG tile per frame, screenshotted once by headless Chrome, stepped through by ffmpeg | `video/split.py` |
 | Fix and letter | **Muse Spark** (JSON mode) picks a physical fix and writes the letter from the measurements only; verified in two layers before use: code checks every number against the measurements, then **Muse Spark as a separate reviewer** (LLM as judge) lists unsupported claims (a warrant said to be met, a death risk for a child); either objection sends the letter back with the reason, and after 3 tries what remains is shown for a person to check; **Muse Image** draws the fix onto the real street | `pack.py` |
 
 ## Run
@@ -34,6 +35,7 @@ Needs Python 3.11+ and ffmpeg. No other dependencies. Put `MODEL_API_KEY=...` (M
 open calibrate.html                      # tape-measured rectangle, or no tape: match 4 points to a satellite view
 python3 analyze.py VIDEO site.json       # tracks, near-misses, clips, Spark review -> out/VIDEO/events.json
 python3 pack.py out/VIDEO site.json      # letter, fix image, evidence page -> out/VIDEO/index.html
+python3 video/split.py out/VIDEO 1       # hero shot: event1.mp4 beside it in road metres -> out/VIDEO/event1-hero.mp4
 python3 test_cw.py                       # self-checks
 ```
 
