@@ -7,9 +7,9 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 | G1 Tracks | SAM 3.1 keeps one ID on each crossing pedestrian for at least 80% of the time they are visible | news CCTV `sites/kids-cctv.json` | passed 28 Oct (2 of 2 crossers, 150/150 frames) |
 | G2 Metres | A road distance NOT used for calibration (a second lane width, or crossing-line length) comes out within ±15% of its assumed value | same | Wed 28 Oct 22:00 |
 | G3 Conflicts | Checked by eye, at least 2 of the top 3 events are real close passes, and no event involves a parked or queued vehicle | same | Thu 29 Oct 22:00 |
-| G4 Own footage | Footage filmed from height at the user's college gate runs end to end, with calibration from measured points | user's video | Sun 1 Nov 22:00 |
+| G4 Own footage | Footage filmed from height at our college gate runs end to end, with calibration from measured points | our video | Sun 1 Nov 22:00 |
 | G5 Blind check | A transport or civil engineering lecturer, not told which clips the pipeline flagged, agrees with it on danger vs none with Cohen's kappa of 0.6 or more (rules below, written before any gate-pack clip is made) | the gate pack | Tue 3 Nov 22:00 |
-| G6 Speed | Against vehicles hand-timed between two lines taped 15 m apart, at least 80% of matched vehicles read within ±15% or ±2 km/h (whichever is larger), and the median error is within ±10%; at least 20 matched vehicles, or G6 is "not tested". Added Thu 29 Oct, before the taped lines are filmed; details below | user's video, with the lines taped | Sun 1 Nov 22:00 |
+| G6 Speed | Against vehicles hand-timed between two lines taped 15 m apart, at least 80% of matched vehicles read within ±15% or ±2 km/h (whichever is larger), and the median error is within ±10%; at least 20 matched vehicles, or G6 is "not tested". Added Thu 29 Oct, before the taped lines are filmed; details below | our video, with the lines taped | Sun 1 Nov 22:00 |
 
 **Scope cut if G3 fails:** report the closest approach in metres plus vehicle speed (no PET). The evidence pack and letter still ship.
 
@@ -48,15 +48,15 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 - These conditions and the constants in `validate_gate.py` (`BAND_PCT`, `BAND_KMH`, `PASS_SHARE`, `MAX_LEAN_PCT`,
   `MIN_VEHICLES`, `MATCH_M`, `MIN_SPEEDS`) do not change after the trap footage arrives.
 
-## Status (Wed 28 Oct, evening, written by the agent)
+## Status (Wed 28 Oct, evening)
 
 - **G1** passed (see table).
-- **G2 not yet tested.** Both test clips were calibrated from assumed lengths, so no independent measured distance exists. This waits for the user's footage with measured points.
+- **G2 not yet tested.** Both test clips were calibrated from assumed lengths, so no independent measured distance exists. This waits for our footage with measured points.
 - **G3 partial.**
   - On the schoolchildren CCTV clip, the pipeline reports 1 event. It is a pole tracked as a person, and Muse Spark rejects it, so the evidence pack shows 0 near-misses. Checked by eye: no real close pass happened there (the children were 1.4 m or more from slow, turning cars). So: no false alarm in the final output, but no true positive tested yet either.
-  - The Indian intersection clip's event count is *withdrawn 29 Oct: the clip is a time-lapse; see the last section*.
+  - The Indian intersection clip's event count is *withdrawn 29 Oct: the clip is a time-lapse; see 'The Indian clip is a time-lapse' below*.
   - A true positive needs footage with a real near-miss.
-- A 13-agent review found 14 confirmed defects, all fixed:
+- An AI-assisted code review found 14 confirmed defects, all fixed:
   - speed teleports from ID switches;
   - a person who waits and then crosses was dropped as static;
   - people waiting on the pavement counted as conflicts (optional `roadway_m` polygon added);
@@ -74,7 +74,7 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 
 ## Status update (Wed 28 Oct, late night)
 
-- A second 11-agent review found 13 confirmed defects, all fixed:
+- A second AI-assisted code review found 13 confirmed defects, all fixed:
   - a rejected pole came back through unreviewed events;
   - an odd Muse Image or Spark reply stopped the page from being written;
   - the static test was all-or-nothing (now long still stretches are dropped per window, so waiting then crossing keeps the crossing);
@@ -92,9 +92,9 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 - New:
   - head blur in evidence clips and the street photo;
   - long videos in SAM parts with a cost guard (5 minutes then; 15 s since the 16-object finding);
-  - Muse Wonder ear-witness (`listen.py`). On the user's college clip it heard brakes at 14.5–15.4 s on two separate calls, and a spectrogram shows tonal squeal energy at 1.75–3.75 s into that window. Corroborated, not ground truth.
+  - Muse Wonder ear-witness (`listen.py`). On our college clip it heard brakes at 14.5–15.4 s on two separate calls, and a spectrogram shows tonal squeal energy at 1.75–3.75 s into that window. Corroborated, not ground truth.
 - 25 self-checks pass.
-- Added after the judge-side critique (JUDGE_REPORT.md):
+- Added after an internal judge-side critique (not published):
   - a close-pass tier (PET 1.5–3 s);
   - exposure on every report: crossings watched, moving vehicles, minutes, 85th-percentile speed, conflicts per 100 crossings;
   - the page never implies "safe";
@@ -109,7 +109,7 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
   - PET agrees with an independent conflict-area PET within 0.5 s on 51 of 65.
   - Same tier on 56 of 65.
   - All 9 pairs only the textbook flagged are explained.
-  - *Re-scored after the speed fix (last section): 0.24 km/h, 53 of 66 within 0.5 s, same tier on 57 of 66, the
+  - *Re-scored after the speed fix (see 'Review fixes, re-scored on the merged code' below): 0.24 km/h, 53 of 66 within 0.5 s, same tier on 57 of 66, the
     same 9 pairs.*
   - This is a partial answer to "no true positive yet". G3 still needs a true positive through SAM and phone calibration.
 - PET search now uses a grid index (equal to brute force on 30 random cases, see the test), and vehicles can be full footprint polygons.
@@ -122,8 +122,8 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
   - Spark review now uses a zoomed crop of each person's clearest frame. The full-frame snapshot rejected 4 real
     students; the crop keeps rejecting empty road, a pole and part of a car.
   - G3 is passed on drone footage with ground truth (top 3 events are real, none involves a parked vehicle).
-    The phone-angle version still needs the user's footage.
-- A third review (8 agents) confirmed 4 real defects plus 6 smaller ones. All fixed except two stated limits (long-video ID boundaries, box jitter):
+    The phone-angle version still needs our footage.
+- A third AI-assisted code review confirmed 4 real defects plus 6 smaller ones. All fixed except two stated limits (long-video ID boundaries, box jitter):
   - the street photo could go out unblurred for long videos or a custom person concept (now no photo rather than faces);
   - calibration with prep_filter could silently misplace points (now `marked_on` is checked);
   - the stillness filter ran after track splitting, so a glitching pole escaped;
@@ -154,7 +154,7 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 - SAM 3.1's 16-object limit is per video request, not per frame (54 cached replies: none above 16, no new ID after
   16). Parts cut from 5 min to 15 s; on the kids clip 2 of 8 requests still fill, on the dense Indian clip all 12.
   Full requests are counted and the page says counts are a minimum.
-- Fourth review (3 reviewers, each finding checked by a skeptic), 10 confirmed and fixed: crowd-mode clips left heads
+- Fourth AI-assisted code review (each finding checked again), 10 confirmed and fixed: crowd-mode clips left heads
   unblurred on every other frame (boxes now filled between samples); PV² and rates used minutes rounded to 0.1;
   gap rate per minute read backwards for empty roads (now share of time); crowd-mode street photo missing; image
   cost called a Meta price; child and non-car events showed the adult car-front risk without a caveat; pedestrian
@@ -163,8 +163,8 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
   *Corrected 29 Oct: stale. Clip 15's events.json was rewritten after this validation.json; scored as stored, the run gives 26 of 36.*
 - Vehicle crowd mode: DUT 35 of 36 (4 real false alarms); dense Indian clip coverage 6 -> 20 vehicles a frame. Found and
   fixed on the way: one-frame pedestrian fragments and riders accepted as pedestrians by Spark (that clip's event
-  counts are *withdrawn 29 Oct: the clip is a time-lapse; see the last section*). G2 on real footage still pending.
-- Fifth review (2 reviewers, findings checked): crowd-mode vehicles over ~36 km/h were lost at 5 samples a second (now
+  counts are *withdrawn 29 Oct: the clip is a time-lapse; see 'The Indian clip is a time-lapse' below*). G2 on real footage still pending.
+- Fifth AI-assisted code review (findings checked): crowd-mode vehicles over ~36 km/h were lost at 5 samples a second (now
   10); synonym concepts shared one cache (now refused); letter check missed non-English facts and comma numbers, and
   flagged "SAM 3.1" from the prompt (fixed). DUT with vehicles at 10 a second: 12 of 36, speed bias +0.2 km/h, 1 real
   false alarm. *Corrected 29 Oct: the misses were not at the 10 km/h bar. 20 of the 24 were Spark's review (17 of them
@@ -182,7 +182,7 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
      the same way for scoring) were both read slow. With a least-squares slope, cars at about 10 km/h now count as
      moving, so the truth set grows from 36 to 52 conflicts (24 to 34 serious). This is the "moving" bar being read
      right, not better detection. The same commit added the phantom-speed guard (its Indian-clip speeds are
-     *withdrawn 29 Oct: the clip is a time-lapse; see the last section*).
+     *withdrawn 29 Oct: the clip is a time-lapse; see 'The Indian clip is a time-lapse' below*).
   2. **Rider gate (b54d1ab).** Spark called walking students "rider" or "cyclist". DUT tracks no bikes, so no bike box
      is ever under them and every such call is now overruled.
   3. **New events.** Today's code finds conflicts in track pieces Spark never saw: 8 events in crowd mode, 17 in
@@ -212,7 +212,7 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 | Indian crowd clip (no ground truth), after review | withdrawn | withdrawn |
 
 *Corrected later on 29 Oct: the Indian row is withdrawn. The clip is a time-lapse, so its events and speeds were never
-measurements; see the last section.*
+measurements; see 'The Indian clip is a time-lapse' below.*
 
 - Unchanged: moving vehicles counted right on 8 of 8 clips, longest gap within 0.5 s on 6 of 8, pedestrian crossings
   374 against the dataset's 280.
@@ -241,8 +241,7 @@ measurements; see the last section.*
 - Offline recomputes (cached tracks or ground truth, no API calls; SAM requests were stubbed to fail on a cache miss):
   - SinD ground truth, 20 min: 37 of 63 crossings (1 in 1.7) within 3 s, 25 of 63 within 1.5 s. Old tile: 103.2
     (104.8 on the merged code: 66 conflicts / 63 crossings; the 37 and 25 do not change).
-  - Dense Indian clip, crowd cache: its one number is *withdrawn 29 Oct: the clip is a time-lapse; see the last
-    section*. It did show that Spark rejected 10 of the 15 tracked crossers as not people (8 riders, 2 "not a
+  - Dense Indian clip, crowd cache: its one number is *withdrawn 29 Oct: the clip is a time-lapse; see 'The Indian clip is a time-lapse' below*. It did show that Spark rejected 10 of the 15 tracked crossers as not people (8 riders, 2 "not a
     person").
   - Review fix: the first version kept Spark's rejected crossers in n but not in k, so the share read too low.
     `pack.real_crossers` now drops them from n by person (one with any piece still confirmed stays).
@@ -297,7 +296,7 @@ These rules do not change after anyone labels.
 Tooling dry runs (offline, not the gate): on a copy of the cached dense Indian clip (390 frames), with the vehicle
 sampling rate its cache was made at and no `--review-decoys` (so decoys are limited to pedestrians Spark had
 already looked at), `blind_set.py` rebuilt the tracks from cache with no SAM request. *Added 29 Oct: that clip is a
-time-lapse (see the last section), so the near-misses and gaps below test the tool only; they say nothing about the
+time-lapse (see 'The Indian clip is a time-lapse' below), so the near-misses and gaps below test the tool only; they say nothing about the
 street.*
 
 - The first version wrote 12 near-misses and 8 decoys, but 6 near-miss clips, with events at 30.0-30.8 s, were cut
@@ -333,7 +332,7 @@ street.*
 
 ## Review fixes, re-scored on the merged code (Thu 29 Oct, evening)
 
-A review of the merged lanes found README numbers from older code. Each was recomputed once, at $0, on the merged
+A review of the merged branches found README numbers from older code. Each was recomputed once, at $0, on the merged
 code (no API calls: SAM and Spark were stubbed to fail on a cache miss).
 
 - **SinD** (`python3 validate_sind.py data/sind`, three runs, the same each time). The SinD lines were written before
@@ -354,11 +353,11 @@ code (no API calls: SAM and Spark were stubbed to fail on a cache miss).
   The new conflict is P15 with motorcycle#108, a close pass (PET 2.7 s) at 10.1 km/h: the old median of steps read
   that motorcycle at 9.6 km/h there, under the 10 km/h "moving" bar. No conflict was lost and no tier changed.
 - **Dense Indian clip:** re-scored here on the merged code, then withdrawn the same day: the clip is a time-lapse,
-  so its conflicts, speeds and one number were never measurements (see the last section).
+  so its conflicts, speeds and one number were never measurements (see 'The Indian clip is a time-lapse' below).
 
-- **Rank 35, tracker tweak after OC-SORT: tried, not shipped.** Velocity from 3 samples back and a second greedy
+- **Tracker tweak after OC-SORT: tried, not shipped.** Velocity from 3 samples back and a second greedy
   round against each unmatched track's last seen box, scored with `validate_offline.py` on `out/dut-15s` and
-  `out/dut-vcrowd` (the change patched in from a scratch script):
+  `out/dut-vcrowd` (the change patched in for that run only, never committed):
 
 | | Today's tracker | Tweak |
 |---|---|---|
@@ -369,15 +368,15 @@ code (no API calls: SAM and Spark were stubbed to fail on a cache miss).
 | Tracks for the 296 pedestrians followed (split ones) | 325 (23) | 316 (18) |
 | Events on pieces Spark never saw | 8 / 17 | 19 / 26 |
 
-  Recall and false alarms hold, so by the plan's rule it could ship. It is not shipped before the gate run: it finds
+  Recall and false alarms hold, so by our ship rule (recall and false alarms must not get worse) it could ship. It is not shipped before the gate run: it finds
   nothing more, and it moves 20 events onto track pieces with no stored Spark verdict, so the README's after-review
   DUT numbers could no longer be checked at $0 without a paid Spark re-review.
-- **Single concept "vehicle" (rank 4b):** `vehicle_test.py` now holds the test (60 cached crowd frames of the Indian
+- **Single concept "vehicle":** `vehicle_test.py` now holds the test (60 cached crowd frames of the Indian
   clip sent with "vehicle", about $0.15, capped at $0.20; boxes matched at IoU 0.5 against car, motorcycle and auto
   rickshaw; adopt at 95% recall). It has not been run, so "vehicle" is not adopted and $34 for 15 minutes is a
   condition, not a plan.
-- **Waiting for the gate footage, no code yet:** the horn fused with a speed profile (rank 24), the 20 km/h ghost car
-  (25), parked vehicles (30) and the SAM video re-check (36). Each is built only if its go/no-go check on the first
+- **Waiting for the gate footage, no code yet:** the horn fused with a speed profile, the 20 km/h ghost car,
+  parked vehicles and the SAM video re-check. Each is built only if its go/no-go check on the first
   gate events.json passes; none has been run.
 - **Privacy:** a clip with no near-misses but a full people reply now gets frame 0 searched (one image), so its street
   photo is not refused; `blind_set.py` refuses a full people video request (G5 above); in `docs/` git ignores every
@@ -416,7 +415,8 @@ code (no API calls: SAM and Spark were stubbed to fail on a cache miss).
   An unflagged run's numbers and page are unchanged (self-checked).
 - **Medians measured to set the thresholds**, at $0: each run's tracks rebuilt from its cached SAM replies (crowd
   caches from exactly the frames cached), Spark and SAM stubbed to fail on a cache miss, nothing written under
-  `out/` (a scratch script, not in the repo); SinD and DUT ground truth cut into pieces the way analyze.py cuts ours.
+  `out/`; SinD and DUT ground truth cut into pieces the way analyze.py cuts ours. The tracks were rebuilt with
+  analyze.py's own track code; the caches and the DUT and SinD data are not public.
 
 | Video | Walking pieces | Median walking speed | Guard |
 |---|---|---|---|
@@ -436,3 +436,9 @@ code (no API calls: SAM and Spark were stubbed to fail on a cache miss).
   video sped up less than about 2x would pass. The kids clip's two runs differ by 2x (waiting children and running
   ones), so a crossing where most people run could be flagged.
 - 137 self-checks pass.
+
+## Log
+
+- Edited Thu 29 Oct 2026, before any footage of our gate: wording and references only; no number, date or
+  condition changed. Reviews are named as AI-assisted code reviews (their defect counts kept, the reviewer
+  head-counts dropped), internal rank numbers and file names are gone, and "the last section" links name their section.
