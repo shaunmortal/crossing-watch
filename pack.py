@@ -32,6 +32,7 @@ import ailabel
 import crowd
 import filmcheck
 import fixband
+import gazette
 import openweights
 import overlay
 import pace
@@ -300,8 +301,8 @@ def headline(events, seen, site):
 def engineering_lines(seen, cost, site=None):
     """The numbers road engineers already use, from the same tracks: PV^2 (IRC:103-2012) and gaps in traffic
     (UK Traffic Signs Manual ch. 6), plus what the tracking cost. Rates from a short video are scaled, and say so.
-    For a site in India, the moving vehicles over India's school-zone speed, also when none was (older events.json
-    files have no over_25_kmh, so their facts stay the same)."""
+    For a site in India, the moving vehicles over India's limit past a school or hospital where signs show it, also
+    when none was (older events.json files have no over_25_kmh, so their facts stay the same)."""
     minutes = watched_minutes(seen)
     if not minutes:
         return []
@@ -328,8 +329,8 @@ def engineering_lines(seen, cost, site=None):
                      f"more, longest {seen['longest_gap_s']} s (the first and last are cut short by the video). "
                      f"UK Traffic Signs Manual ch. 6 (13.5.2): 4-6 s is an "
                      f"acceptable gap at urban speeds; other groups, such as children, may need 10-12 s or longer.")
-    if site and in_india(site) and "over_25_kmh" in seen:
-        lines.append(f"{seen['over_25_kmh']} of {seen.get('vehicles', '?')} moving vehicles passed faster than "
+    if site and in_india(site) and "over_25_kmh" in seen and seen.get("vehicles"):  # "0 of 0" says nothing
+        lines.append(f"{seen['over_25_kmh']} of {seen['vehicles']} moving vehicles passed faster than "
                      f"{road.IN_SCHOOL_KMH} km/h, the speed India's Motor Vehicles (Driving) Regulations 2017 "
                      "(reg. 16(5)) set past schools and hospitals where signed.")
     if cost and cost.get("sam_usd") is not None:
@@ -763,7 +764,8 @@ def in_india(site):
 
 def legal_section(site):
     """For a site in India ("country": "IN"), why the authority can act: the Supreme Court's own sentences, each
-    linked to its page of the order. Paragraph 35.6 only when the site's "city" is in Annexure 46."""
+    linked to its page of the order, then the driving regulations' (gazette.rules). Paragraph 35.6 only when the
+    site's "city" is in Annexure 46."""
     if not in_india(site):
         return ""
     city = str(site.get("city", "")).strip()
@@ -774,7 +776,7 @@ def legal_section(site):
     annexure = (f'<p class="note">{html.escape(city)} is one of the 50 million-plus cities in Annexure 46 of MoRTH\'s '
                 "Road Accidents in India 2023.</p>" if listed else "")
     return (f'<section id="law"><h2>Why the authority can act</h2>{quotes}{annexure}<p class="note">{html.escape(LEGAL_NOTE)}</p>'
-            f'<p class="note">Source: {html.escape(ORDER)} (<a href="{ORDER_PDF}">PDF</a>).</p></section>')
+            f'<p class="note">Source: {html.escape(ORDER)} (<a href="{ORDER_PDF}">PDF</a>).</p>{gazette.rules(site)}</section>')
 
 
 def submitted(site):
