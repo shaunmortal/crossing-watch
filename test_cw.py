@@ -3621,6 +3621,33 @@ def test_indian_legal_box_quotes_the_driving_regulations_word_for_word_without_t
     assert not [line for line in stopped if "faster than 25 km/h" in line]  # never "0 of 0 moving vehicles"
 
 
+def test_a_letter_saying_a_driver_broke_a_rule_goes_back_and_is_flagged_if_kept():
+    """Code, at no cost, sends back a letter or fix reason that says someone broke a law or rule; a video cannot
+    show a limit applied. "broken" (a broken footpath) is no accusation."""
+    assert pack.accusing("Cars passed at 30 km/h. That is illegal here.\nDrivers violated the limit.") == [
+        "That is illegal here.", "Drivers violated the limit."]
+    assert pack.accusing("The footpath is broken. Drivers braked late. Unlawfully fast; a breach.") == [
+        "Unlawfully fast; a breach."]
+    good = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "Cars passed close to people."}
+    bad = {**good, "letter": "Drivers broke the 25 km/h limit."}
+    replies, prompts, judged = [bad, good], [], []
+    old = pack.model_plan, pack.judge_problems
+    pack.model_plan = lambda prompt, key, photo=None, known=None: (prompts.append(prompt), replies.pop(0))[1]
+    pack.judge_problems = lambda letter, measured, key: judged.append(letter) or []
+    try:
+        plan = pack.ask_plan("PROMPT", '{"limit_kmh": 25}', "key")
+        assert plan["letter"] == good["letter"] and plan["tries"] == 2 and judged == [good["letter"]]
+        assert "says someone broke a rule" in prompts[1] and bad["letter"] in prompts[1]
+        replies[:] = [{**good, "why": "It is illegal to speed here."}] * pack.LETTER_TRIES
+        stubborn = pack.ask_plan("PROMPT", '{"limit_kmh": 25}', "key")
+    finally:
+        pack.model_plan, pack.judge_problems = old
+    assert stubborn["accuses"] == ["It is illegal to speed here."] and stubborn["tries"] == pack.LETTER_TRIES
+    section = pack.letter_section(stubborn)
+    assert "says someone broke a rule, which a video cannot show: It is illegal to speed here." in section
+    assert 'id="letter-check" hidden' in section
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):

@@ -95,6 +95,7 @@ MPH = re.compile(rf"(?:(?:{NUMBER.pattern})\s?)?(?<![a-z])(?:mph|miles (?:per|an
 WITH_UNIT = re.compile(rf"({NUMBER.pattern})\s?(km/h|kmph|s(?:ec(?:ond)?s?)?|%|per ?cent)(?![\w/])", re.I)
 UNIT_FIELD = {"k": "vehicle_kmh", "s": "pet_s", "%": "death_risk_pct", "p": "death_risk_pct"}  # unit's 1st letter
 SENTENCE = re.compile(r"(?<=[.!?])\s+|\n")
+ACCUSES = re.compile(r"\b(?:illegal|unlawful|violat|breach|broke\b)", re.I)  # a rule broken: no video can show that
 SHOWN_FILE = re.compile(r'\b(?:src|poster)="([^"#?]+)')  # a file the page shows (clip, poster, picture), no #t=...
 UNSHAREABLE = re.compile(r"clip\.mp4|person-.*\.jpg")  # the unblurred video and the unblurred crops Spark saw
 PLAN_KEYS = ("fix", "why", "image_prompt", "letter")
@@ -417,12 +418,20 @@ def mixed(letter, worst):
     return out
 
 
-def retry_note(bad, crossed, problems):
+def accusing(text):
+    """Sentences that say someone broke a law or rule ("illegal", "violated", "breach"). A video measures speeds and
+    gaps, not whether a limit was signed there (reg. 16(5) needs a sign), so code sends them back at no cost."""
+    return [s.strip() for s in SENTENCE.split(text) if ACCUSES.search(s)]
+
+
+def retry_note(bad, crossed, problems, accused=()):
     """Why the previous letter goes back, for the next try."""
     reasons = ([f"Your previous letter used numbers that are not in the measurements: {', '.join(bad)}. Use only "
                 "numbers given above, written in digits, with speeds in km/h."] if bad else [])
     reasons += [f'Your previous letter put one near-miss\'s speed beside another near-miss\'s time gap: "{s}". Keep '
                 "each near-miss's numbers together." for s in crossed]
+    reasons += [f'Your previous letter says someone broke a rule: "{s}". The video measures speeds and time gaps, '
+                "not whether a limit applied there: say what was measured." for s in accused]
     reasons += ([f"A reviewer found claims in your previous letter that the measurements do not support: "
                  f"{' '.join(problems)} Fix them."] if problems else [])
     return "\n\n" + " ".join(reasons)
@@ -467,7 +476,7 @@ def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES, stated=(
     `measured` only, never the prompt (its wording would let "3.1" from "SAM 3.1" pass), plus `stated`, the
     principal's notes, which both checks read labelled as stated by the principal, not measured. "tries" counts the
     model's replies, for the pack's receipt."""
-    note, plan, bad, crossed, problems = "", None, [], [], []
+    note, plan, bad, crossed, accused, problems = "", None, [], [], [], []
     worst, measured = json.loads(measured).get("worst", []), measured + stated_text(stated)
     for attempt in range(tries):
         try:
@@ -478,13 +487,15 @@ def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES, stated=(
             note = f"\n\nYour previous output was invalid: {str(err)[:200]}. Reply with the JSON object only."
             continue
         bad = unmeasured(plan["letter"] + " " + plan["why"], measured)
-        crossed = mixed(plan["letter"], worst)
+        crossed, accused = mixed(plan["letter"], worst), accusing(plan["letter"] + "\n" + plan["why"])
         judged = api_key or JUDGE_URL
-        problems = [] if bad or crossed or not judged else judge_problems(plan["letter"], measured, api_key)
-        if not bad and not crossed and not problems:
+        coded = bad or crossed or accused  # code's objections first: the judge is asked only when code has none
+        problems = [] if coded or not judged else judge_problems(plan["letter"], measured, api_key)
+        if not coded and not problems:
             return {**plan, "writer": WRITER, "tries": attempt + 1, **({"judged_by": judges(api_key)} if judged else {})}
-        note = retry_note(bad, crossed, problems)
-    return {**plan, "writer": WRITER, "tries": tries, "unmeasured": bad, "mixed": crossed, "unsupported": problems}
+        note = retry_note(bad, crossed, problems, accused)
+    return {**plan, "writer": WRITER, "tries": tries, "unmeasured": bad, "mixed": crossed, "unsupported": problems,
+            "accuses": accused}
 
 
 def stated_text(notes):
@@ -941,11 +952,12 @@ def letter_section(plan, events=(), measured="", signoff=None):
     check = "".join(f'<p class="note">Check before sending: {html.escape(text)}</p>' for text in (
         [f'these numbers are not in the measurements: {", ".join(plan["unmeasured"])}.'] if plan.get("unmeasured") else [])
         + [f"this sentence mixes two near-misses: {s}" for s in plan.get("mixed", [])]
+        + [f"this sentence says someone broke a rule, which a video cannot show: {s}" for s in plan.get("accuses", [])]
         + [f"the reviewer says: {p}" for p in plan.get("unsupported", [])])
     sources = "the measurements" + (" and the principal's notes" if plan.get("notes") else "")
     checked = (f"Every number was checked against {sources} by code, and the claims by {plan['judged_by']}."
                if plan.get("judged_by") else f"Every number was checked against {sources} by code.")
-    clean = not (plan.get("unmeasured") or plan.get("mixed") or plan.get("unsupported"))
+    clean = not (plan.get("unmeasured") or plan.get("mixed") or plan.get("unsupported") or plan.get("accuses"))
     known = " ".join(sorted({n.replace(",", "") for n in NUMBER.findall(measured + stated_text(plan.get("notes")))}))
     writer = f'<p class="note">{html.escape(note)}</p>' if (note := writer_note(plan)) else ""
     return (f'<section class="letter-sheet" id="letter"><h2>Letter to the road authority</h2>{writer}<div class="letter" '
