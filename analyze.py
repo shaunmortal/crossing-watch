@@ -1,6 +1,6 @@
 """Crossing Watch: find pedestrian-vehicle near-misses in one video of a crossing.
 
-Run: python3 analyze.py VIDEO SITE.json [--out DIR]
+Run: python3 analyze.py VIDEO SITE.json [--out DIR] [--budget USD]
 SITE.json holds four calibration points (clip pixels) and where they lie on the road (metres); see sites/.
 Writes DIR/events.json and prints the most dangerous moments first.
 """
@@ -29,8 +29,10 @@ OVERLAP_FRAMES = 20   # consecutive parts share 2 s, so someone crossing the cut
 TILE_OVERLAP = 0.15   # neighbouring person tiles share this much of the frame
 LINK_SHARE = 0.6      # two tracks are one object when, on shared frames, the smaller box lies this much inside the other
 SAM_USD_PER_1K_FRAMES = 0.20  # SAM video, Meta's list price
+SAM_MIN_FRAMES = 50           # ...which bills at least this many frames per request
 SAM_USD_PER_IMAGE = 0.0025    # crowd mode: SAM images, Meta's list price of $2.50 per 1,000 images
-MAX_COST_USD = 10.0  # above this estimate, --allow-cost is required
+MAX_COST_USD = 10.0  # above this estimate, --allow-cost (or a --budget) is required
+MODES = ("video", "crowd", "auto")  # person_mode / vehicle_mode values
 PREP_FILTER = re.compile(r"^((crop|scale|transpose|hflip|vflip)(=[\w.*:+\-/]+)?)(,(crop|scale|transpose|hflip|vflip)(=[\w.*:+\-/]+)?)*$")
 
 
@@ -58,10 +60,10 @@ def load_site(path):
         raise SystemExit(f"{path}: zone_m must be [x_min, y_min, x_max, y_max] in metres")
     if "roadway_m" in site and not numeric_points(site["roadway_m"]):
         raise SystemExit(f"{path}: roadway_m must be a polygon of at least three [x, y] points in metres")
-    if site.get("person_mode", "video") not in ("video", "crowd"):
-        raise SystemExit(f"{path}: person_mode must be \"video\" or \"crowd\" (frame-by-frame detection for dense crowds)")
-    if site.get("vehicle_mode", "video") not in ("video", "crowd"):
-        raise SystemExit(f"{path}: vehicle_mode must be \"video\" or \"crowd\" (frame-by-frame detection for dense traffic)")
+    for key, crowd_of in (("person_mode", "crowds"), ("vehicle_mode", "traffic")):
+        if site.get(key, "video") not in MODES:
+            raise SystemExit(f"{path}: {key} must be \"video\", \"crowd\" (frame-by-frame detection for dense {crowd_of}) "
+                             "or \"auto\" (video first, frame by frame for a concept whose video requests fill up)")
     if site.get("person_grid", 1) not in (1, 2, 3):
         raise SystemExit(f"{path}: person_grid must be 1, 2 or 3 (use 2 or 3 when more than ~16 people are in view)")
     if site.get("view", "oblique") not in ("oblique", "top-down"):
@@ -159,21 +161,37 @@ def tile_clip(piece, folder, rect, frame_size):
     return clip, sub
 
 
-def check_cost(pieces, plan, frame_size, total, allow, images=0, all_images=0):
-    """Refuse a surprise bill: estimate the SAM cost of the requests not already cached. `plan` is
-    [(concept, grid)]; each tile of each part is one request; `images` uncached crowd-mode image requests out of
-    `all_images`. Returns the estimated cost of the whole video, cached or not."""
-    units = [(folder, rect, concept) for _, _, folder in pieces for concept, grid in plan for rect in tiles(frame_size, grid)]
-    todo = sum(1 for folder, rect, concept in units if not sam.cache_path(tile_folder(folder, rect, frame_size), concept).exists())
-    def usd_for(requests, image_requests):
-        return requests * total / len(pieces) / 1000 * SAM_USD_PER_1K_FRAMES + image_requests * SAM_USD_PER_IMAGE
-    usd = usd_for(todo, images)
+def spend_cap(budget, allow):
+    """Dollars a run may spend on new SAM requests: --budget is a hard cap; without one, MAX_COST_USD unless
+    --allow-cost."""
+    return budget if budget is not None else math.inf if allow else MAX_COST_USD
+
+
+def billed_frames(pieces, total):
+    """Frames SAM video bills for one request on each part: parts overlap, and a short last part is billed
+    SAM_MIN_FRAMES."""
+    return [max(SAM_MIN_FRAMES, min(CHUNK_FRAMES, total - first)) for first, _, _ in pieces]
+
+
+def check_cost(pieces, plan, frame_size, total, cap, images=0, all_images=0):
+    """Refuse a surprise bill: estimate the SAM cost of the requests not already cached and stop if it is over `cap`
+    dollars (spend_cap). `plan` is [(concept, grid)]; each tile of each part is one request; `images` uncached
+    crowd-mode image requests out of `all_images`. Returns (that estimate, the cost of the whole video, cached or
+    not)."""
+    units = [(frames, tile_folder(folder, rect, frame_size), concept)
+             for (_, _, folder), frames in zip(pieces, billed_frames(pieces, total))
+             for concept, grid in plan for rect in tiles(frame_size, grid)]
+    def usd_for(frames, image_requests):
+        return frames / 1000 * SAM_USD_PER_1K_FRAMES + image_requests * SAM_USD_PER_IMAGE
+    usd = usd_for(sum(n for n, folder, concept in units if not sam.cache_path(folder, concept).exists()), images)
     print(f"{total / FPS / 60:.1f} min of video, {len(pieces)} part(s), {len(units)} SAM video request(s), "
           f"{images} image request(s); "
           f"SAM cost about ${usd:.2f}", flush=True)
-    if usd > MAX_COST_USD and not allow:
-        raise SystemExit(f"estimated SAM cost ${usd:.2f} is over ${MAX_COST_USD:.0f}; re-run with --allow-cost")
-    return usd_for(len(units), all_images)
+    if round(usd, 2) > cap:  # in whole cents, as printed
+        raise SystemExit(f"estimated SAM cost ${usd:.2f} is over the ${cap:.2f} this run may still spend; pass a larger "
+                         f"--budget USD (without one the cap is ${MAX_COST_USD:.0f}, lifted by --allow-cost). Replies "
+                         "already received are cached and not paid for again")
+    return usd, usd_for(sum(n for n, _, _ in units), all_images)
 
 
 
@@ -184,6 +202,42 @@ def full_requests(pieces, plan, frame_size):
                for _, _, folder in pieces for concept, grid in plan for rect in tiles(frame_size, grid)]
     found = [len(sam.parse(r.read_text())) for r in replies if r.exists()]
     return sum(n >= sam.MAX_OBJECTS for n in found), len(found)
+
+
+def fill_seconds(pieces, concept, grid, frame_size):
+    """For each part whose cached SAM video reply for `concept` filled up (sam.saturation_frame; the earliest of its
+    tiles), the second into the part when it did. A fill at CHUNK_FRAMES - OVERLAP_FRAMES or later does not count in
+    a part that is not the last: the next part covers those frames."""
+    seconds = []
+    for k, (_, _, folder) in enumerate(pieces):
+        replies = [sam.cache_path(tile_folder(folder, rect, frame_size), concept) for rect in tiles(frame_size, grid)]
+        fills = [sam.saturation_frame(sam.parse(r.read_text())) for r in replies if r.exists()]
+        last = k == len(pieces) - 1
+        counted = [f for f in fills if f is not None and (last or f < CHUNK_FRAMES - OVERLAP_FRAMES)]
+        if counted:
+            seconds.append(min(counted) / FPS)
+    return seconds
+
+
+def switch_note(concept, seconds, parts):
+    """The page's line for a concept auto mode moved to frame-by-frame detection, from its fill_seconds."""
+    lo, hi = min(seconds), max(seconds)
+    within = f"{lo:.1f} s" if lo == hi else f"{lo:.1f}-{hi:.1f} s"
+    return (f"{concept}: {sam.MAX_OBJECTS} objects taken within {within} in {len(seconds)} of {parts} "
+            f"part{'' if parts == 1 else 's'}, so frame-by-frame was used")
+
+
+def auto_switch(site, pieces, plan, key, frame_size):
+    """{concept: fill_seconds} for the auto-mode concepts in `plan` whose SAM video replies filled up; their video
+    requests are sent (or read from cache) first. Those concepts are then detected frame by frame, as in crowd mode."""
+    switched = {}
+    for concept, grid in plan:
+        if concept in crowd_concepts(site, "auto"):
+            track_all(pieces, concept, key, frame_size, grid)  # sends the video requests not cached yet
+            if seconds := fill_seconds(pieces, concept, grid, frame_size):
+                switched[concept] = seconds
+    return switched
+
 
 def box_area(b):
     return (b[2] - b[0]) * (b[3] - b[1])
@@ -233,11 +287,12 @@ def track_all(pieces, concept, key, frame_size=None, grid=1):
 
 
 
-def crowd_concepts(site):
+def crowd_concepts(site, mode="crowd"):
     """Concepts detected frame by frame on images (crowd mode) instead of tracked by SAM video, which keeps at most
-    sam.MAX_OBJECTS per request: people with "person_mode": "crowd", vehicles with "vehicle_mode": "crowd"."""
-    return (([site.get("person", "person")] if site.get("person_mode") == "crowd" else [])
-            + (list(site["vehicles"]) if site.get("vehicle_mode") == "crowd" else []))
+    sam.MAX_OBJECTS per request: people with "person_mode": "crowd", vehicles with "vehicle_mode": "crowd". With
+    `mode` "auto", the concepts auto mode may switch."""
+    return (([site.get("person", "person")] if site.get("person_mode") == mode else [])
+            + (list(site["vehicles"]) if site.get("vehicle_mode") == mode else []))
 
 
 def crowd_frames(site, concept, total):
@@ -246,9 +301,16 @@ def crowd_frames(site, concept, total):
     return crowd.sample_frames(total, FPS, rate)
 
 
-def concept_tracks(site, concept, clip, total, pieces, out_dir, key, frame_size, grid=1):
-    """One concept's tracks in whole-clip frames and pixels, by crowd mode or SAM video as the site asks."""
-    if concept in crowd_concepts(site):
+def image_requests(site, concepts, total, out_dir):
+    """(uncached, all) crowd-mode image requests for `concepts`."""
+    frames = [(c, f) for c in concepts for f in crowd_frames(site, c, total)]
+    return sum(not (crowd.cache_dir(out_dir, c) / f"{f:06d}.sam.txt").exists() for c, f in frames), len(frames)
+
+
+def concept_tracks(site, concept, clip, total, pieces, out_dir, key, frame_size, grid=1, switched=()):
+    """One concept's tracks in whole-clip frames and pixels, by crowd mode or SAM video as the site asks; concepts
+    `switched` by auto mode go frame by frame too."""
+    if concept in crowd_concepts(site) or concept in switched:
         jump = crowd.MAX_AREA_JUMP if concept in site["vehicles"] else math.inf
         return crowd.track(clip, crowd_frames(site, concept, total), FPS, concept, key, crowd.cache_dir(out_dir, concept), jump)
     return track_all(pieces, concept, key, frame_size, grid)
@@ -359,7 +421,11 @@ def main():
     parser.add_argument("site")
     parser.add_argument("--out", help="output folder (default out/<video name>)")
     parser.add_argument("--allow-cost", action="store_true", help=f"run even if SAM would cost over ${MAX_COST_USD:.0f}")
+    parser.add_argument("--budget", type=float, metavar="USD", help="hard cap on what new SAM requests may cost in "
+                        f"this run, at Meta's list prices (replaces the ${MAX_COST_USD:.0f} cap; --allow-cost does not lift it)")
     args = parser.parse_args()
+    if args.budget is not None and not args.budget >= 0:
+        parser.error("--budget must be 0 or more US dollars")
 
     site = load_site(args.site)
     out_dir = Path(args.out or Path("out") / Path(args.video).stem)
@@ -379,25 +445,31 @@ def main():
     pieces = parts(clip, out_dir, total)
     person_concept, grid = site.get("person", "person"), site.get("person_grid", 1)
     crowded = crowd_concepts(site)
-    images = sum(1 for c in crowded for f in crowd_frames(site, c, total)
-                 if not (crowd.cache_dir(out_dir, c) / f"{f:06d}.sam.txt").exists())
     video_plan = [(c, g) for c, g in [(person_concept, grid)] + [(c, 1) for c in site["vehicles"]] if c not in crowded]
-    all_images = sum(len(crowd_frames(site, c, total)) for c in crowded)
-    cost = {"sam_usd": round(check_cost(pieces, video_plan, frame_size, total, args.allow_cost, images, all_images), 2),
-            "image_usd": round(all_images * SAM_USD_PER_IMAGE, 2)}
+    cap = spend_cap(args.budget, args.allow_cost)
+    spent, sam_usd = check_cost(pieces, video_plan, frame_size, total, cap, *image_requests(site, crowded, total, out_dir))
+    switched = auto_switch(site, pieces, video_plan, key, frame_size)
+    notes = [switch_note(c, seconds, len(pieces)) for c, seconds in switched.items()]
+    if switched:
+        print("auto mode: " + "; ".join(notes), flush=True)
+        sam_usd += check_cost(pieces, [], frame_size, total, cap - spent,
+                              *image_requests(site, list(switched), total, out_dir))[1]
+    cost = {"sam_usd": round(sam_usd, 2),
+            "image_usd": round(image_requests(site, crowded + list(switched), total, out_dir)[1] * SAM_USD_PER_IMAGE, 2)}
 
-    tracks_of = lambda concept, g=1: concept_tracks(site, concept, clip, total, pieces, out_dir, key, frame_size, g)
+    tracks_of = lambda concept, g=1: concept_tracks(site, concept, clip, total, pieces, out_dir, key, frame_size, g,
+                                                    switched)
     person_boxes = tracks_of(person_concept, grid)
     vehicle_boxes = {f"{concept}#{vid}": t for concept in site["vehicles"] for vid, t in tracks_of(concept).items()}
     top_down = site.get("view") == "top-down"
     people, vehicles = road_tracks(site, H, person_boxes, vehicle_boxes, frame_size)
     events = placed(road.conflicts(people, vehicles, FPS), people, vehicles)
     seen = road.exposure(people, vehicles, FPS, total)
-    full = full_requests(pieces, video_plan, frame_size)
+    full = (*full_requests(pieces, [(c, g) for c, g in video_plan if c not in switched], frame_size), notes)
     if full[0]:
         print(f"warning: {full[0]} of {full[1]} SAM requests hit the {sam.MAX_OBJECTS}-object limit; later arrivals "
               "in those parts were not tracked (use person_mode / vehicle_mode \"crowd\": the Crowded and Dense "
-              "traffic boxes on the calibration page)", flush=True)
+              "traffic boxes on the calibration page; or \"auto\")", flush=True)
 
     write_events(out_dir, site, events, seen, cost, full)  # saved before the slower, network-bound evidence step
     review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size, top_down)

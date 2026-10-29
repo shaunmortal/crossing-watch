@@ -42,7 +42,10 @@ short because one SAM 3.1 video request tracks at most 16 objects **in all**: on
 are never picked up (none of 54 replies had more, and none gained an ID after filling). Any request that still hits
 the limit is counted, and the page says its counts are a minimum. For crowds, set `"person_grid": 2` in the site file: people are
 tracked in 4 overlapping tiles (SAM returns at most 16 objects per request) and joined where the tiles meet. The SAM cost is
-estimated first, and a run over $10 needs `--allow-cost`.
+estimated first at Meta's list prices: a run over $10 needs `--allow-cost`, and `--budget USD` is a hard cap that
+nothing lifts. With `"person_mode": "auto"` or `"vehicle_mode": "auto"`, a concept goes to SAM video first; if a part
+fills its 16 objects before the next part takes over, that concept is detected frame by frame instead and the page
+says when it filled (on the Indian clip: "person: 16 objects taken within 1.0-1.6 s in 3 of 3 parts").
 
 ### Open weights: Muse Glimmer writes the letter
 
@@ -169,8 +172,10 @@ The DUT data has no licence and was used only for internal testing; it is not in
 - Distances are only as good as the measured calibration rectangle.
 - Rates per hour from a short video are scaled, not a peak-hour count; the page says so next to PV², and shows no
   PV² for videos under 15 minutes.
-- SAM video tracking at 10 frames a second costs about $0.20 per 1,000 frames per concept, so an hour with four
-  concepts is roughly $25-30. The page prints the estimate for each video.
+- SAM video tracking at 10 frames a second costs $0.20 per 1,000 frames per concept at Meta's list price, so an hour
+  with four concepts is about $33 (the 2 s overlaps between parts are billed too). Frame-by-frame detection costs
+  $2.50 per 1,000 images: about $79 for 15 minutes of people and three vehicle concepts, about $34 with the single
+  concept "vehicle". The page prints the SAM cost of each pack.
 - Box jitter alone gives a queued car an apparent speed of a few km/h. That is well under the 10 km/h "moving"
   threshold, so it does not create events, but very slow vehicles are not measured precisely.
 

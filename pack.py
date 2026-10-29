@@ -123,9 +123,9 @@ def engineering_lines(seen, cost):
                      f"UK Traffic Signs Manual ch. 6 (13.5.2): 4-6 s is an "
                      f"acceptable gap at urban speeds; other groups, such as children, may need 10-12 s or longer.")
     if cost and cost.get("sam_usd") is not None:
-        images = f"about ${cost['image_usd']:.2f} of it image detection, " if cost.get("image_usd") else ""
-        lines.append(f"SAM tracking cost for this video: about ${cost['sam_usd']:.2f}, so about "
-                     f"${cost['sam_usd'] * 60 / minutes:.2f} per hour of footage ({images}at Meta's list prices).")
+        images = f" (about ${cost['image_usd']:.2f} of it image detection)" if cost.get("image_usd") else ""
+        lines.append(f"SAM cost for this pack: about ${cost['sam_usd']:.2f} at Meta's list prices{images}, so about "
+                     f"${cost['sam_usd'] * 60 / minutes:.2f} per hour of footage.")
     return lines
 
 
@@ -138,11 +138,15 @@ def engineering(seen, cost):
 
 
 def limit_note(full):
-    """Say so when SAM's per-request object limit was reached: then the counts are a minimum."""
+    """Say so when SAM's per-request object limit was reached: then the counts are a minimum. A third item holds
+    analyze's auto-mode notes, for concepts that filled it and were detected frame by frame instead."""
+    notes = full[2] if full and len(full) > 2 and full[2] else []
+    switched = (f'<p class="note">SAM video tracking keeps at most {sam.MAX_OBJECTS} objects per request. '
+                f'{html.escape("; ".join(notes))}.</p>' if notes else "")
     if not full or not full[0]:
-        return ""
-    return (f'<p class="note">In {full[0]} of {full[1]} tracking requests SAM reached its {sam.MAX_OBJECTS}-object '
-            "limit, so some people or vehicles were not tracked: counts and near-misses here are a minimum.</p>")
+        return switched
+    return switched + (f'<p class="note">In {full[0]} of {full[1]} tracking requests SAM reached its {sam.MAX_OBJECTS}-object '
+                       "limit, so some people or vehicles were not tracked: counts and near-misses here are a minimum.</p>")
 
 def unmeasured(text, facts_text):
     """Numbers in `text` that appear nowhere in the measured facts: a letter to an authority must not invent any."""

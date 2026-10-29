@@ -21,7 +21,8 @@ CROP_OUT_PX = 384   # upscaled so a small person is visible
 ROAD_USERS = {"child", "adult", "elderly", "wheelchair user", "rider", "cyclist", "not a person", "unclear"}
 NOT_PEDESTRIANS = {"not a person", "rider", "cyclist"}  # riders are vehicles here, as bicycles are in SinD
 RIDER_VERDICTS = {"rider", "cyclist"}
-RIDEABLE = {"motorcycle", "bicycle", "scooter", "auto rickshaw"}  # vehicle concepts a person can ride on or in
+RIDEABLE = {"motorcycle", "bicycle", "scooter", "auto rickshaw",  # vehicle concepts a person can ride on or in;
+            "vehicle"}  # the single concept "vehicle" covers two-wheelers too, so its boxes count
 RIDER_GATE_SHARE = 0.3  # a rider call stands only if the person's box is this much inside a rideable box
 VIEWS = {False: "a traffic camera looking down at a street crossing at an angle",
          True: "a drone looking straight down on a street crossing; people look like small heads and shoulders from above"}

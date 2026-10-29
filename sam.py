@@ -42,6 +42,13 @@ def parse(text):
     return tracks
 
 
+def saturation_frame(tracks):
+    """The frame on which a video reply's MAX_OBJECTS-th object first appeared (`tracks` from parse), or None if it
+    never filled: from then on, newcomers were not tracked."""
+    firsts = sorted(min(track) for track in tracks.values())
+    return firsts[MAX_OBJECTS - 1] if len(firsts) >= MAX_OBJECTS else None
+
+
 def request(video, concept, api_key):
     """Raw streamed text for one concept tracked through an MP4 (H.264, faststart)."""
     url = "data:video/mp4;base64," + base64.b64encode(Path(video).read_bytes()).decode()

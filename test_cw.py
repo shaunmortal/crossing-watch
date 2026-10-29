@@ -278,7 +278,7 @@ def test_spark_rider_call_needs_a_bike_under_the_person():
     original = review.review
     review.review = lambda *a, **k: dict(rider)
     try:
-        for vehicle, rejected in (("motorcycle#1", True), ("car#1", False)):
+        for vehicle, rejected in (("motorcycle#1", True), ("vehicle#1", True), ("car#1", False)):
             events = [{"person": "7/0"}]
             analyze.review_people(None, Path("."), events, {"7/0": {f: (0.14 * f, 0.0) for f in range(20)}},
                                   {"7": person}, {vehicle: bike}, None, (640, 360), False)
@@ -401,6 +401,60 @@ def test_sam_requests_that_hit_the_object_limit_are_counted():
         pieces = [(0, None, a), (130, None, b)]
         assert analyze.full_requests(pieces, [("car", 1)], (64, 48)) == (1, 2)
 
+def test_budget_is_a_hard_cap_on_new_sam_spending():
+    import contextlib, io, tempfile
+    from pathlib import Path
+    import analyze
+    assert analyze.spend_cap(5.0, True) == 5.0  # --allow-cost does not lift a --budget
+    assert analyze.spend_cap(None, True) == math.inf and analyze.spend_cap(None, False) == analyze.MAX_COST_USD
+    with tempfile.TemporaryDirectory() as tmp:
+        pieces = [(first, None, Path(tmp) / name) for first, name in ((0, "a"), (130, "b"), (260, "c"))]
+        for _, _, folder in pieces:
+            folder.mkdir()
+        assert analyze.billed_frames(pieces, 290) == [150, 150, 50]  # overlaps billed; a 30-frame last part bills 50
+        sam.cache_path(pieces[0][2], "car").write_text("")  # part a is cached: not paid again
+        with contextlib.redirect_stdout(io.StringIO()):
+            new, whole = analyze.check_cost(pieces, [("car", 1)], (64, 48), 290, 0.04)
+            assert (round(new, 4), round(whole, 4)) == (0.04, 0.07)  # $0.20 per 1,000 frames
+            try:
+                analyze.check_cost(pieces, [("car", 1)], (64, 48), 290, 0.039)
+                raise AssertionError("over the budget accepted")
+            except SystemExit as err:
+                assert "$0.04 is over the $0.04" in str(err) and "--budget" in str(err)
+
+
+def test_auto_mode_switches_a_concept_whose_video_requests_fill_up():
+    import tempfile
+    from pathlib import Path
+    import analyze, crowd
+    box = "<|box;x1=1;y1=1;x2=5;y2=5;w=64;h=48|>"
+    fills_at = lambda frame: "<0f>" + "".join(f"{i}{box}" for i in range(sam.MAX_OBJECTS - 1)) + f"<{frame}f>99{box}"
+    assert sam.saturation_frame(sam.parse(fills_at(16))) == 16
+    assert sam.saturation_frame(sam.parse("<0f>" + "".join(f"{i}{box}" for i in range(15)))) is None
+    site = {"person": "person", "vehicles": ["car"], "person_mode": "auto"}
+    with tempfile.TemporaryDirectory() as tmp:
+        pieces = [(first, None, Path(tmp) / name) for first, name in ((0, "a"), (130, "b"), (260, "c"))]
+        for (_, _, folder), frame in zip(pieces, (16, 135, 135)):  # b's late fill is covered by part c; c is last
+            folder.mkdir()
+            sam.cache_path(folder, "person").write_text(fills_at(frame))
+            sam.cache_path(folder, "car").write_text(fills_at(10))  # full too, but cars stay in video mode
+        switched = analyze.auto_switch(site, pieces, [("person", 1), ("car", 1)], None, (64, 48))
+        assert switched == {"person": [1.6, 13.5]}
+        jumps, real = {}, crowd.track
+        crowd.track = lambda clip, frames, fps, concept, key, cache, jump: jumps.update({concept: jump}) or {}
+        try:
+            analyze.concept_tracks(site, "person", None, 20, pieces, Path(tmp), None, (64, 48), 1, switched)
+        finally:
+            crowd.track = real
+        assert jumps == {"person": math.inf}  # detected frame by frame
+    note = analyze.switch_note("person", switched["person"], 3)
+    assert note == "person: 16 objects taken within 1.6-13.5 s in 2 of 3 parts, so frame-by-frame was used"
+    assert "within 1.0 s in 1 of 1 part," in analyze.switch_note("vehicle", [1.0], 1)
+    page = pack.limit_note([0, 4, [note]])
+    assert "at most 16 objects per request. person: 16 objects taken within 1.6-13.5 s" in page and "minimum" not in page
+    assert pack.limit_note([0, 4, []]) == "" and "minimum" in pack.limit_note([1, 4, [note]])
+
+
 def test_crowds_are_tiled_and_cut_boxes_joined():
     import analyze
     assert analyze.tiles((640, 360), 1) == [(0, 0, 640, 360)]
@@ -468,10 +522,11 @@ def test_pv2_and_engineering_numbers_say_when_they_are_scaled():
     short = pack.engineering_lines({"minutes": 0.2, "duration_s": 15.0, "crossings": 5, "vehicles": 20}, None)
     assert "x 10^8" not in short[0] and "at least 15 minutes" in short[0]
     crowd = pack.engineering({"minutes": 10}, {"sam_usd": 7.2, "image_usd": 6.0})
-    assert "about $6.00 of it image detection, at Meta&#x27;s list prices" in crowd and "guess" not in crowd
+    assert "SAM cost for this pack: about $7.20 at Meta&#x27;s list prices (about $6.00 of it image detection)" in crowd
+    assert "guess" not in crowd
     import analyze, contextlib, io  # Meta's list price for SAM images is $2.50 per 1,000
     with contextlib.redirect_stdout(io.StringIO()):
-        assert analyze.check_cost([(0, None, None)], [], None, 100, False, images=1000, all_images=1000) == 2.5
+        assert analyze.check_cost([(0, None, None)], [], None, 100, analyze.MAX_COST_USD, 1000, 1000) == (2.5, 2.5)
     assert pack.engineering({"minutes": 0}, None) == ""
     assert "2 of 10" in pack.limit_note([2, 10]) and pack.limit_note([0, 10]) == pack.limit_note(None) == ""
 
@@ -740,6 +795,15 @@ def test_site_concepts_must_not_share_a_cache_name():
             raise AssertionError("duplicate concepts accepted")
         except SystemExit as err:
             assert "same cache name" in str(err)
+        one = {"image_points": SQUARE_IMG, "world_points": SQUARE_ROAD, "vehicles": ["vehicle"]}
+        path.write_text(json.dumps(one | {"person_mode": "auto", "vehicle_mode": "auto"}))
+        assert analyze.load_site(path)["vehicles"] == ["vehicle"]
+        path.write_text(json.dumps(one | {"vehicle_mode": "fast"}))
+        try:
+            analyze.load_site(path)
+            raise AssertionError("unknown mode accepted")
+        except SystemExit as err:
+            assert "vehicle_mode" in str(err) and '"auto"' in str(err)
 
 
 def test_number_check_reads_grouped_numbers_and_non_english_facts():
