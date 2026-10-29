@@ -27,8 +27,8 @@ CHUNK_FRAMES = 150    # 15 s per SAM request: one request tracks at most sam.MAX
 OVERLAP_FRAMES = 20   # consecutive parts share 2 s, so someone crossing the cut keeps one ID
 TILE_OVERLAP = 0.15   # neighbouring person tiles share this much of the frame
 LINK_SHARE = 0.6      # two tracks are one object when, on shared frames, the smaller box lies this much inside the other
-SAM_USD_PER_1K_FRAMES = 0.20
-SAM_USD_PER_IMAGE_GUESS = 0.002  # crowd mode; Meta's per-image price was not found, this is a third-party rate
+SAM_USD_PER_1K_FRAMES = 0.20  # SAM video, Meta's list price
+SAM_USD_PER_IMAGE = 0.0025    # crowd mode: SAM images, Meta's list price of $2.50 per 1,000 images
 MAX_COST_USD = 10.0  # above this estimate, --allow-cost is required
 PREP_FILTER = re.compile(r"^((crop|scale|transpose|hflip|vflip)(=[\w.*:+\-/]+)?)(,(crop|scale|transpose|hflip|vflip)(=[\w.*:+\-/]+)?)*$")
 
@@ -165,7 +165,7 @@ def check_cost(pieces, plan, frame_size, total, allow, images=0, all_images=0):
     units = [(folder, rect, concept) for _, _, folder in pieces for concept, grid in plan for rect in tiles(frame_size, grid)]
     todo = sum(1 for folder, rect, concept in units if not sam.cache_path(tile_folder(folder, rect, frame_size), concept).exists())
     def usd_for(requests, image_requests):
-        return requests * total / len(pieces) / 1000 * SAM_USD_PER_1K_FRAMES + image_requests * SAM_USD_PER_IMAGE_GUESS
+        return requests * total / len(pieces) / 1000 * SAM_USD_PER_1K_FRAMES + image_requests * SAM_USD_PER_IMAGE
     usd = usd_for(todo, images)
     print(f"{total / FPS / 60:.1f} min of video, {len(pieces)} part(s), {len(units)} SAM video request(s), "
           f"{images} image request(s); "
@@ -371,7 +371,7 @@ def main():
     video_plan = [(c, g) for c, g in [(person_concept, grid)] + [(c, 1) for c in site["vehicles"]] if c not in crowded]
     all_images = sum(len(crowd_frames(site, c, total)) for c in crowded)
     cost = {"sam_usd": round(check_cost(pieces, video_plan, frame_size, total, args.allow_cost, images, all_images), 2),
-            "image_usd": round(all_images * SAM_USD_PER_IMAGE_GUESS, 2)}
+            "image_usd": round(all_images * SAM_USD_PER_IMAGE, 2)}
 
     tracks_of = lambda concept, g=1: concept_tracks(site, concept, clip, total, pieces, out_dir, key, frame_size, g)
     person_boxes = tracks_of(person_concept, grid)

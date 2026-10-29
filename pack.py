@@ -122,10 +122,9 @@ def engineering_lines(seen, cost):
                      f"UK Traffic Signs Manual ch. 6 (13.5.2): 4-6 s is an "
                      f"acceptable gap at urban speeds; other groups, such as children, may need 10-12 s or longer.")
     if cost and cost.get("sam_usd") is not None:
-        basis = (f"about ${cost['image_usd']:.2f} of it is image detection at a guessed $0.002 an image, as Meta's "
-                 "image price was not found" if cost.get("image_usd") else "at Meta's list price for SAM video")
+        images = f"about ${cost['image_usd']:.2f} of it image detection, " if cost.get("image_usd") else ""
         lines.append(f"SAM tracking cost for this video: about ${cost['sam_usd']:.2f}, so about "
-                     f"${cost['sam_usd'] * 60 / minutes:.2f} per hour of footage ({basis}).")
+                     f"${cost['sam_usd'] * 60 / minutes:.2f} per hour of footage ({images}at Meta's list prices).")
     return lines
 
 

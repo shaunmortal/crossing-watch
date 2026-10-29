@@ -339,12 +339,16 @@ def test_pv2_and_engineering_numbers_say_when_they_are_scaled():
     assert "2.0 x 10^8" in text and "IRC:103-2012" in text and "scaled from 30 minutes" in text
     assert "4 gaps" in text and "12.5% of the time" in text and "about $3.00 per hour" in text
     plain = " ".join(pack.engineering_lines(seen, {"sam_usd": 1.5}))
-    assert "Meta's list price" in plain and "guessed" not in plain
+    assert "at Meta's list prices" in plain and "image detection" not in plain
     exact = pack.engineering_lines({"minutes": 20.2, "duration_s": 1215.0, "crossings": 500, "vehicles": 2000}, None)
     assert f"{road.pv2(500, 2000, 20.25) / 1e8:.1f} x 10^8" in exact[0]  # from the exact 20.25 min, not 20.2
     short = pack.engineering_lines({"minutes": 0.2, "duration_s": 15.0, "crossings": 5, "vehicles": 20}, None)
     assert "x 10^8" not in short[0] and "at least 15 minutes" in short[0]
-    assert "guessed" in pack.engineering({"minutes": 10}, {"sam_usd": 7.2, "image_usd": 6.0})
+    crowd = pack.engineering({"minutes": 10}, {"sam_usd": 7.2, "image_usd": 6.0})
+    assert "about $6.00 of it image detection, at Meta&#x27;s list prices" in crowd and "guess" not in crowd
+    import analyze, contextlib, io  # Meta's list price for SAM images is $2.50 per 1,000
+    with contextlib.redirect_stdout(io.StringIO()):
+        assert analyze.check_cost([(0, None, None)], [], None, 100, False, images=1000, all_images=1000) == 2.5
     assert pack.engineering({"minutes": 0}, None) == ""
     assert "2 of 10" in pack.limit_note([2, 10]) and pack.limit_note([0, 10]) == pack.limit_note(None) == ""
 
