@@ -379,7 +379,8 @@ def road_tracks(site, H, person_boxes, vehicle_boxes, frame_size):
     kept. A vehicle seen at an angle is a car-shaped footprint when its concept has a size (vehicle_size)."""
     zone = site.get("zone_m") or road.zone_around(site["world_points"])
     top_down = site.get("view") == "top-down"
-    walkers = {pid: road.without_riders(t, vehicle_boxes.values()) for pid, t in person_boxes.items()}
+    on_frame = road.boxes_by_frame(vehicle_boxes.values())
+    walkers = {pid: road.without_riders(t, on_frame) for pid, t in person_boxes.items()}
     people = {f"{pid}/{k}": piece for pid, t in walkers.items()
               for k, piece in enumerate(road.split_at_jumps(road.moving_frames(  # stillness judged before cutting
                   road.person_points(t, H, zone, site.get("roadway_m"), frame_size, top_down), FPS), FPS))

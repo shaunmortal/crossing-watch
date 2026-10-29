@@ -136,12 +136,24 @@ def inside_share(inner, outer):
     return w * h / ((inner[2] - inner[0]) * (inner[3] - inner[1]))
 
 
+def boxes_by_frame(tracks):
+    """{frame: [box, ...]} of all `tracks`: the index without_riders looks a frame's vehicles up in, built once per
+    run."""
+    out = {}
+    for track in tracks:
+        for f, b in track.items():
+            out.setdefault(f, []).append(b)
+    return out
+
+
 def without_riders(person_track, vehicle_tracks, share=RIDER_OVERLAP):
     """The person track minus frames where the box sits inside some vehicle's box with the feet no lower than the
-    vehicle's: a rider or driver. Someone crossing in front of a bus overlaps it too, but stands lower in the frame."""
+    vehicle's: a rider or driver. Someone crossing in front of a bus overlaps it too, but stands lower in the frame.
+    `vehicle_tracks`: the vehicles' tracks, or their boxes_by_frame (a dict), which keeps a 25-minute crowd run from
+    comparing every person frame with every vehicle track."""
+    on = vehicle_tracks if isinstance(vehicle_tracks, dict) else boxes_by_frame(vehicle_tracks)
     return {f: b for f, b in person_track.items()
-            if not any(f in v and inside_share(b, v[f]) >= share and b[3] <= v[f][3] + RIDER_FEET_PX
-                       for v in vehicle_tracks)}
+            if not any(inside_share(b, v) >= share and b[3] <= v[3] + RIDER_FEET_PX for v in on.get(f, ()))}
 
 
 def person_points(track, H, zone=None, roadway=None, frame_size=None, top_down=False):
