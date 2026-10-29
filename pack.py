@@ -347,6 +347,19 @@ def limit_note(full):
                        "limit, so some people or vehicles were not tracked: counts and near-misses here are a minimum.</p>")
 
 
+def tracked_by(full):
+    """The method's opening: SAM 3.1's tracks and Muse Spark's check only when `full`, analyze.py's SAM request counts
+    (events.json's sam_full_requests), says SAM made them; sample/'s made-up tracks have none. Never "every" person:
+    a full video request leaves some untracked (limit_note)."""
+    if not full:
+        return ("No SAM tracking run is recorded for these tracks (events.json counts no SAM requests), so neither "
+                "SAM 3.1 nor Muse Spark made or checked them. ")
+    return (f"SAM 3.1 tracked the pedestrians and vehicles it found, at most {sam.MAX_OBJECTS} objects per video "
+            "request (a note under the counts says when a request was full). Four points on the road turned pixels "
+            "into metres. Muse Spark looked at the person in each near-miss, most dangerous first, and removed tracks "
+            "that were not people; a card says when it did not look. ")
+
+
 def privacy_note(privacy):
     """The page's count of blurred heads, when analyze had SAM image search find the people a full video request
     for people missed on the published frames."""
@@ -1053,11 +1066,10 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None, privacy=No
                       for i, e in enumerate(events[:SHOWN_EVENTS])) or (
         f"<p>No conflicts under {road.CLOSE_PASS_S} s in these {html.escape(summary.minutes(seen))} minutes. "
         "A short recording can miss rare events: record more school-run periods before drawing any conclusion.</p>")
-    method = (f"SAM 3.1 tracked every pedestrian and vehicle. Four points on the road turned pixels into metres. "
-              f"A near-miss is a pedestrian and a moving vehicle on the same spot (within {road.CONFLICT_RADIUS_M} m) "
-              f"less than {road.PET_MAX_S} s apart (post-encroachment time); {road.PET_MAX_S}-{road.CLOSE_PASS_S} s is "
-              f"reported as a close pass. Muse Spark checked each clip and removed "
-              f"tracks that were not people. Death risk: Rosén & Sander (2009), Accident Analysis & Prevention "
+    method = (f"{tracked_by(full)}A near-miss is a pedestrian and a moving vehicle on the same spot (within "
+              f"{road.CONFLICT_RADIUS_M} m) less than {road.PET_MAX_S} s apart (post-encroachment time); "
+              f"{road.PET_MAX_S}-{road.CLOSE_PASS_S} s is reported as a close pass. "
+              f"Death risk: Rosén & Sander (2009), Accident Analysis & Prevention "
               f"41(3):536-542, for adults hit by a car front; children are not covered by that study. Speed-limit rows "
               f"replay the same moment with the vehicle no faster than the limit, a {road.REACTION_S} s reaction and "
               f"{road.BRAKING_MPS2} m/s² braking. {site.get('calibration_note', '')}")

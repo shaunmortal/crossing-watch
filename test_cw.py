@@ -3311,6 +3311,19 @@ def test_page_reads_without_colour_and_on_a_phone():
     assert "22 minutes of video" in pack.stats([], {"minutes": 22.0, "vehicles": 3})[1]
 
 
+def test_method_says_sam_and_spark_made_the_tracks_only_when_sam_ran():
+    """sample/'s made-up tracks have no SAM request counts, so the method never says SAM tracked them or Spark checked
+    them; a SAM run's says SAM tracked what it found, at most MAX_OBJECTS a request, never 'every' person."""
+    site, seen = {"name": "gate", "world_points": SQUARE_ROAD}, {"minutes": 1.0, "crossings": 3}
+    made_up = pack.page(site, [], seen, None, None, 10)
+    assert "No SAM tracking run is recorded for these tracks" in made_up
+    assert "SAM 3.1 tracked" not in made_up and "Muse Spark looked" not in made_up
+    tracked = pack.page(site, [], seen, None, None, 10, full=(0, 4, []))
+    assert (f"SAM 3.1 tracked the pedestrians and vehicles it found, at most {sam.MAX_OBJECTS} objects per video "
+            "request") in tracked and "Muse Spark looked at the person in each near-miss" in tracked
+    assert "every pedestrian" not in made_up + tracked
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):
