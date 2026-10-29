@@ -8,7 +8,7 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 | G2 Metres | A road distance NOT used for calibration (a second lane width, or crossing-line length) comes out within ±15% of its assumed value | same | Wed 28 Oct 22:00 |
 | G3 Conflicts | Checked by eye, at least 2 of the top 3 events are real close passes, and no event involves a parked or queued vehicle | same | Thu 29 Oct 22:00 |
 | G4 Own footage | Footage filmed from height at the user's college gate runs end to end, with calibration from measured points | user's video | Sun 1 Nov 22:00 |
-| G5 Blind check | A transport or civil engineering lecturer, not told which clips the pipeline flagged, agrees with it on danger vs none with Cohen's kappa of 0.6 or more (rules below, written before any clip is made) | the gate pack | Tue 3 Nov 22:00 |
+| G5 Blind check | A transport or civil engineering lecturer, not told which clips the pipeline flagged, agrees with it on danger vs none with Cohen's kappa of 0.6 or more (rules below, written before any gate-pack clip is made) | the gate pack | Tue 3 Nov 22:00 |
 
 **Scope cut if G3 fails:** report the closest approach in metres plus vehicle speed (no PET). The evidence pack and letter still ship.
 
@@ -174,16 +174,19 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 - No cached events.json has the crosser list yet (all predate it), so the pyramid has not been drawn from a real
   pack. The first gate pack will be the first. With SinD's 63 crossings, 0 collisions would still allow up to 5.7%.
 
-## G5 Blind check, pre-registered (Thu 29 Oct, before any clip is made or labelled)
+## G5 Blind check, pre-registered (Thu 29 Oct, before any gate-pack clip is made or labelled)
 
 These rules do not change after anyone labels.
 
 - **Clips** (`blind_set.py OUT_DIR SITE.json --review-decoys`, on the gate pack after G4):
   - the near-misses Spark did not reject, as the page counts them, most dangerous first, at most 12;
   - as many decoys: a pedestrian and a moving vehicle on the same spot 5 to 8 s apart, closest first, each
-    pedestrian one Muse Spark says is a person, so a pole is never a decoy;
-  - every clip 12 s long from 2 s before the first of the two reached the spot, the pedestrian boxed cyan and the
+    pedestrian one Muse Spark says is a person, so a pole is never a decoy, and one who passes no other vehicle
+    under 3 s apart inside the clip, so the rater never sees real danger the key calls none;
+  - every clip 12 s long (121 frames) from 2 s before the first of the two reached the spot (from the video's start
+    when that is sooner; earlier when 12 s would run past the video's end), the pedestrian boxed cyan and the
     vehicle red, every tracked person's head blurred, no sound, shuffled with a fixed seed as clip01, clip02...;
+    a clip of any other length stops the run before the key is written;
   - the key (`blind-key.json`) stays with us; the rater gets only the `blind/` folder.
 - **Rater:** one transport or civil engineering lecturer decides the gate. Classmates, if any, are reported
   separately as non-experts.
@@ -196,9 +199,19 @@ These rules do not change after anyone labels.
   or unanswered. The answers are then reported as descriptive only.
 - `score_humans.py` prints this verdict itself, so the rule is applied as written.
 
-Tooling dry run (offline, not the gate): on the cached dense Indian clip, with the vehicle sampling rate its cache
-was made at and no `--review-decoys`, `blind_set.py` rebuilt the tracks from cache with no SAM request and wrote
-20 clips of 121 frames: 12 near-misses and 8 decoys (decoys limited to pedestrians Spark had already looked at).
+Tooling dry runs (offline, not the gate): on a copy of the cached dense Indian clip (390 frames), with the vehicle
+sampling rate its cache was made at and no `--review-decoys` (so decoys are limited to pedestrians Spark had
+already looked at), `blind_set.py` rebuilt the tracks from cache with no SAM request.
+
+- The first version wrote 12 near-misses and 8 decoys, but 6 near-miss clips, with events at 30.0-30.8 s, were cut
+  short by the video's end: 102, 102, 102, 106, 110 and 110 frames (frame counts from ffprobe). And every decoy's
+  pedestrian passed another vehicle under 3 s apart inside its clip. Both are fixed in the rules above, before
+  anyone labelled.
+- The re-run wrote 12 near-misses, all 121 frames, and 0 decoys: of 30 pairs 5 to 8 s apart, 29 had the pedestrian
+  under 3 s from another vehicle inside the clip, and the one left was a pedestrian Spark had not looked at. A set
+  from a crossing this busy would be not decidable; the gate pack needs `--review-decoys` and calm crossings too.
+- Near-misses in the video's first 2 s start with less lead (four here, at 0.2-1.7 s), and the six at 30.0-30.8 s
+  with more; the rules above allow both.
 
 ## Judge bench, Spark side (Thu 29 Oct)
 
@@ -218,3 +231,5 @@ was made at and no `--review-decoys`, `blind_set.py` rebuilt the tracks from cac
   (Wilson 95% 0-32%).
 - Not run yet (paid): Muse Spark twice per letter, and Muse Glimmer once on Kaggle. Both are Muse models, so neither
   is an independent judge of Muse letters. A reply that cannot be read is counted on its own, not as a catch.
+  Totals and their Wilson bounds count letters (one flagged if any of its readable runs flagged it), never runs:
+  two runs on one letter are not independent.
