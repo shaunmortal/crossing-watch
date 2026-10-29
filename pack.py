@@ -281,12 +281,15 @@ def headline(events, seen, site):
     days, length = (site.get(key) for key in SCHOOL_YEAR)
     minutes = watched_minutes(seen)
     if all(isinstance(v, (int, float)) and v > 0 for v in (days, length)) and minutes >= MIN_RATE_MINUTES:
+        capped = seen.get("window_s") and length > minutes  # a window_s on the rush is never scaled to the dismissal
+        length, dismissals = ((minutes, f"the {round(minutes, 1):g} analysed minutes of each dismissal") if capped
+                              else (length, f"{length:g}-minute dismissals"))
         scaled = lambda count: f"{float(f'{count * length / minutes * days:.2g}'):,.0f}"  # 2 significant figures
         # 0 seen is never 0 a year: Poisson's upper bound, scaled the same way
         per_year = lambda k: f"about {scaled(k)}" if k else f"up to {scaled(poisson_range(0)[1])}"
         lines.append(f"If every dismissal is like this one: {per_year(k3)} crossings a school year with a moving "
                      f"vehicle through the same spot within {s3:g} s, {per_year(k15)} within {s15:g} s ({days:g} school "
-                     f"days, {length:g}-minute dismissals).")
+                     f"days, {dismissals}).")
     return lines
 
 
@@ -836,10 +839,23 @@ def receipt_line(data, plan, images):
     return f"Receipt: {'; '.join(parts)}. Dollar costs on this page are for SAM only." if parts else ""
 
 
-def hash_line(source_sha256, site):
+def window_line(window, recording_s=None):
+    """Which minutes of the recording were analysed (window_s, kept in events.json's exposure) and that the page's
+    times count from its start; "" without one."""
+    if not window:
+        return ""
+    start, end = (f"{round(s / 60, 1):g}" for s in window)
+    whole = f"this {round(recording_s / 60, 1):g}-minute recording" if recording_s else "the recording"
+    return (f"Only minutes {start}-{end} of {whole} were analysed (seconds {window[0]:g}-{window[1]:g}); times on this "
+            f"page count from second {window[0]:g}. ")
+
+
+def hash_line(source_sha256, site, window=None, recording_s=None):
     """Where the hashes are that show a changed file: the original video's (from analyze.py) and SHA256SUMS in the
-    shared folder; for a site in India, the evidence-law form that asks for them, which the school fills and signs."""
+    shared folder; for a site in India, the evidence-law form that asks for them, which the school fills and signs.
+    The original is hashed whole, so window_line says which part of it was analysed."""
     video = (f"The original video's SHA-256 is <code>{html.escape(source_sha256)}</code>. " if source_sha256 else "")
+    video += html.escape(window_line(window, recording_s))
     law = (" In India, Part A of the certificate for electronic evidence in the Schedule to the Bharatiya Sakshya "
            "Adhiniyam, 2023 (section 63(4)) asks for these hash values: the school fills and signs it."
            if in_india(site) else "")
@@ -1054,7 +1070,7 @@ def top(site, events, seen, plan, images, signoff, full, warning, lines):
 
 
 def page(site, events, seen, plan, images, fps, cost=None, full=None, privacy=None, signoff=None, receipt="",
-         source_sha256=None, timeline=None, ground=None, paths=None, case="", walking=None):
+         source_sha256=None, timeline=None, ground=None, paths=None, case="", walking=None, recording_s=None):
     warning = banner(walking, site)  # then the headline, pyramid, engineering numbers, barcode and card numbers go
     lines = [] if warning else headline(events, seen, site)  # its ranges and school-year line go under the pyramid
     ranges = "".join(f'<p class="note">{html.escape(line)}</p>' for line in lines[1:])
@@ -1077,7 +1093,7 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None, privacy=No
 {map_section(events, site, ground, paths, not warning)}<section id="clips"><h2>{moments}</h2>{cards}</section>{fix_section(plan, images)}{fixband.figure(images)}{legal_section(site)}
 {letter_section(plan, events[:SHOWN_EVENTS], facts(site, events, seen, paths), signoff)}{case}
 {tct_section()}<section id="method"><h2>How this was measured</h2><p class="note">{html.escape(method)}</p>{privacy_note(privacy)}
-{f'<p class="note">{html.escape(receipt)}</p>' if receipt else ""}{hash_line(source_sha256, site)}</section>"""
+{f'<p class="note">{html.escape(receipt)}</p>' if receipt else ""}{hash_line(source_sha256, site, seen.get("window_s"), recording_s)}</section>"""
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Crossing Watch evidence</title>
 <style>{STYLE}{summary.STYLE}{roadmap.STYLE}{overlay.STYLE}</style></head><body>
@@ -1296,7 +1312,7 @@ def main():
     page_html = page(site, events, seen, plan, images, data["fps"], data.get("cost"), data.get("sam_full_requests"),
                      data.get("privacy"), signoff=signoff, receipt=receipt_line(data, plan, images),
                      source_sha256=data.get("source_sha256"), timeline=data.get("timeline"), ground=ground,
-                     paths=paths, walking=data.get("walking"))
+                     paths=paths, walking=data.get("walking"), recording_s=data.get("recording_s"))
     (out_dir / "index.html").write_text(page_html)
     seal.write_sums(share(out_dir, page_html))  # the only folder to publish, and its hashes
     counts = ("not measurements, see the page's warning" if untrusted else

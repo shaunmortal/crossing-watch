@@ -3324,6 +3324,25 @@ def test_method_says_sam_and_spark_made_the_tracks_only_when_sam_ran():
     assert "every pedestrian" not in made_up + tracked
 
 
+def test_a_window_page_says_which_minutes_were_analysed_and_caps_the_school_year_line():
+    """window_s (in events.json's exposure) and recording_s: the method says minutes S-E of an M-minute recording and
+    that times count from second S; the school-year line scales no further than the analysed minutes."""
+    site = {"name": "gate", "world_points": SQUARE_ROAD}
+    seen = {"minutes": 15.0, "duration_s": 900.0, "crossings": 40, "crossers": [f"c{i}" for i in range(40)],
+            "window_s": [130, 1030]}
+    assert ("Only minutes 2.2-17.2 of this 25-minute recording were analysed (seconds 130-1030); times on this page "
+            "count from second 130.") in pack.page(site, [], seen, None, None, 10, recording_s=1500.0)
+    assert "Only minutes 2.2-17.2 of the recording were analysed" in pack.page(site, [], seen, None, None, 10)
+    whole = {k: v for k, v in seen.items() if k != "window_s"}
+    assert "were analysed" not in pack.page(site, [], whole, None, None, 10)
+    events = [{"person": "c1/0", "vehicle": "car#1", "pet_s": 0.5, "tier": "serious"}]
+    school = {"school_days": 200, "dismissal_minutes": 30}
+    assert pack.headline(events, seen, school)[-1].endswith(
+        "about 200 within 1.5 s (200 school days, the 15 analysed minutes of each dismissal).")
+    assert pack.headline(events, whole, school)[-1].endswith("(200 school days, 30-minute dismissals).")
+    assert pack.headline(events, seen, {**school, "dismissal_minutes": 10})[-1].endswith("10-minute dismissals).")
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):
