@@ -3,12 +3,16 @@ the letter only when the video's metres agree with the tape (GATES.md G2).
 
 Run: python3 agent.py VIDEO SITE.json [--out DIR]               start, or continue a paused case
      python3 agent.py VIDEO SITE.json --answer R1 "7.2 m"       a person answers request R1
-     python3 agent.py VIDEO SITE.json --approve                 the head of the school signs the letter off
+     python3 agent.py VIDEO SITE.json --approve --approved-by "A. Rao, Principal" --school "..."
+                                                                the head of the school signs the letter off
      python3 agent.py VIDEO SITE.json --reject --notes "..."    ...or sends it back with notes
 The case lives in DIR/case/: progress.json (the whole conversation, so a stopped case resumes) and agent_log.jsonl (one
-line per step). analyze.py and pack.py never call the agent: without this script nothing changes.
-The site file marks the distance to tape, in clip pixels, apart from the calibration points:
-"check": {"what": "kerb to kerb along the zebra", "points": [[x, y], [x, y]]}.
+line per step). analyze.py and pack.py never call the agent: without this script nothing changes. Its tracking
+re-reads the SAM replies an earlier analyze.py run cached (--budget 0): new SAM requests that round to a cent or more
+stop the run, and the tool fails instead of paying.
+The site file marks the distance to tape, in clip pixels, along the road and apart from the calibration points (kerb
+to kerb is a calibration input when the rectangle runs kerb to kerb, so that check could never fail):
+"check": {"what": "line A to line B along the near kerb", "points": [[x, y], [x, y]]}.
 """
 import argparse
 import datetime
@@ -31,9 +35,10 @@ import sam
 
 MAX_TURNS = 25           # model turns per start or resume (the workshop's turn limit); then the case pauses
 MAX_USD = 1.00           # estimated Spark spend on agent turns per case; tracking and pack.ask_plan's calls are apart
-# an estimate per 1M input / output tokens: Muse Spark Open's Fireworks list price (muse-spark-1.3's Meta API price
-# is not checked)
-USD_PER_M_IN, USD_PER_M_OUT = 1.25, 4.25
+USD_PER_M_IN, USD_PER_M_OUT = 1.25, 4.25  # per 1M input / output tokens, an estimate at PRICE (cached input in full)
+PRICE = (f"Meta API Standard list price for muse-spark-1.3 (${USD_PER_M_IN:g} / ${USD_PER_M_OUT:g} per 1M tokens, "
+         "$0.15 cached input; list price fetched 29 Oct 2026 from https://dev.meta.ai/docs/pricing-rate-limits.md)")
+TRACK_BUDGET_USD = "0"   # analyze.py --budget for the agent's tracking: it re-reads the paid run's SAM cache
 MAX_REFUSALS = 3         # submit_letter refused this often in a row: a person is asked (the workshop's memo_refused)
 CHECK_TOLERANCE = 0.15   # GATES.md G2: a distance not used for calibration agrees with the tape within 15%
 TAPE = re.compile(r"\s*([0-9]+(?:\.[0-9]+)?)\s*(m|cm)\s*", re.I)  # the whole answer: "7.2 m", "7.2m" or "720 cm"
@@ -103,13 +108,14 @@ def check_distance(site):
 
 
 def run_tracker(p, site):
-    """analyze.py on the case's video with `site` (SAM replies are cached, so a re-run pays only for what is new);
-    per concept SAM video tracked, [requests that hit its object limit, requests]."""
+    """analyze.py on the case's video with `site`, from SAM's cache only (--budget 0: a reply not cached stops it
+    with its cost, which goes back to the model); per concept SAM video tracked, [requests that hit its object
+    limit, requests]."""
     out_dir = Path(p["out"])
     copy = out_dir / "case" / f"site-{site['person_mode']}-{site['vehicle_mode']}.json"
     copy.write_text(json.dumps(site, indent=1, ensure_ascii=False))
     run = subprocess.run([sys.executable, str(Path(__file__).with_name("analyze.py")), p["video"], str(copy),
-                          "--out", str(out_dir)], stderr=subprocess.PIPE, text=True)
+                          "--out", str(out_dir), "--budget", TRACK_BUDGET_USD], stderr=subprocess.PIPE, text=True)
     if run.returncode:
         raise ValueError(run.stderr.strip()[-500:] or f"analyze.py exited with {run.returncode}")
     clip = out_dir / "clip.mp4"
@@ -321,10 +327,9 @@ def case_section(out_dir):
     items = "".join(f"<li>{'Person: ' if s.get('person') else ''}{html.escape(s['summary'])}</li>" for s in steps)
     turns, usd = sum("turn" in s for s in steps), max([s.get("usd", 0) for s in steps] or [0])
     return (f'<section><h2>How the agent worked this case</h2><ol>{items}</ol><p class="note">Muse Spark chose one '
-            f"tool per turn: {turns} turns, about ${usd:.2f}, estimated at Muse Spark Open's Fireworks list price of "
-            f"${USD_PER_M_IN:g} / ${USD_PER_M_OUT:g} per million input / output tokens; the Meta API price of "
-            f"{review.MODEL} was not checked. Tracking (SAM, Spark's pedestrian reviews, the sound check) is billed "
-            "apart and is not in this figure. Steps marked Person were a person's answers.</p></section>")
+            f"tool per turn: {turns} turns, about ${usd:.2f}, estimated at the {PRICE}, with cached input counted at "
+            "the full input price. Tracking (SAM, Spark's pedestrian reviews, the sound check) is billed apart and is "
+            "not in this figure. Steps marked Person were a person's answers.</p></section>")
 
 
 def write_page(p, images=None):

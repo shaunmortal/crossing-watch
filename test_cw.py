@@ -2627,7 +2627,7 @@ def agent_case(folder):
                                                                          "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
     (out / "events.json").write_text(json.dumps({"fps": 10, "exposure": {"minutes": 0.3}, "events": [e]}))
     site = {"name": "gate", "image_points": SQUARE_IMG, "world_points": SQUARE_ROAD, "vehicles": ["car"],
-            "check": {"what": "kerb to kerb at the zebra", "points": [[100, 200], [240, 200]]}}  # 140 px at 20 px/m
+            "check": {"what": "line A to line B along the near kerb", "points": [[100, 200], [240, 200]]}}  # 140 px at 20 px/m
     (out / "site.json").write_text(json.dumps(site))
     return out, site, e
 
@@ -2744,6 +2744,23 @@ def test_case_agent_stops_at_its_turn_and_dollar_caps():
             assert run() == "over_budget" and len(bodies) == 4 and raises_system_exit(run)
     finally:
         agent.spark_turn, agent.MAX_TURNS, agent.MAX_USD = old
+
+
+def test_case_agent_tracks_from_the_sam_cache_only():
+    """The agent's track tool runs analyze.py with --budget 0, so a request SAM has not answered before stops the run
+    with its cost, which goes back to the model, instead of paying."""
+    import agent, subprocess, tempfile
+    calls, old = [], agent.subprocess.run
+    agent.subprocess.run = lambda argv, **kw: calls.append(argv) or subprocess.CompletedProcess(argv, 1, stderr="over")
+    try:
+        with tempfile.TemporaryDirectory() as folder:
+            out, site, _ = agent_case(folder)
+            (out / "case").mkdir()
+            p = {"out": str(out), "video": str(out / "video.mp4")}
+            assert raises_value_error(lambda: agent.run_tracker(p, {**site, "person_mode": "crowd", "vehicle_mode": "video"}))
+    finally:
+        agent.subprocess.run = old
+    assert calls[0][-2:] == ["--budget", "0"] and calls[0][1].endswith("analyze.py")
 
 
 def test_guesses_keep_5_to_150_kmh_and_the_chart_draws_the_measured_speed_in_red():
