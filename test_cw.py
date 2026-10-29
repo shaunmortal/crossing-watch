@@ -223,6 +223,52 @@ def test_footsteps_stay_on_screen_and_the_meeting_spot_appears_with_the_first_ar
     assert filters.count("t=fill") == 4 and filters.index("t=fill") < filters.index("t=3")  # boxes drawn over the dots
 
 
+SHAPE = ["000000", "011100", "011110", "001110", "000100"]  # a 5 x 6 mask
+SHAPE_TEXT = "!!!!)Hl*-9hfWz"  # SHAPE as SAM sends it after "!", made by meta-sam-parser's own encoder
+
+
+def test_sam_one_bit_masks_decode_and_are_found_under_their_tracked_box():
+    import masks, tempfile
+    from pathlib import Path
+    assert masks.decode(SHAPE_TEXT, 5, 6) == [bytes(int(c) for c in row) for row in SHAPE]
+    for broken in (SHAPE_TEXT[:-1], SHAPE_TEXT.replace("z", "}"), ""):  # cut short; a digit outside the 85; empty
+        try:
+            masks.decode(broken, 5, 6)
+            raise AssertionError(broken)
+        except ValueError:
+            pass
+    with tempfile.TemporaryDirectory() as tmp:
+        tile = Path(tmp) / "part1" / "tile288_0"  # a crop's reply: its boxes are 288 px left of the clip's
+        tile.mkdir(parents=True)
+        (tile / "person.sam.txt").write_text(
+            f"<3f>0<|box;x1=10;y1=20;x2=15;y2=24;w=352;h=208|><|mask;x=0;y=0;data=5,6,!{SHAPE_TEXT}|>")
+        assert masks.find(tmp, [[298.0, 20.0, 303.0, 24.0], [10, 20, 15, 24]]) == {(298, 20, 303, 24): (5, 6, SHAPE_TEXT)}
+
+
+def test_evidence_clips_draw_sam_silhouettes_instead_of_boxes_where_masks_are_cached():
+    import tempfile
+    from pathlib import Path
+    walker = {10: [100, 50, 105, 54], 11: [102.5, 50.5, 107.5, 54.5], 12: [105, 51, 110, 55], 14: [300, 50, 310, 90]}
+    car_first = {"t_person_s": 1.1, "t_vehicle_s": 1.0}  # 11 is filled in between samples; 14 has no mask near
+    calls, old = [], render.subprocess.run
+    render.subprocess.run = lambda args, **kwargs: calls.append((args, kwargs))
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "person.sam.txt").write_text("".join(
+                f"<{f}f>0<|box;x1={b[0]};y1={b[1]};x2={b[2]};y2={b[3]};w=640;h=360|><|mask;x=0;y=0;data=5,6,!{SHAPE_TEXT}|>"
+                for f, b in walker.items() if f in (10, 12)))
+            render.render(Path(tmp) / "clip.mp4", car_first, walker, {}, 10, "event1.mp4", frame_size=(640, 360))
+    finally:
+        render.subprocess.run = old
+    (args, kwargs), size = calls[0], 640 * 360 * 4
+    graph, tint = args[args.index("-filter_complex") + 1], kwargs["input"]
+    assert "-vf" not in args and "overlay" in graph and len(tint) == 32 * size  # frames 0-31, one RGBA frame each
+    pixel = lambda n, x, y: tint[n * size + (y * 640 + x) * 4:n * size + (y * 640 + x) * 4 + 4]
+    assert pixel(10, 101, 51) == b"\x00\xff\xff" + bytes([render.TINT]) and pixel(10, 100, 50) == bytes(4)
+    assert pixel(11, 103, 51) == pixel(10, 101, 51)  # the frame between borrows a neighbour's mask, at its own box
+    assert "eq(n,10)" not in graph and "eq(n,14)" in graph and pixel(14, 301, 51) == bytes(4)  # no mask: its box
+
+
 def test_spark_verdicts_are_validated():
     ok = review.read_verdict('Sure: {"cyan_is_a_pedestrian": false, "road_user": "not a person", "reason": "a pole"}')
     assert ok == {"is_person": False, "road_user": "not a person", "reason": "a pole"}
