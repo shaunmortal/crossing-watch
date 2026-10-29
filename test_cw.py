@@ -2812,6 +2812,22 @@ def test_case_agent_page_is_the_pack_page_with_its_privacy_note_and_gap_barcode(
     assert "up to 2 found by SAM image search" in page and "Gaps in traffic" in page
 
 
+def test_case_agent_page_names_the_tracks_spark_removed():
+    """The agent's page gets pack's note on the tracks Spark's review removed, from events.json's unfiltered events
+    (the page's cards show only the kept ones), with no digit-bearing reason."""
+    import agent, html, tempfile
+    with tempfile.TemporaryDirectory() as folder:
+        out, site, e = agent_case(folder)
+        pole = {**e, "person": "2/0", "review": {"is_person": False, "road_user": "not a person", "reason": "a pole"}}
+        plate = {**e, "person": "3/0", "review": {"is_person": False, "road_user": "rider", "reason": "plate MP04 AB"}}
+        data = {"fps": 10, "exposure": {"minutes": 0.3}, "events": [e, pole, plate]}
+        (out / "events.json").write_text(json.dumps(data))
+        agent.write_page({"site": str(out / "site.json"), "out": str(out), "letter": None})
+        page = (out / "index.html").read_text()
+    note = 'Removed by Muse Spark: 2 tracks (track 2/0, not a person ("a pole"); track 3/0, rider). Spark can be wrong.'
+    assert html.escape(note) in page and "MP04" not in page
+
+
 def test_case_agent_sign_off_draws_the_fix_in_the_measured_band_once():
     """--approve: Muse Image (stubbed) draws only inside the measured band, as pack.main does, the share/ folder holds
     the band picture under SHA256SUMS, and writing the page again after sign-off pays for no new picture."""
@@ -2906,6 +2922,34 @@ def test_case_agent_tracks_from_the_sam_cache_only():
     finally:
         agent.subprocess.run = old
     assert calls[0][-2:] == ["--budget", "0"] and calls[0][1].endswith("analyze.py")
+
+
+def test_case_agent_never_replaces_a_signed_letter_silently():
+    """A folder where pack.py signed a letter: a new case there stops before any model call or write, since its
+    tracking rewrites events.json and its letter plan.json. A letter the case replaces itself (one the head sent
+    back) is kept as plan-<sha8>.json, as pack's are."""
+    import agent, contextlib, hashlib, io, tempfile
+    bodies, old = [], (agent.spark_turn, pack.ask_plan)
+    agent.spark_turn = scripted_spark([], bodies)
+    pack.ask_plan = lambda prompt, measured, key, photo: {"fix": "f", "letter": "Revised.", "writer": "Muse Spark"}
+    plan = {"fix": "f", "letter": "Signed text.", "writer": "Muse Spark"}
+    try:
+        with tempfile.TemporaryDirectory() as folder, contextlib.redirect_stdout(io.StringIO()):
+            out, site, _ = agent_case(folder)
+            (out / "plan.json").write_text(json.dumps(plan))
+            pack.sign(out, plan, "A. Rao, Principal", "Gate School")
+            message = stopped(lambda: agent.work(out / "video.mp4", out / "site.json", out, "key"))
+            untouched = not (out / "case").exists() and json.loads((out / "plan.json").read_text()) == plan
+            (out / "signoff.json").unlink()  # unsigned: the case's own draft, revised after the head's notes
+            p = {"out": str(out), "site": str(out / "site.json"), "tape_m": 7.2, "refusals": 0, "letter": plan,
+                 "tracked_with": agent.calibration(site)}
+            agent.submit_letter(p, {"notes": ""}, "key")
+            kept = json.loads((out / f"plan-{hashlib.sha256(b'Signed text.').hexdigest()[:8]}.json").read_text())
+            now = json.loads((out / "plan.json").read_text())
+    finally:
+        agent.spark_turn, pack.ask_plan = old
+    assert "A. Rao, Principal signed" in message and "--out" in message and bodies == [] and untouched
+    assert kept == plan and now["letter"] == "Revised."
 
 
 def test_guesses_keep_5_to_150_kmh_and_the_chart_draws_the_measured_speed_in_red():
