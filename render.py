@@ -1,10 +1,12 @@
 """Evidence clips: a few seconds around each near-miss, with the pedestrian drawn cyan and the vehicle red (as SAM's
 own silhouettes where its masks are cached, else as boxes), the pedestrian's footsteps dotted cyan up to a yellow spot
-where the two met, and every person's head blurred so clips of children can be shared.
+where the two met, and every person's head blurred so clips of children can be shared. Then a StroMotion still of
+each clip: the whole near-miss in one picture.
 Captions (PET, gap, speed) are shown by the evidence page, since this ffmpeg build has no text filter."""
 import subprocess
 from pathlib import Path
 
+import crowd
 import masks
 
 PAD_S = 2.0
@@ -16,6 +18,11 @@ SPOT_PX = 14       # the meeting spot, larger than a footstep
 TINT = 89          # silhouettes are filled at 35% (of 255), so the street shows through
 HOLD_FRAMES = 1    # crowd mode finds people every 2nd frame: the frame between borrows its neighbour's mask
 RGB = {"cyan": b"\x00\xff\xff", "red": b"\xff\x00\x00"}
+STEP_S = 0.5       # the still copies both road users this often, so wider spacing means faster
+CAR_STEP_S = 1.0   # a car is long: at 0.5 s its copies would pile up
+MAX_IOU = 0.3      # a copy that overlaps the last one kept on its side more than this is left out
+MIN_COPY_PX = 2    # a copy cut thinner than this by the frame edge is left out
+EDGE = "@0.7:t=1"  # each pasted copy gets a thin outline in its colour
 
 
 def box_filters(tracks, first, last):
@@ -149,3 +156,46 @@ def render(clip, event, person_track, vehicle_track, fps, out_path, everyone=(),
                            "-movflags", "+faststart", str(out_path)], check=True, input=tint or None)
     return out_path
 
+
+def copies(track, anchor, step, first, last):
+    """Frames of `track` pasted into the still: `anchor` and every `step` frames out from it within first..last, each
+    left out when it overlaps the last copy kept on its side more than MAX_IOU."""
+    kept = [anchor] if anchor in track else []
+    for sign, end in ((-1, first - 1), (1, last + 1)):
+        drawn = track.get(anchor)
+        for f in range(anchor + sign * step, end, sign * step):
+            if f in track and (drawn is None or crowd.iou(drawn, track[f]) <= MAX_IOU):
+                kept.append(f)
+                drawn = track[f]
+    return sorted(kept)
+
+
+def crop(box, frame_size):
+    """(x, y, w, h) of a box clamped to the frame, or None when the frame edge leaves under MIN_COPY_PX of it."""
+    x1, y1 = max(0, round(box[0])), max(0, round(box[1]))
+    x2, y2 = min(frame_size[0], round(box[2]) + 1), min(frame_size[1], round(box[3]) + 1)
+    return (x1, y1, x2 - x1, y2 - y1) if min(x2 - x1, y2 - y1) >= MIN_COPY_PX else None
+
+
+def one_frame(n):
+    return f"trim=start_frame={n}:end_frame={n + 1},setpts=PTS-STARTPTS"
+
+
+def strobe(video, event, person_track, vehicle_track, fps, frame_size, out_path):
+    """A StroMotion still from the evidence clip `video` (already blurred and drawn on): its frame where the first of
+    the two reached the spot, with copies of the vehicle, then the pedestrian, cut from the clip at a fixed step
+    before and after, so wider spacing means faster. Returns the page's {"image", "moments", "step_s"}."""
+    first, last = window(event, fps)
+    step_s = CAR_STEP_S if event["vehicle"].split("#")[0] == "car" else STEP_S
+    anchor = round(min(event["t_person_s"], event["t_vehicle_s"]) * fps)
+    pasted = [(f, box, colour) for track, colour in ((vehicle_track, "red"), (person_track, "cyan"))
+              for f in copies(track, anchor, round(step_s * fps), first, last)
+              if (box := crop(track[f], frame_size))]
+    chain = [f"[0:v]{one_frame(anchor - first)}[s0]"]
+    for k, (f, (x, y, w, h), colour) in enumerate(pasted, 1):
+        chain.append(f"[{k}:v]{one_frame(f - first)},crop={w}:{h}:{x}:{y},drawbox=color={colour}{EDGE}[c{k}];"
+                     f"[s{k - 1}][c{k}]overlay={x}:{y}[s{k}]")
+    subprocess.run(["ffmpeg", "-v", "error", "-y", *["-i", str(video)] * (len(pasted) + 1), "-filter_complex",
+                    ";".join(chain), "-map", f"[s{len(pasted)}]", "-frames:v", "1", "-q:v", "2", str(out_path)],
+                   check=True)
+    return {"image": Path(out_path).name, "moments": len({anchor} | {f for f, _, _ in pasted}), "step_s": step_s}

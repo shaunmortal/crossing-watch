@@ -1,7 +1,8 @@
 """What the evidence page lays over each clip: a gap clock that counts from when the first of the pedestrian and the
 vehicle reached the spot and freezes in red, with the tier, when the second gets there; and the same gap as a
 sentence for anyone who cannot watch the video. On the worst fast person-first card, a stopping strip on the road:
-red, the metres the vehicle needed to stop; green, the same from the lower speed limit."""
+red, the metres the vehicle needed to stop; green, the same from the lower speed limit. Above each clip, its
+StroMotion still: the whole near-miss in one picture, which is also what prints."""
 import html
 import math
 
@@ -119,6 +120,17 @@ def strip(e, site, shown):
             + f'</svg><p class="note">{html.escape(strip_note(e, stop))}</p>')
 
 
+def strobe(e):
+    """The card's StroMotion still (render.strobe's {"image", "moments", "step_s"}) with what it is; '' without one."""
+    still = e.get("strobe")
+    if not still:
+        return ""
+    words = (f"Composite of {still['moments']} moments, {still['step_s']:.1f} s apart, cut from the clip below: the "
+             f"pedestrian in cyan, the {e['vehicle'].split('#')[0]} in red. Wider spacing means faster.")
+    return (f'<figure class="strobe"><img src="{html.escape(still["image"])}" alt="The near-miss in one picture">'
+            f'<figcaption class="note">{html.escape(words)}</figcaption></figure>')
+
+
 def clip(video, e, strip_html=""):
     """The card's clip with its clock on top (none without a clip), then the gap sentence and strip()'s markup, if
     any. Without the page script the clock just shows the final gap."""
@@ -163,4 +175,5 @@ STYLE = """
 .strip.on { visibility: visible; } .strip polygon { stroke-width: 2px; vector-effect: non-scaling-stroke; }
 .strip .red { fill: rgba(192, 57, 43, 0.45); stroke: #c0392b; } .strip .green { fill: rgba(46, 158, 91, 0.8); stroke: #2e9e5b; }
 .strip .ring { fill: none; stroke: #f1c40f; stroke-width: 3px; }
+.strobe { margin: 0 0 12px; } @media print { .clip video, .clock, .strip { display: none; } }
 """

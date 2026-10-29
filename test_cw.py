@@ -269,6 +269,28 @@ def test_evidence_clips_draw_sam_silhouettes_instead_of_boxes_where_masks_are_ca
     assert "eq(n,10)" not in graph and "eq(n,14)" in graph and pixel(14, 301, 51) == bytes(4)  # no mask: its box
 
 
+def test_stromotion_still_copies_both_at_a_fixed_step_and_skips_piled_up_copies():
+    import subprocess, tempfile
+    from pathlib import Path
+    fast = {f: [10 * f, 100, 20 + 10 * f, 160] for f in range(40)}
+    slow = {f: [100 + f, 100, 120 + f, 160] for f in range(40)}  # 5 frames on it still overlaps its copy by 0.6
+    assert render.copies(fast, 20, 5, 0, 39) == [0, 5, 10, 15, 20, 25, 30, 35]
+    assert render.copies(slow, 20, 5, 0, 39) == [5, 20, 35] and render.copies({20: [0, 0, 9, 9]}, 20, 5, 0, 39) == [20]
+    assert render.crop([-5, 10, 30, 400], (640, 360)) == (0, 10, 31, 350) and render.crop([639.6, 0, 700, 9], (640, 360)) is None
+    with tempfile.TemporaryDirectory() as tmp:
+        clip = Path(tmp) / "event1.mp4"
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=10:duration=5",
+                        "-pix_fmt", "yuv420p", str(clip)], check=True)
+        walker = {f: [10 + 5 * f, 40, 30 + 5 * f, 100] for f in range(50)}
+        car = {f: [300 - 12 * f, 100, 340 - 12 * f, 140] for f in range(50)}  # off the frame from 3 s
+        still = render.strobe(clip, {"vehicle": "car#1", "t_person_s": 2.0, "t_vehicle_s": 2.5}, walker, car, 10,
+                              (320, 180), Path(tmp) / "event1-strobe.jpg")
+        size = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=width,height", "-of", "csv=p=0",
+                               str(Path(tmp) / "event1-strobe.jpg")], check=True, capture_output=True, text=True).stdout
+    # cars every 1.0 s from the first arrival at 2.0 s: walker at 0-4 s, car at 0-2 s (then off the frame)
+    assert still == {"image": "event1-strobe.jpg", "moments": 5, "step_s": 1.0} and size.strip() == "320,180"
+
+
 def test_spark_verdicts_are_validated():
     ok = review.read_verdict('Sure: {"cyan_is_a_pedestrian": false, "road_user": "not a person", "reason": "a pole"}')
     assert ok == {"is_person": False, "road_user": "not a person", "reason": "a pole"}
@@ -301,6 +323,16 @@ def test_page_links_find_an_event_card_and_its_moment():
                                                "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
     assert '<article class="card" id="event-3" data-t="2.00">' in pack.event_card(3, e, 10)  # clip starts at 1.5 s
     assert 'data-t="1.00"' in pack.event_card(1, e | {"t_vehicle_s": 1.0}, 10)  # clip starts at 0, not -1 s
+
+
+def test_cards_open_with_their_stromotion_still_only_when_there_is_one():
+    e = {"vehicle": "motorcycle#1", "vehicle_kmh": 30.0, "pet_s": 0.5, "t_person_s": 3.0, "t_vehicle_s": 3.5,
+         "gap_m": 0.4, "death_risk_pct": 1.5, "clip": "event1.mp4",
+         "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5}, "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
+    assert overlay.strobe(e) == "" and "<figure" not in pack.event_card(1, e, 10)
+    card = pack.event_card(1, e | {"strobe": {"image": "event1-strobe.jpg", "moments": 9, "step_s": 0.5}}, 10)
+    assert card.index('<img src="event1-strobe.jpg"') < card.index("<video")  # at the top of the card
+    assert "Composite of 9 moments, 0.5 s apart" in card and "the motorcycle in red" in card
 
 
 def test_gap_clock_says_who_came_first_and_freezes_on_the_tier():

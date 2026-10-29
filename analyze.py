@@ -329,6 +329,8 @@ def add_evidence(video, clip, out_dir, events, people, person_boxes, vehicle_box
             e["clip"] = render.render(clip, e, *pair, FPS, out_dir / f"event{i + 1}.mp4",
                                       everyone=list(person_boxes.values()), frame_size=frame_size).name
             e["heard"] = listen.listen(video, e, out_dir / f"event{i + 1}.wav", key)
+            e["strobe"] = render.strobe(out_dir / e["clip"], e, *pair, FPS, frame_size,
+                                        out_dir / f"event{i + 1}-strobe.jpg")  # the whole near-miss in one picture
         except (subprocess.CalledProcessError, OSError) as err:
             print(f"evidence for event {i + 1} failed: {err}", flush=True)
 
