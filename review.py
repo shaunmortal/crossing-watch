@@ -12,12 +12,18 @@ import urllib.request
 
 import road
 import sam
+import seal
 
+# Standard mode only: never a -contributor id (Meta trains on Contributor-mode content).
 MODEL = "muse-spark-1.3"
 TIMEOUT_S = 120
 CROP_FACTOR = 3     # crop this many box-sizes around the person
 MIN_CROP_PX = 80
 CROP_OUT_PX = 384   # upscaled so a small person is visible
+BOX_PX = 2          # the cyan box is drawn after upscaling, this thick...
+BOX_PAD_PX = 4      # ...and this far outside the person, so no cyan smears onto them
+REASON_CHARS = 70   # Spark's reason is shown cut to this...
+LINE_COLS = 100     # ...and a printed line to this, so it fits a terminal at 18-20 pt in a screen recording
 ROAD_USERS = {"child", "adult", "elderly", "wheelchair user", "rider", "cyclist", "not a person", "unclear"}
 NOT_PEDESTRIANS = {"not a person", "rider", "cyclist"}  # riders are vehicles here, as bicycles are in SinD
 RIDER_VERDICTS = {"rider", "cyclist"}
@@ -52,8 +58,11 @@ def read_verdict(text):
 def gated(verdict, person_boxes, rideables, walk_kmh=None):
     """Spark's verdict, except that "rider" or "cyclist" rejects the person only when SAM found a rideable vehicle
     under them: their box RIDER_GATE_SHARE or more inside its box on the same frame. Otherwise they stay a
-    pedestrian, marked rider_unconfirmed (on the DUT drone test Spark called walking students riders). "not a
-    person" always stands: a shadow moves at walking pace too."""
+    pedestrian, marked rider_unconfirmed (on the DUT drone test Spark called walking students riders). "unclear"
+    keeps the person too, marked review_unclear: only a sure "no" rejects (a rule set after seeing 3 DUT cases, not
+    checked on held-out data). "not a person" always stands: a shadow moves at walking pace too."""
+    if verdict and not verdict["is_person"] and verdict["road_user"] == "unclear":
+        return {**verdict, "is_person": True, "review_unclear": True}
     if not verdict or verdict["is_person"] or verdict["road_user"] not in RIDER_VERDICTS:
         return verdict
     share = max((road.inside_share(b, w[f]) for w in rideables for f, b in person_boxes.items() if f in w), default=0.0)
@@ -70,6 +79,26 @@ def unconfirmed_rider(verdict):
     return f"pedestrian (Spark thought {verdict['road_user']}; no bike found under them{walk})"
 
 
+def public_reason(reason, chars=REASON_CHARS):
+    """Spark's reason as it may be shown: cut to `chars`, or "" when it holds a digit (a number plate could be in
+    it)."""
+    reason = " ".join(str(reason or "").split())
+    if any(c.isdigit() for c in reason):
+        return ""
+    return reason if len(reason) <= chars else reason[:chars - 3].rstrip() + "..."
+
+
+def said(pid, verdict):
+    """The terminal line for a track Spark's gated verdict removed, or None when it was kept or not reviewed."""
+    if not verdict or verdict["is_person"]:
+        return None
+    why = (f"{verdict['road_user']}, bike box under them" if verdict["road_user"] in RIDER_VERDICTS
+           else "not a pedestrian")
+    line = f"Muse Spark: track {pid} removed: {why}"
+    reason = public_reason(verdict.get("reason"), min(REASON_CHARS, LINE_COLS - len(line) - len(' ("")')))
+    return line + (f' ("{reason}")' if reason else "")
+
+
 def crop_window(box, frame_size):
     """(x, y, side) of a square crop CROP_FACTOR box-sizes wide around the box, kept inside the frame."""
     side = min(max(MIN_CROP_PX, CROP_FACTOR * max(box[2] - box[0], box[3] - box[1])), *frame_size)
@@ -80,17 +109,27 @@ def crop_window(box, frame_size):
 
 
 def person_crop(clip, person_track, frame_size, out_path):
-    """JPEG crop of the frame where the person's box is largest, the box drawn in cyan."""
+    """JPEG crop of the frame where the person's box is largest, upscaled, then the box drawn in cyan."""
     frame, box = max(person_track.items(), key=lambda kv: (kv[1][2] - kv[1][0]) * (kv[1][3] - kv[1][1]))
     x, y, side = crop_window(box, frame_size)
-    outline = f"drawbox=x={box[0] - x:.0f}:y={box[1] - y:.0f}:w={box[2] - box[0]:.0f}:h={box[3] - box[1]:.0f}:color=cyan:t=1"
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(clip), "-vf",
-                    f"select=eq(n\\,{frame}),crop={side}:{side}:{x}:{y},{outline},"
-                    f"scale={CROP_OUT_PX}:{CROP_OUT_PX}:flags=lanczos", "-frames:v", "1", str(out_path)], check=True)
+                    f"select=eq(n\\,{frame}),crop={side}:{side}:{x}:{y},"
+                    f"scale={CROP_OUT_PX}:{CROP_OUT_PX}:flags=lanczos,{outline(box, x, y, side)}",
+                    "-frames:v", "1", str(out_path)], check=True)
     return out_path
 
 
+def outline(box, x, y, side):
+    """ffmpeg drawbox for `box` (frame pixels) on the (x, y, side) crop once upscaled to CROP_OUT_PX: BOX_PX thick,
+    BOX_PAD_PX outside the person. Drawn before upscaling, a 1 px line grew into a thick, blurred band on their edges."""
+    k = CROP_OUT_PX / side
+    left, top = (box[0] - x) * k - BOX_PAD_PX, (box[1] - y) * k - BOX_PAD_PX
+    width, height = (box[2] - box[0]) * k + 2 * BOX_PAD_PX, (box[3] - box[1]) * k + 2 * BOX_PAD_PX
+    return f"drawbox=x={left:.0f}:y={top:.0f}:w={width:.0f}:h={height:.0f}:color=cyan:t={BOX_PX}"
+
+
 def ask(image_path, api_key, top_down=False):
+    """Spark's raw reply text about one crop ("" when it held no message), or None if the call failed."""
     url = "data:image/jpeg;base64," + base64.b64encode(image_path.read_bytes()).decode()
     body = json.dumps({"model": MODEL, "reasoning": {"effort": "minimal"}, "text": {"format": {"type": "json_object"}},
                        "input": [{"role": "user", "content": [
@@ -104,13 +143,16 @@ def ask(image_path, api_key, top_down=False):
     except (OSError, ValueError, http.client.HTTPException) as err:  # URLError and JSONDecodeError included
         print(f"review failed for {image_path.name}: {err}", flush=True)
         return None
-    text = "".join(c.get("text", "") for o in reply.get("output", []) if o.get("type") == "message"
+    return "".join(c.get("text", "") for o in reply.get("output", []) if o.get("type") == "message"
                    for c in o.get("content", []) if isinstance(c, dict)) if isinstance(reply, dict) else ""
-    return read_verdict(text)
 
 
 def review(clip, person_track, frame_size, out_path, api_key, top_down=False):
-    """Spark's verdict on one tracked pedestrian (None if the call or its reply failed)."""
+    """Spark's verdict on one tracked pedestrian (None if the call or its reply failed). Its reply is kept beside the
+    crop (`out_path` as .json) and read again while the crop, model and prompt are the same, so a re-run neither pays
+    again nor changes the counts a signed letter quotes; delete the .json to make Spark look again."""
     if not person_track:
         return None
-    return ask(person_crop(clip, person_track, frame_size, out_path), api_key, top_down)
+    crop = person_crop(clip, person_track, frame_size, out_path)
+    return seal.reused(out_path.with_suffix(".json"), [crop.read_bytes(), MODEL, PROMPT, VIEWS[top_down]],
+                       lambda: ask(crop, api_key, top_down), read_verdict)

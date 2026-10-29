@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 
 import crowd
+import filmcheck
 import listen
 import pace
 import render
@@ -38,6 +39,10 @@ SAM_USD_PER_IMAGE = 0.0025    # crowd mode: SAM images, Meta's list price of $2.
 MAX_COST_USD = 10.0  # above this estimate, --allow-cost (or a --budget) is required
 MIN_WINDOW_S = 900   # a shorter window_s gets no hourly rates, PV² or school-year line on the page (pack.MIN_RATE_MINUTES)
 MODES = ("video", "crowd", "auto")  # person_mode / vehicle_mode values
+# HDR source only: scale to SDR (BT.709) colours; 42.8 dB PSNR against the SDR original on a synthetic HLG clip,
+# untested on a real iPhone HLG file, and it may clip a bright sky
+TO_SDR = ":out_transfer=bt709:out_primaries=bt709:out_color_matrix=bt709:out_range=tv"
+STEADY_MIN_S = 2      # a clip this short after its reference frame gets no camera check (as filmcheck.py)
 PREP_FILTER = re.compile(r"^((crop|scale|transpose|hflip|vflip)(=[\w.*:+\-/]+)?)(,(crop|scale|transpose|hflip|vflip)(=[\w.*:+\-/]+)?)*$")
 
 
@@ -78,6 +83,9 @@ def load_site(path):
         raise SystemExit(f"{path}: person_grid must be 1, 2 or 3 (use 2 or 3 when more than ~16 people are in view)")
     if site.get("view", "oblique") not in ("oblique", "top-down"):
         raise SystemExit(f"{path}: view must be \"oblique\" (a phone up high, looking across) or \"top-down\" (drone)")
+    if not isinstance(site.get("feet_hidden", True), bool):
+        raise SystemExit(f"{path}: feet_hidden must be true (drop a person's frames whose feet sit on a vehicle's box; "
+                         "the default at an angle) or false")
     sizes = site.get("vehicle_sizes_m", {})
     if not (isinstance(sizes, dict) and all(k in vehicles and isinstance(v, list) and len(v) == 2
                                             and all(isinstance(x, (int, float)) and x > 0 for x in v) and v[0] >= v[1]
@@ -120,12 +128,14 @@ def check_source(video, out_dir, prep_filter, sha256=None, window=None):
 
 def prepare(video, out_dir, extra_filter="", window=None):
     """Re-encode to what SAM wants: H.264 with faststart, FPS frames a second, WIDTH pixels wide; only the seconds
-    `window` [start, end] of the video when given (clip time 0 is then the video's `start`)."""
+    `window` [start, end] of the video when given (clip time 0 is then the video's `start`). An HDR source (iPhone
+    HDR Video) is mapped to SDR colours, else the clip comes out dark and washed out."""
     clip = out_dir / "clip.mp4"
     if clip.exists():
         return clip
     partial = out_dir / "clip.part.mp4"
-    filters = ",".join(f for f in (extra_filter, f"fps={FPS}", f"scale={WIDTH}:-2") if f)
+    hdr = probe(video, "stream=color_transfer") in filmcheck.HDR_TRANSFERS
+    filters = ",".join(f for f in (extra_filter, f"fps={FPS}", f"scale={WIDTH}:-2" + (TO_SDR if hdr else "")) if f)
     cut = ["-ss", f"{window[0]:.3f}", "-t", f"{window[1] - window[0]:.3f}"] if window else []
     try:
         subprocess.run(["ffmpeg", "-v", "error", "-y", *cut, "-i", str(video), "-vf", filters, "-an", "-c:v", "libx264",
@@ -134,6 +144,20 @@ def prepare(video, out_dir, extra_filter="", window=None):
     finally:
         partial.unlink(missing_ok=True)
     return clip
+
+
+def camera_check(clip, total, window=None):
+    """filmcheck.steadiness on the analysed clip: how far the view moved from the frame the calibration was clicked on
+    (clip time 0 with window_s, else filmcheck.REF_S), and whether it darkened. Its times are clip seconds, like
+    t_person_s. None for a clip too short to check, or one ffmpeg could not read."""
+    start, end = (0.0 if window else filmcheck.REF_S), total / FPS
+    if end - start < STEADY_MIN_S:
+        return None
+    try:
+        return filmcheck.steadiness(clip, start, end)
+    except subprocess.CalledProcessError as err:
+        print(f"camera check failed: {err}", flush=True)
+        return None
 
 
 def frame_count(clip):
@@ -404,25 +428,28 @@ def run_record(out_dir, started, replies_before):
 
 
 def write_events(out_dir, site, events, seen, cost, full, privacy=None, source_sha256=None, run=None, timeline=None,
-                 paths=None, walking=None, recording_s=None):
-    """events.json; `recording_s`, the whole recording's length, only when window_s analysed part of it."""
+                 paths=None, walking=None, recording_s=None, camera=None):
+    """events.json; `recording_s`, the whole recording's length, only when window_s analysed part of it; `camera`,
+    camera_check's dict (kept out of exposure, so the letter's facts stay the same)."""
     (out_dir / "events.json").write_text(json.dumps({"site": site.get("name", ""), "fps": FPS, "exposure": seen,
                                                      "cost": cost,
                                                      "sam_full_requests": full, "privacy": privacy,
                                                      "source_sha256": source_sha256,
                                                      **({"recording_s": recording_s} if recording_s else {}), "run": run,
                                                      "timeline": timeline, "paths": paths, "walking": walking,
-                                                     "events": events}, indent=1))
+                                                     "camera": camera, "events": events}, indent=1))
 
 
 def road_tracks(site, H, person_boxes, vehicle_boxes, frame_size):
-    """SAM boxes -> (pedestrian track pieces, vehicle shapes) in road metres, cleaned: riders dropped, tracks split
-    where the ID jumps, pieces under road.MIN_PIECE_S dropped, only the analysis zone (and carriageway, if marked)
-    kept. A vehicle seen at an angle is a car-shaped footprint when its concept has a size (vehicle_size)."""
+    """SAM boxes -> (pedestrian track pieces, vehicle shapes) in road metres, cleaned: riders dropped, frames whose
+    feet sit on a vehicle's box dropped at an angle (road.feet_hidden), tracks split where the ID jumps, pieces under
+    road.MIN_PIECE_S dropped, only the analysis zone (and carriageway, if marked) kept. A vehicle seen at an angle is a car-shaped footprint when its concept has a size (vehicle_size)."""
     zone = site.get("zone_m") or road.zone_around(site["world_points"])
     top_down = site.get("view") == "top-down"
     on_frame = road.boxes_by_frame(vehicle_boxes.values())
     walkers = {pid: road.without_riders(t, on_frame) for pid, t in person_boxes.items()}
+    if not top_down and site.get("feet_hidden", True):  # the site file's "feet_hidden": false switches it off
+        walkers = {pid: road.feet_hidden(t, on_frame) for pid, t in walkers.items()}
     people = {f"{pid}/{k}": piece for pid, t in walkers.items()
               for k, piece in enumerate(road.split_at_jumps(road.moving_frames(  # stillness judged before cutting
                   road.person_points(t, H, zone, site.get("roadway_m"), frame_size, top_down), FPS), FPS))
@@ -481,21 +508,33 @@ def walking_kmh(feet):
 def review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size, top_down):
     """Spark looks once at each pedestrian piece involved in a conflict (most dangerous first, at most
     MAX_REVIEWS), and its verdict is attached to all that piece's events. A rider call stands only with a
-    rideable vehicle's box under the person (review.gated)."""
+    rideable vehicle's box under the person, and "unclear" keeps them (review.gated). Each removal is printed
+    (review.said). Returns (verdicts read from a reply saved by an earlier run, people reviewed): a saved reply is
+    reused while the crop is the same (review.review)."""
     rideables = [t for name, t in vehicle_boxes.items() if name.split("#")[0].lower() in review.RIDEABLE]
-    verdicts = {}
+    verdicts, reused = {}, 0
     for e in events:
         pid = e["person"]
         if pid not in verdicts and len(verdicts) < MAX_REVIEWS:
-            boxes = piece_boxes(person_boxes, people, pid)
+            boxes, crop = piece_boxes(person_boxes, people, pid), out_dir / f"person-{pid.replace('/', '-')}.jpg"
+            before = saved_reply(crop)
             try:
-                verdict = review.review(clip, boxes, frame_size, out_dir / f"person-{pid.replace('/', '-')}.jpg",
-                                        key, top_down)
+                verdict = review.review(clip, boxes, frame_size, crop, key, top_down)
             except (subprocess.CalledProcessError, OSError) as err:
                 print(f"review of {pid} failed: {err}", flush=True)
                 verdict = None
+            reused += verdict is not None and before is not None and saved_reply(crop) == before  # not asked again
             verdicts[pid] = review.gated(verdict, boxes, rideables, walking_kmh(people[pid]))
+            if line := review.said(pid, verdicts[pid]):  # a Meta model judging, on screen; never the crop's path
+                print(line, flush=True)
         e["review"] = verdicts.get(pid)
+    return reused, len(verdicts)
+
+
+def saved_reply(crop):
+    """The bytes of Spark's reply saved beside a person crop (review.review), or None."""
+    path = crop.with_suffix(".json")
+    return path.read_bytes() if path.exists() else None
 
 
 def evidence_events(events):
@@ -652,11 +691,15 @@ def main():
               "in those parts were not tracked (use person_mode / vehicle_mode \"crowd\": the Crowded and Dense "
               "traffic boxes on the calibration page; or \"auto\")", flush=True)
 
+    camera = camera_check(clip, total, window)  # one calibration holds only while the phone stays put
     # saved before the slower, network-bound evidence step
     write_events(out_dir, site, events, seen, cost(), full, source_sha256=source,
                  run=run_record(out_dir, started, before), timeline=timeline, paths=paths, walking=walk,
-                 recording_s=recording_s)
-    review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size, top_down)
+                 recording_s=recording_s, camera=camera)
+    reused, reviewed = review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size,
+                                     top_down)
+    if reviewed:  # same footage, same numbers: delete person-*.json for a fresh look
+        print(f"Spark verdicts reused: {reused} of {reviewed}", flush=True)
     everyone, privacy, searched = list(person_boxes.values()), None, []
     # with no events this searches frame 0 only (one image): the street photo is still shown for the desire lines
     if person_concept not in crowded + list(switched) and full_requests(pieces, [(person_concept, grid)], frame_size)[0]:
@@ -665,7 +708,8 @@ def main():
     add_evidence(args.video, clip, out_dir, events, people, vehicles, person_boxes, vehicle_boxes, key, frame_size,
                  everyone, (window or [0.0])[0])
     write_events(out_dir, site, events, seen, cost(len(searched)), full, privacy, source,
-                 run_record(out_dir, started, before), timeline, paths, walk, recording_s)
+                 {**run_record(out_dir, started, before), "spark_reviewed": reviewed, "spark_reused": reused}, timeline,
+                 paths, walk, recording_s, camera)
     report(seen, events, untrusted)
 
 

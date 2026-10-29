@@ -3311,6 +3311,174 @@ def test_page_reads_without_colour_and_on_a_phone():
     assert "22 minutes of video" in pack.stats([], {"minutes": 22.0, "vehicles": 3})[1]
 
 
+def test_a_saved_verdict_is_reused_until_its_inputs_change_and_a_failure_is_not_saved():
+    """Spark's and Wonder's raw replies are kept by the SHA-256 of each input and parsed again on every read; a failed
+    call or an unreadable reply is not kept. analyze counts the verdicts it reused; Wonder's go to event<N>-heard.json."""
+    import analyze, seal, subprocess, tempfile
+    from pathlib import Path
+    adult = '{"cyan_is_a_pedestrian": true, "road_user": "adult", "reason": "walking"}'
+    with tempfile.TemporaryDirectory() as tmp:
+        path, asked = Path(tmp, "person-1.json"), []
+        ask = lambda *_: asked.append(1) or adult
+        assert seal.reused(path, [b"crop", "model"], ask, review.read_verdict)["road_user"] == "adult"
+        assert seal.reused(path, [b"crop", "model"], ask, review.read_verdict)["road_user"] == "adult"
+        fixed = lambda text: {**review.read_verdict(text), "fixed": True}  # a later parser fix reads the saved reply
+        assert seal.reused(path, [b"crop", "model"], ask, fixed)["fixed"] and len(asked) == 1
+        assert seal.reused(path, [b"other crop", "model"], ask, review.read_verdict) and len(asked) == 2
+        assert seal.inputs_sha256([b"ab", b"c"]) != seal.inputs_sha256([b"a", b"bc"])
+        for failed in (lambda: None, lambda: "no json"):  # a dropped call, an unreadable reply: asked again next run
+            assert seal.reused(Path(tmp, "x.json"), [b"crop"], failed, review.read_verdict) is None
+            assert not Path(tmp, "x.json").exists()
+
+        def crop(clip, track, size, out):
+            out.write_bytes(b"the same crop")
+            return out
+        video = Path(tmp, "v.mp4")
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=4", "-c:a", "aac",
+                        str(video)], check=True)
+        old = review.person_crop, review.ask, listen.hear
+        review.person_crop, review.ask = crop, ask
+        listen.hear = lambda *_: asked.append(1) or '{"sounds": [{"t_s": 3.0, "sound": "horn"}]}'
+        try:
+            runs = [analyze.review_people(None, Path(tmp), [{"person": "7/0"}], {"7/0": {f: (0.14 * f, 0.0)
+                                          for f in range(20)}}, {"7": {5: [100, 100, 120, 140]}}, {}, None,
+                                          (640, 360), False) for _ in range(2)]
+            heard = [listen.listen(video, {"t_person_s": 2.0, "t_vehicle_s": 2.5}, Path(tmp, "event1.wav"), "key")
+                     for _ in range(2)]
+        finally:
+            review.person_crop, review.ask, listen.hear = old
+        assert runs == [(0, 1), (1, 1)] and Path(tmp, "person-7-0.json").exists()
+        assert heard[0] == heard[1] == [{"t_s": 1.0, "sound": "horn"}] and Path(tmp, "event1-heard.json").exists()
+        assert len(asked) == 4  # one Spark look and one Wonder listen for the two runs
+
+
+def test_feet_on_a_vehicle_box_are_not_on_the_road_at_an_angle():
+    """road.feet_hidden drops a scooter rider whose box only sits on the bike's (too little inside for without_riders)
+    and keeps a walker in front of the bike and a pedestrian in front of a bus; analyze uses it at an angle only."""
+    import analyze
+    bike, bus = {0: [100, 100, 160, 200]}, {0: [0, 0, 400, 300]}
+    rider, walker, in_front = {0: [115, 20, 145, 110]}, {0: [120, 90, 140, 215]}, {0: [200, 150, 240, 310]}
+    assert road.without_riders(rider, [bike]) == rider  # 0.11 of its box inside the bike's: today's filter keeps it
+    assert road.feet_hidden(rider, road.boxes_by_frame([bike])) == {}
+    assert road.feet_hidden(walker, road.boxes_by_frame([bike])) == walker
+    assert road.feet_hidden(in_front, road.boxes_by_frame([bus])) == in_front
+    site, H = {"image_points": SQUARE_IMG, "world_points": SQUARE_ROAD}, road.homography(SQUARE_IMG, SQUARE_ROAD)
+    riding = {"r": {f: [190, 100 + 5 * f, 210, 140 + 5 * f] for f in range(20)}}  # 0.25 m a frame, 2 s
+    scooter = {"motorcycle#1": {f: [180, 130 + 5 * f, 220, 200 + 5 * f] for f in range(20)}}
+    pieces = lambda s: set(analyze.road_tracks(s, H, riding, scooter, (400, 400))[0])
+    assert pieces(site) == set() and pieces({**site, "feet_hidden": False}) == {"r/0"}
+    assert pieces({**site, "view": "top-down"}) == {"r/0"}  # a drone sees box centres: untouched
+
+
+def test_spark_unclear_keeps_the_person_and_is_never_a_decoy():
+    """Only a sure "no" rejects: "unclear" with the cyan box called not a pedestrian keeps the person, marked
+    review_unclear, while "not a person" still rejects; a blind-set decoy is never someone Spark was unsure of."""
+    import blind_set
+    kept = review.gated({"is_person": False, "road_user": "unclear", "reason": "too small to tell"}, {}, [])
+    assert kept["is_person"] is True and kept["review_unclear"] is True
+    pole = {"is_person": False, "road_user": "not a person", "reason": "a pole"}
+    assert review.gated(pole, {}, []) == pole
+    sure = {"is_person": True, "road_user": "unclear", "reason": ""}
+    assert review.gated(sure, {}, []) == sure  # a pedestrian, only not which kind: nothing overturned
+    assert pack.confirmed([{"person": "1/0", "review": kept}, {"person": "2/0", "review": pole}]) == [
+        {"person": "1/0", "review": kept}]
+    pair = {"person": "1/0", "vehicle": "car#1", "pet_s": 6.0, "t_person_s": 1.0, "t_vehicle_s": 7.0}
+    assert blind_set.decoys([pair], lambda pid: kept, 1, 200) == []
+    assert blind_set.decoys([pair], lambda pid: {"is_person": True, "road_user": "adult"}, 1, 200) == [pair]
+
+
+def test_spark_crop_draws_its_box_after_upscaling_outside_the_person():
+    """The cyan box is drawn on the upscaled crop, BOX_PAD_PX outside the person's box, so no cyan lies on them."""
+    import subprocess, tempfile
+    from pathlib import Path
+    box = [100, 100, 110, 130]  # 10 x 30 px: a 90 px crop at (60, 70), upscaled 4.27x
+    assert review.outline(box, *review.crop_window(box, (640, 360))) == "drawbox=x=167:y=124:w=51:h=136:color=cyan:t=2"
+    with tempfile.TemporaryDirectory() as tmp:
+        clip, crop = Path(tmp, "clip.mp4"), Path(tmp, "person.jpg")
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=gray:size=640x360:rate=10:duration=1",
+                        "-vf", "drawbox=x=100:y=100:w=10:h=30:color=white:t=fill", "-pix_fmt", "yuv420p", str(clip)],
+                       check=True)
+        review.person_crop(clip, {3: box}, (640, 360), crop)
+        rgb = subprocess.run(["ffmpeg", "-v", "error", "-i", str(crop), "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                             check=True, capture_output=True).stdout
+    pixel = lambda x, y: rgb[3 * (review.CROP_OUT_PX * y + x):3 * (review.CROP_OUT_PX * y + x) + 3]
+    assert len(rgb) == 3 * review.CROP_OUT_PX ** 2
+    r, g, b = pixel(188, 124)  # on the box's top line
+    assert r < 60 and g > 200 and b > 200
+    assert min(pixel(172, 192)) > 220  # just inside the person's left edge: white, where a 1 px box drawn first was cyan
+
+
+def test_spark_removals_are_printed_without_digits_or_crop_paths():
+    """One terminal line per track Spark's gated verdict removed (review.said), at most LINE_COLS wide, its reason
+    dropped when it holds a digit (a number plate could be in it); kept, unsure or unreviewed people print nothing."""
+    import contextlib, io
+    from pathlib import Path
+    import analyze
+    rider = {"is_person": False, "road_user": "rider", "reason": "seated on a motorcycle"}
+    assert review.said("c84/0", rider) == \
+        'Muse Spark: track c84/0 removed: rider, bike box under them ("seated on a motorcycle")'
+    pole = {"is_person": False, "road_user": "not a person", "reason": "rear of an auto-rickshaw"}
+    assert review.said("7/0", pole) == 'Muse Spark: track 7/0 removed: not a pedestrian ("rear of an auto-rickshaw")'
+    assert review.said("7/0", pole | {"reason": "plate MP04 AB"}) == "Muse Spark: track 7/0 removed: not a pedestrian"
+    long = review.said("c84/0", rider | {"reason": "a person " * 20})
+    assert len(long) <= review.LINE_COLS and long.endswith('...")')
+    assert len(review.public_reason("a person " * 20)) == review.REASON_CHARS
+    unsure = review.gated({"is_person": False, "road_user": "unclear"}, {}, [])
+    for kept in (None, {"is_person": True, "road_user": "adult"}, unsure):
+        assert review.said("7/0", kept) is None
+    original, out = review.review, io.StringIO()
+    review.review = lambda *a, **k: dict(pole)
+    try:
+        with contextlib.redirect_stdout(out):
+            analyze.review_people(None, Path("."), [{"person": "7/0"}, {"person": "7/0"}],
+                                  {"7/0": {f: (0.14 * f, 0.0) for f in range(20)}}, {"7": {5: [100, 100, 110, 130]}},
+                                  {}, None, (640, 360), False)
+    finally:
+        review.review = original
+    assert out.getvalue() == review.said("7/0", pole) + "\n" and ".jpg" not in out.getvalue()  # once per track
+
+
+def test_exposure_counts_vehicles_over_indias_school_zone_speed():
+    """over_25_kmh: the moving vehicles whose median speed is over road.IN_SCHOOL_KMH (reg. 16(5)), 0 included."""
+    fps, frames = 10, 60
+    fast, slow = edges_along_x(8.0, fps, frames), edges_along_x(6.0, fps, frames, y=5.0)  # 28.8 and 21.6 km/h
+    seen = road.exposure({}, {"car#1": fast, "car#2": slow}, fps, 600)
+    assert seen["vehicles"] == 2 and seen["over_25_kmh"] == 1
+    assert road.exposure({}, {"car#2": slow}, fps, 600)["over_25_kmh"] == 0
+    assert road.exposure({}, {}, fps, 600)["over_25_kmh"] == 0
+
+
+def test_analyze_keeps_the_camera_check_and_maps_hdr_to_sdr():
+    """events.json's camera: filmcheck.steadiness against the frame the calibration was clicked on (clip time 0 with
+    window_s, else filmcheck.REF_S), none for a clip too short; prepare maps an HDR (HLG) source to BT.709."""
+    import subprocess, tempfile
+    from pathlib import Path
+    import analyze, filmcheck
+    asked, real = [], filmcheck.steadiness
+    filmcheck.steadiness = lambda clip, start, end: asked.append((start, end)) or {"max_shift_px": 2}
+    try:
+        assert analyze.camera_check("clip", 9000) == analyze.camera_check("clip", 9000, [45, 945]) == {"max_shift_px": 2}
+        assert analyze.camera_check("clip", 25) is None  # 2.5 s: under STEADY_MIN_S after the 1 s reference
+    finally:
+        filmcheck.steadiness = real
+    assert asked == [(filmcheck.REF_S, 900.0), (0.0, 900.0)]
+    with tempfile.TemporaryDirectory() as tmp:
+        hlg = Path(tmp, "hlg.mp4")
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=10:duration=1", "-vf",
+                        "setparams=color_trc=arib-std-b67:color_primaries=bt2020:colorspace=bt2020nc",
+                        "-pix_fmt", "yuv420p", str(hlg)], check=True)
+        assert analyze.probe(hlg, "stream=color_transfer") == "arib-std-b67"
+        assert analyze.probe(analyze.prepare(hlg, Path(tmp)), "stream=color_transfer") == "bt709"
+
+
+def test_every_default_model_id_is_standard_mode():
+    """No model id is a Contributor-mode one (Meta trains on Contributor-mode content). Contributor variants exist
+    only for Muse Spark 1.3 and 1.2, so in practice this guards the Spark ids. It checks the defaults only: a
+    LETTER_MODEL or JUDGE_MODEL set in the environment is not covered."""
+    for model in (sam.MODEL, review.MODEL, listen.MODEL, pack.IMAGE_MODEL, pack.LETTER_MODEL, pack.JUDGE_MODEL):
+        assert "contributor" not in model.lower(), model
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):

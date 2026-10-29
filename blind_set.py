@@ -67,12 +67,14 @@ def load_tracks(site, out_dir):
 
 def decoys(candidates, verdict_of, n, total):
     """Up to n pairs whose closest pass was DECOY_MIN_PET_S to DECOY_MAX_PET_S apart, closest first, each pedestrian
-    one Spark says is a person (so a pole is never a decoy) and in no near-miss or close pass inside its clip."""
+    one Spark says is a person, not one it was unsure of (so a pole is never a decoy), and in no near-miss or close
+    pass inside its clip."""
     out = []
     for e in sorted((e for e in candidates if e["pet_s"] >= DECOY_MIN_PET_S), key=lambda e: e["pet_s"]):
         if len(out) == n:
             break
-        if not endangered(e, candidates, total) and (verdict_of(e["person"]) or {}).get("is_person"):
+        verdict = verdict_of(e["person"]) or {}
+        if not endangered(e, candidates, total) and verdict.get("is_person") and not verdict.get("review_unclear"):
             out.append(e)
     return out
 

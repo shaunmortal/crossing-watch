@@ -8,7 +8,10 @@ import math
 import statistics
 
 CONFLICT_RADIUS_M = 1.0   # a vehicle edge this close to where a pedestrian stood counts as the same spot
-PET_MAX_S = 1.5           # traffic-conflict studies treat PET under ~1.5 s as a serious conflict
+# 1.5 s: Ankunda, Ali & Mohanty 2024 (AAP 203:107633), 11 h of AI-processed video at an Indian midblock crossing,
+# found crash risk rises with the 5-min count of PET < 1.5 s; Mumbai (Marisamynathan & Vedagiri 2020, mean PET per
+# pedestrian) and Thiruvananthapuram school zones (Manisha et al. 2025, PET per site) flag under 2 s as high risk.
+PET_MAX_S = 1.5           # under this a serious conflict
 CLOSE_PASS_S = 3.0        # 1.5-3 s is reported as a "close pass": never let a short video read as "safe"
 UNSEEN_S = 0.5            # SAM missed the person or vehicle this long around its moment: crowd mode inferred its position
 BEFORE_S = 2.0            # kmh_2s_before: the vehicle's speed this long before it reached the spot
@@ -27,6 +30,7 @@ BORDER_PX = 1             # a box touching the frame edge is cut off, so its low
 MIN_SPEED_STEPS = 3       # a speed needs this many frame-to-frame steps in its window; one jump is noise
 RIDER_OVERLAP = 0.6       # a "person" box this much inside a vehicle box is its rider or driver, not a pedestrian
 RIDER_FEET_PX = 3         # ...if their feet are not below the vehicle's (a pedestrian in front has lower feet)
+HIDDEN_FEET_PX = 2        # feet_hidden: a box bottom from this far above a vehicle's top to this far above its bottom
 MIN_PIECE_S = 1.0         # a pedestrian or vehicle piece shorter than this has no trustworthy path, timing or speed
 MAX_WALK_MPS = 10.0       # faster than a sprint: the track's ID has jumped to someone (or something) else
 GRID_M = 2.0              # spatial index cell; any size >= 0 gives the same answers, this one is fast
@@ -34,6 +38,8 @@ GAP_ADULT_S = 6.0         # UK Traffic Signs Manual ch. 6, 13.5.2: an acceptable
 GAP_SLOW_S = 12.0         # ..."other groups may require larger gaps, of 10 - 12 s or longer"
 PV2_UNDIVIDED, PV2_DIVIDED = 1e8, 2e8  # IRC:103-2012 6.7.4.1.2: peak-hour PV^2 above this "may" warrant control
 SPEED_LIMITS_KMH = (30, 20)  # replayed "what if this street had a limit" scenarios
+IN_SCHOOL_KMH = 25        # India: Motor Vehicles (Driving) Regulations 2017, reg. 16(5), past schools and hospitals
+                          # where signed (exposure counts the moving vehicles faster than this: over_25_kmh)
 # Both favour the driver, so replayed impact speeds are not understated: 1.5 s is a typical perception-reaction
 # time for an unexpected hazard (road design uses 2.5 s), 7 m/s^2 is hard braking on dry asphalt.
 REACTION_S = 1.5
@@ -137,8 +143,8 @@ def inside_share(inner, outer):
 
 
 def boxes_by_frame(tracks):
-    """{frame: [box, ...]} of all `tracks`: the index without_riders looks a frame's vehicles up in, built once per
-    run."""
+    """{frame: [box, ...]} of all `tracks`: the index without_riders and feet_hidden look a frame's vehicles up in,
+    built once per run."""
     out = {}
     for track in tracks:
         for f, b in track.items():
@@ -154,6 +160,19 @@ def without_riders(person_track, vehicle_tracks, share=RIDER_OVERLAP):
     on = vehicle_tracks if isinstance(vehicle_tracks, dict) else boxes_by_frame(vehicle_tracks)
     return {f: b for f, b in person_track.items()
             if not any(inside_share(b, v) >= share and b[3] <= v[3] + RIDER_FEET_PX for v in on.get(f, ()))}
+
+
+def feet_hidden(person_track, on_frame, margin=HIDDEN_FEET_PX):
+    """The person track minus frames whose box bottom, at its centre, lies inside a vehicle's box: that bottom is on
+    the vehicle, not on the road. A scooter rider whose box sits on the bike's (too little of it inside for
+    without_riders), or someone whose feet a nearer vehicle hides. For a camera at an angle only; a pedestrian in
+    front of a bus has feet below its box and is kept. `on_frame`: the vehicles' boxes_by_frame."""
+    # ponytail: fixed 2 px margin at any resolution; riders a few px above the bike box are still missed (51 boxes
+    # within 10 px on the Indian cache). Scale it with the vehicle box's height if gate footage shows them.
+    def hidden(f, b):
+        x = (b[0] + b[2]) / 2
+        return any(v[0] <= x <= v[2] and v[1] - margin <= b[3] <= v[3] - margin for v in on_frame.get(f, ()))
+    return {f: b for f, b in person_track.items() if not hidden(f, b)}
 
 
 def person_points(track, H, zone=None, roadway=None, frame_size=None, top_down=False):
@@ -563,7 +582,8 @@ def pv2(crossings, vehicles, minutes):
 def exposure(people, vehicles, fps, frames):
     """How much was watched, so a short or quiet video is never read as "safe": crossings (people, counted once
     per tracked id however many pieces it was split into), moving vehicles, minutes, and the 85th-percentile
-    vehicle speed, each vehicle's speed taken while it was actually moving (the speed traffic engineers quote).
+    vehicle speed, each vehicle's speed taken while it was actually moving (the speed traffic engineers quote), and
+    how many of those medians were over IN_SCHOOL_KMH.
     When someone crossed, also the gaps in traffic where they crossed that are long enough to cross in, and who
     crossed (sorted ids), so a count of people in conflicts can stay inside this one."""
     crossers = {pid.split("/")[0] for pid, feet in people.items() if crossing_cells({pid: feet}, fps)}
@@ -574,7 +594,8 @@ def exposure(people, vehicles, fps, frames):
             vehicle_speeds.append(statistics.median(moving))
     p85 = percentile(vehicle_speeds, 0.85)
     seen = {"minutes": round(frames / fps / 60, 1), "duration_s": round(frames / fps, 1), "crossings": len(crossers), "vehicles": len(vehicle_speeds),
-            "speed_85th_kmh": round(p85 * 3.6, 1) if p85 else None, "crossers": sorted(crossers)}
+            "speed_85th_kmh": round(p85 * 3.6, 1) if p85 else None,
+            "over_25_kmh": sum(v * 3.6 > IN_SCHOOL_KMH for v in vehicle_speeds), "crossers": sorted(crossers)}
     cells = crossing_cells(people, fps)
     if not cells:
         return seen
