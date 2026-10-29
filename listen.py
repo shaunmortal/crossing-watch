@@ -37,11 +37,13 @@ def read_sounds(text, seconds):
 
 def audio_around(video, t_s, out_path):
     """(mono 16 kHz WAV of PAD_S either side of t_s from the original video, its start time); the path is None
-    when the video has no sound."""
+    when the video has no sound. Only the first audio track is read: an iPhone's Spatial Audio file also holds a
+    4-channel APAC track, which ffmpeg would pick (most channels) and cannot decode."""
     start = max(0.0, t_s - PAD_S)
     try:
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{start:.2f}", "-t", f"{2 * PAD_S:.2f}", "-i", str(video),
-                        "-vn", "-ac", "1", "-ar", str(SAMPLE_RATE), str(out_path)], check=True, capture_output=True)
+                        "-map", "0:a:0?", "-vn", "-ac", "1", "-ar", str(SAMPLE_RATE), str(out_path)], check=True,
+                       capture_output=True)
     except subprocess.CalledProcessError:
         return None, start
     return (out_path if out_path.stat().st_size >= MIN_WAV_BYTES else None), start
