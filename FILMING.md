@@ -92,7 +92,8 @@ ffmpeg -v error -sseof -1 -i TEST.MOV -update 1 last.png
 
 - Send the **original file by a Google Drive link** (or cable, or AirDrop). **Never WhatsApp**: it shrinks and
   re-compresses the video. `filmcheck.py` catches a shrunken copy.
-- Back it up twice and note its fingerprint: `shasum -a 256 CLIP.MOV`.
+- Back it up twice and note its fingerprint: `shasum -a 256 CLIP.MOV`. `analyze.py` records the same SHA-256 and the
+  page prints it, which ties the pack to this one recording, so send the original, not a copy.
 - Delete the raw video after processing, as the notice says. Only blurred outputs are shared.
 
 ## After the footage arrives

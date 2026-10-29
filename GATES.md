@@ -160,3 +160,15 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
   - Kids 15-second parts: 0 of 7, 95% range 0.0-41.0%, up to 3.7 people in a recording this long.
 - Pages built from an events.json written before this change show no headline, rather than a count that could hold
   someone twice.
+
+## Receipt, hashes and safety pyramid (Thu 29 Oct)
+
+- **Scale table numbers** (README "Scale"), recomputed offline from the cached SAM replies, no API calls, at Meta's
+  list prices ($0.20 per 1,000 video frames billed, at least 50 a request; $2.50 per 1,000 images):
+  - kids school CCTV, 2 concepts: 8 requests, 1,088 frames billed, $0.22 for 48.4 s ($4.05 per 15 minutes);
+  - dense Indian clip, 4 concepts: 12 requests, 1,720 frames billed, $0.34 for 39.0 s ($7.94 per 15 minutes);
+  - frame by frame for 15 minutes: 13,500 images, $33.75, with the one concept "vehicle"; 31,500, $78.75, with three.
+- The share folder's `SHA256SUMS` passes the system `shasum -a 256 -c` in the self-check; `--verify` reports a changed
+  page as CHANGED and a deleted file as MISSING.
+- No cached events.json has the crosser list yet (all predate it), so the pyramid has not been drawn from a real
+  pack. The first gate pack will be the first. With SinD's 63 crossings, 0 collisions would still allow up to 5.7%.
