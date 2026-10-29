@@ -10,6 +10,10 @@ import statistics
 CONFLICT_RADIUS_M = 1.0   # a vehicle edge this close to where a pedestrian stood counts as the same spot
 PET_MAX_S = 1.5           # traffic-conflict studies treat PET under ~1.5 s as a serious conflict
 CLOSE_PASS_S = 3.0        # 1.5-3 s is reported as a "close pass": never let a short video read as "safe"
+UNSEEN_S = 0.5            # SAM missed the person or vehicle this long around its moment: crowd mode inferred its position
+BEFORE_S = 2.0            # kmh_2s_before: the vehicle's speed this long before it reached the spot
+SLOWDOWN_KMH = 3.0        # person first, a vehicle less than this slower than then: "no slowdown measured" (SinD: none
+                          # of 18 person-first vehicles slowed by 3 km/h or more; our speeds agree within 0.3 km/h)
 MIN_CROSSING_M = 2.0      # a pedestrian piece that moves this far counts as one crossing (exposure)
 MOVING_MPS = 10 / 3.6     # slower than this the vehicle is parked, queued or creeping, not a serious threat
 SPEED_WINDOW_S = 1.0
@@ -387,17 +391,77 @@ def best_passes(feet, vehicles, index, speed_of, fps, bucket, radius=CONFLICT_RA
                     continue
                 if vid not in best or (frames, gap) < best[vid][0]:
                     best[vid] = ((frames, gap), fp, fv, gap, speed_of[vid][fv])
-    return {vid: event_fields(b, fps) for vid, b in best.items()}
+    return {vid: event_fields(b, fps, speed_of[vid]) for vid, b in best.items()}
 
 
-def event_fields(best, fps):
+def event_fields(best, fps, speed_mps=None):
+    """An event's numbers from its best pass; with the vehicle's speeds (frame -> m/s), also its speed BEFORE_S
+    earlier (None where it was not measured)."""
     (frames, _), fp, fv, gap, mps = best
     # Same model as the limit replay: the vehicle was speed * PET metres away; under REACTION_S (every serious
     # event) there is no time to brake, so the hit would be at full speed.
     impact_kmh = impact_mps(mps, mps * frames / fps) * 3.6
+    before = (speed_mps or {}).get(fv - round(BEFORE_S * fps))
     return {"pet_s": frames / fps, "t_person_s": fp / fps, "t_vehicle_s": fv / fps,
             "gap_m": round(gap, 2), "vehicle_kmh": round(mps * 3.6, 1), "impact_kmh": round(impact_kmh, 1),
-            "death_risk_pct": round(100 * death_risk(impact_kmh), 1), "with_limit": with_limits(mps, frames / fps)}
+            "death_risk_pct": round(100 * death_risk(impact_kmh), 1), "with_limit": with_limits(mps, frames / fps),
+            "first": first_on_spot(fp, fv), "kmh_2s_before": None if before is None else round(before * 3.6, 1)}
+
+
+def first_on_spot(t_person, t_vehicle):
+    """Who reached the conflict spot first: "person", "vehicle", or "both" at the same moment (PET 0)."""
+    return "both" if t_person == t_vehicle else "person" if t_person < t_vehicle else "vehicle"
+
+
+def first_counts(events):
+    """How many events the person, or the vehicle, reached the spot first. People first points at drivers not
+    yielding; vehicles first at people stepping into gaps."""
+    order = [first_on_spot(e["t_person_s"], e["t_vehicle_s"]) for e in events]
+    return {"person_first": order.count("person"), "vehicle_first": order.count("vehicle"),
+            "both_at_once": order.count("both")}
+
+
+def unseen_s(detected, frame, fps):
+    """Seconds SAM did not detect an object around `frame`: 0 when it did on that frame, else the gap between its
+    detections either side, across which crowd mode inferred (crowd.filled) where it was. `detected` holds the
+    frames it was detected on."""
+    before = max((f for f in detected if f <= frame), default=frame)
+    after = min((f for f in detected if f >= frame), default=frame)
+    return (after - before) / fps
+
+
+def first_note(e):
+    """The card's line on who reached the spot first. Vehicle first, the impact and risk (event_fields: the vehicle
+    speed * PET metres away) are for someone on the spot PET before it came. Person first, the vehicle's speed
+    BEFORE_S earlier: what was measured, never what the driver did."""
+    vehicle, pet, first = e["vehicle"].split("#")[0], e["pet_s"], first_on_spot(e["t_person_s"], e["t_vehicle_s"])
+    if first == "both":
+        return f"The person and the {vehicle} were on the spot at the same moment."
+    if first == "vehicle":
+        return (f"The {vehicle} passed the spot first and the person reached it {pet:.1f} s later: the impact and risk "
+                f"are for someone on the spot {pet:.1f} s before the {vehicle} came.")
+    before = e.get("kmh_2s_before")
+    slowdown = "" if before is None or before - e["vehicle_kmh"] >= SLOWDOWN_KMH else ": no slowdown measured"
+    earlier = "" if before is None else f" ({before} km/h two seconds earlier{slowdown})"
+    return f"The person was on the spot first; the {vehicle} reached it {pet:.1f} s later at {e['vehicle_kmh']} km/h{earlier}."
+
+
+def seen_note(e):
+    """The card's line on whether SAM saw both at the moment, or for how long one's position was inferred; empty
+    for an event from before this was measured."""
+    unseen = e.get("unseen_s")
+    if not unseen:
+        return ""
+    who = {"person": "the person", "vehicle": "the " + e["vehicle"].split("#")[0]}
+    gaps = [f"{unseen[k]:.1f} s ({who[k]})" for k in ("person", "vehicle") if unseen[k] >= UNSEEN_S]
+    if not gaps:
+        return "Seen at the moment."
+    return f"Not detected for about {' and '.join(gaps)}; position{'s' if len(gaps) > 1 else ''} inferred."
+
+
+def moment_note(e):
+    """first_note and seen_note, for the event card."""
+    return " ".join(n for n in (first_note(e), seen_note(e)) if n)
 
 
 def closest_pass(feet, edges, fps, radius=CONFLICT_RADIUS_M, pet_max=PET_MAX_S, min_speed=MOVING_MPS):

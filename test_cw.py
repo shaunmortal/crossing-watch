@@ -640,6 +640,52 @@ def test_sind_oblique_table_compares_vehicle_shapes_with_the_truth():
     assert "| car-shaped footprint | 1 | 1 | 0 | 0 |" in table
 
 
+def test_who_reached_the_spot_first_and_the_vehicle_speed_two_seconds_before():
+    fps, car = 10, edges_along_x(8.0, 10, 60)  # within 1 m of x = 0 on frames 28-32, at 28.8 km/h throughout
+    waited = road.closest_pass({f: (0.0, 0.0) for f in range(15)}, car, fps)  # left the spot 1.4 s before it came
+    assert waited["first"] == "person" and waited["kmh_2s_before"] == waited["vehicle_kmh"] == 28.8
+    assert road.closest_pass({f: (0.0, 0.0) for f in range(36, 60)}, car, fps)["first"] == "vehicle"
+    bare = road.event_fields(((20, 0.5), 0, 20, 0.5, 25 / 3.6), fps)  # no speeds given: nothing from before
+    assert bare["first"] == "person" and bare["kmh_2s_before"] is None
+    e = {"person": "1/0", "vehicle": "car#1", "tier": "serious", "pet_s": 0.6, "t_person_s": 3.0, "t_vehicle_s": 3.6,
+         "gap_m": 0.4, "vehicle_kmh": 31.0, "kmh_2s_before": 32.0, "death_risk_pct": 2.0,
+         "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5}, "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
+    line = ("The person was on the spot first; the car reached it 0.6 s later at 31.0 km/h (32.0 km/h two seconds "
+            "earlier: no slowdown measured).")
+    assert road.first_note(e) == line and html.escape(line) in pack.event_card(1, e, fps)
+    assert road.first_note({**e, "kmh_2s_before": 38.0}).endswith("(38.0 km/h two seconds earlier).")
+    assert road.first_note({**e, "kmh_2s_before": None}).endswith("at 31.0 km/h.")
+    car_first = {**e, "t_person_s": 4.2}
+    assert road.first_note(car_first) == ("The car passed the spot first and the person reached it 0.6 s later: the "
+                                          "impact and risk are for someone on the spot 0.6 s before the car came.")
+    assert "same moment" in road.first_note({**e, "t_vehicle_s": 3.0})
+    assert all("did not slow" not in pack.event_card(1, x, fps) for x in (e, car_first))
+    measured = json.loads(pack.facts({}, [e, car_first, car_first], {"minutes": 1}))
+    assert (measured["person_first"], measured["vehicle_first"], measured["both_at_once"]) == (1, 2, 0)
+
+
+def test_events_inside_tracking_gaps_say_their_position_was_inferred():
+    import analyze, crowd
+    from pathlib import Path
+    detected = {0: [0, 0, 10, 30], 2: [4, 0, 14, 30], 10: [20, 0, 30, 30]}  # seen every 0.2 s, then lost for 0.8 s
+    assert [road.unseen_s(detected, f, 10) for f in (2, 1, 5)] == [0.0, 0.2, 0.8]
+    real = crowd.track  # crowd mode keeps what SAM detected apart from the boxes it fills in between
+    crowd.track = lambda clip, frames, fps, concept, key, cache, jump: {"c0": detected}
+    try:
+        site = {"person": "person", "vehicles": ["car"], "person_mode": "crowd"}
+        tracks, seen = analyze.concept_tracks(site, "person", None, 20, [], Path("out"), None, None)
+        video = analyze.concept_tracks(site, "car", None, 20, [], Path("out"), None, None)
+    finally:
+        crowd.track = real
+    assert seen == {"c0": detected} and sorted(tracks["c0"]) == list(range(11)) and video == ({}, {})
+    event = {"person": "c0/0", "vehicle": "car#1", "t_person_s": 0.5, "t_vehicle_s": 0.6}
+    [e] = analyze.with_unseen([event], seen, {"car#1": {f: [0, 0, 9, 9] for f in range(20)}})
+    assert e["unseen_s"] == {"person": 0.8, "vehicle": 0.0}
+    assert road.seen_note(e) == "Not detected for about 0.8 s (the person); position inferred."
+    assert road.seen_note({**e, "unseen_s": {"person": 0.2, "vehicle": 0.0}}) == "Seen at the moment."
+    assert road.seen_note(event) == ""  # an events.json from before this was measured
+
+
 def test_spark_crop_stays_inside_the_frame():
     assert review.crop_window([0, 0, 10, 20], (640, 360)) == (0, 0, 80)          # small box: minimum crop, clamped
     assert review.crop_window([600, 300, 640, 360], (640, 360)) == (460, 180, 180)  # 3 x 60 px, pushed inside
@@ -1004,6 +1050,7 @@ def test_number_check_reads_grouped_numbers_and_non_english_facts():
 def test_paths_and_other_arrays_never_reach_the_letter_facts():
     """Every number in the facts counts as measured, so arrays of coordinates would let a letter's numbers through."""
     e = {"person": "1/0", "vehicle": "car#1", "tier": "serious", "pet_s": 0.5, "vehicle_kmh": 30.0, "death_risk_pct": 1.5,
+         "t_person_s": 2.0, "t_vehicle_s": 2.5,
          "with_limit": {"20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}, "where": [41.7, 63.2],
          "path_person": [[57.9, 88.4]], "path_vehicle": [[77.3, 12.6]], "replay": [[71.1, 72.2]], "spans": [[13.7, 19.3]]}
     seen = {"minutes": 0.3, "crossings": 4, "spans": [[23.9, 31.7]], "replay": (44.4, 55.5)}

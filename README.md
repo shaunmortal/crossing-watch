@@ -193,6 +193,12 @@ The DUT data has no licence and was used only for internal testing; it is not in
   SAM image search looks again on the clips and the street photo (one image request per 0.2 s of published
   video) and blurs those it finds; check every public frame by eye. Number plates are blurred only on vehicles
   SAM tracked.
+- Crowd mode fills in a box across up to 1 s of missed detections, so a near-miss can sit on an inferred position
+  rather than a seen one. Each card says which: "Seen at the moment", or how long SAM did not detect the person or
+  the vehicle when that was 0.5 s or more ("position inferred"). Re-scored at $0 from the cached replies on 29 Oct,
+  before Spark's review: 12 of 22 conflicts on the dense Indian clip (a phone at an angle, crowd mode for people and
+  vehicles), against 1 of 54 (vehicle crowd mode) and 1 of 55 (crowd mode) on the top-down DUT clips. SAM video mode
+  fills nothing in, so it never flags one.
 - A person standing still on the carriageway when a car passes within 1 m is reported as a near-miss.
 - The death-risk curve is for adults (15+) hit by a car front; children are not covered by that study.
 - Distances are only as good as the measured calibration rectangle.

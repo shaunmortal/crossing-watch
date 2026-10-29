@@ -82,6 +82,7 @@ def facts(site, events, seen):
     return json.dumps({
         "site": site.get("name", ""), "observed": {k: v for k, v in seen.items() if not isinstance(v, (list, tuple, set))},
         "serious_near_misses": len(serious(events)), "close_passes": len(events) - len(serious(events)),
+        **road.first_counts(events),
         "definition": f"serious: pedestrian and moving vehicle on the same spot less than {road.PET_MAX_S} s apart; "
                       f"close pass: {road.PET_MAX_S}-{road.CLOSE_PASS_S} s",
         "worst": [{"tier": e.get("tier", "serious"), "pet_s": e["pet_s"], "vehicle": e["vehicle"].split("#")[0], "vehicle_kmh": e["vehicle_kmh"],
@@ -309,7 +310,7 @@ def event_card(i, e, fps):
 <tr><td>As driven</td><td>{e.get("impact_kmh", e["vehicle_kmh"])} km/h</td><td>{e["death_risk_pct"]}%</td></tr>
 <tr><td>30 km/h limit</td><td>{at30["impact_kmh"]} km/h</td><td>{at30["death_risk_pct"]}%</td></tr>
 <tr><td>20 km/h limit</td><td>{at20["impact_kmh"]} km/h</td><td>{at20["death_risk_pct"]}%</td></tr></table>
-<p class="note">At {e["t_person_s"]:.1f} s in the video. Gap {e["gap_m"]} m. {html.escape(verdict.get("reason", ""))}
+<p class="note">At {e["t_person_s"]:.1f} s in the video. Gap {e["gap_m"]} m. {html.escape(road.moment_note(e))} {html.escape(verdict.get("reason", ""))}
 {html.escape(risk_caveat(road_user, e["vehicle"].split("#")[0]))}</p>
 {heard_line(e.get("heard"))}</article>"""
 

@@ -314,12 +314,16 @@ def image_requests(site, concepts, total, out_dir):
 
 
 def concept_tracks(site, concept, clip, total, pieces, out_dir, key, frame_size, grid=1, switched=()):
-    """One concept's tracks in whole-clip frames and pixels, by crowd mode or SAM video as the site asks; concepts
-    `switched` by auto mode go frame by frame too."""
+    """(tracks, detected): one concept's tracks in whole-clip frames and pixels, by crowd mode or SAM video as the
+    site asks (concepts `switched` by auto mode go frame by frame too), and the same tracks on only the frames SAM
+    detected them. Crowd mode fills the boxes in between; a SAM video track is all detections."""
     if concept in crowd_concepts(site) or concept in switched:
         jump = crowd.MAX_AREA_JUMP if concept in site["vehicles"] else math.inf
-        return crowd.track(clip, crowd_frames(site, concept, total), FPS, concept, key, crowd.cache_dir(out_dir, concept), jump)
-    return track_all(pieces, concept, key, frame_size, grid)
+        detected = crowd.track(clip, crowd_frames(site, concept, total), FPS, concept, key,
+                               crowd.cache_dir(out_dir, concept), jump)
+        return {tid: crowd.filled(t) for tid, t in detected.items()}, detected
+    tracks = track_all(pieces, concept, key, frame_size, grid)
+    return tracks, tracks
 
 
 def probe(path, entries, *extra):
@@ -374,6 +378,14 @@ def placed(events, people, vehicles):
                     "path_person": roadmap.path_around(feet, fp, FPS), "path_vehicle": roadmap.path_around(centres, fv, FPS),
                     "footprint": [[round(v, 1) for v in q] for q in vehicles[e["vehicle"]][fv]]})
     return out
+
+
+def with_unseen(events, person_detected, vehicle_detected):
+    """The events with how long SAM had not detected the person and the vehicle around their moments (road.unseen_s),
+    from concept_tracks' detected tracks: 0 in SAM video mode, where nothing is inferred."""
+    gap = lambda track, t: round(road.unseen_s(track, round(t * FPS), FPS), 1)
+    return [{**e, "unseen_s": {"person": gap(person_detected[e["person"].split("/")[0]], e["t_person_s"]),
+                               "vehicle": gap(vehicle_detected[e["vehicle"]], e["t_vehicle_s"])}} for e in events]
 
 
 def piece_boxes(person_boxes, people, pid):
@@ -434,7 +446,7 @@ def search_heads(site, clip, out_dir, events, total, pieces, key, budget):
     check_cost(pieces, [], None, total, budget, sum(not (cache / f"{f:06d}.sam.txt").exists() for f in frames),
                len(frames))
     near = lambda f: (g for d in range(1, sampled.step) for g in (f - d, f + d) if 0 <= g < total)
-    found = crowd.track(clip, frames, FPS, person, key, cache)
+    found = {tid: crowd.filled(t) for tid, t in crowd.track(clip, frames, FPS, person, key, cache).items()}
     return {tid: {**{g: b for f, b in t.items() for g in near(f)}, **t} for tid, t in found.items()}, frames
 
 
@@ -525,11 +537,14 @@ def main():
 
     tracks_of = lambda concept, g=1: concept_tracks(site, concept, clip, total, pieces, out_dir, key, frame_size, g,
                                                     switched)
-    person_boxes = tracks_of(person_concept, grid)
-    vehicle_boxes = {f"{concept}#{vid}": t for concept in site["vehicles"] for vid, t in tracks_of(concept).items()}
+    person_boxes, person_detected = tracks_of(person_concept, grid)
+    by_concept = {concept: tracks_of(concept) for concept in site["vehicles"]}
+    vehicle_boxes = {f"{c}#{vid}": t for c, (tracks, _) in by_concept.items() for vid, t in tracks.items()}
+    vehicle_detected = {f"{c}#{vid}": t for c, (_, detected) in by_concept.items() for vid, t in detected.items()}
     top_down = site.get("view") == "top-down"
     people, vehicles = road_tracks(site, H, person_boxes, vehicle_boxes, frame_size)
-    events = placed(road.conflicts(people, vehicles, FPS), people, vehicles)
+    events = with_unseen(placed(road.conflicts(people, vehicles, FPS), people, vehicles), person_detected,
+                         vehicle_detected)
     seen = road.exposure(people, vehicles, FPS, total)
     full = (*full_requests(pieces, [(c, g) for c, g in video_plan if c not in switched], frame_size), notes)
     if full[0]:

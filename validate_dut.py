@@ -138,8 +138,8 @@ def our_tracks(site, clip_out):
     pieces = analyze.parts(clip_file, clip_out, total)  # all cached by the run
     tracks_of = lambda concept, g=1: analyze.concept_tracks(site, concept, clip_file, total, pieces, clip_out, None,
                                                             frame_size, g)
-    person_boxes = tracks_of(site.get("person", "person"), site.get("person_grid", 1))
-    vehicle_boxes = {f"{c}#{k}": t for c in site["vehicles"] for k, t in tracks_of(c).items()}
+    person_boxes = tracks_of(site.get("person", "person"), site.get("person_grid", 1))[0]
+    vehicle_boxes = {f"{c}#{k}": t for c in site["vehicles"] for k, t in tracks_of(c)[0].items()}
     H = road.homography(site["image_points"], site["world_points"])
     return person_boxes, vehicle_boxes, *analyze.road_tracks(site, H, person_boxes, vehicle_boxes, frame_size), total
 

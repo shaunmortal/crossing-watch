@@ -153,7 +153,7 @@ def sample_frames(total_frames, clip_fps, sample_fps):
 
 
 def track(clip, frames, clip_fps, concept, api_key, cache_dir, max_area_jump=math.inf):
-    """Tracks of one concept in a crowded clip: SAM image detection on `frames` (see sample_frames), IDs from
-    `associate` (see its `max_area_jump`), boxes filled in between samples."""
-    tracks = associate(detect(clip, frames, concept, api_key, cache_dir, clip_fps), clip_fps, max_area_jump)
-    return {tid: filled(t) for tid, t in tracks.items()}
+    """Tracks of one concept in a crowded clip, as detected: SAM image detection on `frames` (see sample_frames), IDs
+    from `associate` (see its `max_area_jump`). `filled` adds the boxes in between; keeping these apart says which
+    positions were seen and which inferred."""
+    return associate(detect(clip, frames, concept, api_key, cache_dir, clip_fps), clip_fps, max_area_jump)
