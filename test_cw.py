@@ -1114,6 +1114,104 @@ def test_sam_text_parses_into_tracks():
     assert sam.parse("<0f>0<|box;x1=5;y1=6;x2=5;y2=8;w=640;h=360|>") == {}  # zero-width box dropped
 
 
+def test_judge_bench_plants_one_lie_per_copy_and_the_code_check_misses_the_ones_without_digits():
+    """Glimmer's v1 letter: 12 single-lie copies, half of kinds JUDGE_PROMPT does not name, and 4 clean controls."""
+    import judge_bench
+    name, letter, facts = judge_bench.glimmer_base()
+    assert name == "glimmer" and letter.startswith("Dear Road Authority") and not judge_bench.code_flags(letter, facts)
+    bench = judge_bench.bench_letters([(name, letter, facts)])
+    planted = [i for i in bench if i["planted"]]
+    assert len(planted) == 12 and sum(i["named"] for i in planted) == 6 and len(bench) == 16
+    assert all(i["letter"] != letter for i in planted) and len({i["letter"] for i in bench}) == 16
+    assert not any(c.isdigit() for _, _, lie in judge_bench.INSERTED for c in lie)
+    caught = {i["kind"] for i in planted if judge_bench.code_flags(i["letter"], i["measured"])}
+    assert caught == {"number in words", "km/h written as mph"}
+    assert not any(judge_bench.code_flags(i["letter"], i["measured"]) for i in bench if not i["planted"])
+    swap = next(i["letter"] for i in planted if i["kind"] == "near-misses swapped")
+    assert "a car at 29.0 km/h with adult death risk if hit 3.0% and a car at 38.0 km/h" in swap
+
+
+def test_judge_bench_counts_unreadable_replies_apart_and_asks_only_for_missing_runs():
+    import judge_bench
+    item = {"id": "x", "kind": "k", "named": True, "planted": True, "letter": "L", "measured": "{}", "code": [False]}
+    replies, prompts = ['{"problems": ["a lie"]}', "no json here"], []
+    def ask(prompt):
+        prompts.append(prompt)
+        if not replies:
+            raise OSError("server down")
+        return replies.pop(0)
+    import contextlib, io
+    with contextlib.redirect_stderr(io.StringIO()) as said:
+        done = judge_bench.judged(item, "spark", ask, 3)  # the third call fails: not recorded, asked again next run
+    assert "asked again next run" in said.getvalue()
+    assert done["spark"] == [True, None] and "LETTER:\nL" in prompts[0] and "spark" not in item
+    assert judge_bench.judged(done, "spark", ask, 2) is not done and len(prompts) == 3  # 2 runs held: no call
+    assert judge_bench.tally([done], "spark") == (1, 1, 1)
+    control = {**item, "id": "y", "planted": False, "spark": [False, False]}
+    text = "\n".join(judge_bench.table([done, control]))
+    assert "| k | yes | 0/1 | 1/1 | - | 1/1 |" in text and "Muse Spark 1 of 4 replies" in text
+    assert "| **Clean controls: false alarms** |  | 0/1 (0-79%) | 0/2 (0-66%) | - | 0/1 (0-79%) |" in text
+
+
+def test_judge_bench_takes_a_cached_spark_letter_in_todays_form_and_never_a_glimmer_one():
+    import judge_bench, shutil, tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as tmp:
+        folder = Path(tmp) / "gate"
+        folder.mkdir()
+        shutil.copyfile(judge_bench.HERE / "sample" / "events.json", folder / "events.json")
+        plan = {"writer": pack.LETTER_MODEL, "letter": "SAM 3.1 found two serious near-misses; a car at 38.0 km/h."}
+        (folder / "plan.json").write_text(json.dumps(plan))
+        assert judge_bench.spark_base(Path(tmp)) is None
+        (folder / "plan.json").write_text(json.dumps({**plan, "writer": "Muse Spark"}))
+        _, letter, facts = judge_bench.spark_base(Path(tmp))
+    assert letter == "SAM found 2 serious near-misses; a car at 38.0 km/h." and '"vehicle_kmh": 38.0' in facts
+
+
+def test_blind_set_hides_near_misses_among_spark_checked_decoys_in_same_length_clips():
+    import blind_set
+    near = [{"person": f"{p}/0", "vehicle": "car#1", "tier": "serious", "pet_s": 0.4, "t_person_s": t, "t_vehicle_s": t + 0.4}
+            for p, t in (("a", 0.5), ("b", 20.0))]
+    candidates = [{"person": p, "vehicle": "car#2", "tier": "close pass", "pet_s": pet, "t_person_s": 30.0, "t_vehicle_s": 30.0 + pet}
+                  for p, pet in (("pole/0", 5.1), ("c/0", 2.0), ("d/0", 7.9), ("e/0", 6.0), ("f/0", 5.5))]
+    verdicts = {"pole/0": {"is_person": False}, "d/0": {"is_person": True}, "e/0": {"is_person": True}, "f/0": None}
+    asked = []
+    fakes = blind_set.decoys(candidates, lambda pid: (asked.append(pid), verdicts.get(pid))[1], 2)
+    assert [e["person"] for e in fakes] == ["e/0", "d/0"] and "c/0" not in asked  # a near-miss is never a decoy
+    for e in near + fakes:
+        first, last = render.window(blind_set.blind_window(e), 10)
+        assert last - first == 120 and first == max(0, round((min(e["t_person_s"], e["t_vehicle_s"]) - 2) * 10))
+    clips = blind_set.shuffled(near, fakes)
+    assert clips == blind_set.shuffled(near, fakes) and [c[0] for c in clips] == [f"clip0{k}.mp4" for k in range(1, 5)]
+    key = blind_set.key_record(clips)
+    assert sorted(c["truth"] for c in key["clips"]) == ["decoy", "decoy", "serious", "serious"]
+    page = blind_set.page([c[0] for c in clips])
+    assert page.count('type="radio"') == 16 and "new Blob" in page and "localStorage" in page
+    assert not any(word in page for word in ("decoy", "pet_s", "car#", "e/0"))  # nothing on the page gives a clip away
+
+
+def test_score_humans_scores_danger_against_none_with_kappa_and_wilson():
+    import score_humans, tempfile
+    from pathlib import Path
+    assert score_humans.kappa(20, 5, 10, 15) == 0.3999999999999999 and score_humans.kappa(5, 0, 0, 0) is None
+    lo, hi = score_humans.wilson(0, 10)
+    assert lo == 0 and abs(hi - 0.2775) < 1e-4 and abs(score_humans.wilson(20, 24)[0] - 0.6415) < 1e-4
+    truth = {f"clip{k:02d}.mp4": k <= 6 for k in range(1, 13)}  # 6 near-misses, 6 decoys
+    said = {**{c: "serious" for c, d in truth.items() if d}, **{c: "none" for c, d in truth.items() if not d},
+            "clip01.mp4": "close", "clip07.mp4": "close", "clip12.mp4": "cant_tell"}
+    with tempfile.TemporaryDirectory() as tmp:
+        good, bad = Path(tmp) / "good.json", Path(tmp) / "bad.json"
+        good.write_text(json.dumps({"rater": "A. Rao, lecturer", "answers": said}))
+        rater, read = score_humans.read_answers(good, truth)
+        for wrong in ({"answers": {"clip99.mp4": "none"}}, {"answers": {"clip01.mp4": ["none"]}}, "not json {"):
+            bad.write_text(wrong if isinstance(wrong, str) else json.dumps(wrong))
+            assert exits(lambda: score_humans.read_answers(bad, truth))
+    assert rater == "A. Rao, lecturer" and read["clip12.mp4"] is None and score_humans.table(truth, read) == (6, 1, 0, 4, 1)
+    lines = score_humans.report(rater, truth, read)
+    assert "Agreed with the pipeline on 10 of 11" in lines[1] and "kappa 0.81" in lines[1] and lines[-1].endswith("PASS")
+    assert "NOT DECIDABLE" in score_humans.report(rater, dict(list(truth.items())[3:9]), read)[-1]
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):
