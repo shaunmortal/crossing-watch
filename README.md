@@ -86,7 +86,8 @@ Without a key the page shows the measurements only; the fix and the letter need 
 Needs Python 3.11+ and ffmpeg. No other dependencies. Put `MODEL_API_KEY=...` (Meta Model API) in `.env`.
 
 ```
-open calibrate.html                      # tape-measured rectangle, or no tape: match 4 points to a satellite view
+open calibrate.html                      # tape-measured rectangle, or no tape: match 4 points to a satellite view;
+                                         # 4 optional speed-line clicks add G6's "trap" and the agent's "check"
 python3 analyze.py VIDEO site.json       # tracks, near-misses, clips, Spark review -> out/VIDEO/events.json
 python3 pack.py out/VIDEO site.json      # letter, fix image, evidence page -> out/VIDEO/index.html
 python3 pack.py out/VIDEO site.json --notes notes.txt                                  # the principal's notes
@@ -120,10 +121,17 @@ sign with `agent.py --approve`.
   gives G7's pass mark (`passmark.py`, rule in `GATES.md`): from the headline's own counts, the most crossings with a
   vehicle within 3 s, and the most distinct such vehicles, that an after-film as long may show for a one-sided
   Fisher exact test at 5%. Page only, never in the letter; never under the pace warning or without a crosser list.
+- The page opens summary first: the minutes of video, the site and the headline, the first shown near-miss's blurred
+  clip playing beside the serious, close and crossings tiles, what the school asks for, and where the letter stands
+  (draft, approved, changed after sign-off, filed), then a bar that jumps to each section. Under the pace warning it
+  shows no clip and no ask.
 - Printed, the page keeps light colours even in dark mode, shows only the 3 worst near-misses (a letter number from
   another reads "(clip N, not printed)") and puts the letter first, on its own sheet.
 
-Filming your own crossing: [`FILMING.md`](FILMING.md) (phone locked at 1080p 30 fps, tape marks, consent notice; `python3 filmcheck.py CLIP` checks the test clip).
+Filming your own crossing: [`FILMING.md`](FILMING.md) (phone locked at 1080p 30 fps, tape marks, consent notice).
+`python3 filmcheck.py CLIP [START END]` checks a clip's size, orientation, frame rate, HDR Video and Spatial Audio,
+and whether the view held still and did not darken (from START, the window's start, to END). Muse Wonder hears only
+the first audio track, so a Spatial Audio file still gets its sound check.
 If the video is HDR anyway (HLG or PQ), `analyze.py` maps it to SDR (BT.709) as it scales the clip, else the clip
 comes out dark and washed out. That is checked only on synthetic HLG clips, where it brings the clip closer to the SDR
 original; it is untested on a real iPhone HLG file, and it may clip a bright sky.
@@ -175,9 +183,12 @@ SAM replies are cached per output folder, and so are Muse Spark's and Muse Wonde
 its crop or sound clip (person-<id>.json, event<N>-heard.json) under the SHA-256 of what was sent, and read again
 while that is unchanged. Same footage, same numbers: a re-run neither pays again nor changes the counts a signed
 letter quotes, and analyze.py prints "Spark verdicts reused: N of M". Delete those files to make Spark or Wonder look
-again, and keep the same ffmpeg between a run and its re-run. An output folder refuses a different video.
+again, and keep the same ffmpeg between a run and its re-run. An output folder knows its video by SHA-256: it refuses
+a different video, and the same file moved or renamed keeps its paid SAM replies.
 A dropped SAM request is retried after 10, 30 and 90 s (130 s in all; longer when Meta's Retry-After asks, e.g. 60 s
-on a 503). A longer dropout still ends the run, and a re-run resumes from the cache.
+on a 503); a refusal (HTTP 4xx other than 408 and 429) never is. A longer dropout still ends the run, and a re-run
+resumes from the cache. A reply is saved whole or not at all, SAM video requests go out 4 at a time, and a progress
+line prints every 25 new video and 250 new image replies.
 Videos are sent to SAM in 15-second parts that overlap by 2 s, so a person crossing a cut keeps one ID. Parts are
 short because one SAM 3.1 video request tracks at most 16 objects **in all**: once 16 IDs are taken, later arrivals
 are never picked up (none of 54 replies had more, and none gained an ID after filling). Any request that still hits
@@ -186,7 +197,8 @@ tracked in 4 overlapping tiles (SAM returns at most 16 objects per request) and 
 estimated first at Meta's list prices: a run over $10 needs `--allow-cost`, and `--budget USD` is a hard cap that
 nothing lifts. With `"person_mode": "auto"` or `"vehicle_mode": "auto"`, a concept goes to SAM video first; if a part
 fills its 16 objects before the next part takes over, that concept is detected frame by frame instead and the page
-says when it filled (on the Indian time-lapse: "person: 16 objects taken within 1.0-1.6 s in 3 of 3 parts").
+says when it filled (on the Indian time-lapse: "person: 16 objects taken within 1.0-1.6 s in 3 of 3 parts"). Before
+anything is paid, analyze.py prints the most that switch could add in SAM images.
 
 `"window_s": [S, E]` in the site file analyses only seconds S to E of the recording, picked by the window rule in
 `GATES.md` before any near-miss is seen; the SHA-256 is still of the whole original, clip time 0 is second S, and the
@@ -302,7 +314,10 @@ the road that was not used for calibration (calibrate.html writes it from the sp
 "points": [[x, y], [x, y]]}`; never kerb to kerb, which is a calibration input. The agent asks a person to
 tape it (answered in m or cm), and the letter is refused until the video and the tape agree within 15% (gate G2) and
 the near-misses were tracked with the site's current calibration points. Three refusals in a row go to a person.
-The head of the school then approves the letter or sends it back with notes. Every step goes to
+The head of the school then approves the letter or sends it back with notes; `--approve` needs `--approved-by` and
+`--school` and writes the same `signoff.json` as pack.py, so the page names who signed. The case page carries
+pack.py's receipt, the street seen from above, the Muse Image fix drawn only inside the measured band, and a `share/`
+folder with its `SHA256SUMS`. Every step goes to
 `out/VIDEO/case/agent_log.jsonl`, and the page shows "How the agent worked this case". No agent run has been made
 against the Meta API yet; a test drives it with a scripted model.
 

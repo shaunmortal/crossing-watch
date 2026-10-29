@@ -621,6 +621,18 @@ code gets our numbers from the same frame and the same tape.
 - The new crop (the cyan box drawn after upscaling, outside the person) has new bytes, so Spark is asked again on the
   next paid run; until then these are its stored verdicts on the old crops.
 
+## G6's log with a window, and the tape marks in calibrate.html (Thu 29 Oct 2026, before the rehearsal or the main recording is filmed)
+
+- With `window_s`, analyze.py tracks only seconds S to E, and `validate_gate.py` reads TRAP.csv's times on the whole
+  original but counts only the vehicles that cross both lines inside the window (commit 08b28be). So G6's "from the
+  start of that video" is read as from second S: the log starts with the first vehicle that crosses both lines at or
+  after S, and goes on in order until 30 are logged. A log started at second 0 would spend its vehicles before S.
+- `calibrate.html` writes `"trap"` from four optional speed-line clicks after the rectangle's corners (A near, B near,
+  B far, A far, and the taped distance between the lines, 15 m by default; commit 26defae), and the case agent's
+  `"check"` from A near and B near: a road distance along the near kerb that calibration does not use, as G2 asks.
+  Checked under a DOM stub only; not yet clicked through in a real browser.
+- The G6 and window rule text above is unchanged.
+
 ## The README's first-screen numbers, re-checked at $0 (Thu 29 Oct 2026)
 
 On the merged build (commit 5083592), with no key in the environment and no API call:
