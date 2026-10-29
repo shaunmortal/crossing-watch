@@ -3755,6 +3755,15 @@ def test_readme_first_screen_fits_a_phone_its_links_resolve_and_one_story_on_the
     assert "not downloaded yet" not in readme
 
 
+def test_feet_overlap_counts_frames_whose_feet_sit_on_a_vehicle_box_after_the_rider_filter():
+    """feet_overlap.py's share: a rider sitting on a bike's box counts as hidden, a walker in front of it does not,
+    and a rider inside a bus's box (dropped by without_riders) is not in the total at all."""
+    import feet_overlap
+    people = {"rider": {0: [115, 20, 145, 110]}, "walker": {0: [120, 90, 140, 215]}, "in bus": {1: [10, 10, 50, 100]}}
+    vehicles = {"motorcycle#1": {0: [100, 100, 160, 200]}, "bus#2": {1: [0, 0, 400, 300]}}
+    assert feet_overlap.feet_overlap(people, vehicles) == (1, 2)
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):

@@ -50,7 +50,8 @@ open sample/index.html                    # macOS; elsewhere open the file in a 
   `openweights.py`, `passmark.py` and `gazette.py`.
 - **Case agent:** `agent.py`.
 - **Checks:** `test_cw.py`; `validate_sind.py`, `validate_dut.py` and `validate_offline.py` (ground truth);
-  `validate_gate.py` (G6, G8); `blind_set.py` and `score_humans.py` (G5); `judge_bench.py`; `vehicle_test.py`.
+  `validate_gate.py` (G6, G8); `blind_set.py` and `score_humans.py` (G5); `judge_bench.py`; `vehicle_test.py`;
+  `feet_overlap.py` (feet on a vehicle's box, at an angle).
 - **Video and X:** `video/split.py` (the hero shot); `guess.py` (X replies' speed guesses against the measured speed).
 - **Docs and records:** `FILMING.md`, `GATES.md`, `sites/`, `sample/`, `kaggle/`, `provenance/`, `LICENSES/`.
 
@@ -423,6 +424,38 @@ a rectangle of the vehicle type's size, turned to its direction of travel and mo
 6 m up and 15 m back: 29 serious in truth, 42 from the lower edge, 31 from footprints; 15 m up and 20 m back: 37, 64
 and 38. This is a simulation: the box noise is independent per frame, and no real phone footage was checked.
 
+**Lower phones, as on a footpath.** The same check with the phone lower (re-run on 29 Oct at $0:
+`--oblique 6,15`, `3,8` and `3,12`), car-shaped footprints against SinD's true footprints, counting the people in
+view. **No occlusion modelled:** every person is an exact point and nothing hides anyone.
+
+| Phone | Serious, truth | Serious, footprints | Serious missed | Serious extra | PET vs truth (mean) |
+|---|---|---|---|---|---|
+| 10 m up, 25 m back | 35 | 37 | 3 | 5 | -0.01 s |
+| 6 m up, 15 m back | 29 | 31 | 3 | 5 | +0.00 s |
+| 3 m up, 12 m back | 22 | 24 | 5 | 7 | +0.02 s |
+| 3 m up, 8 m back | 18 | 17 | 4 | 3 | +0.08 s |
+
+**What a phone on a footpath adds.** A separate $0 simulation of a 1x lens 3 m up over a 7.5 m road (flat road;
+the lens's focal length is assumed, not checked) puts numbers on the errors the tape and the angle bring:
+
+- **Clicks** (95th percentile over 2,000 random click sets): a 1-pixel click error in the 640-px clip, 6 m back,
+  moves the 15 m speed line's scale by 1.0% and a speed at the crossing centre by 0.9%. Extended 10-14 m along the
+  road, past what the lens sees from there, it moves speeds by 15.4% and positions by 1.23 m: speeds hold near the
+  tape, not far beyond it.
+- **Tape on the kerb top, not the road:** 4 m back, a kerb 0.10 / 0.15 / 0.20 m high makes vehicle speeds read
+  3.3% / 5.0% / 6.7% low and moves the crossing centre 0.26 / 0.39 / 0.52 m.
+- **Road crown** 0.075 / 0.125 m above the kerbs, same camera: the centre point reads 0.20 / 0.34 m off, the
+  along-road scale x1.026 / x1.043.
+- **Feet hidden** by someone in front, every person's box bottom 10 / 20 / 40 px above the feet (simulated camera
+  pixels), against the same camera with the feet seen: 3 m up and 8 m back, 18 serious become 18 / 19 / 17 (missed
+  0 / 0 / 2, extra 0 / 1 / 1); 3 m up and 12 m back, 25 become 26 / 23 / 23 (missed 0 / 3 / 4, extra 1 / 1 / 2).
+
+So the speed and PET maths transfer (SinD, true positions), and at an angle the footprints keep serious conflicts
+within a few of the truth in simulation. What does not transfer is DUT's end-to-end tracking: from a drone no one is
+hidden. `python3 feet_overlap.py SITE OUT_DIR` counts, at $0 from a run's cached SAM replies, how often a person's box
+bottom sits on a vehicle's box, the frames the feet-hidden rule drops. That is a proxy for occlusion, not a measured
+error, and its share for the gate run is added after Monday's recording.
+
 ### End to end, against ground truth (DUT)
 
 `validate_dut.py` runs the whole pipeline (SAM 3.1, metres, near-misses, Muse Spark) on 8 drone clips of a campus
@@ -589,9 +622,10 @@ python3 vehicle_test.py out/indian-crowd --spend   # 60 cached crowd frames, abo
   $33. Crowd mode costs more: 15 minutes of people at 5 images a second plus three vehicle concepts at 10 a second
   is 31,500 images, about $79 (about $34 with the single concept "vehicle", if `vehicle_test.py` shows it finds 95%
   of what the three concepts find; not run yet). The page prints the SAM cost for each video.
-- Every DUT number comes from a drone looking straight down, where boxes never overlap and no one is hidden behind a
-  vehicle. From a phone at an angle, people pass behind vehicles and each other, so keeping their IDs and finding
-  their feet is harder; DUT does not test that, and its numbers are a best case for it.
+- Every ground-truth number here, DUT and SinD alike, comes from a drone looking straight down, where boxes never
+  overlap and no one is hidden behind a vehicle. From a phone at an angle, people pass behind vehicles and each
+  other, so keeping their IDs and finding their feet is harder; DUT does not test that, and its numbers are a best
+  case for it. The phone-angle numbers above are simulations with no occlusion modelled, not measurements.
 - Box jitter alone gives a queued car an apparent speed of a few km/h. That is well under the 10 km/h "moving"
   threshold, so it does not create events, but very slow vehicles are not measured precisely.
 
