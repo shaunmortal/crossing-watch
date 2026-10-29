@@ -5,6 +5,7 @@ Run after analyze.py: python3 pack.py OUT_DIR SITE.json
 Writes OUT_DIR/index.html next to the clips (open it in a browser), and OUT_DIR/share/: the page and only the files it
 shows, the one folder to publish, with their SHA256SUMS. The letter is kept in OUT_DIR/plan.json, so a re-run pays
 nothing; --notes FILE revises it, and --approved-by NAME --school SCHOOL signs it (OUT_DIR/signoff.json).
+A signed letter is replaced only with --new-letter, and kept as plan-<sha>.json.
 python3 pack.py --verify FOLDER checks a shared folder: MATCH, CHANGED or MISSING per file.
 """
 import argparse
@@ -135,6 +136,7 @@ NOTES:
 # school's own facts nor take them as measured
 STATED = "\n\nSTATED BY THE PRINCIPAL, NOT MEASURED (a letter may give these as the school's own statements):\n"
 SIGNOFF_KEYS = ("approved_by", "school", "date", "letter_sha256")  # signoff.json
+PLAN_BACKUP = "plan-{sha8}.json"  # a replaced plan.json, named by the first 8 hex digits of its letter's sha256
 FILED_KEYS = ("to", "channel", "date", "reference")  # the site's "submitted" record, once the pack is filed
 TCT_TOOLKIT = "https://www.childhealthinitiative.org/media/v5bntgmp/tct-toolkit__one-pager_final_508_updated.pdf"
 PRINTED_CARDS = 3  # on paper only the worst 3 near-misses, so the letter's own sheet comes soon
@@ -890,13 +892,18 @@ def disclosure(plan, signoff=None):
     is an AI draft until a named person approves it, and Meta's AUP forbids passing outputs off as human-written.
     signoff.json fills in the blank only while its sha256 is still the letter's."""
     source = "the measurements in this pack" + (" and the principal's notes" if plan.get("notes") else "")
-    signed = bool(signoff) and signoff["letter_sha256"] == sha256(plan["letter"])
+    signed = is_signed(plan, signoff)
     by = (f"{signoff['approved_by']}, {signoff['school']}, {signoff['date']} ({edits(plan)})" if signed
           else "____ (name, role, date)")
     stale = (f'<p class="note bad">Changed after sign-off by {html.escape(signoff["approved_by"])} on '
              f'{html.escape(signoff["date"])}, not signed.</p>' if signoff and not signed else "")
     return (f'{stale}<p class="disclosure">Drafted by {html.escape(plan.get("writer") or "an AI model")} from {source}. '
             f"Read and approved by: {html.escape(by)}.</p>")
+
+
+def is_signed(plan, signoff):
+    """signoff.json (read_signoff) approves this plan's letter: its letter_sha256 is still the letter's."""
+    return bool(plan and signoff) and signoff["letter_sha256"] == sha256(plan["letter"])
 
 
 def edits(plan):
@@ -1070,9 +1077,14 @@ def new_plan(out_dir, prompt, measured, key, photo, revise=None, notes=""):
 
 
 def write_plan(out_dir, plan):
-    """plan.json, the paid-for letter, and beside it when an open-weights server wrote it, PROVENANCE: the model id,
-    host, request id, usage, wall seconds and the letter's sha256 (never the key)."""
-    (out_dir / "plan.json").write_text(json.dumps(plan, indent=1, ensure_ascii=False))
+    """plan.json, the paid-for letter, after copying the letter it held to plan-<first 8 of its sha256>.json, so no
+    paid-for or signed letter is ever lost (signoff.json's letter_sha256 names its file); pack and the case agent both
+    write through here. Beside it, when an open-weights server wrote it, PROVENANCE: the model id, host, request id,
+    usage, wall seconds and the letter's sha256 (never the key)."""
+    path, old = out_dir / "plan.json", read_json(out_dir / "plan.json")
+    if isinstance(old, dict) and isinstance(old.get("letter"), str):
+        shutil.copyfile(path, out_dir / PLAN_BACKUP.format(sha8=sha256(old["letter"])[:8]))
+    path.write_text(json.dumps(plan, indent=1, ensure_ascii=False))
     if LETTER_URL and "wall_s" in plan:
         record = {"model": LETTER_MODEL, "host": openweights.host(LETTER_URL), **{k: plan.get(k) for k in RUN_KEYS},
                   "tries": plan.get("tries"), "letter_sha256": sha256(plan["letter"])}
@@ -1096,6 +1108,22 @@ def read_signoff(out_dir):
     return None
 
 
+def kept_letter(out_dir, signoff, untrusted, new_letter):
+    """Why a run that cannot reuse plan.json (saved_plan found none) must stop, or "": out_dir is agent.py's case,
+    whose letter only agent.py signs, or plan.json holds the letter signoff.json signed and --new-letter was not given.
+    A signed letter may already be filed, so it is never swapped silently."""
+    if (out_dir / "case" / "progress.json").exists():
+        return "this folder is agent.py's case: sign with agent.py --approve"
+    old = read_json(out_dir / "plan.json")
+    if new_letter or not (isinstance(old, dict) and isinstance(old.get("letter"), str) and is_signed(old, signoff)):
+        return ""
+    why = (untrusted.rstrip(".") if untrusted else f"another writer ({old.get('writer')}, now {WRITER})"
+           if old.get("writer") != WRITER else "other measurements")
+    return (f"plan.json holds the letter {signoff['approved_by']} signed on {signoff['date']}, and this run cannot "
+            f"reuse it: {why}. Nothing was written; add --new-letter to replace it (the signed letter is kept as "
+            f"{PLAN_BACKUP.format(sha8=signoff['letter_sha256'][:8])}).")
+
+
 def parse_args():
     """The command line, the notes' text and (approved_by, school), refusing flags that cannot go together."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -1108,8 +1136,11 @@ def parse_args():
     parser.add_argument("--approved-by", default="", metavar="NAME",
                         help='who read and approved plan.json\'s letter, e.g. "A. Rao, Principal" (with --school)')
     parser.add_argument("--school", default="", help="the school that sends the letter")
+    parser.add_argument("--new-letter", action="store_true", help="replace a signed letter this run cannot reuse "
+                        f"(other measurements, another writer or a pace warning); the signed one is kept as "
+                        f"{PLAN_BACKUP.format(sha8='<sha>')}")
     args = parser.parse_args()
-    if args.verify and (args.out_dir or args.notes or args.approved_by or args.school):
+    if args.verify and (args.out_dir or args.notes or args.approved_by or args.school or args.new_letter):
         parser.error("--verify FOLDER goes alone")
     if not args.verify and not (args.out_dir and args.site):
         parser.error("give out_dir and site (or --verify FOLDER)")
@@ -1159,6 +1190,9 @@ def main():
     saved = None if untrusted else saved_plan(out_dir, prompt)
     if untrusted:
         print(f"no letter or fix picture: {untrusted}", file=sys.stderr)
+    signoff = read_signoff(out_dir)
+    if not saved and (stop := kept_letter(out_dir, signoff, untrusted, args.new_letter)):
+        sys.exit(f"pack.py: {stop}")  # before any paid call and before index.html is written
     if (notes or all(signer)) and not saved:
         sys.exit("pack.py: --notes and --approved-by work on plan.json's letter from these same measurements, and "
                  "there is none: run pack.py without them first, and have that letter read")
@@ -1187,7 +1221,7 @@ def main():
                 http.client.HTTPException, subprocess.CalledProcessError) as err:
             print(f"letter or fix image failed, the page shows plan.json's letter if any, else the measurements only: "
                   f"{err}", file=sys.stderr)
-    signoff = sign(out_dir, plan, *signer) if plan and all(signer) else read_signoff(out_dir)
+    signoff = sign(out_dir, plan, *signer) if plan and all(signer) else signoff
     page_html = page(site, events, seen, plan, images, data["fps"], data.get("cost"), data.get("sam_full_requests"),
                      data.get("privacy"), signoff=signoff, receipt=receipt_line(data, plan, images),
                      source_sha256=data.get("source_sha256"), timeline=data.get("timeline"), ground=ground,

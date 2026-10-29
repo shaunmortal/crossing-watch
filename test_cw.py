@@ -2860,6 +2860,61 @@ def test_too_few_walking_pieces_are_not_judged():
     standing = {"1/0": {f: (0.0, 0.0) for f in range(100)}}  # a piece that never crossed is not a walker
     assert pace.walking(standing, 10) == {"median_mps": None, "pieces": 0, "flag": None}
 
+
+def stopped(call):
+    """The message of the SystemExit `call` raises, or None."""
+    try:
+        call()
+    except SystemExit as stop:
+        return str(stop)
+    return None
+
+
+def test_a_signed_letter_is_never_replaced_by_a_rerun_from_other_measurements():
+    """Signed, then a fact or the writer changes: the re-run asks no model, writes nothing and exits; --new-letter
+    pays for a new letter and keeps the signed one as plan-<sha8>.json, and the page says it is not signed."""
+    import hashlib, tempfile
+    draft = {"fix": "speed table", "why": "w", "image_prompt": "i", "writer": pack.WRITER, "letter": "Signed text."}
+    new = lambda prompt: {**draft, "letter": "New."}
+    with tempfile.TemporaryDirectory() as folder:
+        out = pack_folder(folder)
+        run_pack(out, ask=lambda prompt: draft)
+        run_pack(out, "--approved-by", "A. Rao, Principal", "--school", "Gate School")
+        page, plan = (out / "index.html").read_text(), (out / "plan.json").read_text()
+        data = json.loads((out / "events.json").read_text())
+        (out / "events.json").write_text(json.dumps({**data, "exposure": {"minutes": 0.31}}))
+        calls = []
+        message = stopped(lambda: calls.extend(run_pack(out, ask=new, key="key")))
+        assert "A. Rao, Principal signed on" in message and "other measurements" in message and calls == []
+        assert (out / "plan.json").read_text() == plan and (out / "index.html").read_text() == page
+        (out / "events.json").write_text(json.dumps(data))  # the same measurements, another writer
+        old, pack.WRITER = pack.WRITER, "Muse Spark Open (open weights)"
+        try:
+            assert "another writer" in stopped(lambda: calls.extend(run_pack(out, ask=new, key="key")))
+        finally:
+            pack.WRITER = old
+        assert calls == [] and (out / "index.html").read_text() == page
+        (out / "events.json").write_text(json.dumps({**data, "exposure": {"minutes": 0.31}}))
+        assert len(run_pack(out, "--new-letter", ask=new, key="key")) == 1
+        sha8 = hashlib.sha256(b"Signed text.").hexdigest()[:8]
+        assert json.loads((out / f"plan-{sha8}.json").read_text())["letter"] == "Signed text."
+        assert json.loads((out / "plan.json").read_text())["letter"] == "New."
+        assert "not signed." in (out / "index.html").read_text()
+        assert not any(f.name.startswith("plan") for f in (out / "share").iterdir())  # never published
+
+
+def test_pack_never_overwrites_the_case_agents_letter_or_page():
+    """agent.py's case folder: its letter comes from another prompt, so a pack.py run there would pay for a new one
+    and overwrite plan.json and index.html. It stops first and says to sign with agent.py --approve."""
+    import tempfile
+    with tempfile.TemporaryDirectory() as folder:
+        out = pack_folder(folder)
+        (out / "case").mkdir()
+        (out / "case" / "progress.json").write_text("{}")
+        calls = []
+        assert "agent.py --approve" in stopped(lambda: calls.extend(run_pack(out, ask=lambda p: 1 / 0, key="key")))
+        assert calls == [] and not (out / "index.html").exists() and not (out / "plan.json").exists()
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):
