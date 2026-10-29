@@ -2908,6 +2908,34 @@ def test_case_agent_tracks_from_the_sam_cache_only():
     assert calls[0][-2:] == ["--budget", "0"] and calls[0][1].endswith("analyze.py")
 
 
+def test_case_agent_never_replaces_a_signed_letter_silently():
+    """A folder where pack.py signed a letter: a new case there stops before any model call or write, since its
+    tracking rewrites events.json and its letter plan.json. A letter the case replaces itself (one the head sent
+    back) is kept as plan-<sha8>.json, as pack's are."""
+    import agent, contextlib, hashlib, io, tempfile
+    bodies, old = [], (agent.spark_turn, pack.ask_plan)
+    agent.spark_turn = scripted_spark([], bodies)
+    pack.ask_plan = lambda prompt, measured, key, photo: {"fix": "f", "letter": "Revised.", "writer": "Muse Spark"}
+    plan = {"fix": "f", "letter": "Signed text.", "writer": "Muse Spark"}
+    try:
+        with tempfile.TemporaryDirectory() as folder, contextlib.redirect_stdout(io.StringIO()):
+            out, site, _ = agent_case(folder)
+            (out / "plan.json").write_text(json.dumps(plan))
+            pack.sign(out, plan, "A. Rao, Principal", "Gate School")
+            message = stopped(lambda: agent.work(out / "video.mp4", out / "site.json", out, "key"))
+            untouched = not (out / "case").exists() and json.loads((out / "plan.json").read_text()) == plan
+            (out / "signoff.json").unlink()  # unsigned: the case's own draft, revised after the head's notes
+            p = {"out": str(out), "site": str(out / "site.json"), "tape_m": 7.2, "refusals": 0, "letter": plan,
+                 "tracked_with": agent.calibration(site)}
+            agent.submit_letter(p, {"notes": ""}, "key")
+            kept = json.loads((out / f"plan-{hashlib.sha256(b'Signed text.').hexdigest()[:8]}.json").read_text())
+            now = json.loads((out / "plan.json").read_text())
+    finally:
+        agent.spark_turn, pack.ask_plan = old
+    assert "A. Rao, Principal signed" in message and "--out" in message and bodies == [] and untouched
+    assert kept == plan and now["letter"] == "Revised."
+
+
 def test_guesses_keep_5_to_150_kmh_and_the_chart_draws_the_measured_speed_in_red():
     import contextlib, guess, io, sys, tempfile
     from pathlib import Path

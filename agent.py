@@ -436,10 +436,15 @@ def person_step(p, key, answer=None, approve=None, notes=None):
 
 
 def work(video, site, out_dir, key, answer=None, approve=None, notes=None):
-    """Start or resume the case in out_dir/case; returns its status."""
+    """Start or resume the case in out_dir/case; returns its status. A new case never starts where pack.py signed a
+    letter: its tracking rewrites events.json and its letter plan.json, and the signed letter may already be filed."""
     case_dir = Path(out_dir) / "case"
-    case_dir.mkdir(parents=True, exist_ok=True)
     saved = case_dir / "progress.json"
+    signed = None if saved.exists() else pack.read_signoff(Path(out_dir))
+    if signed:
+        raise SystemExit(f"{out_dir} holds the letter {signed['approved_by']} signed on {signed['date']} with pack.py; "
+                         "pass a new --out folder")
+    case_dir.mkdir(parents=True, exist_ok=True)
     p = json.loads(saved.read_text()) if saved.exists() else {
         "video": str(Path(video).resolve()), "site": str(Path(site).resolve()), "out": str(out_dir), "status": "new",
         "turn": 0, "usd": 0.0, "messages": [], "requests": [], "tape_m": None, "refusals": 0, "letter": None}
