@@ -10,6 +10,8 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 | G4 Own footage | Footage filmed from height at our college gate runs end to end, with calibration from measured points | our video | Sun 1 Nov 22:00 |
 | G5 Blind check | A transport or civil engineering lecturer, not told which clips the pipeline flagged, agrees with it on danger vs none with Cohen's kappa of 0.6 or more (rules below, written before any gate-pack clip is made) | the gate pack | Tue 3 Nov 22:00 |
 | G6 Speed | Against vehicles hand-timed between two lines taped 15 m apart, at least 80% of matched vehicles read within ±15% or ±2 km/h (whichever is larger), and the median error is within ±10%; at least 20 matched vehicles, or G6 is "not tested". Added Thu 29 Oct, before the taped lines are filmed; details below | our video, with the lines taped | Sun 1 Nov 22:00 |
+| G7 After the fix | A film of the same dismissal after the fix shows a drop only if a one-sided Fisher exact test at 5% finds both fewer crossings with a moving vehicle through the same spot within 3 s and fewer distinct such vehicles. Added Thu 29 Oct, before the rehearsal or the main recording is filmed; details below | our video, then a film after the fix | the mark Mon 2 Nov night; the verdict only once a fix is built and filmed |
+| G8 Second operator | Someone who has never seen the code clicks the calibration on our frame: both site files put the two speed lines within ±5% of 15 m and of each other, and give the same G6 verdict with median errors within 5 points. Added Thu 29 Oct, before the rehearsal or the main recording is filmed; details below | our video, with the lines taped | Tue 3 Nov 22:00 |
 
 **Scope cut if G3 fails:** report the closest approach in metres plus vehicle speed (no PET). The evidence pack and letter still ship.
 
@@ -437,8 +439,78 @@ code (no API calls: SAM and Spark were stubbed to fail on a cache miss).
   ones), so a crossing where most people run could be flagged.
 - 137 self-checks pass.
 
+## Window rule, pre-registered (Thu 29 Oct 2026, before the rehearsal or the main recording is filmed)
+
+Which seconds of a gate recording are analysed (the site file's `window_s`) is fixed by this rule, so the window
+cannot be picked after seeing the near-misses. It holds for Saturday's rehearsal and Monday's recording alike.
+
+- **The bell, B.** The second of the recording at which the dismissal bell is heard on it. If it cannot be heard: the
+  bell's clock time noted on the day (else the bell time spoken at the start of the recording), minus the
+  recording's start (`creation_time` from ffprobe, in UTC: add 5 h 30 min for IST).
+- **The window.** `window_s` is [S, S + 900], with S = B - 120: 15 minutes from 2 minutes before the bell. If the
+  recording started less than 2 minutes before the bell, S is 0.
+- **Shorter only when** the recording ends before S + 900, or the camera moved inside the window (`filmcheck.py`, or
+  by eye): the window then ends at the last whole second before the end or the move. A move before S leaves no
+  window, and that recording is not analysed. A window under 900 s is analysed as it is; the page then gives no
+  hourly rates, PV² or school-year line.
+- **Never changed** after anything made from that recording's analysis (events, the page, a clip) has been seen, and
+  never for cost: the free estimate (`--budget 0`) chooses the modes, never the window.
+- With FILMING.md's hand-cut fallback, the cut starts at S and lasts the window's length, and both SHA-256s are noted.
+- B, how B was found, S and the end are written in this file with the run's result.
+
+## G7 After-fix pass mark, pre-registered (Thu 29 Oct 2026, before the rehearsal or the main recording is filmed)
+
+How anyone would know a fix worked. This rule is fixed now. The mark itself is worked out from Monday's counts on
+Mon 2 Nov at night and written here before any fix exists. No film after a fix can exist before submission, so G7
+has no verdict before then, and the page never shows an "after" result.
+
+- **Counts, from a pack's events.json.** n: the people who crossed, each once (the page's one number). k: those of
+  them with a moving vehicle through the same spot within 3 s. V: the distinct vehicles among the first such vehicle
+  for each of the k people. People cross in groups and one vehicle can pass several of them (on DUT's ground truth,
+  run at $0 on 29 Oct: 44 people within 1.5 s of a vehicle, from only 11 vehicles), so a drop must show in V too.
+- **Test.** A one-sided Fisher exact test, before against after: the chance, if nothing changed and with both films'
+  totals fixed, that the after-film's count is as low as it is or lower. "Drop shown" means p ≤ 0.05 for k (the
+  after-film's k of its n against Monday's k of n) and p ≤ 0.05 for V (its V of its n against Monday's V of n).
+  Both must pass. p ≤ 0.05 is the one comparator, everywhere.
+- **3 s is the deciding tier; 1.5 s is printed beside it.** With 4 or fewer people within 1.5 s on Monday, no
+  after-film of the same length could show a drop at 5%. On SinD's two 10-minute halves (nothing changed between
+  them; run at $0 on 29 Oct), the 3 s test would show a halved share with 74% chance against 39% for 1.5 s, and
+  neither half shows a drop against the other (p 0.55-0.64).
+- **The mark, written here on Mon 2 Nov night:** the largest after-film k and V that pass for an after-film of n
+  crossings; the chance of passing if the true share halved, with one and with two after-films; and when no count
+  can pass, the fewest same-length films after the fix that would give a mark. Then never changed.
+- **The after-film.** The same spot, stand, tape marks and calibration (the same `world_points`), the same minutes by
+  the window rule above, the same site settings (modes, vehicles, `person_grid`). G7 is not tested if either film
+  is flagged by the walking-pace guard, has no crossers list, or was calibrated differently.
+- **Reading it.** A drop shown is a drop between two dismissals at that crossing, not proof that the fix caused it:
+  traffic differs from day to day. No drop shown does not show the fix failed; one after-film can be too short to
+  show a real drop. A "no drop shown" goes in the README, never in the video or the X post.
+
+## G8 Second operator, pre-registered (Thu 29 Oct 2026, before the rehearsal or the main recording is filmed)
+
+After SAM, the calibration clicks are the main human judgement left. G8 asks whether someone who has never seen the
+code gets our numbers from the same frame and the same tape.
+
+- **Scope.** The clicks only, on our tape marks and our calibration frame. Not the taping, the measuring or where the
+  camera stands. G8 does not show that any school can run Crossing Watch.
+- **Site B.** A classmate who has never seen the code gets only `calibrate.html`, our calibration frame and the
+  taped rectangle's lengths, on our laptop (the raw video stays with us), and clicks the four rectangle corners.
+  Site A's `trap` (its four image points and distance) is copied into site B, so both runs measure the same tape
+  marks. G8 is not run if site B's `world_points`, `frame_size` or `marked_on` differ from site A's, and site B's
+  corners are checked by eye to be in site A's order (a different first corner turns the road frame).
+- **Run, at $0 from the same cached SAM replies:** `python3 validate_gate.py SITE_A.json OUT TRAP.csv`, then the same
+  with `SITE_B.json`.
+- **Pass:** (a) each run puts the speed lines within ±5% of 15 m (its line "the calibration puts the lines X m
+  apart"), and the two runs within ±5% of each other; and (b) G6 gives the same verdict (pass, fail or not tested)
+  under both site files, with its two median signed errors within 5 percentage points. When G6 is not tested it
+  prints no median, and (b) is the verdict alone. **Fail:** anything else. **Not tested:** no `TRAP.csv` or no site B.
+- **No bar on the headline count:** a bar on k would either fail on calibration noise or pass by design.
+- **When:** after G6's log and Monday's run, so Monday night or Tuesday. A fail is reported here and in the README as
+  it is. In the video only a pass, as a caption next to G6's result.
+
 ## Log
 
-- Edited Thu 29 Oct 2026, before any footage of our gate: wording and references only; no number, date or
-  condition changed. Reviews are named as AI-assisted code reviews (their defect counts kept, the reviewer
-  head-counts dropped), internal rank numbers and file names are gone, and "the last section" links name their section.
+- Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
+  number, date or condition changed. Reviews are named as AI-assisted code reviews (their defect counts kept, the
+  reviewer head-counts dropped), internal rank numbers and file names are gone, and "the last section" links name
+  their section.
