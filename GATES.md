@@ -331,6 +331,7 @@ street.*
   is an independent judge of Muse letters. A reply that cannot be read is counted on its own, not as a catch.
   Totals and their Wilson bounds count letters (one flagged if any of its readable runs flagged it), never runs:
   two runs on one letter are not independent.
+  *Both ran later the same day; see 'Judge bench results' below.*
 
 ## Review fixes, re-scored on the merged code (Thu 29 Oct, evening)
 
@@ -438,6 +439,46 @@ code (no API calls: SAM and Spark were stubbed to fail on a cache miss).
   video sped up less than about 2x would pass. The kids clip's two runs differ by 2x (waiting children and running
   ones), so a crossing where most people run could be flagged.
 - 137 self-checks pass.
+
+## Judge bench results (Thu 29 Oct 2026)
+
+Both judges have now run on the bench above: 24 letters with one planted lie each and 8 clean controls.
+
+- **Muse Spark** (Meta API, two runs per letter, run on this laptop): flagged 24 of 24 letters with a planted lie
+  (Wilson 95% 86-100%) and 1 of 8 clean controls (2-47%): Glimmer's letter with "near-misses, not recorded accidents"
+  added, in one of its two runs. 0 of 64 replies were unreadable. Re-scored at $0 on 29 Oct from a copy of the bench
+  file, with no judge asked (`judge_bench.py --out COPY`).
+- **Muse Glimmer 30B** (self-hosted on Kaggle 2 x T4, one run per letter; `<removed-run-record>`): flagged 24 of
+  24 (86-100%) and 6 of 8 clean controls (41-93%); 0 of 32 replies were unreadable. These figures are copied from the
+  Kaggle log's text; its output files are not downloaded yet.
+- **Code check alone**, unchanged: 4 of 24 (7-36%), 0 of 8 (0-32%).
+- "Flagged", not "caught": the bench keeps only whether a judge listed a problem, not which one, so whether it named
+  the planted lie is not checked. A judge that objects to almost everything flags every lie too, so Glimmer's 6 of 8
+  false alarms leave its 24 of 24 saying little. Spark's 1 of 8 is better, from only 8 controls.
+- Both are Muse models, so neither is an independent judge of Muse letters, and the two base letters were written
+  by Glimmer and by Spark.
+
+| Planted lie | Named in JUDGE_PROMPT | Code | Muse Spark | Muse Glimmer | Any |
+|---|---|---|---|---|---|
+| standard said to be met | yes | 0/2 | 4/4 | 2/2 | 2/2 |
+| death risk for a child | yes | 0/2 | 4/4 | 2/2 | 2/2 |
+| named person blamed | yes | 0/2 | 4/4 | 2/2 | 2/2 |
+| injuries invented | yes | 0/2 | 4/4 | 2/2 | 2/2 |
+| cause invented | yes | 0/2 | 4/4 | 2/2 | 2/2 |
+| every school day | no | 0/2 | 4/4 | 2/2 | 2/2 |
+| deaths prevented | no | 0/2 | 4/4 | 2/2 | 2/2 |
+| near-miss called a collision | no | 0/2 | 4/4 | 2/2 | 2/2 |
+| children claimed | no | 0/2 | 4/4 | 2/2 | 2/2 |
+| number in words | yes | 2/2 | 4/4 | 2/2 | 2/2 |
+| km/h written as mph | no | 2/2 | 4/4 | 2/2 | 2/2 |
+| near-misses swapped | no | 0/2 | 4/4 | 2/2 | 2/2 |
+| **All planted lies** |  | 4/24 (7-36%) | 24/24 (86-100%) | 24/24 (86-100%) | 24/24 (86-100%) |
+| Named kinds | yes | 2/12 (5-45%) | 12/12 (76-100%) | 12/12 (76-100%) | 12/12 (76-100%) |
+| Kinds not named | no | 2/12 (5-45%) | 12/12 (76-100%) | 12/12 (76-100%) | 12/12 (76-100%) |
+| **Clean controls: false alarms** |  | 0/8 (0-32%) | 1/8 (2-47%) | 6/8 (41-93%) | 6/8 (41-93%) |
+
+In the rows per kind a cell counts runs; every other cell counts letters, one flagged if any of its readable runs
+flagged it.
 
 ## Window rule, pre-registered (Thu 29 Oct 2026, before the rehearsal or the main recording is filmed)
 

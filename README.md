@@ -124,16 +124,24 @@ says when it filled (on the Indian time-lapse: "person: 16 objects taken within 
 Set `LETTER_MODEL_URL` to any OpenAI-compatible server and the fix and letter come from that model instead of Muse
 Spark, with the same number check. `<removed-run-record>` runs Meta's official 4-bit **Muse Glimmer 30B**
 (`meta-models/Muse-Glimmer-30B-GGUF`, Apache 2.0) with llama.cpp on Kaggle's free 2 x T4 and writes the evidence
-page; when the pack has a blurred street photo, Glimmer is shown it too. One run has a record so far,
-[`<removed-run-record>`](<removed-run-record>): on the synthetic sample, which has no person tracks and so no
-photo, Glimmer's part took 592 s; it proposed a raised zebra crossing and wrote a letter whose every number passed the
-code check. No Glimmer run has been sent a street photo yet. The letter was correct but stiff, so Muse Spark stays the
-default writer. Version 1 ran with llama-server's default sampling and the template's default "high" reasoning. The
-notebook now pins llama.cpp `b11976` and the Hugging Face revision, checks both files against their published sha256,
-runs one 32,768-token slot with medium reasoning and the model card's sampling, stops with a clear error if Glimmer
-runs out of context, and writes `<removed-run-record>` (llama.cpp build, GPUs, timings, the letter's sha256, the git
-commit and pack.py's sha256). The page then says "Muse Glimmer 30B wrote this in N s on Kaggle 2 x T4", with N from
-the server's own timings. The Kaggle notebook was run by the author.
+page; when the pack has a blurred street photo, Glimmer is shown it too. The notebook pins llama.cpp `b11976` and
+the Hugging Face revision, checks both files against their published sha256 before use, runs one 32,768-token slot
+with medium reasoning and the model card's sampling, stops with a clear error if Glimmer runs out of context, and
+writes `<removed-run-record>` (llama.cpp build, GPUs, timings, the letter's sha256, the git commit and pack.py's
+sha256). The page then says "Muse Glimmer 30B wrote this in N s on Kaggle 2 x T4", with N from the server's own
+timings. Two runs have a record, both on the synthetic sample, which has no person tracks and so no photo:
+- [`<removed-run-record>`](<removed-run-record>), with llama-server's default sampling and the template's
+  default "high" reasoning: Glimmer's part took 592 s; it proposed a raised zebra crossing and wrote a letter whose
+  every number passed the code check. The letter was correct but stiff.
+- [`<removed-run-record>`](<removed-run-record>), 29 Oct, the notebook as it is now at commit 3ed3c6e: both
+  sha256 checks passed and pack.py took 313 s. Glimmer needed two tries (the log does not say why the first went
+  back); the letter kept, 2,263 tokens at 13.6 tokens a second, proposes a raised zebra crossing with entry deflection
+  and passed the code check. No judge read it: the run had no Meta key. The same run then judged the planted-lies
+  bench (below): every lie flagged, but also 6 of 8 clean letters. The output files, `<removed-run-record>`
+  among them, are not downloaded yet; the record is copied from the run's log.
+
+No Glimmer run has been sent a street photo yet, and Muse Spark stays the default writer.
+The Kaggle notebook was run by the author.
 The open-weights model is sent a JSON schema that gives the plan's shape only. A number lock is opt-in:
 `LETTER_MODEL_NUMBER_LOCK=1` also holds every string to a pattern that allows digits only as the measured numbers.
 On Fireworks (29 Oct) that pattern trapped Muse Spark Open in "a0a0a0…" in every field. The text held no unmeasured
@@ -143,7 +151,8 @@ check and the reviewer still run after that, and the run record counts the model
 `LETTER_MODEL_KEY` adds a Bearer token for a server that needs one, and the letter says "self-hosted" only when the
 server runs on the same machine.
 `JUDGE_MODEL_URL` makes the open-weights model a judge too: it reviews the letter beside Muse Spark, or alone without a
-Meta key, and the page names only the judges that ran. No Glimmer judge run has been made yet.
+Meta key, and the page names only the judges that ran. As a judge on the planted-lies bench, Glimmer objected to
+6 of 8 clean letters (below).
 `sample/` is a synthetic example (made-up tracks, no video) for trying the letter step anywhere.
 
 ```
@@ -225,10 +234,21 @@ python3 agent.py VIDEO site.json --approve            # or --reject --notes "...
 a Muse Spark letter from our cache, and scores each letter check on them: 24 copies with 12 kinds of lie, half of
 them kinds the judge's prompt does not name (a near-miss called a collision, "every school day", two near-misses'
 speeds swapped...), and 8 clean controls. The 18 added sentences have no digit, and the 2 swaps use only measured
-numbers. Run offline today, the code check caught 4 of 24 (the numbers in words and the speeds in mph; Wilson 95%
-7-36%) and flagged 0 of 8 controls (0-32%): the rest is the judge's job. Muse Spark and Muse Glimmer as judges are
-not run yet; both are Muse models, so neither is an independent judge of Muse letters. A judge reply that cannot be
-read is counted on its own, never as a catch. Details in [`GATES.md`](GATES.md).
+numbers. Results on 29 Oct (Wilson 95% ranges; the full table is in [`GATES.md`](GATES.md)):
+
+| Letter check | Letters with a planted lie flagged | Clean letters flagged |
+|---|---|---|
+| Code alone, offline | 4 of 24 (7-36%): the numbers in words and the speeds in mph | 0 of 8 (0-32%) |
+| Muse Spark as judge, two runs a letter | 24 of 24 (86-100%) | 1 of 8 (2-47%) |
+| Muse Glimmer 30B as judge, one run a letter on Kaggle | 24 of 24 (86-100%) | 6 of 8 (41-93%) |
+
+Muse Spark flagged every planted lie, the six kinds its prompt never names too, and objected to one clean letter of
+eight. Glimmer also flagged every lie but objected to six clean letters of eight: as a judge it objects to nearly
+everything, so its 24 of 24 shows little, and Muse Spark stays the default judge. "Flagged" means the judge listed a
+problem; whether it named the planted one is not checked. Both are Muse models, so neither is an independent judge of
+Muse letters, and 8 controls are few. No reply was unreadable (0 of 64 from Spark, 0 of 32 from Glimmer); one that
+cannot be read is counted on its own, never as a catch. Glimmer's figures are from the Kaggle log
+([`<removed-run-record>`](<removed-run-record>)); its output files are not downloaded yet.
 
 ```
 python3 judge_bench.py --out out/judge-bench.json             # build the letters, score the code check
