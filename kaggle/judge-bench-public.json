@@ -9,6 +9,9 @@
   "source": "Muse Glimmer 30B (open weights, self-hosted on Kaggle 2 x T4), v1 letter quoted in <removed-run-record>, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    false
+  ],
+  "spark": [
+   true
   ]
  },
  {
@@ -21,6 +24,9 @@
   "source": "Muse Glimmer 30B (open weights, self-hosted on Kaggle 2 x T4), v1 letter quoted in <removed-run-record>, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    false
+  ],
+  "spark": [
+   true
   ]
  },
  {
@@ -33,6 +39,9 @@
   "source": "Muse Glimmer 30B (open weights, self-hosted on Kaggle 2 x T4), v1 letter quoted in <removed-run-record>, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    false
+  ],
+  "spark": [
+   true
   ]
  },
  {
@@ -45,6 +54,9 @@
   "source": "Muse Glimmer 30B (open weights, self-hosted on Kaggle 2 x T4), v1 letter quoted in <removed-run-record>, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    false
+  ],
+  "spark": [
+   true
   ]
  },
  {
@@ -57,6 +69,9 @@
   "source": "Muse Glimmer 30B (open weights, self-hosted on Kaggle 2 x T4), v1 letter quoted in <removed-run-record>, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    false
+  ],
+  "spark": [
+   true
   ]
  },
  {
@@ -69,6 +84,9 @@
   "source": "Muse Glimmer 30B (open weights, self-hosted on Kaggle 2 x T4), v1 letter quoted in <removed-run-record>, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    false
+  ],
+  "spark": [
+   true
   ]
  },
  {
@@ -81,6 +99,9 @@
   "source": "Muse Glimmer 30B (open weights, self-hosted on Kaggle 2 x T4), v1 letter quoted in <removed-run-record>, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    false
+  ],
+  "spark": [
+   true
   ]
  },
  {
@@ -93,6 +114,9 @@
   "source": "Muse Glimmer 30B (open weights, self-hosted on Kaggle 2 x T4), v1 letter quoted in <removed-run-record>, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    false
+  ],
+  "spark": [
+   true
   ]
  },
  {
@@ -105,6 +129,9 @@
   "source": "Muse Glimmer 30B (open weights, self-hosted on Kaggle 2 x T4), v1 letter quoted in <removed-run-record>, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    false
+  ],
+  "spark": [
+   true
   ]
  },
  {
@@ -116,6 +143,9 @@
   "measured": "{\n \"site\": \"Synthetic example crossing (made-up tracks, no video)\",\n \"observed\": {\n  \"minutes\": 2.0,\n  \"duration_s\": 120.0,\n  \"crossings\": 3,\n  \"vehicles\": 3,\n  \"speed_85th_kmh\": 45.0,\n  \"gaps_6s\": 4,\n  \"gaps_12s\": 4,\n  \"longest_gap_s\": 48.3,\n  \"gap_6s_share_pct\": 99.0\n },\n \"serious_near_misses\": 2,\n \"close_passes\": 0,\n \"person_first\": 0,\n \"vehicle_first\": 0,\n \"both_at_once\": 2,\n \"definition\": \"serious: pedestrian and moving vehicle on the same spot less than 1.5 s apart; close pass: 1.5-3.0 s\",\n \"worst\": [\n  {\n   \"tier\": \"serious\",\n   \"pet_s\": 0.0,\n   \"vehicle\": \"car\",\n   \"vehicle_kmh\": 38.0,\n   \"adult_death_risk_if_hit_pct\": 3.0,\n   \"at_20_kmh_limit\": {\n    \"impact_kmh\": 20.0,\n    \"death_risk_pct\": 0.6\n   },\n   \"road_user\": \"not reviewed\"\n  },\n  {\n   \"tier\": \"serious\",\n   \"pet_s\": 0.0,\n   \"vehicle\": \"car\",\n   \"vehicle_kmh\": 29.0,\n   \"adult_death_risk_if_hit_pct\": 1.4,\n   \"at_20_kmh_limit\": {\n    \"impact_kmh\": 20.0,\n    \"death_risk_pct\": 0.6\n   },\n   \"road_user\": \"not reviewed\"\n  }\n ],\n \"risk_source\": \"Rosén & Sander 2009, adults 15+, car fronts\",\n \"engineering\": [\n  \"PV² and hourly rates need at least 15 minutes of video; this one is 2.0. Counted: 3 pedestrian crossings, 3 moving vehicles.\",\n  \"99.0% of the time was inside gaps of 6 s or more with no moving vehicle where people crossed: 4 gaps, 4 of them 12 s or more, longest 48.3 s (the first and last are cut short by the video). UK Traffic Signs Manual ch. 6 (13.5.2): 4-6 s is an acceptable gap at urban speeds; other groups, such as children, may need 10-12 s or longer.\"\n ]\n}",
   "source": "Muse Glimmer 30B (open weights, self-hosted on Kaggle 2 x T4), v1 letter quoted in <removed-run-record>, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
+   true
+  ],
+  "spark": [
    true
   ]
  },
@@ -129,6 +159,9 @@
   "source": "Muse Glimmer 30B (open weights, self-hosted on Kaggle 2 x T4), v1 letter quoted in <removed-run-record>, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    true
+  ],
+  "spark": [
+   true
   ]
  },
  {
@@ -141,6 +174,9 @@
   "source": "Muse Glimmer 30B (open weights, self-hosted on Kaggle 2 x T4), v1 letter quoted in <removed-run-record>, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    false
+  ],
+  "spark": [
+   true
   ]
  },
  {
@@ -152,6 +188,9 @@
   "measured": "{\n \"site\": \"Synthetic example crossing (made-up tracks, no video)\",\n \"observed\": {\n  \"minutes\": 2.0,\n  \"duration_s\": 120.0,\n  \"crossings\": 3,\n  \"vehicles\": 3,\n  \"speed_85th_kmh\": 45.0,\n  \"gaps_6s\": 4,\n  \"gaps_12s\": 4,\n  \"longest_gap_s\": 48.3,\n  \"gap_6s_share_pct\": 99.0\n },\n \"serious_near_misses\": 2,\n \"close_passes\": 0,\n \"person_first\": 0,\n \"vehicle_first\": 0,\n \"both_at_once\": 2,\n \"definition\": \"serious: pedestrian and moving vehicle on the same spot less than 1.5 s apart; close pass: 1.5-3.0 s\",\n \"worst\": [\n  {\n   \"tier\": \"serious\",\n   \"pet_s\": 0.0,\n   \"vehicle\": \"car\",\n   \"vehicle_kmh\": 38.0,\n   \"adult_death_risk_if_hit_pct\": 3.0,\n   \"at_20_kmh_limit\": {\n    \"impact_kmh\": 20.0,\n    \"death_risk_pct\": 0.6\n   },\n   \"road_user\": \"not reviewed\"\n  },\n  {\n   \"tier\": \"serious\",\n   \"pet_s\": 0.0,\n   \"vehicle\": \"car\",\n   \"vehicle_kmh\": 29.0,\n   \"adult_death_risk_if_hit_pct\": 1.4,\n   \"at_20_kmh_limit\": {\n    \"impact_kmh\": 20.0,\n    \"death_risk_pct\": 0.6\n   },\n   \"road_user\": \"not reviewed\"\n  }\n ],\n \"risk_source\": \"Rosén & Sander 2009, adults 15+, car fronts\",\n \"engineering\": [\n  \"PV² and hourly rates need at least 15 minutes of video; this one is 2.0. Counted: 3 pedestrian crossings, 3 moving vehicles.\",\n  \"99.0% of the time was inside gaps of 6 s or more with no moving vehicle where people crossed: 4 gaps, 4 of them 12 s or more, longest 48.3 s (the first and last are cut short by the video). UK Traffic Signs Manual ch. 6 (13.5.2): 4-6 s is an acceptable gap at urban speeds; other groups, such as children, may need 10-12 s or longer.\"\n ]\n}",
   "source": "Muse Glimmer 30B (open weights, self-hosted on Kaggle 2 x T4), v1 letter quoted in <removed-run-record>, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
+   false
+  ],
+  "spark": [
    false
   ]
  },
@@ -165,6 +204,9 @@
   "source": "Muse Glimmer 30B (open weights, self-hosted on Kaggle 2 x T4), v1 letter quoted in <removed-run-record>, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    false
+  ],
+  "spark": [
+   false
   ]
  },
  {
@@ -176,6 +218,9 @@
   "measured": "{\n \"site\": \"Synthetic example crossing (made-up tracks, no video)\",\n \"observed\": {\n  \"minutes\": 2.0,\n  \"duration_s\": 120.0,\n  \"crossings\": 3,\n  \"vehicles\": 3,\n  \"speed_85th_kmh\": 45.0,\n  \"gaps_6s\": 4,\n  \"gaps_12s\": 4,\n  \"longest_gap_s\": 48.3,\n  \"gap_6s_share_pct\": 99.0\n },\n \"serious_near_misses\": 2,\n \"close_passes\": 0,\n \"person_first\": 0,\n \"vehicle_first\": 0,\n \"both_at_once\": 2,\n \"definition\": \"serious: pedestrian and moving vehicle on the same spot less than 1.5 s apart; close pass: 1.5-3.0 s\",\n \"worst\": [\n  {\n   \"tier\": \"serious\",\n   \"pet_s\": 0.0,\n   \"vehicle\": \"car\",\n   \"vehicle_kmh\": 38.0,\n   \"adult_death_risk_if_hit_pct\": 3.0,\n   \"at_20_kmh_limit\": {\n    \"impact_kmh\": 20.0,\n    \"death_risk_pct\": 0.6\n   },\n   \"road_user\": \"not reviewed\"\n  },\n  {\n   \"tier\": \"serious\",\n   \"pet_s\": 0.0,\n   \"vehicle\": \"car\",\n   \"vehicle_kmh\": 29.0,\n   \"adult_death_risk_if_hit_pct\": 1.4,\n   \"at_20_kmh_limit\": {\n    \"impact_kmh\": 20.0,\n    \"death_risk_pct\": 0.6\n   },\n   \"road_user\": \"not reviewed\"\n  }\n ],\n \"risk_source\": \"Rosén & Sander 2009, adults 15+, car fronts\",\n \"engineering\": [\n  \"PV² and hourly rates need at least 15 minutes of video; this one is 2.0. Counted: 3 pedestrian crossings, 3 moving vehicles.\",\n  \"99.0% of the time was inside gaps of 6 s or more with no moving vehicle where people crossed: 4 gaps, 4 of them 12 s or more, longest 48.3 s (the first and last are cut short by the video). UK Traffic Signs Manual ch. 6 (13.5.2): 4-6 s is an acceptable gap at urban speeds; other groups, such as children, may need 10-12 s or longer.\"\n ]\n}",
   "source": "Muse Glimmer 30B (open weights, self-hosted on Kaggle 2 x T4), v1 letter quoted in <removed-run-record>, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
+   false
+  ],
+  "spark": [
    false
   ]
  },
@@ -189,6 +234,9 @@
   "source": "Muse Glimmer 30B (open weights, self-hosted on Kaggle 2 x T4), v1 letter quoted in <removed-run-record>, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    false
+  ],
+  "spark": [
+   false
   ]
  },
  {
@@ -201,6 +249,9 @@
   "source": "Muse Spark Open (open weights, on Fireworks), letter in provenance/spark-open-sample-letter.txt, its run in provenance/spark-open-fireworks-sample.json, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    false
+  ],
+  "spark": [
+   true
   ]
  },
  {
@@ -213,6 +264,9 @@
   "source": "Muse Spark Open (open weights, on Fireworks), letter in provenance/spark-open-sample-letter.txt, its run in provenance/spark-open-fireworks-sample.json, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    false
+  ],
+  "spark": [
+   true
   ]
  },
  {
@@ -225,6 +279,9 @@
   "source": "Muse Spark Open (open weights, on Fireworks), letter in provenance/spark-open-sample-letter.txt, its run in provenance/spark-open-fireworks-sample.json, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    false
+  ],
+  "spark": [
+   true
   ]
  },
  {
@@ -237,6 +294,9 @@
   "source": "Muse Spark Open (open weights, on Fireworks), letter in provenance/spark-open-sample-letter.txt, its run in provenance/spark-open-fireworks-sample.json, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    false
+  ],
+  "spark": [
+   true
   ]
  },
  {
@@ -249,6 +309,9 @@
   "source": "Muse Spark Open (open weights, on Fireworks), letter in provenance/spark-open-sample-letter.txt, its run in provenance/spark-open-fireworks-sample.json, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    false
+  ],
+  "spark": [
+   true
   ]
  },
  {
@@ -261,6 +324,9 @@
   "source": "Muse Spark Open (open weights, on Fireworks), letter in provenance/spark-open-sample-letter.txt, its run in provenance/spark-open-fireworks-sample.json, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    false
+  ],
+  "spark": [
+   true
   ]
  },
  {
@@ -272,6 +338,9 @@
   "measured": "{\n \"site\": \"Synthetic example crossing (made-up tracks, no video)\",\n \"observed\": {\n  \"minutes\": 2.0,\n  \"duration_s\": 120.0,\n  \"crossings\": 3,\n  \"vehicles\": 3,\n  \"speed_85th_kmh\": 45.0,\n  \"gaps_6s\": 4,\n  \"gaps_12s\": 4,\n  \"longest_gap_s\": 48.3,\n  \"gap_6s_share_pct\": 99.0\n },\n \"serious_near_misses\": 2,\n \"close_passes\": 0,\n \"person_first\": 0,\n \"vehicle_first\": 0,\n \"both_at_once\": 2,\n \"definition\": \"serious: pedestrian and moving vehicle on the same spot less than 1.5 s apart; close pass: 1.5-3.0 s\",\n \"worst\": [\n  {\n   \"tier\": \"serious\",\n   \"pet_s\": 0.0,\n   \"vehicle\": \"car\",\n   \"vehicle_kmh\": 38.0,\n   \"adult_death_risk_if_hit_pct\": 3.0,\n   \"at_20_kmh_limit\": {\n    \"impact_kmh\": 20.0,\n    \"death_risk_pct\": 0.6\n   },\n   \"road_user\": \"not reviewed\"\n  },\n  {\n   \"tier\": \"serious\",\n   \"pet_s\": 0.0,\n   \"vehicle\": \"car\",\n   \"vehicle_kmh\": 29.0,\n   \"adult_death_risk_if_hit_pct\": 1.4,\n   \"at_20_kmh_limit\": {\n    \"impact_kmh\": 20.0,\n    \"death_risk_pct\": 0.6\n   },\n   \"road_user\": \"not reviewed\"\n  }\n ],\n \"risk_source\": \"Rosén & Sander 2009, adults 15+, car fronts\",\n \"engineering\": [\n  \"PV² and hourly rates need at least 15 minutes of video; this one is 2.0. Counted: 3 pedestrian crossings, 3 moving vehicles.\",\n  \"99.0% of the time was inside gaps of 6 s or more with no moving vehicle where people crossed: 4 gaps, 4 of them 12 s or more, longest 48.3 s (the first and last are cut short by the video). UK Traffic Signs Manual ch. 6 (13.5.2): 4-6 s is an acceptable gap at urban speeds; other groups, such as children, may need 10-12 s or longer.\"\n ]\n}",
   "source": "Muse Spark Open (open weights, on Fireworks), letter in provenance/spark-open-sample-letter.txt, its run in provenance/spark-open-fireworks-sample.json, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
+   false
+  ],
+  "spark": [
    false
   ]
  },
@@ -285,6 +354,9 @@
   "source": "Muse Spark Open (open weights, on Fireworks), letter in provenance/spark-open-sample-letter.txt, its run in provenance/spark-open-fireworks-sample.json, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    false
+  ],
+  "spark": [
+   true
   ]
  },
  {
@@ -297,6 +369,9 @@
   "source": "Muse Spark Open (open weights, on Fireworks), letter in provenance/spark-open-sample-letter.txt, its run in provenance/spark-open-fireworks-sample.json, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    false
+  ],
+  "spark": [
+   true
   ]
  },
  {
@@ -308,6 +383,9 @@
   "measured": "{\n \"site\": \"Synthetic example crossing (made-up tracks, no video)\",\n \"observed\": {\n  \"minutes\": 2.0,\n  \"duration_s\": 120.0,\n  \"crossings\": 3,\n  \"vehicles\": 3,\n  \"speed_85th_kmh\": 45.0,\n  \"gaps_6s\": 4,\n  \"gaps_12s\": 4,\n  \"longest_gap_s\": 48.3,\n  \"gap_6s_share_pct\": 99.0\n },\n \"serious_near_misses\": 2,\n \"close_passes\": 0,\n \"person_first\": 0,\n \"vehicle_first\": 0,\n \"both_at_once\": 2,\n \"definition\": \"serious: pedestrian and moving vehicle on the same spot less than 1.5 s apart; close pass: 1.5-3.0 s\",\n \"worst\": [\n  {\n   \"tier\": \"serious\",\n   \"pet_s\": 0.0,\n   \"vehicle\": \"car\",\n   \"vehicle_kmh\": 38.0,\n   \"adult_death_risk_if_hit_pct\": 3.0,\n   \"at_20_kmh_limit\": {\n    \"impact_kmh\": 20.0,\n    \"death_risk_pct\": 0.6\n   },\n   \"road_user\": \"not reviewed\"\n  },\n  {\n   \"tier\": \"serious\",\n   \"pet_s\": 0.0,\n   \"vehicle\": \"car\",\n   \"vehicle_kmh\": 29.0,\n   \"adult_death_risk_if_hit_pct\": 1.4,\n   \"at_20_kmh_limit\": {\n    \"impact_kmh\": 20.0,\n    \"death_risk_pct\": 0.6\n   },\n   \"road_user\": \"not reviewed\"\n  }\n ],\n \"risk_source\": \"Rosén & Sander 2009, adults 15+, car fronts\",\n \"engineering\": [\n  \"PV² and hourly rates need at least 15 minutes of video; this one is 2.0. Counted: 3 pedestrian crossings, 3 moving vehicles.\",\n  \"99.0% of the time was inside gaps of 6 s or more with no moving vehicle where people crossed: 4 gaps, 4 of them 12 s or more, longest 48.3 s (the first and last are cut short by the video). UK Traffic Signs Manual ch. 6 (13.5.2): 4-6 s is an acceptable gap at urban speeds; other groups, such as children, may need 10-12 s or longer.\"\n ]\n}",
   "source": "Muse Spark Open (open weights, on Fireworks), letter in provenance/spark-open-sample-letter.txt, its run in provenance/spark-open-fireworks-sample.json, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
+   true
+  ],
+  "spark": [
    true
   ]
  },
@@ -321,6 +399,9 @@
   "source": "Muse Spark Open (open weights, on Fireworks), letter in provenance/spark-open-sample-letter.txt, its run in provenance/spark-open-fireworks-sample.json, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    true
+  ],
+  "spark": [
+   false
   ]
  },
  {
@@ -332,6 +413,9 @@
   "measured": "{\n \"site\": \"Synthetic example crossing (made-up tracks, no video)\",\n \"observed\": {\n  \"minutes\": 2.0,\n  \"duration_s\": 120.0,\n  \"crossings\": 3,\n  \"vehicles\": 3,\n  \"speed_85th_kmh\": 45.0,\n  \"gaps_6s\": 4,\n  \"gaps_12s\": 4,\n  \"longest_gap_s\": 48.3,\n  \"gap_6s_share_pct\": 99.0\n },\n \"serious_near_misses\": 2,\n \"close_passes\": 0,\n \"person_first\": 0,\n \"vehicle_first\": 0,\n \"both_at_once\": 2,\n \"definition\": \"serious: pedestrian and moving vehicle on the same spot less than 1.5 s apart; close pass: 1.5-3.0 s\",\n \"worst\": [\n  {\n   \"tier\": \"serious\",\n   \"pet_s\": 0.0,\n   \"vehicle\": \"car\",\n   \"vehicle_kmh\": 38.0,\n   \"adult_death_risk_if_hit_pct\": 3.0,\n   \"at_20_kmh_limit\": {\n    \"impact_kmh\": 20.0,\n    \"death_risk_pct\": 0.6\n   },\n   \"road_user\": \"not reviewed\"\n  },\n  {\n   \"tier\": \"serious\",\n   \"pet_s\": 0.0,\n   \"vehicle\": \"car\",\n   \"vehicle_kmh\": 29.0,\n   \"adult_death_risk_if_hit_pct\": 1.4,\n   \"at_20_kmh_limit\": {\n    \"impact_kmh\": 20.0,\n    \"death_risk_pct\": 0.6\n   },\n   \"road_user\": \"not reviewed\"\n  }\n ],\n \"risk_source\": \"Rosén & Sander 2009, adults 15+, car fronts\",\n \"engineering\": [\n  \"PV² and hourly rates need at least 15 minutes of video; this one is 2.0. Counted: 3 pedestrian crossings, 3 moving vehicles.\",\n  \"99.0% of the time was inside gaps of 6 s or more with no moving vehicle where people crossed: 4 gaps, 4 of them 12 s or more, longest 48.3 s (the first and last are cut short by the video). UK Traffic Signs Manual ch. 6 (13.5.2): 4-6 s is an acceptable gap at urban speeds; other groups, such as children, may need 10-12 s or longer.\"\n ]\n}",
   "source": "Muse Spark Open (open weights, on Fireworks), letter in provenance/spark-open-sample-letter.txt, its run in provenance/spark-open-fireworks-sample.json, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
+   false
+  ],
+  "spark": [
    false
   ]
  },
@@ -345,6 +429,9 @@
   "source": "Muse Spark Open (open weights, on Fireworks), letter in provenance/spark-open-sample-letter.txt, its run in provenance/spark-open-fireworks-sample.json, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    false
+  ],
+  "spark": [
+   false
   ]
  },
  {
@@ -357,6 +444,9 @@
   "source": "Muse Spark Open (open weights, on Fireworks), letter in provenance/spark-open-sample-letter.txt, its run in provenance/spark-open-fireworks-sample.json, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
    false
+  ],
+  "spark": [
+   false
   ]
  },
  {
@@ -368,6 +458,9 @@
   "measured": "{\n \"site\": \"Synthetic example crossing (made-up tracks, no video)\",\n \"observed\": {\n  \"minutes\": 2.0,\n  \"duration_s\": 120.0,\n  \"crossings\": 3,\n  \"vehicles\": 3,\n  \"speed_85th_kmh\": 45.0,\n  \"gaps_6s\": 4,\n  \"gaps_12s\": 4,\n  \"longest_gap_s\": 48.3,\n  \"gap_6s_share_pct\": 99.0\n },\n \"serious_near_misses\": 2,\n \"close_passes\": 0,\n \"person_first\": 0,\n \"vehicle_first\": 0,\n \"both_at_once\": 2,\n \"definition\": \"serious: pedestrian and moving vehicle on the same spot less than 1.5 s apart; close pass: 1.5-3.0 s\",\n \"worst\": [\n  {\n   \"tier\": \"serious\",\n   \"pet_s\": 0.0,\n   \"vehicle\": \"car\",\n   \"vehicle_kmh\": 38.0,\n   \"adult_death_risk_if_hit_pct\": 3.0,\n   \"at_20_kmh_limit\": {\n    \"impact_kmh\": 20.0,\n    \"death_risk_pct\": 0.6\n   },\n   \"road_user\": \"not reviewed\"\n  },\n  {\n   \"tier\": \"serious\",\n   \"pet_s\": 0.0,\n   \"vehicle\": \"car\",\n   \"vehicle_kmh\": 29.0,\n   \"adult_death_risk_if_hit_pct\": 1.4,\n   \"at_20_kmh_limit\": {\n    \"impact_kmh\": 20.0,\n    \"death_risk_pct\": 0.6\n   },\n   \"road_user\": \"not reviewed\"\n  }\n ],\n \"risk_source\": \"Rosén & Sander 2009, adults 15+, car fronts\",\n \"engineering\": [\n  \"PV² and hourly rates need at least 15 minutes of video; this one is 2.0. Counted: 3 pedestrian crossings, 3 moving vehicles.\",\n  \"99.0% of the time was inside gaps of 6 s or more with no moving vehicle where people crossed: 4 gaps, 4 of them 12 s or more, longest 48.3 s (the first and last are cut short by the video). UK Traffic Signs Manual ch. 6 (13.5.2): 4-6 s is an acceptable gap at urban speeds; other groups, such as children, may need 10-12 s or longer.\"\n ]\n}",
   "source": "Muse Spark Open (open weights, on Fireworks), letter in provenance/spark-open-sample-letter.txt, its run in provenance/spark-open-fireworks-sample.json, written from the synthetic sample/ (made-up tracks, no video)",
   "code": [
+   false
+  ],
+  "spark": [
    false
   ]
  }
