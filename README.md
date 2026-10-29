@@ -125,6 +125,10 @@ nothing lifts. With `"person_mode": "auto"` or `"vehicle_mode": "auto"`, a conce
 fills its 16 objects before the next part takes over, that concept is detected frame by frame instead and the page
 says when it filled (on the Indian time-lapse: "person: 16 objects taken within 1.0-1.6 s in 3 of 3 parts").
 
+`"window_s": [S, E]` in the site file analyses only seconds S to E of the recording, picked by the window rule in
+`GATES.md` before any near-miss is seen; the SHA-256 is still of the whole original, and the page's times count from
+second S. A window under 15 minutes gets no hourly rates, PV² or school-year line.
+
 ### Open weights: Muse Glimmer writes the letter
 
 Set `LETTER_MODEL_URL` to any OpenAI-compatible server and the fix and letter come from that model instead of Muse
