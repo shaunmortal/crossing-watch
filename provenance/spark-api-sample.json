@@ -1,0 +1,11 @@
+{
+ "model": "muse-spark-1.3",
+ "host": "api.meta.ai",
+ "writer": "Muse Spark",
+ "tries": 1,
+ "judged_by": "Muse Spark (a separate reviewer)",
+ "unmeasured": [],
+ "fix": "20.0 km/h zone with signs",
+ "letter_sha256": "dabbf40f6b13860d430f1827f83ccfe564676caa653c9eb1d1b08c3427a760cc",
+ "note": "Written 30 Oct 2026 for sample/ through the Meta Model API; pack.py does not record wall time or token usage for Muse Spark."
+}

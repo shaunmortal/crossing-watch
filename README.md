@@ -267,6 +267,14 @@ LETTER_MODEL_URL=http://127.0.0.1:8080/v1 python3 pack.py out/VIDEO site.json
 
 #### Open weights: two paths
 
+Same facts, three writers (`python3 writers_table.py`; details in [`kaggle/open-weights.md`](kaggle/open-weights.md)):
+Muse Glimmer 30B on Kaggle's free 2 x T4 wrote the sample letter for $0 in 313 s; Muse Spark Open on Fireworks in
+55.5 s for about $0.012; Muse Spark on the Meta API in one try. All three letters passed the number check.
+The judge bench that can be published is [`kaggle/judge-bench-public.json`](kaggle/judge-bench-public.json), built only
+from letters about the synthetic `sample/`: Muse Spark flagged 21 of 23 planted lies and 0 of 8 clean letters.
+`JUDGE_VOTES=2` asks an open-weights judge twice and counts a problem only when both replies list it, because Glimmer,
+asked once, flagged 6 of 8 clean letters; its 2-vote result comes from the Kaggle Version 3 run.
+
 `LETTER_MODEL` is the model id sent to the server; the page shows the product name and where it ran. A self-hosted
 server is named "self-hosted" only when it runs on the machine that ran pack.py, and Fireworks' API "on Fireworks".
 
