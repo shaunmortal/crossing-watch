@@ -313,6 +313,45 @@ def test_dut_score_keeps_review_rejections_apart_from_threshold_misses():
     assert [m["by_review"] for m in result["missed_events"]] == [True, False]
 
 
+def test_offline_dut_check_puts_stored_verdicts_through_todays_rider_gate():
+    """validate_offline: a stored rider call with no bike under the person is overruled, one with a motorcycle under
+    them stands, "not a person" stands, an old run's "cyclist" kept as a pedestrian is re-read by today's rule, and a
+    piece Spark never saw stays unreviewed."""
+    import validate_offline
+    said = lambda ok, who: {"is_person": ok, "road_user": who, "reason": ""}
+    stored = [{"person": "a/0", "review": said(False, "rider")}, {"person": "b/0", "review": said(False, "rider")},
+              {"person": "c/0", "review": said(False, "not a person")}, {"person": "d/0", "review": said(True, "cyclist")}]
+    verdicts = validate_offline.stored_verdicts(stored)
+    assert verdicts["d/0"]["is_person"] is False
+    people = {p: {f: (0.0, 0.14 * f) for f in range(20)} for p in ("a/0", "b/0", "c/0", "d/0", "e/0")}
+    boxes = {p[0]: {f: [100.0 * i, 0, 100.0 * i + 10, 20] for f in range(20)} for i, p in enumerate(people)}
+    bike = {"motorcycle#1": {f: [95, -5, 115, 30] for f in range(20)}}  # under person b only
+    events = [{"person": p, "vehicle": "car#1"} for p in people]
+    events = validate_offline.with_verdicts(events, verdicts, boxes, bike, people)
+    assert [(e.get("review") or {}).get("is_person") for e in events] == [True, False, False, True, None]
+    assert events[0]["review"]["rider_unconfirmed"] and events[0]["review"]["walk_kmh"] == 5.0
+    assert "review" not in events[4]
+
+
+def test_offline_speed_check_reads_the_dataset_at_its_own_frame_rate():
+    """validate_offline's speed reference: a DUT car at 3 m/s reads 3 m/s on its evenly spaced 23.976 fps frames,
+    with no speed where a frame lacks neighbours; the summary counts cars near the 10 km/h bar put on the wrong side."""
+    import tempfile
+    from pathlib import Path
+    import validate_dut, validate_offline
+    with tempfile.TemporaryDirectory() as tmp:
+        folder = Path(tmp) / "data" / "trajectories_filtered"
+        folder.mkdir(parents=True)
+        rows = "".join(f"1,{s},{3.0 * (s - 1) / validate_dut.SOURCE_FPS},0\n" for s in range(1, 50))
+        (folder / "intersection_99_traj_veh_filtered.csv").write_text("id,frame,x_est,y_est\n" + rows)
+        native = validate_offline.native_speeds(Path(tmp), "99")["car#1"]
+    assert native[0] is None and native[10] is not None
+    assert all(abs(v - 3.0) < 1e-9 for v in native.values() if v is not None)
+    kmh = lambda ours, ref: (ours / 3.6, ref / 3.6)
+    summary = validate_offline.speed_summary([kmh(9.5, 10.5), kmh(12, 12), kmh(20, 21)])
+    assert summary == {"frames": 3, "mean_abs_kmh": 0.67, "p95_abs_kmh": 1.0, "near_bar_wrong_side_pct": 50.0}
+
+
 def test_page_links_find_an_event_card_and_its_moment():
     """A page link to #event-N finds card N, and data-t is when, in its clip, the near-miss begins."""
     e = {"vehicle": "car#1", "vehicle_kmh": 30.0, "pet_s": 2.5, "t_person_s": 6.0, "t_vehicle_s": 3.5, "gap_m": 0.4,
