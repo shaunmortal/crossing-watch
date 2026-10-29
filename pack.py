@@ -53,12 +53,13 @@ MIN_RATE_MINUTES = 15  # shortest video scaled to hourly rates (MUTCD Warrant 4 
 ALPHA = 0.05      # exact two-sided 95% ranges
 BISECTIONS = 50   # halvings to find a range's end: 1e-15 of the span, and a share never rounds up to exactly 1
 SCHOOL_YEAR = ("school_days", "dismissal_minutes")  # optional site keys: the "if every dismissal" line needs both
-LETTER_URL = os.environ.get("LETTER_MODEL_URL", "")  # an OpenAI-compatible server, e.g. llama-server with Muse
-LETTER_MODEL = os.environ.get("LETTER_MODEL", "Muse Glimmer 30B")  # its API model id, shown as openweights.name()
-LETTER_KEY = os.environ.get("LETTER_MODEL_KEY", "")  # Bearer token for the letter server (Fireworks: FIREWORKS_API_KEY)
-JUDGE_URL = os.environ.get("JUDGE_MODEL_URL", "")  # an OpenAI-compatible server whose model also judges the letter
-JUDGE_MODEL = os.environ.get("JUDGE_MODEL", LETTER_MODEL)  # the judge server's API model id
-JUDGE_KEY = os.environ.get("JUDGE_MODEL_KEY", "")  # Bearer token for the judge server only (Fireworks: as above)
+# each setting from the shell's export, else from .env (sam.env_value), so a forgotten export on the day still runs
+LETTER_URL = sam.env_value("LETTER_MODEL_URL")  # an OpenAI-compatible server, e.g. llama-server with Muse
+LETTER_MODEL = sam.env_value("LETTER_MODEL") or "Muse Glimmer 30B"  # its API model id, shown as openweights.name()
+LETTER_KEY = sam.env_value("LETTER_MODEL_KEY")  # Bearer token for the letter server (Fireworks: FIREWORKS_API_KEY)
+JUDGE_URL = sam.env_value("JUDGE_MODEL_URL")  # an OpenAI-compatible server whose model also judges the letter
+JUDGE_MODEL = sam.env_value("JUDGE_MODEL") or LETTER_MODEL  # the judge server's API model id
+JUDGE_KEY = sam.env_value("JUDGE_MODEL_KEY")  # Bearer token for the judge server only (Fireworks: as above)
 
 
 def writer_label(url, model=LETTER_MODEL):
@@ -67,7 +68,7 @@ def writer_label(url, model=LETTER_MODEL):
 
 
 WRITER = writer_label(LETTER_URL)
-LETTER_HOST = os.environ.get("LETTER_MODEL_HOST", "")  # where it ran, e.g. "Kaggle 2 x T4" (the notebook reads nvidia-smi)
+LETTER_HOST = sam.env_value("LETTER_MODEL_HOST")  # where it ran, e.g. "Kaggle 2 x T4" (the notebook reads nvidia-smi)
 PROVENANCE = "letter-provenance.json"  # beside plan.json: what an open-weights server ran, measured; never a key
 RUN_KEYS = ("request_id", "usage", "wall_s", "timings", "response_format")  # openweights.reply's record
 JUDGE = "Muse Spark (a separate reviewer)"
@@ -82,6 +83,9 @@ MEASUREMENTS:
 
 LETTER:
 {letter}"""
+JUDGE_FAILED = "The reviewer's reply could not be read."  # a judge that failed or answered no list: never a pass
+JUDGE_ERRORS = (OSError, http.client.HTTPException, ValueError, KeyError, IndexError, TypeError)  # URLError, 503,
+# timeout, a reply of the wrong shape: the judge objects instead, so the paid letter is kept with the point to check
 PROBLEMS_SCHEMA = {"type": "object", "properties": {"problems": {"type": "array", "items": {"type": "string"}}},
                    "required": ["problems"], "additionalProperties": False}  # the judge's reply, for a JUDGE_MODEL_URL server
 LETTER_TRIES = 3     # Spark gets this many tries at a letter whose every number was measured
@@ -95,6 +99,7 @@ MPH = re.compile(rf"(?:(?:{NUMBER.pattern})\s?)?(?<![a-z])(?:mph|miles (?:per|an
 WITH_UNIT = re.compile(rf"({NUMBER.pattern})\s?(km/h|kmph|s(?:ec(?:ond)?s?)?|%|per ?cent)(?![\w/])", re.I)
 UNIT_FIELD = {"k": "vehicle_kmh", "s": "pet_s", "%": "death_risk_pct", "p": "death_risk_pct"}  # unit's 1st letter
 SENTENCE = re.compile(r"(?<=[.!?])\s+|\n")
+PLACEHOLDER = re.compile(r"\[[^\[\]\n]{1,60}\]|\{[^{}\n]{1,60}\}|_{3,}")  # [School name], {Date}, ____: never signed
 ACCUSES = re.compile(r"\b(?:illegal|unlawful|violat|breach|broke\b)", re.I)  # a rule broken: no video can show that
 SHOWN_FILE = re.compile(r'\b(?:src|poster)="([^"#?]+)')  # a file the page shows (clip, poster, picture), no #t=...
 UNSHAREABLE = re.compile(r"clip\.mp4|person-.*\.jpg")  # the unblurred video and the unblurred crops Spark saw
@@ -102,7 +107,7 @@ PLAN_KEYS = ("fix", "why", "image_prompt", "letter")
 UNSURE = "pedestrian (Spark unsure; kept)"  # review.gated kept someone Spark called "unclear" (review_unclear)
 PLAN_SCHEMA = {"type": "object", "properties": {k: {"type": "string"} for k in PLAN_KEYS}, "required": list(PLAN_KEYS),
                "additionalProperties": False}  # the plan's shape only, for an open-weights server
-NUMBER_LOCK = os.environ.get("LETTER_MODEL_NUMBER_LOCK", "") == "1"  # opt-in: on Fireworks (29 Oct) the number
+NUMBER_LOCK = sam.env_value("LETTER_MODEL_NUMBER_LOCK") == "1"  # opt-in: on Fireworks (29 Oct) the number
 # pattern trapped Muse Spark Open in "a0a0a0..." text that held no unmeasured number and so passed both checks
 MIN_TEXT_RATIO = 0.2       # compressed / raw size: prose stays near 0.4, one short piece repeated falls under 0.1
 REPEAT_CHECK_BYTES = 200   # shorter text compresses badly whatever it says, so it is not judged this way
@@ -124,8 +129,8 @@ Reply with JSON only:
   "why": "<one sentence linking the fix to the measurements>",
   "image_prompt": "<an instruction to edit a photo of this street so it shows the fix; keep people and buildings unchanged>",
   "letter": "<a short formal letter in {language} from the head of the school to the road authority: what was measured,
-             the worst near-misses, the requested fix, and an offer to share the video. Use [School name] and [Date]
-             as placeholders.>"}}"""
+             the worst near-misses, the requested fix, and an offer to share the video. Sign it from "The Principal";
+             write no date and nothing in square brackets: the principal's sign-off adds who approved it and when.>"}}"""
 # --notes: appended to LETTER_PROMPT with the letter being revised (Meta's legal-agent workshop: "Reject with notes")
 REVISE = """
 
@@ -481,6 +486,13 @@ def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES, stated=(
     for attempt in range(tries):
         try:
             plan = model_plan(prompt + note, api_key, photo, measured)  # not the note: it quotes the bad numbers
+        except (OSError, http.client.HTTPException) as err:  # URLError, HTTPError, timeout: the server, not the reply
+            if plan is None:
+                raise  # nothing paid for yet: main says the letter failed
+            print(f"the letter model failed on try {attempt + 1}, the letter from try {attempt} is kept with its "
+                  f"points to check: {err}", file=sys.stderr)
+            tries = attempt
+            break
         except ValueError as err:  # JSONDecodeError included
             if attempt == tries - 1 and plan is None:
                 raise
@@ -513,10 +525,20 @@ def judge_problems(letter, measured, api_key):
     lists the letter's unsupported claims ([] if none). A reply it cannot read counts as one problem, so a broken judge
     never passes a letter silently."""
     prompt = JUDGE_PROMPT.format(facts=measured, letter=letter)
-    replies = (([spark_reply(prompt, None, api_key)] if api_key else [])
-               + ([open_model_reply(prompt, None, PROBLEMS_SCHEMA, judge=True)[0]] if JUDGE_URL else []))
-    found = [read_problems(text) for text in replies]
-    return [p for problems in found for p in (["The reviewer's reply could not be read."] if problems is None else problems)]
+    asks = (([lambda: spark_reply(prompt, None, api_key)] if api_key else [])
+            + ([lambda: open_model_reply(prompt, None, PROBLEMS_SCHEMA, judge=True)[0]] if JUDGE_URL else []))
+    found = [read_problems(judge_reply(ask)) for ask in asks]
+    return [p for problems in found for p in ([JUDGE_FAILED] if problems is None else problems)]
+
+
+def judge_reply(ask):
+    """One judge's reply text, or "" when its call failed (said on stderr): read_problems reads no list in it, so a
+    network blip or an HTTP 503 is one problem to check, never a pass and never the end of the paid letter."""
+    try:
+        return ask()
+    except JUDGE_ERRORS as err:
+        print(f"a judge failed, its review counts as not read: {str(err)[:200]}", file=sys.stderr)
+        return ""
 
 
 def read_problems(text):
@@ -949,15 +971,18 @@ def letter_section(plan, events=(), measured="", signoff=None):
     if not plan:
         return ""
     paragraphs = "".join(f"<p>{linked(p, events)}</p>" for p in plan["letter"].split("\n") if p.strip())
+    blanks = placeholders(plan["letter"])
     check = "".join(f'<p class="note">Check before sending: {html.escape(text)}</p>' for text in (
         [f'these numbers are not in the measurements: {", ".join(plan["unmeasured"])}.'] if plan.get("unmeasured") else [])
         + [f"this sentence mixes two near-misses: {s}" for s in plan.get("mixed", [])]
         + [f"this sentence says someone broke a rule, which a video cannot show: {s}" for s in plan.get("accuses", [])]
-        + [f"the reviewer says: {p}" for p in plan.get("unsupported", [])])
+        + [f"the reviewer says: {p}" for p in plan.get("unsupported", [])]
+        + ([f"fill in {', '.join(blanks)} before signing."] if blanks else []))
     sources = "the measurements" + (" and the principal's notes" if plan.get("notes") else "")
     checked = (f"Every number was checked against {sources} by code, and the claims by {plan['judged_by']}."
                if plan.get("judged_by") else f"Every number was checked against {sources} by code.")
-    clean = not (plan.get("unmeasured") or plan.get("mixed") or plan.get("unsupported") or plan.get("accuses"))
+    clean = not (plan.get("unmeasured") or plan.get("mixed") or plan.get("unsupported") or plan.get("accuses")
+                 or blanks)
     known = " ".join(sorted({n.replace(",", "") for n in NUMBER.findall(measured + stated_text(plan.get("notes")))}))
     writer = f'<p class="note">{html.escape(note)}</p>' if (note := writer_note(plan)) else ""
     return (f'<section class="letter-sheet" id="letter"><h2>Letter to the road authority</h2>{writer}<div class="letter" '
@@ -1244,8 +1269,23 @@ def write_plan(out_dir, plan):
         (out_dir / PROVENANCE).write_text(json.dumps(record, indent=1))
 
 
+def placeholders(letter):
+    """The blanks a letter still holds ("[School name]", "[Date]", "____"), each once: a letter with any is a draft."""
+    return list(dict.fromkeys(PLACEHOLDER.findall(letter)))
+
+
+def check_signable(letter):
+    """Refuses (SystemExit, before anything is written or paid for) to sign a letter that still holds a blank."""
+    if blanks := placeholders(letter):
+        raise SystemExit(f"not signed: the letter still holds {', '.join(blanks)}. Give the real words in the "
+                         "principal's notes (pack.py --notes FILE, or agent.py --reject --notes \"...\"), read the "
+                         "revised letter, then sign it")
+
+
 def sign(out_dir, plan, approved_by, school):
-    """signoff.json: who read and approved plan.json's letter, the day, and the sha256 of its exact text."""
+    """signoff.json: who read and approved plan.json's letter, the day, and the sha256 of its exact text. Never for a
+    letter that still holds a blank (check_signable): pack.py and agent.py --approve both sign through here."""
+    check_signable(plan["letter"])
     record = {"approved_by": approved_by, "school": school, "date": datetime.date.today().isoformat(),
               "letter_sha256": sha256(plan["letter"])}
     (out_dir / "signoff.json").write_text(json.dumps(record, indent=1, ensure_ascii=False))
@@ -1323,6 +1363,15 @@ def verify_folder(folder):
     sys.exit(0 if set(status.values()) == {"MATCH"} else 1)
 
 
+def failure_line(plan, saved, notes, err):
+    """What a failed letter or picture left: "nothing was saved" only when there is no letter at all."""
+    if plan is None:
+        return f"letter failed, nothing was saved: the page shows the measurements only: {err}"
+    if notes and plan is saved:
+        return f"revising the letter failed: plan.json's letter is unchanged and shown: {err}"
+    return f"fix image failed: the letter is saved in plan.json and shown: {err}"
+
+
 def main():
     args, notes, signer = parse_args()
     if args.verify:
@@ -1349,6 +1398,8 @@ def main():
     if (notes or all(signer)) and not saved:
         sys.exit("pack.py: --notes and --approved-by work on plan.json's letter from these same measurements, and "
                  "there is none: run pack.py without them first, and have that letter read")
+    if all(signer):
+        check_signable(saved["letter"])  # before any paid picture
     plan, images, ground = saved, None, None  # saved stays if a revision fails
     if (events or paths) and not untrusted:
         try:
@@ -1372,8 +1423,7 @@ def main():
                                       photo_people(out_dir / "clip.mp4", site.get("person", "person")), muse, out_dir)
         except (SystemExit, OSError, ValueError, KeyError, IndexError, TypeError, AttributeError,
                 http.client.HTTPException, subprocess.CalledProcessError) as err:
-            print(f"letter or fix image failed, the page shows plan.json's letter if any, else the measurements only: "
-                  f"{err}", file=sys.stderr)
+            print(failure_line(plan, saved, notes, err), file=sys.stderr)
     signoff = sign(out_dir, plan, *signer) if plan and all(signer) else signoff
     page_html = page(site, events, seen, plan, images, data["fps"], data.get("cost"), data.get("sam_full_requests"),
                      data.get("privacy"), signoff=signoff, receipt=receipt_line(data, plan, images),

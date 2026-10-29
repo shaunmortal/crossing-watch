@@ -3733,6 +3733,101 @@ def test_filmcheck_help_prints_its_usage_and_a_non_video_file_is_refused_cleanly
     assert refused.returncode == 1 and "could not read it" in refused.stderr and "Traceback" not in refused.stderr
 
 
+
+def test_a_judge_that_errors_or_a_writer_blip_never_loses_the_paid_letter():
+    """T3: a judge's URLError or HTTP 503 is the "could not be read" problem, so the letter comes back with that point
+    to check; one failed judge never drops the other's review; a writer failure after a paid letter keeps it."""
+    import io
+    import urllib.error
+    good = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "Cars passed close to children."}
+    calls = []
+    def writer(prompt, key, photo=None, known=None):
+        calls.append(prompt)
+        if len(calls) > 1 and blip:
+            raise urllib.error.URLError("network is unreachable")
+        return good
+    def spark_down(prompt, image, key):
+        raise urllib.error.HTTPError("https://example.invalid", 503, "Service Unavailable", {}, io.BytesIO())
+    old = pack.model_plan, pack.spark_reply, pack.open_model_reply, pack.JUDGE_URL
+    pack.model_plan, pack.spark_reply = writer, spark_down
+    try:
+        blip = False
+        plan = pack.ask_plan("PROMPT", "{}", "key")
+        assert plan["letter"] == good["letter"] and plan["unsupported"] == [pack.JUDGE_FAILED]
+        assert plan["tries"] == pack.LETTER_TRIES and html.escape("the reviewer says: " + pack.JUDGE_FAILED) in pack.letter_section(plan)
+        pack.JUDGE_URL = "http://127.0.0.1:8080/v1"  # the open judge answers while Spark is down
+        pack.open_model_reply = lambda prompt, image, schema, judge=False: ('{"problems": ["Too long."]}', {})
+        assert pack.judge_problems("letter", "{}", "key") == [pack.JUDGE_FAILED, "Too long."]
+        pack.JUDGE_URL = ""
+        calls.clear()
+        blip = True
+        kept = pack.ask_plan("PROMPT", "{}", "key")
+        assert kept["letter"] == good["letter"] and kept["tries"] == 1 and kept["unsupported"] == [pack.JUDGE_FAILED]
+        calls.append("a paid call that failed")
+        try:
+            pack.ask_plan("PROMPT", "{}", "key")  # the very first call fails: nothing to keep, so it is not hidden
+            raise AssertionError("a first-call network error must reach main")
+        except urllib.error.URLError:
+            pass
+    finally:
+        pack.model_plan, pack.spark_reply, pack.open_model_reply, pack.JUDGE_URL = old
+    err = OSError("boom")
+    assert "nothing was saved" in pack.failure_line(None, None, "", err)
+    assert "nothing was saved" not in pack.failure_line(good, None, "", err)
+    assert "unchanged" in pack.failure_line(good, good, "shorter please", err)
+
+
+def test_letter_and_judge_servers_are_read_from_dot_env_when_not_exported():
+    """T3: a forgotten export on Monday still finds JUDGE_MODEL_URL and LETTER_MODEL_URL in .env (sam.env_value)."""
+    import importlib
+    import os
+    import tempfile
+    from pathlib import Path
+    names = ("LETTER_MODEL_URL", "JUDGE_MODEL_URL", "JUDGE_MODEL")
+    old_file, old_env = sam.ENV_FILE, {k: os.environ.pop(k, None) for k in names}
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            sam.ENV_FILE = Path(tmp) / ".env"
+            sam.ENV_FILE.write_text("MODEL_API_KEY=x\nJUDGE_MODEL_URL=https://api.fireworks.ai/inference/v1\n"
+                                    "JUDGE_MODEL = accounts/fireworks/models/muse-spark-open\n")
+            importlib.reload(pack)
+            assert pack.JUDGE_URL == "https://api.fireworks.ai/inference/v1" and pack.LETTER_URL == ""
+            assert pack.JUDGE_MODEL == "accounts/fireworks/models/muse-spark-open"
+            os.environ["JUDGE_MODEL_URL"] = "http://127.0.0.1:8080/v1"  # an export wins over .env
+            assert importlib.reload(pack).JUDGE_URL == "http://127.0.0.1:8080/v1"
+    finally:
+        sam.ENV_FILE = old_file
+        for k, value in old_env.items():
+            os.environ.pop(k, None)
+            if value is not None:
+                os.environ[k] = value
+        importlib.reload(pack)
+
+
+def test_a_letter_with_a_blank_is_flagged_and_never_signed():
+    """T6: "[School name]", "[Date]" or "____" left in the letter shows under "Check before sending", and sign-off
+    (pack.py --approved-by and agent.py --approve, both through pack.sign) refuses it and writes no signoff.json."""
+    import tempfile
+    from pathlib import Path
+    assert "[School name]" not in pack.LETTER_PROMPT and "nothing in square brackets" in pack.LETTER_PROMPT
+    blank = {"fix": "speed table", "why": "w", "image_prompt": "i", "writer": "Muse Spark",
+             "letter": "[Date]\nDear Sir,\nCars passed close.\nThe Principal, [School name]\nSigned: ____ [Date]"}
+    assert pack.placeholders(blank["letter"]) == ["[Date]", "[School name]", "____"]
+    section = pack.letter_section(blank)
+    assert "Check before sending: fill in [Date], [School name], ____ before signing." in section
+    assert 'id="letter-check" hidden' in section
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            pack.sign(Path(tmp), blank, "A. Rao, Principal", "Gate School")
+            raise AssertionError("a letter with blanks was signed")
+        except SystemExit as stop:
+            assert "[School name]" in str(stop) and "--notes" in str(stop)
+        assert not (Path(tmp) / "signoff.json").exists()
+        filled = {**blank, "letter": "Dear Sir,\nCars passed close (PET < 1 s, speeds > 30 km/h).\nThe Principal"}
+        assert pack.placeholders(filled["letter"]) == []
+        assert pack.sign(Path(tmp), filled, "A. Rao, Principal", "Gate School")["school"] == "Gate School"
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):
