@@ -3408,6 +3408,36 @@ def test_spark_crop_draws_its_box_after_upscaling_outside_the_person():
     assert min(pixel(172, 192)) > 220  # just inside the person's left edge: white, where a 1 px box drawn first was cyan
 
 
+def test_spark_removals_are_printed_without_digits_or_crop_paths():
+    """One terminal line per track Spark's gated verdict removed (review.said), at most LINE_COLS wide, its reason
+    dropped when it holds a digit (a number plate could be in it); kept, unsure or unreviewed people print nothing."""
+    import contextlib, io
+    from pathlib import Path
+    import analyze
+    rider = {"is_person": False, "road_user": "rider", "reason": "seated on a motorcycle"}
+    assert review.said("c84/0", rider) == \
+        'Muse Spark: track c84/0 removed: rider, bike box under them ("seated on a motorcycle")'
+    pole = {"is_person": False, "road_user": "not a person", "reason": "rear of an auto-rickshaw"}
+    assert review.said("7/0", pole) == 'Muse Spark: track 7/0 removed: not a pedestrian ("rear of an auto-rickshaw")'
+    assert review.said("7/0", pole | {"reason": "plate MP04 AB"}) == "Muse Spark: track 7/0 removed: not a pedestrian"
+    long = review.said("c84/0", rider | {"reason": "a person " * 20})
+    assert len(long) <= review.LINE_COLS and long.endswith('...")')
+    assert len(review.public_reason("a person " * 20)) == review.REASON_CHARS
+    unsure = review.gated({"is_person": False, "road_user": "unclear"}, {}, [])
+    for kept in (None, {"is_person": True, "road_user": "adult"}, unsure):
+        assert review.said("7/0", kept) is None
+    original, out = review.review, io.StringIO()
+    review.review = lambda *a, **k: dict(pole)
+    try:
+        with contextlib.redirect_stdout(out):
+            analyze.review_people(None, Path("."), [{"person": "7/0"}, {"person": "7/0"}],
+                                  {"7/0": {f: (0.14 * f, 0.0) for f in range(20)}}, {"7": {5: [100, 100, 110, 130]}},
+                                  {}, None, (640, 360), False)
+    finally:
+        review.review = original
+    assert out.getvalue() == review.said("7/0", pole) + "\n" and ".jpg" not in out.getvalue()  # once per track
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):

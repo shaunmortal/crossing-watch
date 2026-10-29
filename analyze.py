@@ -486,8 +486,9 @@ def walking_kmh(feet):
 def review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size, top_down):
     """Spark looks once at each pedestrian piece involved in a conflict (most dangerous first, at most
     MAX_REVIEWS), and its verdict is attached to all that piece's events. A rider call stands only with a
-    rideable vehicle's box under the person (review.gated). Returns (verdicts read from a reply saved by an earlier
-    run, people reviewed): a saved reply is reused while the crop is the same (review.review)."""
+    rideable vehicle's box under the person, and "unclear" keeps them (review.gated). Each removal is printed
+    (review.said). Returns (verdicts read from a reply saved by an earlier run, people reviewed): a saved reply is
+    reused while the crop is the same (review.review)."""
     rideables = [t for name, t in vehicle_boxes.items() if name.split("#")[0].lower() in review.RIDEABLE]
     verdicts, reused = {}, 0
     for e in events:
@@ -502,6 +503,8 @@ def review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, ke
                 verdict = None
             reused += verdict is not None and before is not None and saved_reply(crop) == before  # not asked again
             verdicts[pid] = review.gated(verdict, boxes, rideables, walking_kmh(people[pid]))
+            if line := review.said(pid, verdicts[pid]):  # a Meta model judging, on screen; never the crop's path
+                print(line, flush=True)
         e["review"] = verdicts.get(pid)
     return reused, len(verdicts)
 

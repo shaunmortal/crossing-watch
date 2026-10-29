@@ -21,6 +21,8 @@ MIN_CROP_PX = 80
 CROP_OUT_PX = 384   # upscaled so a small person is visible
 BOX_PX = 2          # the cyan box is drawn after upscaling, this thick...
 BOX_PAD_PX = 4      # ...and this far outside the person, so no cyan smears onto them
+REASON_CHARS = 70   # Spark's reason is shown cut to this...
+LINE_COLS = 100     # ...and a printed line to this, so it fits a terminal at 18-20 pt in a screen recording
 ROAD_USERS = {"child", "adult", "elderly", "wheelchair user", "rider", "cyclist", "not a person", "unclear"}
 NOT_PEDESTRIANS = {"not a person", "rider", "cyclist"}  # riders are vehicles here, as bicycles are in SinD
 RIDER_VERDICTS = {"rider", "cyclist"}
@@ -74,6 +76,26 @@ def unconfirmed_rider(verdict):
         return None
     walk = "" if verdict.get("walk_kmh") is None else f"; measured walking {verdict['walk_kmh']} km/h"
     return f"pedestrian (Spark thought {verdict['road_user']}; no bike found under them{walk})"
+
+
+def public_reason(reason, chars=REASON_CHARS):
+    """Spark's reason as it may be shown: cut to `chars`, or "" when it holds a digit (a number plate could be in
+    it)."""
+    reason = " ".join(str(reason or "").split())
+    if any(c.isdigit() for c in reason):
+        return ""
+    return reason if len(reason) <= chars else reason[:chars - 3].rstrip() + "..."
+
+
+def said(pid, verdict):
+    """The terminal line for a track Spark's gated verdict removed, or None when it was kept or not reviewed."""
+    if not verdict or verdict["is_person"]:
+        return None
+    why = (f"{verdict['road_user']}, bike box under them" if verdict["road_user"] in RIDER_VERDICTS
+           else "not a pedestrian")
+    line = f"Muse Spark: track {pid} removed: {why}"
+    reason = public_reason(verdict.get("reason"), min(REASON_CHARS, LINE_COLS - len(line) - len(' ("")')))
+    return line + (f' ("{reason}")' if reason else "")
 
 
 def crop_window(box, frame_size):
