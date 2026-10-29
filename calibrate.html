@@ -17,8 +17,9 @@ fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 16px 0; } 
 </head>
 <body>
 <h1>Crossing Watch: mark the road</h1>
-<p class="muted">Take a full frame of the video itself, not a screenshot with player bars (for example
-<code>ffmpeg -i VIDEO -frames:v 1 frame.jpg</code>). The page scales it to the 640 px analysis size.</p>
+<p class="muted">Take a full frame of the video itself, not a screenshot with player bars:
+<code>ffmpeg -ss S -i VIDEO -frames:v 1 frame.jpg</code>, with S the start of the site's <code>window_s</code> in
+seconds (0 without one). The page scales it to the 640 px analysis size.</p>
 
 <fieldset><legend>How do you know distances on the road?</legend>
 <label><input type="radio" name="mode" value="tape" checked> I measured a rectangle on the road with a tape</label>
