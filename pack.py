@@ -76,9 +76,11 @@ def serious(events):
 
 
 def facts(site, events, seen):
+    """The measurements a letter may quote, as JSON. Arrays (paths, spans, replays) never enter: they are not facts
+    for a letter, and their many numbers would let almost any number in a letter pass the measured-number check."""
     worst = events[:SHOWN_EVENTS]
     return json.dumps({
-        "site": site.get("name", ""), "observed": seen,
+        "site": site.get("name", ""), "observed": {k: v for k, v in seen.items() if not isinstance(v, (list, tuple, set))},
         "serious_near_misses": len(serious(events)), "close_passes": len(events) - len(serious(events)),
         "definition": f"serious: pedestrian and moving vehicle on the same spot less than {road.PET_MAX_S} s apart; "
                       f"close pass: {road.PET_MAX_S}-{road.CLOSE_PASS_S} s",

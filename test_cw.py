@@ -598,6 +598,19 @@ def test_number_check_reads_grouped_numbers_and_non_english_facts():
     assert pack.unmeasured("about 2,000 an hour", facts) == ["2,000"]
     assert "0921" not in pack.facts({"name": "स्कूल"}, [], {"minutes": 1})  # no \\u escapes to hide digits in
 
+
+def test_paths_and_other_arrays_never_reach_the_letter_facts():
+    """Every number in the facts counts as measured, so arrays of coordinates would let a letter's numbers through."""
+    e = {"person": "1/0", "vehicle": "car#1", "tier": "serious", "pet_s": 0.5, "vehicle_kmh": 30.0, "death_risk_pct": 1.5,
+         "with_limit": {"20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}, "where": [41.7, 63.2],
+         "path_person": [[57.9, 88.4]], "path_vehicle": [[77.3, 12.6]], "replay": [[71.1, 72.2]], "spans": [[13.7, 19.3]]}
+    seen = {"minutes": 0.3, "crossings": 4, "spans": [[23.9, 31.7]], "replay": (44.4, 55.5)}
+    text = pack.facts({"name": "gate"}, [e], seen)
+    array_numbers = "41.7 63.2 57.9 88.4 77.3 12.6 71.1 72.2 13.7 19.3 23.9 31.7 44.4 55.5"
+    assert pack.unmeasured(array_numbers, text) == sorted(array_numbers.split(), key=float)
+    assert '"crossings": 4' in text and '"vehicle_kmh": 30.0' in text
+
+
 def test_sam_text_parses_into_tracks():
     text = ("<0f>0<|box;x1=1.0;y1=2.0;x2=3.0;y2=4.0;w=640;h=360|><|mask...|>1<|box;x1=5;y1=6;x2=7;y2=8;w=640;h=360|>"
             "<1f>0<|box;x1=1.5;y1=2.5;x2=3.5;y2=4.5;w=640;h=360|>")
