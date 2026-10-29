@@ -559,9 +559,58 @@ code gets our numbers from the same frame and the same tape.
 - **When:** after G6's log and Monday's run, so Monday night or Tuesday. A fail is reported here and in the README as
   it is. In the video only a pass, as a caption next to G6's result.
 
+## Feet-hidden rule, people side only (Thu 29 Oct 2026, commit d53f9f1)
+
+- **Rule.** From a phone at an angle, a person's frame is dropped when the bottom of its box, at its centre, sits on
+  a vehicle's box (from 2 px above its top to 2 px above its bottom): a scooter rider whose box only sits on the
+  bike's, which the rider filter misses, or feet hidden by a nearer vehicle. People only, never vehicles against
+  vehicles. Top-down views are untouched, and the site key `"feet_hidden": false` switches it off.
+- **Both ways, at $0**, each run rebuilt from its cached SAM replies with the rule off and on; re-run on the merged
+  build on 29 Oct with the same figures. The share is reported here as "feet hidden", not on the cards.
+
+| Run | Person box-frames dropped (after the rider filter) | What changes |
+|---|---|---|
+| Schoolchildren CCTV, one request | 0 of 2,293 (0%) | nothing (1,440 frames, 7 crossings, 0 events, 13 walking pieces at 0.80 m/s) |
+| Schoolchildren CCTV, 15 s parts | 4 of 1,829 (0.2%) | frames 1,017 to 1,013, nothing else (14 walking pieces, 1.66 m/s) |
+| Indian time-lapse, crowd mode | 2,122 of 6,204 (34.2%) | pieces 17 to 10, crossings 13 to 7, events 22 (14 serious) to 10 (7 serious), moving vehicles 28 to 28, walking pieces 13 to 7 at 2.71 m/s |
+| Indian time-lapse, SAM video: 15 s parts / one request | 74 of 599 (12.4%) / 5 of 235 (2.1%) | nothing |
+
+- **The Indian clip.** Its changes are relative, with no ground truth, and the clip is withdrawn as a measurement (see
+  'The Indian clip is a time-lapse' above). With 7 walking pieces the pace guard no longer judges it; the site
+  file's `not_measurements` still marks it.
+- **DUT** is top-down, so the rule is off there: validate_offline's totals at d53f9f1 were byte-identical to before
+  it, 44 and 45 of 52 after review (crowd and vehicle crowd mode; the next entry moves the second).
+- **SinD:** no gain is claimed.
+- **Risk.** A true near-miss with a bike between the camera and the person loses frames, so its PET can grow by the
+  hidden time.
+
+## Spark's "unclear" keeps the person (Thu 29 Oct 2026, commit 45bfd46)
+
+- **Rule.** Only a sure "no" from Muse Spark removes a person: "unclear" with the cyan box called not a pedestrian now
+  keeps them (`review.gated`, marked `review_unclear`; the card says "pedestrian (Spark unsure; kept)"), and a
+  blind-set decoy is never someone Spark was unsure of. The rule was set after seeing 3 DUT cases, post hoc, with no
+  held-out check.
+- **Re-scored at $0** with `validate_offline.py` on the cached DUT runs and Spark's stored verdicts, on the merged
+  build on 29 Oct:
+
+| Mode | Found by the geometry | Found after review, before / after the rule | False alarms after review (at a threshold) |
+|---|---|---|---|
+| Vehicle crowd mode (`out/dut-vcrowd`) | 48 of 52 | 45 / 48 of 52 | 6 (2) / 6 (2) |
+| Crowd mode (`out/dut-15s`) | 49 of 52 | 44 / 44 of 52 | 5 (2) / 5 (2) |
+
+- So in vehicle crowd mode Spark's review now makes no net difference (48 with or without it), and in crowd mode it
+  costs 5 real conflicts while removing one false alarm (the geometry alone: 6 false alarms, 2 at a threshold). With
+  every unreviewed piece rejected the worst case is 33 of 52 in vehicle crowd mode (30 before the rule) and 37 in
+  crowd mode.
+- The new crop (the cyan box drawn after upscaling, outside the person) has new bytes, so Spark is asked again on the
+  next paid run; until then these are its stored verdicts on the old crops.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
   number, date or condition changed. Reviews are named as AI-assisted code reviews (their defect counts kept, the
   reviewer head-counts dropped), internal rank numbers and file names are gone, and "the last section" links name
   their section.
+- Thu 29 Oct 2026, after the G7 rule above was written: the page began computing G7's mark from its own k, V and n
+  with `passmark.py`, by the same one-sided Fisher exact test and the same p ≤ 0.05 comparator. It shows no "after"
+  result. The G7 text is unchanged.

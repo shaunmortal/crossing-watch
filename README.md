@@ -22,10 +22,10 @@ date is promised.
 |---|---|---|
 | Track every pedestrian and vehicle through the video | **SAM 3.1** (one concept per request: person, car, motorcycle, auto rickshaw...); in crowds, SAM image detection 5 times a second plus our tracker | `sam.py`, `crowd.py` |
 | Pixels to metres on the road | 4-point homography from a rectangle marked on the road | `road.py`, `calibrate.html` |
-| Clean the tracks | Drop riders inside vehicle boxes, split tracks where the ID jumps, ignore static objects, cut-off boxes and teleport speeds | `road.py` |
+| Clean the tracks | Drop riders inside vehicle boxes and, from a phone at an angle, a person's frames whose feet sit on a vehicle's box, split tracks where the ID jumps, ignore static objects, cut-off boxes and teleport speeds | `road.py` |
 | Near-miss | Post-encroachment time (PET) under 1.5 s, within 1 m, vehicle over 10 km/h (why 1.5 s: Sources) | `road.py` |
 | Severity | Adult death risk at that speed, Rosén & Sander (2009); replay under 30 and 20 km/h limits | `road.py` |
-| Numbers road engineers use | Pedestrians and vehicles an hour, PV² (IRC:103-2012), 85th-percentile speed, and gaps in traffic of 6 s and 12 s where people actually crossed (UK Traffic Signs Manual ch. 6) | `road.py`, `pack.py` |
+| Numbers road engineers use | Pedestrians and vehicles an hour, PV² (IRC:103-2012), 85th-percentile speed, and gaps in traffic of 6 s and 12 s where people actually crossed (UK Traffic Signs Manual ch. 6); for a site in India, how many moving vehicles passed faster than 25 km/h, the speed reg. 16(5) of the Motor Vehicles (Driving) Regulations 2017 sets past schools and hospitals where signed (0 is printed too) | `road.py`, `pack.py` |
 | Second look | **Muse Spark** checks each clip: is that a person, and who (child, elderly, wheelchair user...) | `review.py` |
 | Ear witness | **Muse Wonder** listens to the original audio around each near-miss for horns, screeching brakes and shouts | `listen.py` |
 | One number | Of the people who crossed, how many had a moving vehicle through the same spot within 3 s (and 1.5 s), each person once however many vehicles or track pieces: "k of n crossings (1 in N)", with exact 95% ranges (Clopper-Pearson for the share, Garwood's Poisson range for the count, so 0 seen still reads "up to 3.7"). It is the page's first line and the letter's first fact. With `"school_days"` and `"dismissal_minutes"` in the site file and 15 minutes of video or more, one more line: "If every dismissal is like this one: about X crossings a school year..." | `pack.py`, `road.py` |
@@ -72,11 +72,17 @@ sign with `agent.py --approve`.
   prints "Filed with {to} on {channel}, {date}: reference {reference}." under the title.
 - The page says where it fits in the CDC/FIA school-zone Traffic Conflict Technique toolkit: steps 5-7 (baseline
   counts, pre-intervention conflicts, analysis), without the trained observers step 3 normally needs, with a
-  severity that is not the toolkit's observer scales; step 9 is the same film again after the fix.
+  severity that is not the toolkit's observer scales; step 9 is the same film again after the fix. For it the page
+  gives G7's pass mark (`passmark.py`, rule in `GATES.md`): from the headline's own counts, the most crossings with a
+  vehicle within 3 s, and the most distinct such vehicles, that an after-film as long may show for a one-sided
+  Fisher exact test at 5%. Page only, never in the letter; never under the pace warning or without a crosser list.
 - Printed, the page keeps light colours even in dark mode, shows only the 3 worst near-misses (a letter number from
   another reads "(clip N, not printed)") and puts the letter first, on its own sheet.
 
 Filming your own crossing: [`FILMING.md`](FILMING.md) (phone locked at 1080p 30 fps, tape marks, consent notice; `python3 filmcheck.py CLIP` checks the test clip).
+If the video is HDR anyway (HLG or PQ), `analyze.py` maps it to SDR (BT.709) as it scales the clip, else the clip
+comes out dark and washed out. That is checked only on synthetic HLG clips, where it brings the clip closer to the SDR
+original; it is untested on a real iPhone HLG file, and it may clip a bright sky.
 
 `pack.py` also writes `out/VIDEO/share/`: the page and only the files it shows (evidence clips, the blurred street
 photo, the Muse Image picture). Publish that folder and nothing else. The unblurred `clip.mp4` and the person crops
@@ -90,7 +96,8 @@ gives the command).
 offers discounted pricing or more usage in exchange for permission to use your content to train future Meta models"
 and "In Standard mode, you pay standard prices and your content is not used to train Meta models." Crossing Watch
 calls only Standard-mode model ids, never a `-contributor` one, because what it sends is unblurred video and crops of
-people on the street, and street sound.
+people on the street, and street sound. A self-check fails if a default model id is a Contributor-mode one (a model
+set in the environment is not checked).
 
 **Tamper-evident.** `analyze.py` records the SHA-256 of the original video (`source_sha256` in events.json) and the
 page prints it. `share/` gets a standard `SHA256SUMS` for every file in it, the page included, so anyone can check a
@@ -101,8 +108,12 @@ and signs it. Nothing more is filled in for the school.
 
 **Receipt.** Code writes under "How this was measured" what made the pack: the analysis run's wall-clock minutes and
 the SAM requests it sent ("took every SAM reply from cache, so it paid nothing new" on a re-run), how many people
-Muse Spark looked at, how many near-misses Muse Wonder listened around, the letter's tries and the Muse Image picture.
-Dollars are given for SAM only.
+Muse Spark looked at (and how many of its verdicts were reused from an earlier run), how many near-misses Muse
+Wonder listened around, the letter's tries, the Muse Image picture, and the camera check in the recording's time: the
+largest shift, or that the camera moved (positions after that are off), or that the picture darkened. Dollars are
+given for SAM only. Under it, the tracks Muse Spark's review removed, each with what Spark called it and its reason
+(cut to 70 characters, left out if it holds a digit, as a number plate could; never the crop), and "Spark can be
+wrong". analyze.py prints one line for each removal as it happens.
 
 Even the AI picture keeps Meta's made-by-AI tag: Muse Image's .webp is shipped exactly as it came, captioned
 "AI-drawn proposal by Muse Image, not a photo", with "AI-generated by Muse Image" on the picture itself. Any image
@@ -116,7 +127,11 @@ moment (on paper it reads "(see clip N)"). The letter can be edited on the page 
 re-checked in the browser against the same measurements, and a number that is not there, a number in words or a
 speed in mph gets a red underline.
 
-SAM replies are cached per output folder, so re-running costs nothing. An output folder refuses a different video.
+SAM replies are cached per output folder, and so are Muse Spark's and Muse Wonder's: each raw reply is saved beside
+its crop or sound clip (person-<id>.json, event<N>-heard.json) under the SHA-256 of what was sent, and read again
+while that is unchanged. Same footage, same numbers: a re-run neither pays again nor changes the counts a signed
+letter quotes, and analyze.py prints "Spark verdicts reused: N of M". Delete those files to make Spark or Wonder look
+again, and keep the same ffmpeg between a run and its re-run. An output folder refuses a different video.
 A dropped SAM request is retried after 10, 30 and 90 s (130 s in all; longer when Meta's Retry-After asks, e.g. 60 s
 on a 503). A longer dropout still ends the run, and a re-run resumes from the cache.
 Videos are sent to SAM in 15-second parts that overlap by 2 s, so a person crossing a cut keeps one ID. Parts are
@@ -131,9 +146,14 @@ says when it filled (on the Indian time-lapse: "person: 16 objects taken within 
 
 `"window_s": [S, E]` in the site file analyses only seconds S to E of the recording, picked by the window rule in
 `GATES.md` before any near-miss is seen; the SHA-256 is still of the whole original, clip time 0 is second S, and the
-page's times count from second S. A window under 15 minutes gets no hourly rates, PV² or school-year line, and
-`analyze.py` warns about it. A window that ends past the end of the video is refused, and changing the window needs a
-new `--out` folder.
+page's times count from second S. The page names the analysed minutes beside the original's SHA-256, and the
+school-year line scales no further than them ("the M analysed minutes of each dismissal"). A window under 15 minutes
+gets no hourly rates, PV² or school-year line, and `analyze.py` warns about it. A window that ends past the end of
+the video is refused, and changing the window needs a new `--out` folder.
+
+`"feet_hidden": true` or `false` in the site file (default true; ignored for `"view": "top-down"`). At an angle, a
+person's frame is dropped when the bottom of its box sits on a vehicle's box (from 2 px above its top to 2 px above
+its bottom): a scooter rider, or feet hidden by a nearer vehicle. People only.
 
 ### Open weights: Muse Glimmer writes the letter
 
@@ -369,8 +389,11 @@ to set it.
 - **Vehicles in crowd mode too** (`"vehicle_mode": "crowd"`, for dense traffic that fills SAM's 16 objects). Vehicles
   are detected on every frame (10 a second): at 5 a second a review showed motorcycles over ~36 km/h outran the
   tracker's one-body-size match and vanished. The geometry finds 48 of 52, all 4 misses at a threshold. After
-  Spark's review: 45 of 52 found and 4 real false alarms; Spark called 3 pedestrians in true conflicts "unclear", and
-  17 events come from pieces it has not seen (30 of 52 if it rejected them all).
+  Spark's review: 48 of 52 found and 4 real false alarms. Spark called 3 pedestrians in true conflicts "unclear";
+  "unclear" now keeps the person (only a sure "no" removes one), so here the review makes no net difference (48 with
+  or without it); in crowd mode it costs 5 real conflicts and removes one false alarm. That rule was set after seeing
+  these 3 DUT cases, with no held-out check (GATES.md, 29 Oct). 17 events come from pieces it has not seen (33 of 52
+  if it rejected them all).
 - **Spark's rider calls:** Spark called walking students "rider" or "cyclist", though DUT tracks no bikes. In vehicle
   crowd mode that cost 17 true conflicts (28 of 52 found). So a rider call now stands only when SAM finds a
   motorcycle, bicycle, scooter or auto rickshaw box under the person (`review.gated`); otherwise they stay a
@@ -388,8 +411,8 @@ to set it.
   between cars: the tracker joined different road users across the skipped time. Only its detection coverage, the
   objects found per frame, still means something: SAM video found on average 1.6 people and 6 vehicles a frame, crowd
   mode 14.9 people and 20 vehicles. Its site file now says `"not_measurements"`, so pack.py and the case agent
-  show the warning and ask for no letter whatever its events.json holds. The walking-pace guard below flags it on
-  its own only in crowd mode after an analyze.py re-run (SAM video mode keeps too few walkers to judge).
+  show the warning and ask for no letter whatever its events.json holds. The walking-pace guard below does not judge
+  it: with the feet-hidden rule crowd mode keeps 7 walking pieces, and SAM video mode none.
 - **What the real false alarms are:** two are in clip 09 and were checked frame by frame on 28 Oct. One is a real
   person in yellow whom the dataset stops tracking after 1.8 s while they keep walking along the kerb, so it may be a
   gap in the ground truth. The other is a person standing still at the road edge for the whole clip; the dataset
@@ -438,7 +461,7 @@ replies on 29 Oct (details in `GATES.md`):
 | DUT drone clips, our tracks (8 clips, each in crowd mode, SAM video and 2 x 2 tiles) | 11-129 per run | 1.05-1.48 m/s |
 | DUT and SinD, the datasets' own tracks | 280 / 63 | 1.22 / 1.13 m/s |
 | Schoolchildren CCTV (assumed calibration), two runs | 13 / 14 | 0.80 / 1.66 m/s |
-| Indian time-lapse, crowd mode | 13 | 2.71 m/s: flagged |
+| Indian time-lapse, crowd mode | 7 | 2.71 m/s: not judged (fewer than 10 pieces; the site file's not_measurements still marks it) |
 | Indian time-lapse, SAM video | 0 | not judged |
 
 It sees only the people the tracker keeps: on the time-lapse the fastest were lost, so it reads 2.1x normal walking,
@@ -544,6 +567,8 @@ Measuring near-misses from video is not new, in India either. Each line says onl
   of 7 October 2025, 2025 INSC 1189, paras 35.5, 35.6 and 35.11. https://www.livelaw.in/pdf_upload/2037620122025-10-07-624635.pdf
 - Ministry of Road Transport and Highways (MoRTH), Road Accidents in India 2023, Annexure 46 (the 50 million-plus
   cities). The morth.nic.in link no longer serves the PDF; mirror: https://data.opencity.in/dataset/road-accidents-in-india-2023
+- Motor Vehicles (Driving) Regulations, 2017, regulation 16(5). Gazette of India Extraordinary No. 525, 23 June
+  2017, G.S.R. 634(E): https://keralapolice.gov.in/storage/orders/iaps/cir-15-2018.pdf
 - UK Department for Transport (2019), Traffic Signs Manual chapter 6, section 13.5 (gaps in traffic).
 - Traffic Conflict Technique (TCT) toolkit, school zones (CDC/FIA), one-pager:
   https://www.childhealthinitiative.org/media/v5bntgmp/tct-toolkit__one-pager_final_508_updated.pdf
