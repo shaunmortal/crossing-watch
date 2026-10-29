@@ -77,8 +77,9 @@ alike and the G6 speed check is timed on a 30 fps original.
 
 Mark everything before the rush, and photograph each mark with the tape visible. Write every distance in
 `notes.txt` (it is never committed). Chalk each mark **on the road at the foot of the kerb**, not on top of the
-kerb: the ground plane is the road, and a mark on a kerb 15 cm high sits off it. Measure the kerb height once and
-write it in `notes.txt`. Put the rectangle on the real desire line, where people actually cross.
+kerb: the ground plane is the road, and a mark on a kerb 15 cm high sits off it (tape on the kerb top makes speeds
+read low: 3.3% / 5.0% / 6.7% for a 0.10 / 0.15 / 0.20 m kerb with the camera 3 m up and 4 m back; README,
+Validation). Measure the kerb height once and write it in `notes.txt`. Put the rectangle on the real desire line, where people actually cross.
 
 1. **One zero point** on the near kerb, such as a gate post. Write the along-kerb distance from it to all 8 marks:
    the 4 rectangle corners and the 4 speed-line marks. A far mark sits straight across from its near mark.
@@ -203,7 +204,8 @@ tape marks are visible when zoomed in, and nothing stands between the camera and
   into the road and back counts as a crosser.
 - Check the file loads before any re-encoding:
   `python3 -c "import sys, analyze, agent; s = analyze.load_site(sys.argv[1]); agent.check_distance(s); print('ok')" SITE.json`
-- Free estimate: `python3 analyze.py CLIP.MOV SITE.json --budget 0` prints the minutes it would analyse and "SAM
+- Free estimate: `python3 analyze.py CLIP.MOV SITE.json --budget 0` first prints `recorded <date> IST` (or
+  `recording date NOT RECORDED` when the file has no creation time), then the minutes it would analyse and "SAM
   cost about $X", then, on a first run, stops before any request. A site with `"person_mode"` or `"vehicle_mode"` set
   to `"auto"` first prints "auto mode may add up to $Y of SAM images": what auto mode would add if every auto
   concept switched to frame by frame after the video requests are paid. Pick the modes and the budget from both.
@@ -222,6 +224,9 @@ tape marks are visible when zoomed in, and nothing stands between the camera and
   ```
 
 - Before it: both backups made, and 30-40 GB free on the Mac.
+- After it, at $0: `python3 feet_overlap.py SITE.json out/CLIP` gives the share of person frames whose feet sit on a
+  vehicle's box, from the cached run (how often a phone at an angle may lose feet behind a vehicle; a proxy, not
+  ground truth).
 - Chat apps closed. Optional: seconds shown in the menu-bar clock.
 - Label the run in the video as sped up, by the real factor from the recording's length. On the rehearsal: a
   5-second Cmd+Shift+5 test checked with `ffprobe`, and a timed short run for that factor.

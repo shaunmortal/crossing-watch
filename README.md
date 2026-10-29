@@ -195,7 +195,14 @@ estimated first at Meta's list prices: a run over $10 needs `--allow-cost`, and 
 nothing lifts. With `"person_mode": "auto"` or `"vehicle_mode": "auto"`, a concept goes to SAM video first; if a part
 fills its 16 objects before the next part takes over, that concept is detected frame by frame instead and the page
 says when it filled (on the Indian time-lapse: "person: 16 objects taken within 1.0-1.6 s in 3 of 3 parts"). Before
-anything is paid, analyze.py prints the most that switch could add in SAM images.
+anything is paid, analyze.py prints the most that switch could add in SAM images, before the SAM cost line, so a
+`--budget 0` estimate shows it too.
+Each run first prints when the phone started recording, `recorded <date> IST`, from the file's creation time (or
+`recording date NOT RECORDED` when it has none), and keeps it as `"recorded"` in `out/VIDEO/source.json`. That file
+also stamps the settings the paid SAM replies depend on: the video's bytes and SHA-256, `prep_filter`, the window,
+`FPS`, `WIDTH`, `CHUNK_FRAMES`, `OVERLAP_FRAMES`, and crowd mode's sampling rates `crowd_fps` and `vehicle_fps`
+(a folder stamped before those two counts as made with today's rates). A folder made with other values is refused,
+so changing any of them after a paid run means a new `--out` folder and paying SAM again.
 
 `"window_s": [S, E]` in the site file analyses only seconds S to E of the recording, picked by the window rule in
 `GATES.md` before any near-miss is seen; the SHA-256 is still of the whole original, clip time 0 is second S, and the
@@ -247,7 +254,8 @@ number and no claim, so the code check and the reviewer both passed it. So the l
 open-weights reply whose fields are wordless, or one short piece repeated, now goes back as unreadable. The code
 check and the reviewer still run after that, and the run record counts the model's tries.
 `LETTER_MODEL_KEY` adds a Bearer token for a server that needs one, and the letter says "self-hosted" only when the
-server runs on the same machine.
+server runs on the same machine. Every `LETTER_MODEL_*` and `JUDGE_MODEL_*` setting is read from the shell, else from
+`.env`.
 `JUDGE_MODEL_URL` makes the open-weights model a judge too: it reviews the letter beside Muse Spark, or alone without a
 Meta key, and the page names only the judges that ran. As a judge on the planted-lies bench, Glimmer objected to
 6 of 8 clean letters (below).
@@ -289,6 +297,12 @@ the server rejects the JSON schema with HTTP 400, pack.py asks once more for any
 First Fireworks run, 29 Oct, on `sample/`: Muse Spark Open wrote the fix and letter in one try, 55.5 s wall time (1,019 prompt and 2,732 completion tokens, 2,140 of them reasoning), and both the number check and Muse Spark as judge passed it. The record is `provenance/spark-open-fireworks-sample.json` (request id, usage and the letter's sha256; no key). An earlier attempt the same day, with the number lock on, came back as "a0a0a0..."; that is why the lock is now opt-in.
 
 Our crossing's letter from Muse Spark Open, written on a copy of the folder after Monday's paid run (never the folder the principal signs): GATE-TBD (record `provenance/spark-open-fireworks-gate.json`, with the gate pack's sha256).
+
+A judge whose call fails (a dropped line, an HTTP 503, a reply of the wrong shape) never throws the letter away: the
+letter is kept with the point "The reviewer's reply could not be read." to check. The letter prompt signs it from "The
+Principal" and asks for no placeholders, and signing (`pack.py --approved-by` or `agent.py --approve`) refuses a
+letter that still holds a blank such as `[School name]`, `{Date}` or `____`: give the real words in the principal's
+notes first.
 
 Either model can judge the other's letter. `JUDGE_MODEL` (default: `LETTER_MODEL`) and `JUDGE_MODEL_KEY` belong to the
 judge server alone, and neither server is sent the other's key; a judge on the letter's own URL with no
@@ -612,6 +626,8 @@ python3 vehicle_test.py out/indian-crowd --spend   # 60 cached crowd frames, abo
   before Spark's review: 1 of 54 conflicts (vehicle crowd mode) and 1 of 55 (crowd mode) on the top-down DUT clips.
   SAM video mode fills nothing in, so it never flags one.
 - A person standing still on the carriageway when a car passes within 1 m is reported as a near-miss.
+- With `roadway_m` in the site file, crossings count only people on the carriageway, and the kerbs are taken as
+  straight and parallel for 40 m either way; someone who steps 2 m into the road and back counts as a crosser.
 - The death-risk curve is for adults (15+) hit by a car front; children are not covered by that study.
 - Distances are only as good as the measured calibration rectangle.
 - Rates per hour from a short video are scaled, not a peak-hour count; the page says so next to PV², and shows no

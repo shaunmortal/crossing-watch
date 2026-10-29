@@ -646,6 +646,16 @@ On the merged build (commit 5083592), with no key in the environment and no API 
   and `python3 pack.py sample sample/site.json` wrote a measurements-only page ("2 serious, 0 close passes, fix:
   none"), saying the letter needs `MODEL_API_KEY` or `LETTER_MODEL_URL`.
 
+## Spark's rider call needs the feet no lower than the bike (Thu 29 Oct 2026, commit 5d8d222)
+
+- **Rule.** Muse Spark calling someone a rider removes them only when their feet are no lower than a bike's box
+  (`review.gated` now uses road.py's rider rule, `road.RIDER_FEET_PX`), so a walker passing in front of a parked bike
+  stays a pedestrian, marked `rider_unconfirmed`.
+- **Re-scored at $0** with `validate_offline.py` on the cached DUT runs and Spark's stored verdicts, before and after
+  the rule: no number changed. Vehicle crowd mode (`out/dut-vcrowd`): 48 of 52 by the geometry and after review, 6
+  false alarms, speed 0.16 / 0.55 km/h. Crowd mode (`out/dut-15s`): 49 of 52 by the geometry, 44 of 52 after review, 5
+  false alarms, speed 0.15 / 0.43 km/h. The README's numbers stand.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
