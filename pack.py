@@ -2,7 +2,8 @@
 letter from the measured events only; Muse Image draws that fix onto the real street.
 
 Run after analyze.py: python3 pack.py OUT_DIR SITE.json
-Writes OUT_DIR/index.html next to the clips (open it in a browser).
+Writes OUT_DIR/index.html next to the clips (open it in a browser), and OUT_DIR/share/: the page and only the files it
+shows, the one folder to publish.
 """
 import argparse
 import base64
@@ -11,12 +12,14 @@ import http.client
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import urllib.request
 import uuid
 from pathlib import Path
 
+import ailabel
 import crowd
 import render
 import review
@@ -46,6 +49,8 @@ LETTER:
 {letter}"""
 LETTER_TRIES = 3     # Spark gets this many tries at a letter whose every number was measured
 NUMBER = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?")  # 1,200 is one number
+SHOWN_FILE = re.compile(r'\bsrc="([^"#?]+)')  # a file the page shows (a clip or a picture), without #t=...
+UNSHAREABLE = re.compile(r"clip\.mp4|person-.*\.jpg")  # the unblurred video and the unblurred crops Spark saw
 LETTER_PROMPT = """You help a school ask its road authority to make the crossing outside it safer.
 Below are measurements from a video of the crossing, made by Crossing Watch (SAM 3.1 tracking, road-plane geometry,
 post-encroachment time). Use ONLY these facts; never invent numbers, names, places or dates.
@@ -232,7 +237,8 @@ def open_model_reply(prompt, image):
 
 
 def draw_fix(photo, instruction, api_key, out_path):
-    """Muse Image edit of the real street photo; returns out_path."""
+    """Muse Image edit of the real street photo, saved untouched as out_path (.webp): converting it would drop Meta's
+    AI tag (IPTC trainedAlgorithmicMedia). Returns out_path."""
     boundary = uuid.uuid4().hex
     parts = [f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode()
              for k, v in (("model", IMAGE_MODEL), ("prompt", instruction))]
@@ -245,10 +251,7 @@ def draw_fix(photo, instruction, api_key, out_path):
     data = reply.get("data") if isinstance(reply, dict) else None
     if not (isinstance(data, list) and data and isinstance(data[0], dict) and data[0].get("b64_json")):
         raise ValueError(f"Muse Image returned no image: {str(reply)[:200]}")
-    image = base64.b64decode(data[0]["b64_json"])
-    raw = out_path.with_suffix(".webp")
-    raw.write_bytes(image)
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(raw), str(out_path)], check=True)
+    out_path.write_bytes(base64.b64decode(data[0]["b64_json"]))
     return out_path
 
 
@@ -322,9 +325,9 @@ def fix_section(plan, images):
     if not images:
         return head + "</section>"
     return head + f"""
-<div class="pair"><figure><img src="{images[0]}" alt="The street today"><figcaption>Today</figcaption></figure>
-<figure><img src="{images[1]}" alt="The street with the fix, drawn by Muse Image"><figcaption>With the fix
-(drawn by Muse Image)</figcaption></figure></div></section>"""
+<div class="pair"><figure><img src="{html.escape(images[0])}" alt="The street today"><figcaption>Today</figcaption></figure>
+<figure><img src="{html.escape(images[1])}" alt="The street with the fix, drawn by Muse Image"><span class="ai-label">{ailabel.LABEL}</span>
+<figcaption>AI-drawn proposal by Muse Image, not a photo</figcaption></figure></div></section>"""
 
 
 def letter_section(plan):
@@ -337,9 +340,15 @@ def letter_section(plan):
     checked = (f"Every number was checked against the measurements by code, and the claims by {plan['judged_by']}."
                if plan.get("judged_by") else "Every number was checked against the measurements by code.")
     check += f'<p class="note">{html.escape(checked)}</p>' if not plan.get("unmeasured") and not plan.get("unsupported") else ""
-    writer = f'<p class="note">Fix and letter written by {html.escape(plan["writer"])}.</p>' if plan.get("writer") else ""
-    return (f'<section><h2>Letter to the road authority</h2>{writer}<div class="letter">{paragraphs}</div>{check}'
-            '</section>')
+    return (f'<section><h2>Letter to the road authority</h2><div class="letter">{paragraphs}</div>{check}'
+            f'{disclosure(plan)}</section>')
+
+
+def disclosure(plan):
+    """Written by code after both checks, never inside plan["letter"] (the number check would read it): the letter
+    is an AI draft until a named person approves it, and Meta's AUP forbids passing outputs off as human-written."""
+    return (f'<p class="disclosure">Drafted by {html.escape(plan.get("writer") or "an AI model")} from the measurements '
+            "in this pack. Read and approved by: ____ (name, role, date).</p>")
 
 
 STYLE = """
@@ -352,7 +361,9 @@ h1 { font-size: 1.8rem; margin: 0 0 4px; } h2 { margin-top: 40px; } .muted, .not
 .card { border-top: 1px solid var(--line); padding: 16px 0; } video, img { width: 100%; border-radius: 6px; }
 table { border-collapse: collapse; width: 100%; } td, th { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); }
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } @media (max-width: 600px) { .pair { grid-template-columns: 1fr; } }
-figure { margin: 0; } .letter { border-left: 3px solid var(--line); padding-left: 16px; }
+figure { margin: 0; position: relative; } .letter { border-left: 3px solid var(--line); padding-left: 16px; }
+.ai-label { position: absolute; left: 8px; top: 8px; padding: 2px 8px; border-radius: 4px; background: #000c; color: #fff;
+            font-size: 0.8rem; } .disclosure { border: 1px dashed var(--muted); padding: 8px 12px; }
 """
 
 
@@ -391,6 +402,19 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None):
 {engineering(seen, cost)}
 {map_section(events, site)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{letter_section(plan)}
 <section><h2>How this was measured</h2><p class="note">{html.escape(method)}</p></section></body></html>"""
+
+
+def share(out_dir, page_html):
+    """out_dir/share/: the page and only the files it shows, for the GitHub release. Never the unblurred video or
+    the person crops, even if a page names one; the Muse Image .webp goes in untouched, AI tag and all."""
+    folder = out_dir / "share"
+    shutil.rmtree(folder, ignore_errors=True)
+    folder.mkdir()
+    for name in {html.unescape(n) for n in SHOWN_FILE.findall(page_html)}:
+        if Path(name).name == name and (out_dir / name).is_file() and not UNSHAREABLE.fullmatch(name):
+            shutil.copyfile(out_dir / name, folder / name)
+    (folder / "index.html").write_text(page_html)
+    return folder
 
 
 def clip_minutes(clip, fps):
@@ -432,12 +456,13 @@ def main():
             plan = ask_plan(prompt, measured, key, photo)
             (out_dir / "plan.json").write_text(json.dumps(plan, indent=1, ensure_ascii=False))  # the paid-for letter
             if photo and key:  # Muse Image draws the fix; without a key there is no street image on the page
-                images = (photo.name, draw_fix(photo, plan["image_prompt"], key, out_dir / "street-fixed.jpg").name)
+                images = (photo.name, draw_fix(photo, plan["image_prompt"], key, out_dir / "street-fixed.webp").name)
         except (SystemExit, OSError, ValueError, KeyError, IndexError, TypeError, AttributeError,
                 http.client.HTTPException, subprocess.CalledProcessError) as err:
             print(f"letter or fix image failed, page will show the measurements only: {err}", file=sys.stderr)
-    (out_dir / "index.html").write_text(page(site, events, seen, plan, images, data["fps"], data.get("cost"),
-                                             data.get("sam_full_requests")))
+    page_html = page(site, events, seen, plan, images, data["fps"], data.get("cost"), data.get("sam_full_requests"))
+    (out_dir / "index.html").write_text(page_html)
+    share(out_dir, page_html)  # the only folder to publish
     print(f"wrote {out_dir / 'index.html'}: {len(serious(events))} serious, {len(events) - len(serious(events))} close "
           f"passes, fix: {plan['fix'] if plan else 'none'}")
 
