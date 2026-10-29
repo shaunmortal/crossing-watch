@@ -5,6 +5,7 @@ Run after analyze.py: python3 pack.py OUT_DIR SITE.json
 Writes OUT_DIR/index.html next to the clips (open it in a browser), and OUT_DIR/share/: the page and only the files it
 shows, the one folder to publish, with their SHA256SUMS. The letter is kept in OUT_DIR/plan.json, so a re-run pays
 nothing; --notes FILE revises it, and --approved-by NAME --school SCHOOL signs it (OUT_DIR/signoff.json).
+A signed letter is replaced only with --new-letter, and kept as plan-<sha>.json.
 python3 pack.py --verify FOLDER checks a shared folder: MATCH, CHANGED or MISSING per file.
 """
 import argparse
@@ -39,6 +40,7 @@ import roadmap
 import road
 import sam
 import seal
+import summary
 
 IMAGE_EDIT_URL = "https://api.meta.ai/v1/images/edits"
 IMAGE_MODEL = "muse-image-1.0"
@@ -90,7 +92,7 @@ MPH = re.compile(rf"(?:(?:{NUMBER.pattern})\s?)?(?<![a-z])(?:mph|miles (?:per|an
 WITH_UNIT = re.compile(rf"({NUMBER.pattern})\s?(km/h|kmph|s(?:ec(?:ond)?s?)?|%|per ?cent)(?![\w/])", re.I)
 UNIT_FIELD = {"k": "vehicle_kmh", "s": "pet_s", "%": "death_risk_pct", "p": "death_risk_pct"}  # unit's 1st letter
 SENTENCE = re.compile(r"(?<=[.!?])\s+|\n")
-SHOWN_FILE = re.compile(r'\bsrc="([^"#?]+)')  # a file the page shows (a clip or a picture), without #t=...
+SHOWN_FILE = re.compile(r'\b(?:src|poster)="([^"#?]+)')  # a file the page shows (clip, poster, picture), no #t=...
 UNSHAREABLE = re.compile(r"clip\.mp4|person-.*\.jpg")  # the unblurred video and the unblurred crops Spark saw
 PLAN_KEYS = ("fix", "why", "image_prompt", "letter")
 PLAN_SCHEMA = {"type": "object", "properties": {k: {"type": "string"} for k in PLAN_KEYS}, "required": list(PLAN_KEYS),
@@ -135,6 +137,7 @@ NOTES:
 # school's own facts nor take them as measured
 STATED = "\n\nSTATED BY THE PRINCIPAL, NOT MEASURED (a letter may give these as the school's own statements):\n"
 SIGNOFF_KEYS = ("approved_by", "school", "date", "letter_sha256")  # signoff.json
+PLAN_BACKUP = "plan-{sha8}.json"  # a replaced plan.json, named by the first 8 hex digits of its letter's sha256
 FILED_KEYS = ("to", "channel", "date", "reference")  # the site's "submitted" record, once the pack is filed
 TCT_TOOLKIT = "https://www.childhealthinitiative.org/media/v5bntgmp/tct-toolkit__one-pager_final_508_updated.pdf"
 PRINTED_CARDS = 3  # on paper only the worst 3 near-misses, so the letter's own sheet comes soon
@@ -621,16 +624,33 @@ def street_photo(clip, out_path, person_concept="person", vehicles=()):
     return out_path
 
 
+def article(word):
+    """`word` after "a" or "an", by its first letter: "an auto rickshaw", "a motorcycle"."""
+    return ("an " if word.lower().startswith(tuple("aeiou")) else "a ") + word
+
+
 def passed(e):
     """Who the vehicle passed, by Spark's review: the road user and, escaped, "a ..." / "an ..."."""
     verdict = e.get("review") or {}
     road_user = verdict.get("road_user", "pedestrian (not reviewed by Spark)")
     road_user = review.unconfirmed_rider(verdict) or ("pedestrian" if road_user == "unclear" else road_user)
-    return road_user, html.escape(("an " if road_user[0] in "aeiou" else "a ") + road_user)
+    return road_user, html.escape(article(road_user))
 
 
 def video_tag(e):
     return f'<video src="{html.escape(e["clip"])}" controls muted loop playsinline></video>' if e.get("clip") else ""
+
+
+def card_title(i, e):
+    """Card #i's title, escaped: tier, vehicle, speed, gap and who was passed. Also the first screen's clip caption."""
+    return (f'#{i} &middot; {html.escape(e.get("tier", "serious"))} &middot; {html.escape(e["vehicle"].split("#")[0])} '
+            f'at {e["vehicle_kmh"]} km/h, {e["pet_s"]:.1f} s from {passed(e)[1]}')
+
+
+def first_clip(events):
+    """(card number, event) of the first shown near-miss with its own blurred clip, never clip.mp4; or None."""
+    return next(((i, e) for i, e in enumerate(events[:SHOWN_EVENTS], 1)
+                 if e.get("clip") and not UNSHAREABLE.fullmatch(e["clip"])), None)
 
 
 def tracked_card(i, e):
@@ -645,10 +665,10 @@ def event_card(i, e, fps, strip=""):
     """Card #i, linkable as #event-i; data-t is the second of its clip when the first of the two reached the spot.
     `strip` is overlay.strip()'s stopping strip for this card, if any."""
     verdict, at30, at20 = e.get("review") or {}, e["with_limit"]["30"], e["with_limit"]["20"]
-    road_user, who = passed(e)
+    road_user = passed(e)[0]
     moment_s = min(e["t_person_s"], e["t_vehicle_s"]) - render.window(e, fps)[0] / fps
     return f"""<article class="card" id="event-{i}" data-t="{moment_s:.2f}">{overlay.strobe(e)}{overlay.clip(video_tag(e), e, strip)}
-<h3>#{i} &middot; {html.escape(e.get("tier", "serious"))} &middot; {html.escape(e["vehicle"].split("#")[0])} at {e["vehicle_kmh"]} km/h, {e["pet_s"]:.1f} s from {who}</h3>
+<h3>{card_title(i, e)}</h3>
 <table><tr><th></th><th>Impact speed if hit</th><th>Adult death risk</th></tr>
 <tr><td>As driven</td><td>{e.get("impact_kmh", e["vehicle_kmh"])} km/h</td><td>{e["death_risk_pct"]}%</td></tr>
 <tr><td>30 km/h limit</td><td>{at30["impact_kmh"]} km/h</td><td>{at30["death_risk_pct"]}%</td></tr>
@@ -662,7 +682,7 @@ def risk_caveat(road_user, vehicle):
     """The death-risk curve is for adults hit by a car front; say so where this event is neither."""
     notes = ["The curve is for adults, so this is not a child's risk."] if road_user == "child" else []
     if vehicle != "car":
-        notes.append(f"It was measured for car fronts; for a {vehicle} it is only a rough guide.")
+        notes.append(f"It was measured for car fronts; for {article(vehicle)} it is only a rough guide.")
     return " ".join(notes)
 
 
@@ -688,7 +708,7 @@ def map_section(events, site, ground=None, paths=None, measured=True):
     lines = roadmap.desire_lines(paths, site)  # the counts, then IRC:103-2012's words, shown as a note
     desire = "".join(f"<p>{html.escape(line)}</p>" for line in lines[:-1]) + "".join(
         f'<p class="note">{html.escape(line)}</p>' for line in lines[-1:])
-    return (f"<section><h2>{'Where it happened' if placed else 'Where people crossed'}</h2>"
+    return (f"<section id=\"map\"><h2>{'Where it happened' if placed else 'Where people crossed'}</h2>"
             f"{roadmap.svg(events, site['world_points'], SHOWN_EVENTS, ground, paths, measured)}<p class=\"note\">Seen from "
             f"above, in metres on the road (grid every 5 m; dashed: the measured area).{trails}{near}{under}</p>"
             f"{desire}</section>")
@@ -697,13 +717,13 @@ def map_section(events, site, ground=None, paths=None, measured=True):
 def fix_section(plan, images):
     if not plan:
         return ""
-    head = f"""<section><h2>Proposed fix: {html.escape(plan["fix"])}</h2><p>{html.escape(plan["why"])}</p>"""
+    head = f"""<section id="fix"><h2>Proposed fix: {html.escape(plan["fix"])}</h2><p>{html.escape(plan["why"])}</p>"""
     if not images:
         return head + "</section>"
     return head + f"""
 <div class="pair"><figure><img src="{html.escape(images[0])}" alt="The street today"><figcaption>Today</figcaption></figure>
 <figure><img src="{html.escape(images[1])}" alt="The street with the fix, drawn by Muse Image"><span class="ai-label">{ailabel.LABEL}</span>
-<figcaption>AI-drawn proposal by Muse Image, not a photo</figcaption></figure></div></section>"""
+<figcaption>{summary.AI_DRAWN}</figcaption></figure></div></section>"""
 
 
 def fix_instruction(plan):
@@ -727,7 +747,7 @@ def legal_section(site):
                      for para, page, text in [SCHOOL_ZONES] + ([SURVEY] if listed else []) + [GRIEVANCE])
     annexure = (f'<p class="note">{html.escape(city)} is one of the 50 million-plus cities in Annexure 46 of MoRTH\'s '
                 "Road Accidents in India 2023.</p>" if listed else "")
-    return (f'<section><h2>Why the authority can act</h2>{quotes}{annexure}<p class="note">{html.escape(LEGAL_NOTE)}</p>'
+    return (f'<section id="law"><h2>Why the authority can act</h2>{quotes}{annexure}<p class="note">{html.escape(LEGAL_NOTE)}</p>'
             f'<p class="note">Source: {html.escape(ORDER)} (<a href="{ORDER_PDF}">PDF</a>).</p></section>')
 
 
@@ -846,15 +866,21 @@ def letter_section(plan, events=(), measured="", signoff=None):
     clean = not (plan.get("unmeasured") or plan.get("mixed") or plan.get("unsupported"))
     known = " ".join(sorted({n.replace(",", "") for n in NUMBER.findall(measured + stated_text(plan.get("notes")))}))
     writer = f'<p class="note">{html.escape(note)}</p>' if (note := writer_note(plan)) else ""
-    return (f'<section class="letter-sheet"><h2>Letter to the road authority</h2>{writer}<div class="letter" '
+    return (f'<section class="letter-sheet" id="letter"><h2>Letter to the road authority</h2>{writer}<div class="letter" '
             f'contenteditable="plaintext-only" spellcheck="false" role="textbox" aria-multiline="true" '
             f'aria-label="Letter, editable" data-measured="{known}">{paragraphs}</div>{check}<p class="note ok" id="letter-check"'
             f'{"" if clean else " hidden"}>{html.escape(checked) if clean else ""}</p>{disclosure(plan, signoff)}'
             f"{LETTER_SCRIPT}</section>")
 
 
-# the same three checks as unmeasured(), re-run in the browser on every edit, and a linked number's click
+# the same three checks as unmeasured(), re-run in the browser on every edit, a linked number's click, and on paper
+# the letter first: moved to the top of the page while it prints (a flex `order` cuts lines across pages in WebKit)
 LETTER_SCRIPT = """<script>{  // a block, so its names never clash with another script on the page
+let sheet, after;
+addEventListener("beforeprint", () => {
+  sheet = document.querySelector(".letter-sheet"); after = sheet.nextSibling; document.body.prepend(sheet);
+});
+addEventListener("afterprint", () => sheet.parentNode.insertBefore(sheet, after));
 const letter = document.querySelector(".letter"), verdict = document.getElementById("letter-check");
 const known = new Set(letter.dataset.measured.split(" ").filter(Boolean).map(Number));
 const checks = [[new RegExp(%s, "g"), n => !known.has(Number(n.replaceAll(",", "")))],
@@ -890,13 +916,35 @@ def disclosure(plan, signoff=None):
     is an AI draft until a named person approves it, and Meta's AUP forbids passing outputs off as human-written.
     signoff.json fills in the blank only while its sha256 is still the letter's."""
     source = "the measurements in this pack" + (" and the principal's notes" if plan.get("notes") else "")
-    signed = bool(signoff) and signoff["letter_sha256"] == sha256(plan["letter"])
+    signed = is_signed(plan, signoff)
     by = (f"{signoff['approved_by']}, {signoff['school']}, {signoff['date']} ({edits(plan)})" if signed
           else "____ (name, role, date)")
-    stale = (f'<p class="note bad">Changed after sign-off by {html.escape(signoff["approved_by"])} on '
-             f'{html.escape(signoff["date"])}, not signed.</p>' if signoff and not signed else "")
+    stale = stale_line(signoff) if signoff and not signed else ""
     return (f'{stale}<p class="disclosure">Drafted by {html.escape(plan.get("writer") or "an AI model")} from {source}. '
             f"Read and approved by: {html.escape(by)}.</p>")
+
+
+def stale_line(signoff):
+    return (f'<p class="note bad">Changed after sign-off by {html.escape(signoff["approved_by"])} on '
+            f'{html.escape(signoff["date"])}, not signed.</p>')
+
+
+def letter_status(site, plan, signoff):
+    """Where the letter stands, for the first screen: changed after its sign-off, filed, approved while the sign-off
+    is still the letter's, or a draft."""
+    if signoff and not is_signed(plan, signoff):
+        return stale_line(signoff)
+    if submitted(site):
+        return filed_line(site)
+    if signoff:
+        by = ", ".join(html.escape(signoff[k]) for k in ("approved_by", "school", "date"))
+        return f'<p class="note ok">Approved by {by}.</p>'
+    return '<p class="note">Draft, not yet approved.</p>'
+
+
+def is_signed(plan, signoff):
+    """signoff.json (read_signoff) approves this plan's letter: its letter_sha256 is still the letter's."""
+    return bool(plan and signoff) and signoff["letter_sha256"] == sha256(plan["letter"])
 
 
 def edits(plan):
@@ -919,13 +967,12 @@ def sha256(text):
 
 
 STYLE = """
-:root { --bg: #fafaf7; --ink: #1d1d1b; --muted: #66665f; --line: #deded6; --accent: #c0392b; --ok: #2e7d32; }
-@media screen and (prefers-color-scheme: dark) { :root { --bg: #161614; --ink: #ececE6; --muted: #a3a39a; --line: #34342f; --accent: #ff6b5b; --ok: #7bd88f; } }
+:root { --bg: #fafaf7; --ink: #1d1d1b; --muted: #66665f; --line: #deded6; --accent: #c0392b; --ok: #2e7d32; --warn: #b26b00; }
+@media screen and (prefers-color-scheme: dark) { :root { --bg: #161614; --ink: #ececE6; --muted: #a3a39a; --line: #34342f; --accent: #ff6b5b; --ok: #7bd88f; --warn: #f0a830; } }
 body { margin: 0 auto; max-width: 880px; padding: 24px 16px 64px; background: var(--bg); color: var(--ink);
        font: 16px/1.5 system-ui, sans-serif; }
-h1 { font-size: 1.8rem; margin: 0 0 4px; } h2 { margin-top: 40px; } .muted, .note { color: var(--muted); }
+h1 { font-size: 1.8rem; margin: 0 0 4px; } h2 { margin-top: 40px; } .note { color: var(--muted); }
 .lead { font-size: 1.25rem; margin-bottom: 0; }
-.stats { display: flex; gap: 24px; flex-wrap: wrap; margin: 20px 0; } .stats b { display: block; font-size: 2rem; color: var(--accent); }
 .card { border-top: 1px solid var(--line); padding: 16px 0; } video, img { width: 100%; border-radius: 6px; }
 table { border-collapse: collapse; width: 100%; } td, th { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); }
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } @media (max-width: 600px) { .pair { grid-template-columns: 1fr; } }
@@ -943,6 +990,8 @@ cite { display: block; margin-top: 4px; font-style: normal; color: var(--muted);
 .pyramid i.tip { box-sizing: border-box; background: none; border: 2px dashed var(--accent); }
 @media print { a.clip { text-decoration: none; } a.clip::after { content: " (see clip " attr(data-clip) ")"; }
                .letter-sheet { break-before: page; break-after: page; } }
+@media print { h2, h3 { break-after: avoid; } figure, table, blockquote, .pair { break-inside: avoid; }
+               .letter-sheet:first-child { break-before: auto; } }
 """ + (  # dark colours are for screens only (dark ink on white paper); on paper only the worst cards, so say so
     f"@media print {{ article.card:nth-of-type(n+{PRINTED_CARDS + 1}) {{ display: none; }} "
     + ", ".join(f'a.clip[data-clip="{i}"]::after' for i in range(PRINTED_CARDS + 1, SHOWN_EVENTS + 1))
@@ -950,21 +999,25 @@ cite { display: block; margin-top: 4px; font-style: normal; color: var(--muted);
 
 
 def stats(events, seen, measured=True):
-    """The count tiles. They always say how much was watched, so a quiet video never reads as "safe". Not `measured`
-    (pace.warning), only that: its near-miss counts and speeds are not measurements."""
+    """The count tiles, and the other counts as one line. They always say how much was watched, so a quiet video
+    never reads as "safe": serious, close and crossings as tiles, then vehicles, minutes and the 85th-percentile speed.
+    Not `measured` (pace.warning), only what was watched, as tiles: its near-miss counts and speeds are not
+    measurements."""
     n_serious, crossings = len(serious(events)), seen.get("crossings") or 0
     watched = [(crossings, "pedestrian crossings watched"), (seen.get("vehicles", "?"), "moving vehicles"),
-               (seen.get("minutes", "?"), "minutes of video")]
-    near = [(n_serious, f"serious near-misses (under {road.PET_MAX_S} s)"),
-            (len(events) - n_serious, f"close passes ({road.PET_MAX_S}-{road.CLOSE_PASS_S} s)")]
+               (summary.minutes(seen), "minutes of video")]
+    near = [(n_serious, f"serious near-misses (under {road.PET_MAX_S} s)", "serious"),
+            (len(events) - n_serious, f"close passes ({road.PET_MAX_S}-{road.CLOSE_PASS_S} s)", "close")]
     speed = [(seen["speed_85th_kmh"], "km/h, 85% of vehicles at or below")] if seen.get("speed_85th_kmh") else []
-    tiles = [*near, *watched, *speed] if measured else watched
-    return "".join(f"<div><b>{html.escape(str(v))}</b>{html.escape(label)}</div>" for v, label in tiles)
+    tiles, line = ([*near, (*watched[0], "watched")], [*watched[1:], *speed]) if measured else (
+        [(*w, "watched") for w in watched], [])
+    return ("".join(f'<div class="{kind}"><b>{html.escape(str(v))}</b>{html.escape(label)}</div>'
+                    for v, label, kind in tiles), " · ".join(f"{v} {label}" for v, label in line))
 
 
 def lead(lines):
-    """The headline under the title, its ranges and school-year line as notes."""
-    return "".join(f'<p class="{"note" if i else "lead"}">{html.escape(line)}</p>' for i, line in enumerate(lines))
+    """The headline's first line under the title (its ranges and school-year line go under the pyramid)."""
+    return "".join(f'<p class="lead">{html.escape(line)}</p>' for line in lines[:1])
 
 
 def banner(walking, site):
@@ -975,16 +1028,30 @@ def banner(walking, site):
             "asked for.</p>" if warning else "")
 
 
+def top(site, events, seen, plan, images, signoff, full, warning, lines):
+    """The first screen (summary.header). Under the pace warning only the warning and the watched counts; else the
+    headline's first line (of `lines`), the first shown near-miss's clip, the counts and, with a letter, the ask."""
+    tiles, line = stats(events, seen, not warning)
+    shown = None if warning else first_clip(events)
+    video = summary.clip(*shown, card_title(*shown)) if shown else ""
+    asked = (summary.ask(plan, images, is_signed(plan, signoff), letter_status(site, plan, signoff))
+             if plan and not warning else "")
+    return summary.header(site, seen, warning or lead(lines), video, tiles, line,
+                          limit_note(full), asked, "" if asked else filed_line(site))
+
+
 def page(site, events, seen, plan, images, fps, cost=None, full=None, privacy=None, signoff=None, receipt="",
          source_sha256=None, timeline=None, ground=None, paths=None, case="", walking=None):
     warning = banner(walking, site)  # then the headline, pyramid, engineering numbers, barcode and card numbers go
-    measured = "" if warning else (f"{pyramid(events, seen)}\n{engineering(seen, cost)}"
+    lines = [] if warning else headline(events, seen, site)  # its ranges and school-year line go under the pyramid
+    ranges = "".join(f'<p class="note">{html.escape(line)}</p>' for line in lines[1:])
+    measured = "" if warning else (f"{pyramid(events, seen)}{ranges}\n{engineering(seen, cost)}"
                                    f"{roadmap.gap_strip(timeline, events, SHOWN_EVENTS, full)}")
     moments = "Tracked moments, not measurements (see the warning above)" if warning else "Worst moments"
     cards = "\n".join(tracked_card(i + 1, e) if warning else
                       event_card(i + 1, e, fps, overlay.strip(e, site, events[:SHOWN_EVENTS]))
                       for i, e in enumerate(events[:SHOWN_EVENTS])) or (
-        f"<p>No conflicts under {road.CLOSE_PASS_S} s in these {html.escape(str(seen.get('minutes', '?')))} minutes. "
+        f"<p>No conflicts under {road.CLOSE_PASS_S} s in these {html.escape(summary.minutes(seen))} minutes. "
         "A short recording can miss rare events: record more school-run periods before drawing any conclusion.</p>")
     method = (f"SAM 3.1 tracked every pedestrian and vehicle. Four points on the road turned pixels into metres. "
               f"A near-miss is a pedestrian and a moving vehicle on the same spot (within {road.CONFLICT_RADIUS_M} m) "
@@ -994,16 +1061,15 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None, privacy=No
               f"41(3):536-542, for adults hit by a car front; children are not covered by that study. Speed-limit rows "
               f"replay the same moment with the vehicle no faster than the limit, a {road.REACTION_S} s reaction and "
               f"{road.BRAKING_MPS2} m/s² braking. {site.get('calibration_note', '')}")
+    body = f"""{measured}
+{map_section(events, site, ground, paths, not warning)}<section id="clips"><h2>{moments}</h2>{cards}</section>{fix_section(plan, images)}{fixband.figure(images)}{legal_section(site)}
+{letter_section(plan, events[:SHOWN_EVENTS], facts(site, events, seen, paths), signoff)}{case}
+{tct_section()}<section id="method"><h2>How this was measured</h2><p class="note">{html.escape(method)}</p>{privacy_note(privacy)}
+{f'<p class="note">{html.escape(receipt)}</p>' if receipt else ""}{hash_line(source_sha256, site)}</section>"""
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Crossing Watch evidence</title>
-<style>{STYLE}{roadmap.STYLE}{overlay.STYLE}</style></head><body>
-<h1>Crossing Watch: near-miss evidence</h1>
-<p class="muted">{html.escape(site.get("name", ""))}</p>{filed_line(site)}{warning or lead(headline(events, seen, site))}
-<div class="stats">{stats(events, seen, not warning)}</div>{limit_note(full)}{privacy_note(privacy)}{measured}
-{map_section(events, site, ground, paths, not warning)}<section><h2>{moments}</h2>{cards}</section>{fix_section(plan, images)}{fixband.figure(images)}{legal_section(site)}
-{letter_section(plan, events[:SHOWN_EVENTS], facts(site, events, seen, paths), signoff)}{case}
-{tct_section()}<section><h2>How this was measured</h2><p class="note">{html.escape(method)}</p>
-{f'<p class="note">{html.escape(receipt)}</p>' if receipt else ""}{hash_line(source_sha256, site)}</section>{overlay.SCRIPT}</body></html>"""
+<style>{STYLE}{summary.STYLE}{roadmap.STYLE}{overlay.STYLE}</style></head><body>
+{top(site, events, seen, plan, images, signoff, full, warning, lines)}{summary.jump_bar(body)}{body}{overlay.SCRIPT}</body></html>"""
 
 
 def share(out_dir, page_html):
@@ -1070,9 +1136,14 @@ def new_plan(out_dir, prompt, measured, key, photo, revise=None, notes=""):
 
 
 def write_plan(out_dir, plan):
-    """plan.json, the paid-for letter, and beside it when an open-weights server wrote it, PROVENANCE: the model id,
-    host, request id, usage, wall seconds and the letter's sha256 (never the key)."""
-    (out_dir / "plan.json").write_text(json.dumps(plan, indent=1, ensure_ascii=False))
+    """plan.json, the paid-for letter, after copying the letter it held to plan-<first 8 of its sha256>.json, so no
+    paid-for or signed letter is ever lost (signoff.json's letter_sha256 names its file); pack and the case agent both
+    write through here. Beside it, when an open-weights server wrote it, PROVENANCE: the model id, host, request id,
+    usage, wall seconds and the letter's sha256 (never the key)."""
+    path, old = out_dir / "plan.json", read_json(out_dir / "plan.json")
+    if isinstance(old, dict) and isinstance(old.get("letter"), str):
+        shutil.copyfile(path, out_dir / PLAN_BACKUP.format(sha8=sha256(old["letter"])[:8]))
+    path.write_text(json.dumps(plan, indent=1, ensure_ascii=False))
     if LETTER_URL and "wall_s" in plan:
         record = {"model": LETTER_MODEL, "host": openweights.host(LETTER_URL), **{k: plan.get(k) for k in RUN_KEYS},
                   "tries": plan.get("tries"), "letter_sha256": sha256(plan["letter"])}
@@ -1096,6 +1167,22 @@ def read_signoff(out_dir):
     return None
 
 
+def kept_letter(out_dir, signoff, untrusted, new_letter):
+    """Why a run that cannot reuse plan.json (saved_plan found none) must stop, or "": out_dir is agent.py's case,
+    whose letter only agent.py signs, or plan.json holds the letter signoff.json signed and --new-letter was not given.
+    A signed letter may already be filed, so it is never swapped silently."""
+    if (out_dir / "case" / "progress.json").exists():
+        return "this folder is agent.py's case: sign with agent.py --approve"
+    old = read_json(out_dir / "plan.json")
+    if new_letter or not (isinstance(old, dict) and isinstance(old.get("letter"), str) and is_signed(old, signoff)):
+        return ""
+    why = (untrusted.rstrip(".") if untrusted else f"another writer ({old.get('writer')}, now {WRITER})"
+           if old.get("writer") != WRITER else "other measurements")
+    return (f"plan.json holds the letter {signoff['approved_by']} signed on {signoff['date']}, and this run cannot "
+            f"reuse it: {why}. Nothing was written; add --new-letter to replace it (the signed letter is kept as "
+            f"{PLAN_BACKUP.format(sha8=signoff['letter_sha256'][:8])}).")
+
+
 def parse_args():
     """The command line, the notes' text and (approved_by, school), refusing flags that cannot go together."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -1108,8 +1195,11 @@ def parse_args():
     parser.add_argument("--approved-by", default="", metavar="NAME",
                         help='who read and approved plan.json\'s letter, e.g. "A. Rao, Principal" (with --school)')
     parser.add_argument("--school", default="", help="the school that sends the letter")
+    parser.add_argument("--new-letter", action="store_true", help="replace a signed letter this run cannot reuse "
+                        f"(other measurements, another writer or a pace warning); the signed one is kept as "
+                        f"{PLAN_BACKUP.format(sha8='<sha>')}")
     args = parser.parse_args()
-    if args.verify and (args.out_dir or args.notes or args.approved_by or args.school):
+    if args.verify and (args.out_dir or args.notes or args.approved_by or args.school or args.new_letter):
         parser.error("--verify FOLDER goes alone")
     if not args.verify and not (args.out_dir and args.site):
         parser.error("give out_dir and site (or --verify FOLDER)")
@@ -1159,6 +1249,9 @@ def main():
     saved = None if untrusted else saved_plan(out_dir, prompt)
     if untrusted:
         print(f"no letter or fix picture: {untrusted}", file=sys.stderr)
+    signoff = read_signoff(out_dir)
+    if not saved and (stop := kept_letter(out_dir, signoff, untrusted, args.new_letter)):
+        sys.exit(f"pack.py: {stop}")  # before any paid call and before index.html is written
     if (notes or all(signer)) and not saved:
         sys.exit("pack.py: --notes and --approved-by work on plan.json's letter from these same measurements, and "
                  "there is none: run pack.py without them first, and have that letter read")
@@ -1187,7 +1280,7 @@ def main():
                 http.client.HTTPException, subprocess.CalledProcessError) as err:
             print(f"letter or fix image failed, the page shows plan.json's letter if any, else the measurements only: "
                   f"{err}", file=sys.stderr)
-    signoff = sign(out_dir, plan, *signer) if plan and all(signer) else read_signoff(out_dir)
+    signoff = sign(out_dir, plan, *signer) if plan and all(signer) else signoff
     page_html = page(site, events, seen, plan, images, data["fps"], data.get("cost"), data.get("sam_full_requests"),
                      data.get("privacy"), signoff=signoff, receipt=receipt_line(data, plan, images),
                      source_sha256=data.get("source_sha256"), timeline=data.get("timeline"), ground=ground,
