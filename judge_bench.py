@@ -229,11 +229,11 @@ def asker(column):
     if column == "spark":
         key = sam.load_api_key()
         return lambda prompt: pack.spark_reply(prompt, None, key)
-    url = pack.JUDGE_URL or pack.LETTER_URL
-    if not url:
+    if not (pack.JUDGE_URL or pack.LETTER_URL):
         raise SystemExit("--glimmer needs JUDGE_MODEL_URL (or LETTER_MODEL_URL), the OpenAI-compatible server running "
                          "Muse Glimmer")
-    return lambda prompt: pack.open_model_reply(prompt, None, pack.PROBLEMS_SCHEMA, url)[0]
+    judge = bool(pack.JUDGE_URL)  # the judge server with its own model id and key, else the letter server
+    return lambda prompt: pack.open_model_reply(prompt, None, pack.PROBLEMS_SCHEMA, judge=judge)[0]
 
 
 def main():

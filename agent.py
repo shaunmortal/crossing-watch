@@ -226,7 +226,7 @@ def submit_letter(p, args, key):
     except (ValueError, OSError, subprocess.CalledProcessError):
         photo = None
     p["letter"] = pack.ask_plan(prompt, measured, key, photo)
-    (out_dir / "plan.json").write_text(json.dumps(p["letter"], indent=1, ensure_ascii=False))
+    pack.write_plan(out_dir, p["letter"])
     left = len(p["letter"].get("unmeasured", [])) + len(p["letter"].get("unsupported", []))
     return {"status": "needs_review", "fix": p["letter"]["fix"], "letter": p["letter"]["letter"],
             "summary": f"Video {video_m:.1f} m, tape {tape:g} m, {off_share(video_m, tape):.0%} off: proven. "

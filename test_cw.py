@@ -1706,7 +1706,8 @@ def test_pedestrian_pieces_shorter_than_a_second_are_dropped():
 
 
 def fake_open_model(replies):
-    """A local stand-in for llama-server: answers each POST with the next reply and keeps (path, body, headers)."""
+    """A local stand-in for llama-server: answers each POST with the next reply (an int: that HTTP status) and keeps
+    (path, body, headers)."""
     import threading
     from http.server import BaseHTTPRequestHandler, HTTPServer
     seen = []
@@ -1714,8 +1715,10 @@ def fake_open_model(replies):
     class Fake(BaseHTTPRequestHandler):
         def do_POST(self):
             seen.append((self.path, json.loads(self.rfile.read(int(self.headers["Content-Length"]))), dict(self.headers)))
-            reply = json.dumps(replies.pop(0)).encode()
-            self.send_response(200)
+            reply = replies.pop(0)
+            status = reply if isinstance(reply, int) else 200  # a bare status answers with an error, e.g. 400
+            self.send_response(status)
+            reply = json.dumps({"error": {"message": "response_format unsupported"}} if status != 200 else reply).encode()
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(reply)
@@ -1735,8 +1738,8 @@ def test_open_weights_letter_writer_gets_the_prompt_and_street_photo():
     from pathlib import Path
     plan = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "l"}
     timings, usage = {"prompt_ms": 2000.0, "predicted_ms": 410000.0}, {"prompt_tokens": 900, "completion_tokens": 5000}
-    server, seen = fake_open_model([{"choices": [{"message": {"content": json.dumps(plan)}, "finish_reason": "stop"}],
-                                     "timings": timings, "usage": usage}])
+    server, seen = fake_open_model([{"id": "req-1", "choices": [{"message": {"content": json.dumps(plan)},
+                                     "finish_reason": "stop"}], "timings": timings, "usage": usage}])
     old = pack.LETTER_URL
     pack.LETTER_URL = f"http://127.0.0.1:{server.server_port}/v1"
     try:
@@ -1744,7 +1747,9 @@ def test_open_weights_letter_writer_gets_the_prompt_and_street_photo():
             photo = Path(tmp) / "street.jpg"
             photo.write_bytes(b"\xff\xd8jpeg")
             with contextlib.redirect_stderr(io.StringIO()):
-                assert pack.model_plan("PROMPT", None, photo) == {**plan, "timings": timings, "usage": usage}
+                written = pack.model_plan("PROMPT", None, photo)
+        assert written == {**plan, "timings": timings, "usage": usage, "request_id": "req-1", "wall_s": written["wall_s"],
+                           "response_format": "json_schema"} and isinstance(written["wall_s"], float)
     finally:
         pack.LETTER_URL = old
         server.shutdown()
@@ -1902,6 +1907,102 @@ def test_glimmer_judges_through_its_own_url_and_judged_by_names_only_the_judges_
     assert path == "/v1/chat/completions" and body["response_format"]["json_schema"]["schema"] == pack.PROBLEMS_SCHEMA
     assert good["letter"] in body["messages"][0]["content"][0]["text"] and "Authorization" not in headers
 
+
+SPARK_OPEN = "accounts/fireworks/models/muse-spark-open"  # Fireworks' API model id for Muse Spark Open
+FIREWORKS = "https://api.fireworks.ai/inference/v1"  # never called here: only its host name is read
+
+
+def test_spark_open_on_fireworks_judges_a_glimmer_letter_with_its_own_model_id_and_key():
+    """The API model id is not the name shown, the label says where it ran, and a Glimmer writer and a Spark Open judge
+    on two servers each get their own model id and key."""
+    import contextlib, io
+    good = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "PET 0.4 s."}
+    as_reply = lambda content: {"choices": [{"message": {"content": content}, "finish_reason": "stop"}]}
+    writer, wrote = fake_open_model([as_reply(json.dumps(good))])
+    judge, judged = fake_open_model([as_reply('{"problems": []}')])
+    url = lambda server: f"http://127.0.0.1:{server.server_port}/v1"
+    names = "LETTER_URL", "LETTER_MODEL", "LETTER_KEY", "JUDGE_URL", "JUDGE_MODEL", "JUDGE_KEY"
+    old = [getattr(pack, n) for n in names]
+    for n, value in zip(names, (url(writer), "Muse Glimmer 30B", "letter-key", url(judge), SPARK_OPEN, "judge-key")):
+        setattr(pack, n, value)
+    try:
+        with contextlib.redirect_stderr(io.StringIO()):
+            plan = pack.ask_plan("PROMPT", '{"pet_s": 0.4}', None)
+    finally:
+        for n, value in zip(names, old):
+            setattr(pack, n, value)
+        for server in (writer, judge):
+            server.shutdown()
+            server.server_close()
+    (_, to_writer, writer_headers), (_, to_judge, judge_headers) = wrote[0], judged[0]
+    assert to_writer["model"] == "Muse Glimmer 30B" and writer_headers["Authorization"] == "Bearer letter-key"
+    assert to_judge["model"] == SPARK_OPEN and judge_headers["Authorization"] == "Bearer judge-key"
+    assert plan["judged_by"] == "Muse Spark Open (open weights, self-hosted)"  # this fake judge ran on this machine
+    assert pack.writer_label(FIREWORKS, SPARK_OPEN) == "Muse Spark Open (open weights, on Fireworks)"
+    assert pack.writer_label("http://127.0.0.1:8080/v1", "Muse Glimmer 30B") == "Muse Glimmer 30B (open weights, self-hosted)"
+
+
+def test_fireworks_key_comes_from_env_or_dotenv_only_for_fireworks():
+    """With no key set for a Fireworks URL, FIREWORKS_API_KEY is read as sam.load_api_key reads MODEL_API_KEY; any
+    other server never gets it, and a key set for the server wins."""
+    import os, sam, tempfile
+    from pathlib import Path
+    import openweights
+    old = sam.ENV_FILE, {k: os.environ.pop(k, None) for k in ("FIREWORKS_API_KEY", "MODEL_API_KEY")}
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            sam.ENV_FILE = Path(tmp) / ".env"
+            sam.ENV_FILE.write_text("MODEL_API_KEY=meta-test\nFIREWORKS_API_KEY = fw-file\n")
+            assert openweights.server_key(FIREWORKS, "") == "fw-file" and sam.load_api_key() == "meta-test"
+            assert openweights.server_key(FIREWORKS, "set-for-it") == "set-for-it"
+            assert openweights.server_key("http://127.0.0.1:8080/v1", "") == ""
+            assert openweights.server_key("https://api.example.com/v1", "") == ""
+            os.environ["FIREWORKS_API_KEY"] = "fw-env"
+            assert openweights.server_key(FIREWORKS, "") == "fw-env"
+    finally:
+        sam.ENV_FILE = old[0]
+        for k, value in old[1].items():
+            os.environ.pop(k, None)
+            if value is not None:
+                os.environ[k] = value
+
+
+def test_rejected_json_schema_retries_once_as_json_object_and_the_run_record_says_so():
+    """Fireworks may refuse the schema's patterns: one retry asks for any JSON object, the code check still runs, and
+    letter-provenance.json beside plan.json records the run (never the key); the footer shows the measured wall time."""
+    import contextlib, io, tempfile, urllib.error
+    from pathlib import Path
+    good = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "PET 0.4 s."}
+    usage = {"prompt_tokens": 900, "completion_tokens": 300, "completion_tokens_details": {"reasoning_tokens": 120}}
+    server, seen = fake_open_model([400, {"id": "fw-req-9", "usage": usage, "choices": [
+        {"message": {"content": json.dumps(good), "reasoning_content": "..."}, "finish_reason": "stop"}]}, 500])
+    names = "LETTER_URL", "LETTER_MODEL", "LETTER_KEY", "LETTER_HOST", "JUDGE_URL"
+    old = [getattr(pack, n) for n in names]
+    pack.LETTER_URL, pack.LETTER_MODEL, pack.LETTER_KEY, pack.LETTER_HOST, pack.JUDGE_URL = (
+        f"http://127.0.0.1:{server.server_port}/v1", SPARK_OPEN, "secret-key-123", "", "")
+    try:
+        with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stderr(io.StringIO()) as log:
+            plan = pack.new_plan(Path(tmp), "PROMPT", '{"pet_s": 0.4}', None, None)
+            record = (Path(tmp) / pack.PROVENANCE).read_text()
+            try:
+                pack.open_model_reply("PROMPT", None, {"type": "object"})  # any other error is not retried
+                raise AssertionError("HTTP 500 was accepted")
+            except urllib.error.HTTPError as err:
+                assert err.code == 500
+        pack.LETTER_URL = FIREWORKS  # the footer only: nothing is sent
+        footer = pack.letter_section({**plan, "wall_s": 1.8})
+    finally:
+        for n, value in zip(names, old):
+            setattr(pack, n, value)
+        server.shutdown()
+        server.server_close()
+    assert [body["response_format"]["type"] for _, body, _ in seen] == ["json_schema", "json_object", "json_schema"]
+    assert "rejected json_schema" in log.getvalue() and "secret-key-123" not in log.getvalue() + record
+    kept = json.loads(record)
+    assert kept == {"model": SPARK_OPEN, "host": "127.0.0.1", "request_id": "fw-req-9", "usage": usage,
+                    "wall_s": kept["wall_s"], "timings": None, "response_format": "json_object", "tries": 1,
+                    "letter_sha256": pack.sha256(good["letter"])} and isinstance(kept["wall_s"], float)
+    assert "Muse Spark Open wrote this in 2 s on Fireworks (open weights)." in footer
 
 def test_glimmer_notebook_is_pinned_hash_checked_and_records_its_run():
     """The Kaggle notebook runs unattended for 40 minutes, so its pins and its Python are checked here first."""
@@ -2455,7 +2556,7 @@ def test_judge_bench_asks_glimmer_through_judge_model_url_with_the_problems_sche
     judge's schema, and read the reply's text."""
     import judge_bench
     calls, old = [], (pack.open_model_reply, pack.JUDGE_URL, pack.LETTER_URL)
-    pack.open_model_reply = lambda prompt, image, schema, url=None: (calls.append((schema, url)), ('{"problems": []}', {}))[1]
+    pack.open_model_reply = lambda prompt, image, schema, judge=False: (calls.append((schema, judge)), ('{"problems": []}', {}))[1]
     pack.JUDGE_URL, pack.LETTER_URL = "http://127.0.0.1:8080/v1", ""
     try:
         reply = judge_bench.asker("glimmer")("JUDGE")
@@ -2463,7 +2564,7 @@ def test_judge_bench_asks_glimmer_through_judge_model_url_with_the_problems_sche
         assert exits(lambda: judge_bench.asker("glimmer"))  # no server named: no Glimmer column
     finally:
         pack.open_model_reply, pack.JUDGE_URL, pack.LETTER_URL = old
-    assert reply == '{"problems": []}' and calls == [(pack.PROBLEMS_SCHEMA, "http://127.0.0.1:8080/v1")]
+    assert reply == '{"problems": []}' and calls == [(pack.PROBLEMS_SCHEMA, True)]  # the judge server, its own model
 
 def agent_case(folder):
     """A case folder for the agent: one measured near-miss, and a site whose check distance reads 7.0 m in the video."""

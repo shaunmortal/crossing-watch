@@ -22,7 +22,6 @@ import shutil
 import subprocess
 import sys
 import unicodedata
-import urllib.parse
 import urllib.request
 import uuid
 from pathlib import Path
@@ -30,6 +29,7 @@ from pathlib import Path
 import ailabel
 import crowd
 import fixband
+import openweights
 import overlay
 import pace
 import render
@@ -48,24 +48,22 @@ ALPHA = 0.05      # exact two-sided 95% ranges
 BISECTIONS = 50   # halvings to find a range's end: 1e-15 of the span, and a share never rounds up to exactly 1
 SCHOOL_YEAR = ("school_days", "dismissal_minutes")  # optional site keys: the "if every dismissal" line needs both
 LETTER_URL = os.environ.get("LETTER_MODEL_URL", "")  # an OpenAI-compatible server, e.g. llama-server with Muse
-LETTER_MODEL = os.environ.get("LETTER_MODEL", "Muse Glimmer 30B")  # Glimmer; empty: Muse Spark writes the letter
-LETTER_KEY = os.environ.get("LETTER_MODEL_KEY", "")  # sent as a Bearer token, for a letter server that needs one
+LETTER_MODEL = os.environ.get("LETTER_MODEL", "Muse Glimmer 30B")  # its API model id, shown as openweights.name()
+LETTER_KEY = os.environ.get("LETTER_MODEL_KEY", "")  # Bearer token for the letter server (Fireworks: FIREWORKS_API_KEY)
 JUDGE_URL = os.environ.get("JUDGE_MODEL_URL", "")  # an OpenAI-compatible server whose model also judges the letter
-LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")  # a letter server here runs on the machine that ran pack.py
+JUDGE_MODEL = os.environ.get("JUDGE_MODEL", LETTER_MODEL)  # the judge server's API model id
+JUDGE_KEY = os.environ.get("JUDGE_MODEL_KEY", "")  # Bearer token for the judge server only (Fireworks: as above)
 
 
-def writer_label(url):
-    """Who runs at `url`, the letter's writer or its open-weights judge. "Self-hosted" only when the server is this
-    machine; a remote URL could be anyone's."""
-    if not url:
-        return "Muse Spark"
-    local = urllib.parse.urlsplit(url).hostname in LOCAL_HOSTS
-    return f"{LETTER_MODEL} (open weights{', self-hosted' if local else ''})"
+def writer_label(url, model=LETTER_MODEL):
+    """Who runs at `url`, the letter's writer or its open-weights judge (openweights.label), or Muse Spark."""
+    return openweights.label(url, model) if url else "Muse Spark"
 
 
 WRITER = writer_label(LETTER_URL)
 LETTER_HOST = os.environ.get("LETTER_MODEL_HOST", "")  # where it ran, e.g. "Kaggle 2 x T4" (the notebook reads nvidia-smi)
-OPEN_MODEL_TIMEOUT_S = 900  # a 30B model on two T4s writes a letter in minutes, not seconds
+PROVENANCE = "letter-provenance.json"  # beside plan.json: what an open-weights server ran, measured; never a key
+RUN_KEYS = ("request_id", "usage", "wall_s", "timings", "response_format")  # openweights.reply's record
 JUDGE = "Muse Spark (a separate reviewer)"
 JUDGE_PROMPT = """You review a letter before a school sends it to its road authority. MEASUREMENTS are the only facts.
 List every problem: a claim or number the measurements do not support; a number above one written in words, not in
@@ -459,7 +457,7 @@ def stated_text(notes):
 
 def judges(api_key):
     """The judges that run, by name: Muse Spark with a key, the JUDGE_MODEL_URL model with that URL."""
-    return " and ".join(([JUDGE] if api_key else []) + ([writer_label(JUDGE_URL)] if JUDGE_URL else []))
+    return " and ".join(([JUDGE] if api_key else []) + ([writer_label(JUDGE_URL, JUDGE_MODEL)] if JUDGE_URL else []))
 
 
 def judge_problems(letter, measured, api_key):
@@ -468,7 +466,7 @@ def judge_problems(letter, measured, api_key):
     never passes a letter silently."""
     prompt = JUDGE_PROMPT.format(facts=measured, letter=letter)
     replies = (([spark_reply(prompt, None, api_key)] if api_key else [])
-               + ([open_model_reply(prompt, None, PROBLEMS_SCHEMA, JUDGE_URL)[0]] if JUDGE_URL else []))
+               + ([open_model_reply(prompt, None, PROBLEMS_SCHEMA, judge=True)[0]] if JUDGE_URL else []))
     found = [read_problems(text) for text in replies]
     return [p for problems in found for p in (["The reviewer's reply could not be read."] if problems is None else problems)]
 
@@ -512,36 +510,31 @@ def spark_reply(prompt, image, api_key):
                    for c in o.get("content", []))
 
 
-def open_model_reply(prompt, image, schema, url=None):
-    """Chat completion from an OpenAI-compatible server, e.g. llama-server running Muse Glimmer 30B on a GPU, held to
-    a JSON schema: the text, and the server's own timings and token usage (kept in plan.json for the run record).
-    `url` defaults to LETTER_MODEL_URL, read at call time; LETTER_MODEL_KEY goes to that server only."""
-    url = url or LETTER_URL
+def open_model_reply(prompt, image, schema, judge=False):
+    """Chat completion from the letter's OpenAI-compatible server or, with `judge`, the JUDGE_MODEL_URL one, each read
+    at call time with its own model id and key (a key never crosses servers), through openweights.reply: the text and
+    its run record, kept in plan.json."""
+    url, model, key = (JUDGE_URL, JUDGE_MODEL, JUDGE_KEY) if judge else (LETTER_URL, LETTER_MODEL, LETTER_KEY)
     content = [{"type": "text", "text": prompt}] + ([{"type": "image_url", "image_url": {"url": image}}] if image else [])
-    schema_format = {"type": "json_schema", "json_schema": {"name": "plan", "schema": schema}}
-    body = json.dumps({"model": LETTER_MODEL, "messages": [{"role": "user", "content": content}],
-                       "response_format": schema_format}).encode()
-    key = LETTER_KEY if url == LETTER_URL else ""  # never the letter server's key to a judge on another server
-    headers = {"Content-Type": "application/json", **({"Authorization": f"Bearer {key}"} if key else {})}
-    req = urllib.request.Request(url.rstrip("/") + "/chat/completions", data=body, headers=headers)
-    with urllib.request.urlopen(req, timeout=OPEN_MODEL_TIMEOUT_S) as response:
-        reply = json.load(response)
-    choice = reply["choices"][0]
-    print(f"open model reply: finish_reason {choice.get('finish_reason')}, "  # the Kaggle notebook counts these as tries
-          f"{(reply.get('usage') or {}).get('completion_tokens', '?')} tokens", file=sys.stderr)
-    if choice.get("finish_reason") == "length":  # llama-server's only sign: HTTP 200 and an empty answer
-        raise ValueError(f"{LETTER_MODEL} ran out of context after {(reply.get('usage') or {}).get('completion_tokens', '?')} "
-                         "tokens with no answer: start llama-server with a larger -c or a lower reasoning_strength")
-    return choice["message"]["content"], {"timings": reply.get("timings"), "usage": reply.get("usage")}
+    return openweights.reply(url, model, openweights.server_key(url, key), content, schema)
 
 
 def writer_note(plan):
-    """Who wrote the fix and letter. An open-weights model's time is its server's own timings, never a guess."""
-    timings = plan.get("timings") if LETTER_URL else None
-    if isinstance(timings, dict) and all(isinstance(timings.get(k), (int, float)) for k in ("prompt_ms", "predicted_ms")):
-        where = f" on {LETTER_HOST}" if LETTER_HOST else ""
-        return f"{LETTER_MODEL} wrote this in {(timings['prompt_ms'] + timings['predicted_ms']) / 1000:.0f} s{where} (open weights)."
+    """Who wrote the fix and letter. An open-weights model's time is measured, never a guess: llama-server's own
+    timings, else the wall time around the reply (Fireworks sends no timings)."""
+    seconds = run_seconds(plan) if LETTER_URL else None
+    if seconds is not None:
+        host = LETTER_HOST or openweights.provider(LETTER_URL)
+        return (f"{openweights.name(LETTER_MODEL)} wrote this in {seconds:.0f} s{f' on {host}' if host else ''} "
+                "(open weights).")
     return f"Fix and letter written by {plan['writer']}." if plan.get("writer") else ""
+
+
+def run_seconds(plan):
+    timings, wall = plan.get("timings"), plan.get("wall_s")
+    if isinstance(timings, dict) and all(isinstance(timings.get(k), (int, float)) for k in ("prompt_ms", "predicted_ms")):
+        return (timings["prompt_ms"] + timings["predicted_ms"]) / 1000
+    return wall if isinstance(wall, (int, float)) else None
 
 
 def draw_fix(photo, instruction, api_key, out_path):
@@ -1028,8 +1021,18 @@ def new_plan(out_dir, prompt, measured, key, photo, revise=None, notes=""):
     plan = {**ask_plan(ask, measured, key, photo, stated=stated), "prompt_sha256": sha256(prompt)}
     if revise:
         plan = {**plan, "notes": stated, "draft_letter": revise.get("draft_letter", revise["letter"])}
-    (out_dir / "plan.json").write_text(json.dumps(plan, indent=1, ensure_ascii=False))  # the paid-for letter
+    write_plan(out_dir, plan)
     return plan
+
+
+def write_plan(out_dir, plan):
+    """plan.json, the paid-for letter, and beside it when an open-weights server wrote it, PROVENANCE: the model id,
+    host, request id, usage, wall seconds and the letter's sha256 (never the key)."""
+    (out_dir / "plan.json").write_text(json.dumps(plan, indent=1, ensure_ascii=False))
+    if LETTER_URL and "wall_s" in plan:
+        record = {"model": LETTER_MODEL, "host": openweights.host(LETTER_URL), **{k: plan.get(k) for k in RUN_KEYS},
+                  "tries": plan.get("tries"), "letter_sha256": sha256(plan["letter"])}
+        (out_dir / PROVENANCE).write_text(json.dumps(record, indent=1))
 
 
 def sign(out_dir, plan, approved_by, school):
