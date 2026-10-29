@@ -109,6 +109,8 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
   - PET agrees with an independent conflict-area PET within 0.5 s on 51 of 65.
   - Same tier on 56 of 65.
   - All 9 pairs only the textbook flagged are explained.
+  - *Re-scored after the speed fix (last section): 0.24 km/h, 53 of 66 within 0.5 s, same tier on 57 of 66, the
+    same 9 pairs.*
   - This is a partial answer to "no true positive yet". G3 still needs a true positive through SAM and phone calibration.
 - PET search now uses a grid index (equal to brute force on 30 random cases, see the test), and vehicles can be full footprint polygons.
 - 28 self-checks pass.
@@ -209,6 +211,9 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 | Dataset pedestrians followed by our tracks | 297 of 301, at most 5 tracks each | 296 of 301, at most 4 |
 | Indian crowd clip (no ground truth), after review | 18 events (6 serious), up to 88 km/h | 10 events (5 serious, 2 not yet reviewed), up to 57 km/h |
 
+*Corrected later on 29 Oct: the Indian row's new column is from the truth-pass commit 93d94ac. On the merged code it
+is 6 events (4 serious, 1 not yet reviewed), up to 36.4 km/h; see the last section.*
+
 - Unchanged: moving vehicles counted right on 8 of 8 clips, longest gap within 0.5 s on 6 of 8, pedestrian crossings
   374 against the dataset's 280.
 - How the old column was checked: the stored events re-scored with the code from before the speed fix give the
@@ -234,7 +239,8 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
   line (and the letter's first fact) counts each person once: "k of n crossings (1 in N)" within 3 s and within
   1.5 s, with exact 95% ranges (Clopper-Pearson for the share, Garwood's Poisson range for the count).
 - Offline recomputes (cached tracks or ground truth, no API calls; SAM requests were stubbed to fail on a cache miss):
-  - SinD ground truth, 20 min: 37 of 63 crossings (1 in 1.7) within 3 s, 25 of 63 within 1.5 s. Old tile: 103.2.
+  - SinD ground truth, 20 min: 37 of 63 crossings (1 in 1.7) within 3 s, 25 of 63 within 1.5 s. Old tile: 103.2
+    (104.8 on the merged code: 66 conflicts / 63 crossings; the 37 and 25 do not change).
   - Dense Indian clip, crowd cache (the recompute matches the stored 83 events pair for pair and its 15 crossings;
     Spark's stored verdicts leave 18 events): Spark rejected 10 of the 15 tracked crossers as not people (8 riders,
     2 "not a person"), so the clip has only 5 real crossers and the ranges are wide: 5 of 5 (1 in 1) within 3 s,
@@ -253,6 +259,8 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
   - kids school CCTV, 2 concepts: 8 requests, 1,088 frames billed, $0.22 for 48.4 s ($4.05 per 15 minutes);
   - dense Indian clip, 4 concepts: 12 requests, 1,720 frames billed, $0.34 for 39.0 s ($7.94 per 15 minutes);
   - frame by frame for 15 minutes: 13,500 images, $33.75, with the one concept "vehicle"; 31,500, $78.75, with three.
+    The $33.75 is not adopted: `vehicle_test.py` (about $0.15) has not been run to show "vehicle" finds 95% of what
+    the three concepts find.
 - The share folder's `SHA256SUMS` passes the system `shasum -a 256 -c` in the self-check; `--verify` reports a changed
   page as CHANGED and a deleted file as MISSING.
 - No cached events.json has the crosser list yet (all predate it), so the pyramid has not been drawn from a real
@@ -282,6 +290,11 @@ These rules do not change after anyone labels.
 - **Not decidable:** fewer than 6 near-misses or 6 decoys in the set, or more than a quarter of the clips can't tell
   or unanswered. The answers are then reported as descriptive only.
 - `score_humans.py` prints this verdict itself, so the rule is applied as written.
+- Not part of this gate, and not built: Muse Spark as a fourth rater on the same clips, and a recall list from the
+  filmer's spoken "close" calls through Muse Voice Transcribe.
+- Added the same day, before any clip was made: `blind_set.py` refuses a pack whose people were tracked by a full
+  SAM video request (16 objects), since people who came later have no track to blur. The clips blur the faces SAM
+  found, so each clip is watched before it is handed out.
 
 Tooling dry runs (offline, not the gate): on a copy of the cached dense Indian clip (390 frames), with the vehicle
 sampling rate its cache was made at and no `--review-decoys` (so decoys are limited to pedestrians Spark had
@@ -317,3 +330,70 @@ already looked at), `blind_set.py` rebuilt the tracks from cache with no SAM req
   is an independent judge of Muse letters. A reply that cannot be read is counted on its own, not as a catch.
   Totals and their Wilson bounds count letters (one flagged if any of its readable runs flagged it), never runs:
   two runs on one letter are not independent.
+
+## Review fixes, re-scored on the merged code (Thu 29 Oct, evening)
+
+A review of the merged lanes found README numbers from older code. Each was recomputed once, at $0, on the merged
+code (no API calls: SAM and Spark were stubbed to fail on a cache miss).
+
+- **SinD** (`python3 validate_sind.py data/sind`, three runs, the same each time). The SinD lines were written before
+  the speed fix (a9ef24b) and were not re-scored with DUT.
+
+| Number | Old (as published) | New |
+|---|---|---|
+| Moving vehicles | 556 | 554 |
+| Speed error against SinD's own velocity, mean / 95th percentile | 0.26 / 0.96 km/h | 0.24 / 0.91 km/h |
+| Conflicts under 3 s (serious) | 65 (42) | 66 (42) |
+| Textbook PET within 0.5 s of ours | 51 of 65 | 53 of 66 |
+| Same tier | 56 of 65 | 57 of 66 |
+| Pairs only the textbook calls serious | 9 | the same 9 |
+| Search time for 20 minutes | under a second | 1.0 s on this laptop |
+| Old "per 100 crossings" tile | 103.2 | 104.8 |
+| One number | 37 of 63 within 3 s, 25 of 63 within 1.5 s | unchanged |
+
+  The new conflict is P15 with motorcycle#108, a close pass (PET 2.7 s) at 10.1 km/h: the old median of steps read
+  that motorcycle at 9.6 km/h there, under the 10 km/h "moving" bar. No conflict was lost and no tier changed.
+- **Dense Indian clip** (crowd cache; tracks rebuilt as `validate_dut.our_tracks` does from exactly the cached frames,
+  vehicles at the 5 a second the cache was made at; Spark's stored verdicts through the rider gate; a scratch script,
+  not in the repo). The README had kept the figure from the truth-pass commit 93d94ac; later lane commits changed the
+  tracks on this angled view.
+
+| Number | At 93d94ac | Merged code |
+|---|---|---|
+| Conflicts before Spark's review (serious) | 25 (11) | 22 (14) |
+| After review | 10 events (5 serious, 2 not yet reviewed) | 6 events (4 serious, 1 not yet reviewed) |
+| Fastest vehicle after review / before | 57.0 / 57.0 km/h | 36.4 / 45.9 km/h |
+| One number (crossers left after Spark's rejections) | 5 of 5 within 3 s, 2 of 5 within 1.5 s (as published above) | 3 of 8 within 3 s, 3 of 8 within 1.5 s (95% range 8.5-75.5%) |
+
+- **Rank 35, tracker tweak after OC-SORT: tried, not shipped.** Velocity from 3 samples back and a second greedy
+  round against each unmatched track's last seen box, scored with `validate_offline.py` on `out/dut-15s` and
+  `out/dut-vcrowd` (the change patched in from a scratch script):
+
+| | Today's tracker | Tweak |
+|---|---|---|
+| Found after review (crowd / vehicle crowd mode) | 44 / 45 of 52 | 44 / 45 of 52 |
+| Found by the geometry | 49 / 48 | 49 / 48 |
+| False alarms (of them at a threshold) | 5 (2) / 6 (2) | 5 (2) / 6 (2) |
+| Pedestrian crossings, against 280 true | 374 | 357 |
+| Tracks for the 296 pedestrians followed (split ones) | 325 (23) | 316 (18) |
+| Events on pieces Spark never saw | 8 / 17 | 19 / 26 |
+
+  Recall and false alarms hold, so by the plan's rule it could ship. It is not shipped before the gate run: it finds
+  nothing more, and it moves 20 events onto track pieces with no stored Spark verdict, so the README's after-review
+  DUT numbers could no longer be checked at $0 without a paid Spark re-review.
+- **Single concept "vehicle" (rank 4b):** `vehicle_test.py` now holds the test (60 cached crowd frames of the Indian
+  clip sent with "vehicle", about $0.15, capped at $0.20; boxes matched at IoU 0.5 against car, motorcycle and auto
+  rickshaw; adopt at 95% recall). It has not been run, so "vehicle" is not adopted and $34 for 15 minutes is a
+  condition, not a plan.
+- **Waiting for the gate footage, no code yet:** the horn fused with a speed profile (rank 24), the 20 km/h ghost car
+  (25), parked vehicles (30) and the SAM video re-check (36). Each is built only if its go/no-go check on the first
+  gate events.json passes; none has been run.
+- **Privacy:** a clip with no near-misses but a full people reply now gets frame 0 searched (one image), so its street
+  photo is not refused; `blind_set.py` refuses a full people video request (G5 above); in `docs/` git ignores every
+  video except `eventN.mp4` and `eventN-hero.mp4`, and the person crops and blind clips; the filming notice now says
+  the video and sound go to Meta's AI services and the raw video is kept until the study ends, and `FILMING.md` gives
+  the command that deletes the unblurred files.
+- **School-year line:** a tier seen 0 times read "about 0 crossings a school year". It now gives Poisson's upper
+  bound scaled the same way: "up to 1,100" for 20 minutes of 40 crossers, 30-minute dismissals, 200 days.
+- **Kaggle judge pass:** `out/` is not in the repo zip, so the notebook rebuilt the bench from Glimmer's letter alone
+  (12 lies and 4 controls, not 24 and 8). It now copies an attached `judge-bench.json` and its record says which.

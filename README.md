@@ -77,7 +77,11 @@ Filming your own crossing: [`FILMING.md`](FILMING.md) (phone locked at 1080p 30 
 
 `pack.py` also writes `out/VIDEO/share/`: the page and only the files it shows (evidence clips, the blurred street
 photo, the Muse Image picture). Publish that folder and nothing else. The unblurred `clip.mp4` and the person crops
-Spark looked at never go in, even if a page names them; a self-check proves it.
+Spark looked at never go in, even if a page names them; a self-check proves it. In `docs/` (GitHub Pages), git
+ignores every video except `eventN.mp4` and `eventN-hero.mp4`, and the person crops and blind clips too. Before
+anything is published, the unblurred video goes to SAM, crops of people to Muse Spark and the sound to Muse Wonder,
+through Meta's API; the unblurred files stay in `out/VIDEO/` on the machine that ran it until deleted (`FILMING.md`
+gives the command).
 
 **Tamper-evident.** `analyze.py` records the SHA-256 of the original video (`source_sha256` in events.json) and the
 page prints it. `share/` gets a standard `SHA256SUMS` for every file in it, the page included, so anyone can check a
@@ -130,8 +134,9 @@ runs out of context, and writes `<removed-run-record>` (llama.cpp build, GPUs, t
 commit and pack.py's sha256). The page then says "Muse Glimmer 30B wrote this in N s on Kaggle 2 x T4", with N from
 the server's own timings. The Kaggle notebook was run by the author.
 The open-weights model is also sent a JSON schema whose strings may hold digits only as the measured numbers, each
-followed by a non-digit; llama-server turns it into a grammar that still lets Glimmer think first. No Glimmer run has
-used it yet, the code check and the reviewer still run after it, and the run record counts Glimmer's tries.
+followed by a non-digit. By llama.cpp's source, llama-server turns it into a grammar that should still let Glimmer
+think first; that is not tested yet, as no Glimmer run has used it. The code check and the reviewer still run after
+it, and the run record counts Glimmer's tries.
 `LETTER_MODEL_KEY` adds a Bearer token for a server that needs one, and the letter says "self-hosted" only when the
 server runs on the same machine.
 `JUDGE_MODEL_URL` makes the open-weights model a judge too: it reviews the letter beside Muse Spark, or alone without a
@@ -181,7 +186,10 @@ python3 judge_bench.py --out out/judge-bench.json --spark 2   # Muse Spark judge
 LETTER_MODEL_URL=http://127.0.0.1:8080/v1 python3 judge_bench.py --out out/judge-bench.json --glimmer 1
 ```
 
-The bench file keeps every letter and verdict, so a later run only asks for what is missing.
+The bench file keeps every letter and verdict, so a later run only asks for what is missing. For the notebook's
+Glimmer pass on Kaggle, attach `out/judge-bench.json` with Add Input: the Spark letter lives in `out/`, which the repo
+zip leaves out, so without the file the notebook benches Glimmer's letter alone (12 lies and 4 controls) and its
+record says so.
 
 **Blind check (G5).** `blind_set.py` mixes the pipeline's near-misses with decoys (a pedestrian and a moving vehicle
 on the same spot 5 to 8 s apart, each pedestrian checked by Spark to be a person), cuts every clip to the same 12 s,
@@ -198,18 +206,19 @@ python3 score_humans.py out/VIDEO/blind-key.json answers-*.json
 ## Validation on ground-truth trajectories
 
 `validate_sind.py` runs the near-miss maths on the SinD public sample: 20 minutes of drone-measured trajectories in
-metres at a busy Tianjin intersection, 63 pedestrian crossings and 556 moving vehicles (cars, motorcycles, bicycles,
-tricycles, buses, trucks). It needs no Meta API.
+metres at a busy Tianjin intersection, 63 pedestrian crossings and 554 moving vehicles (cars, motorcycles, bicycles,
+tricycles, buses, trucks). It needs no Meta API. Re-scored on 29 Oct after the speed fix (old and new in `GATES.md`).
 
-- **Speed:** ours, from positions, against SinD's own velocity: mean error 0.26 km/h, 95th percentile 0.96 km/h.
-- **PET:** 65 conflicts under 3 s (42 serious). An independent textbook PET over a conflict area (Allen et al.
-  1978) agrees within 0.5 s on 51 of 65 and gives the same tier on 56. In every disagreement the area method gives
+- **Speed:** ours, from positions, against SinD's own velocity: mean error 0.24 km/h, 95th percentile 0.91 km/h.
+- **PET:** 66 conflicts under 3 s (42 serious). An independent textbook PET over a conflict area (Allen et al.
+  1978) agrees within 0.5 s on 53 of 66 and gives the same tier on 57. In every disagreement the area method gives
   the lower PET, because its conflict area is broader, so ours errs on the side of not overstating.
-- **Pairs only the textbook flagged:** 9, and each was checked. 2 were stopped cars beside a person; we exclude
-  vehicles under 10 km/h on purpose. 4 never came within 3 m at the same moment, an artefact of the broad area.
-  3 were cycles under 10 km/h passing 1.2–1.6 m away, at our thresholds' edge.
-- **Speed of the search:** the grid index searches 20 minutes of mixed traffic in under a second.
-- **One number:** 37 of 63 crossings (1 in 1.7) had a moving vehicle through the same spot within 3 s, 25 of 63 (1 in 2.5) within 1.5 s; exact 95% ranges 45.6-71.0% and 27.6-52.8%. The tile it replaced divided conflicts (person-vehicle pairs) by crossings: 65 / 63, "103 per 100 crossings", because a person passed by several vehicles counted once per vehicle.
+- **Pairs only the textbook flagged** as serious: 9, the same 9 pairs as before the speed fix, and each was checked.
+  2 were stopped cars beside a person; we exclude vehicles under 10 km/h on purpose. 4 never came within 3 m at the
+  same moment, an artefact of the broad area. 3 were cycles under 10 km/h passing 1.2–1.6 m away, at our thresholds'
+  edge.
+- **Speed of the search:** the grid index searches 20 minutes of mixed traffic in about a second (1.0 s on a laptop).
+- **One number:** 37 of 63 crossings (1 in 1.7) had a moving vehicle through the same spot within 3 s, 25 of 63 (1 in 2.5) within 1.5 s; exact 95% ranges 45.6-71.0% and 27.6-52.8%. The tile it replaced divided conflicts (person-vehicle pairs) by crossings: 66 / 63, "105 per 100 crossings", because a person passed by several vehicles counted once per vehicle.
 
 This checks the measurement layer on true positions.
 
@@ -284,9 +293,10 @@ to set it.
   before).
 - **Dense Indian intersection** (39 s, no ground truth, calibration guessed): SAM video saw on average 1.6 people and
   6 vehicles a frame, crowd mode 14.9 people and 20 vehicles. Before the fixes above it reported 543 serious
-  near-misses, nearly all one-frame track fragments and riders; re-scored from its cache, 10 events survive Spark's
-  review (5 serious; 2 from pieces Spark has not seen). Speeds there are not trustworthy (up to 57 km/h) because
-  nothing was measured on that road.
+  near-misses, nearly all one-frame track fragments and riders. Re-scored at $0 from its cache with today's code
+  (vehicles as cached, 5 a second): 22 conflicts before Spark's review (14 serious), 6 events after it (4 serious; 1
+  from a piece Spark has not seen). Speeds there are not trustworthy (up to 36 km/h after the review, 46 km/h
+  before) because nothing was measured on that road.
 - **What the real false alarms are:** two are in clip 09 and were checked frame by frame on 28 Oct. One is a real
   person in yellow whom the dataset stops tracking after 1.8 s while they keep walking along the kerb, so it may be a
   gap in the ground truth. The other is a person standing still at the road edge for the whole clip; the dataset
@@ -327,10 +337,17 @@ The video-mode range is counted from the cached SAM replies of our two real-stre
 minutes, at $0.20 per 1,000 frames billed (at least 50 a request, the 2 s overlaps included): a school crossing on
 CCTV with 2 concepts, $0.22 for 48 s; a dense Indian intersection with 4 concepts, $0.34 for 39 s. Frame by frame,
 15 minutes is 4,500 images of people plus 9,000 per vehicle concept at $2.50 per 1,000: $34 with the one concept
-"vehicle", $79 with three. Muse Spark, Muse Wonder and Muse Image are not in these dollars; the page's receipt counts
-their calls, and its cost line gives each pack's own SAM cost. Sources: the
+"vehicle", $79 with three. The $34 holds only if "vehicle" finds 95% or more of what car, motorcycle and auto
+rickshaw find; that $0.15 test (below) has not been run, so "vehicle" is not adopted. Muse Spark, Muse Wonder and
+Muse Image are not in these dollars; the page's receipt counts their calls, and its cost line gives each pack's own
+SAM cost. Sources: the
 [at-network list thread](https://lists.umanitoba.ca/hyperkitty/list/at-network@lists.umanitoba.ca/thread/IDKSFWIEFDC5N73AYNEDYWW3TFUGMF52/)
 and [Telraam's prices](https://telraam.net/en/pricing).
+
+```
+python3 vehicle_test.py out/indian-crowd           # what the "vehicle" test would cost; sends nothing
+python3 vehicle_test.py out/indian-crowd --spend   # 60 cached crowd frames, about $0.15, capped at $0.20
+```
 
 ## Limits, stated
 
@@ -359,7 +376,8 @@ and [Telraam's prices](https://telraam.net/en/pricing).
   Muse Image $0.01 a picture, Muse Wonder $4 per million input tokens and $20 per million output tokens. At 10 frames
   a second in 15 s parts that overlap by 2 s, an hour of video mode with four concepts sends 166,080 frames: about
   $33. Crowd mode costs more: 15 minutes of people at 5 images a second plus three vehicle concepts at 10 a second
-  is 31,500 images, about $79 (about $34 with the single concept "vehicle"). The page prints the SAM cost for each video.
+  is 31,500 images, about $79 (about $34 with the single concept "vehicle", if `vehicle_test.py` shows it finds 95%
+  of what the three concepts find; not run yet). The page prints the SAM cost for each video.
 - Box jitter alone gives a queued car an apparent speed of a few km/h. That is well under the 10 km/h "moving"
   threshold, so it does not create events, but very slow vehicles are not measured precisely.
 

@@ -12,7 +12,8 @@ college is open, else Mon 2 Nov. Agree the backup with the filmer now.
 - Written OK from the college office to film and to publish blurred clips.
 - Ask the office two numbers for the site file: school days a year (`"school_days"`) and how long dismissal lasts (`"dismissal_minutes"`). With both and 15 minutes of video, the page adds a school-year line.
 - Print an A3 notice and tape it at the gate: "Road-safety study by [student], [college]. Vehicles are measured.
-  Every face is blurred before anything is shared. Raw video is deleted after processing. Contact: ___."
+  The video and its sound are analysed with Meta's AI services. Only clips and pictures with faces blurred are
+  published. The raw video stays with the study team and is deleted when the study ends. Contact: ___."
   Film the notice for 3 seconds at the start of the recording.
 - Tape measure (15 m or longer), chalk, coloured tape, a tripod or tape to fix the phone, a power bank.
 
@@ -32,9 +33,10 @@ college is open, else Mon 2 Nov. Agree the backup with the filmer now.
   by phone and were not checked.
 
 Why 30 fps, locked: `analyze.py` resamples every clip to 10 frames a second. From 25 or 30 fps that keeps evenly
-spaced frames. From 24 fps it keeps uneven steps of 2, 2, 3, 2, 3 source frames, and in an offline check the
-median-step speed in `road.speeds()` read a steady car at 0.834 times its true speed (17% slow); 25, 29.97 and 30 fps
-read 1.000.
+spaced frames. From 24 fps it keeps uneven steps of 2, 2, 3, 2, 3 source frames. The old median-of-steps speed read a
+steady car there at 0.834 times its true speed (17% slow); today's least-squares speed in `road.speeds()` reads the
+true speed at 24 fps too (a self-check in `test_cw.py`). We still ask for 30 fps locked, so every clip is treated
+alike and the G6 speed check is timed on a 30 fps original.
 
 ## Framing
 
@@ -92,9 +94,22 @@ ffmpeg -v error -sseof -1 -i TEST.MOV -update 1 last.png
 
 - Send the **original file by a Google Drive link** (or cable, or AirDrop). **Never WhatsApp**: it shrinks and
   re-compresses the video. `filmcheck.py` catches a shrunken copy.
-- Back it up twice and note its fingerprint: `shasum -a 256 CLIP.MOV`. `analyze.py` records the same SHA-256 and the
-  page prints it, which ties the pack to this one recording, so send the original, not a copy.
-- Delete the raw video after processing, as the notice says. Only blurred outputs are shared.
+- Back it up twice until the study ends, and note its fingerprint: `shasum -a 256 CLIP.MOV`. `analyze.py` records
+  the same SHA-256 and the page prints it, which ties the pack to this one recording, so send the original, not a
+  copy.
+- What leaves the laptop: `analyze.py` sends the unblurred video to SAM, crops of people to Muse Spark and the sound
+  to Muse Wonder, through Meta's API. Only `out/VIDEO/share/` is published: blurred clips and pictures.
+- The unblurred files stay in `out/VIDEO/`: `clip.mp4` (and the parts cut from it), the `person-*.jpg` crops Spark
+  saw and the `event*.wav` sound. When the study ends (the letter filed, the hackathon judged), delete them with the
+  raw video and its backups, as the notice says:
+
+  ```
+  find out/VIDEO \( -name clip.mp4 -o -name 'person-*.jpg' -o -name '*.wav' \) -delete
+  rm CLIP.MOV
+  ```
+
+  The SAM replies (`*.sam.txt`: boxes and silhouettes, no picture) and the share folder stay; the page keeps the
+  original's SHA-256. After this, `analyze.py` and `pack.py` cannot run on that folder again.
 
 ## After the footage arrives
 
