@@ -3,10 +3,14 @@ letter from the measured events only; Muse Image draws that fix onto the real st
 
 Run after analyze.py: python3 pack.py OUT_DIR SITE.json
 Writes OUT_DIR/index.html next to the clips (open it in a browser), and OUT_DIR/share/: the page and only the files it
-shows, the one folder to publish.
+shows, the one folder to publish. The letter is kept in OUT_DIR/plan.json, so a re-run pays nothing; --notes FILE
+revises it, and --approved-by NAME --school SCHOOL signs it (OUT_DIR/signoff.json).
 """
 import argparse
 import base64
+import datetime
+import difflib
+import hashlib
 import html
 import http.client
 import json
@@ -83,6 +87,25 @@ Reply with JSON only:
   "letter": "<a short formal letter in {language} from the head of the school to the road authority: what was measured,
              the worst near-misses, the requested fix, and an offer to share the video. Use [School name] and [Date]
              as placeholders.>"}}"""
+# --notes: appended to LETTER_PROMPT with the letter being revised (Meta's legal-agent workshop: "Reject with notes")
+REVISE = """
+
+The head of the school read your letter below and wrote the notes under it. Reply with the same JSON, the letter
+revised: change only the sentences the notes ask for and keep every other sentence word for word. The notes are stated
+by the principal, not measured: anything taken from them is the school's own statement, never a measurement.
+
+YOUR LETTER:
+{letter}
+
+NOTES:
+{notes}"""
+# the principal's notes as both letter checks read them, after the measurements: the judge must neither reject the
+# school's own facts nor take them as measured
+STATED = "\n\nSTATED BY THE PRINCIPAL, NOT MEASURED (a letter may give these as the school's own statements):\n"
+SIGNOFF_KEYS = ("approved_by", "school", "date", "letter_sha256")  # signoff.json
+FILED_KEYS = ("to", "channel", "date", "reference")  # the site's "submitted" record, once the pack is filed
+TCT_TOOLKIT = "https://www.childhealthinitiative.org/media/v5bntgmp/tct-toolkit__one-pager_final_508_updated.pdf"
+PRINTED_CARDS = 3  # on paper only the worst 3 near-misses, so the letter's own sheet comes soon
 # Muse Image only: IRC 103-2022 as the Supreme Court quotes it (order para 21 and its footnote 1). Never in
 # LETTER_PROMPT, where 4, 10 and 20 would count as measured numbers.
 RAISED_SPEC = ("Draw the crossing raised to the level of the footpath and 4 m wide, with a speed hump 10-20 m before it "
@@ -321,14 +344,15 @@ def retry_note(bad, crossed, problems):
     return "\n\n" + " ".join(reasons)
 
 
-def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES):
+def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES, stated=()):
     """The model's fix and letter, verified before use in two layers (Meta's verifiable-agents workshop): code
     checks that every number was measured, then Muse Spark as a separate reviewer (LLM as judge) lists claims the
     measurements do not support. An invalid reply or either objection goes back with the reason; after the last try
     the letter is kept with what remains listed for a person to check before sending. Numbers are checked against
-    `measured` only, never the prompt (its wording would let "3.1" from "SAM 3.1" pass)."""
+    `measured` only, never the prompt (its wording would let "3.1" from "SAM 3.1" pass), plus `stated`, the
+    principal's notes, which both checks read labelled as stated by the principal, not measured."""
     note, plan, bad, crossed, problems = "", None, [], [], []
-    worst = json.loads(measured).get("worst", [])
+    worst, measured = json.loads(measured).get("worst", []), measured + stated_text(stated)
     for attempt in range(tries):
         try:
             plan = model_plan(prompt + note, api_key, photo)
@@ -344,6 +368,11 @@ def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES):
             return {**plan, "writer": WRITER, **({"judged_by": JUDGE} if api_key else {})}
         note = retry_note(bad, crossed, problems)
     return {**plan, "writer": WRITER, "unmeasured": bad, "mixed": crossed, "unsupported": problems}
+
+
+def stated_text(notes):
+    """The principal's notes as the letter checks read them, after the measurements: labelled, never as measured."""
+    return STATED + "\n\n".join(notes) if notes else ""
 
 
 def judge_problems(letter, measured, api_key):
@@ -517,6 +546,36 @@ def legal_section(site):
             f'<p class="note">Source: {html.escape(ORDER)} (<a href="{ORDER_PDF}">PDF</a>).</p></section>')
 
 
+def submitted(site):
+    """The site's "submitted" record, {to, channel, date, reference} all filled in, or None until the pack is filed."""
+    sent = site.get("submitted")
+    if sent is None:
+        return None
+    if not (isinstance(sent, dict) and all(isinstance(sent.get(k), str) and sent[k].strip() for k in FILED_KEYS)):
+        raise ValueError(f'the site\'s "submitted" needs {", ".join(FILED_KEYS)}, each filled in')
+    return sent
+
+
+def filed_line(site):
+    """Under the title once the pack is filed. Only "filed, reference X": whether anything is approved or fixed is
+    the authority's to say, and no resolution date is promised."""
+    sent = submitted(site)
+    if not sent:
+        return ""
+    to, channel, date, reference = (html.escape(sent[k].strip()) for k in FILED_KEYS)
+    return f'<p class="filed">Filed with {to} on {channel}, {date}: reference {reference}.</p>'
+
+
+def tct_section():
+    """Where this pack sits in the school-zone Traffic Conflict Technique toolkit, and the step left after the fix."""
+    return ('<section><h2>Where this fits in a conflict study</h2><p class="note">This pack covers steps 5-7 (baseline '
+            f'counts, pre-intervention conflicts, analysis) of the CDC/FIA school-zone <a href="{TCT_TOOLKIT}">Traffic '
+            "Conflict Technique toolkit</a>, without the trained observers step 3 normally needs. Severity here is "
+            "post-encroachment time and the measured speed, not the toolkit's observer severity scales, so the two do "
+            "not compare one to one. Step 9 comes after the fix is in place: film the same dismissal from the same spot "
+            "for as long, run this pack again and compare.</p></section>")
+
+
 def linked(text, events):
     """`text` as HTML, each number with a unit that equals exactly one shown event's speed, PET or death risk linked
     to that event's card. The raw text is split first and each piece escaped: escaping first would let the number
@@ -531,9 +590,10 @@ def linked(text, events):
     return "".join(out) + html.escape(text[end:])
 
 
-def letter_section(plan, events=(), measured=""):
-    """The letter, editable in the browser. A number that is one shown event's own links to its clip ("see clip N"
-    when printed); an edit re-checks every number against `measured` as it is typed."""
+def letter_section(plan, events=(), measured="", signoff=None):
+    """The letter, editable in the browser, on its own printed sheet. A number that is one shown event's own links to
+    its clip ("see clip N" when printed); an edit re-checks every number against `measured` (and the principal's
+    notes) as it is typed. `signoff` (signoff.json) names who approved it while its sha256 still matches."""
     if not plan:
         return ""
     paragraphs = "".join(f"<p>{linked(p, events)}</p>" for p in plan["letter"].split("\n") if p.strip())
@@ -541,14 +601,15 @@ def letter_section(plan, events=(), measured=""):
         [f'these numbers are not in the measurements: {", ".join(plan["unmeasured"])}.'] if plan.get("unmeasured") else [])
         + [f"this sentence mixes two near-misses: {s}" for s in plan.get("mixed", [])]
         + [f"the reviewer says: {p}" for p in plan.get("unsupported", [])])
-    checked = (f"Every number was checked against the measurements by code, and the claims by {plan['judged_by']}."
-               if plan.get("judged_by") else "Every number was checked against the measurements by code.")
+    sources = "the measurements" + (" and the principal's notes" if plan.get("notes") else "")
+    checked = (f"Every number was checked against {sources} by code, and the claims by {plan['judged_by']}."
+               if plan.get("judged_by") else f"Every number was checked against {sources} by code.")
     clean = not (plan.get("unmeasured") or plan.get("mixed") or plan.get("unsupported"))
-    known = " ".join(sorted({n.replace(",", "") for n in NUMBER.findall(measured)}))
-    return (f'<section><h2>Letter to the road authority</h2><div class="letter" contenteditable="plaintext-only" '
-            f'spellcheck="false" role="textbox" aria-multiline="true" aria-label="Letter, editable" '
-            f'data-measured="{known}">{paragraphs}</div>{check}<p class="note ok" id="letter-check"'
-            f'{"" if clean else " hidden"}>{html.escape(checked) if clean else ""}</p>{disclosure(plan)}'
+    known = " ".join(sorted({n.replace(",", "") for n in NUMBER.findall(measured + stated_text(plan.get("notes")))}))
+    return (f'<section class="letter-sheet"><h2>Letter to the road authority</h2><div class="letter" '
+            f'contenteditable="plaintext-only" spellcheck="false" role="textbox" aria-multiline="true" '
+            f'aria-label="Letter, editable" data-measured="{known}">{paragraphs}</div>{check}<p class="note ok" id="letter-check"'
+            f'{"" if clean else " hidden"}>{html.escape(checked) if clean else ""}</p>{disclosure(plan, signoff)}'
             f"{LETTER_SCRIPT}</section>")
 
 
@@ -584,16 +645,42 @@ document.addEventListener("click", event => {
 }</script>""" % (json.dumps(NUMBER.pattern), json.dumps(NUMBER_WORD.pattern), json.dumps(MPH.pattern))
 
 
-def disclosure(plan):
+def disclosure(plan, signoff=None):
     """Written by code after both checks, never inside plan["letter"] (the number check would read it): the letter
-    is an AI draft until a named person approves it, and Meta's AUP forbids passing outputs off as human-written."""
-    return (f'<p class="disclosure">Drafted by {html.escape(plan.get("writer") or "an AI model")} from the measurements '
-            "in this pack. Read and approved by: ____ (name, role, date).</p>")
+    is an AI draft until a named person approves it, and Meta's AUP forbids passing outputs off as human-written.
+    signoff.json fills in the blank only while its sha256 is still the letter's."""
+    source = "the measurements in this pack" + (" and the principal's notes" if plan.get("notes") else "")
+    signed = bool(signoff) and signoff["letter_sha256"] == sha256(plan["letter"])
+    by = (f"{signoff['approved_by']}, {signoff['school']}, {signoff['date']} ({edits(plan)})" if signed
+          else "____ (name, role, date)")
+    stale = (f'<p class="note bad">Changed after sign-off by {html.escape(signoff["approved_by"])} on '
+             f'{html.escape(signoff["date"])}, not signed.</p>' if signoff and not signed else "")
+    return (f'{stale}<p class="disclosure">Drafted by {html.escape(plan.get("writer") or "an AI model")} from {source}. '
+            f"Read and approved by: {html.escape(by)}.</p>")
+
+
+def edits(plan):
+    """How much the principal's notes changed the AI draft, by sentence (difflib): "1 of 12 sentences changed after
+    the principal's notes". A sentence cut or added counts, out of the longer of the two letters."""
+    if "draft_letter" not in plan:
+        return "as drafted, no notes"
+    draft, final = sentences(plan["draft_letter"]), sentences(plan["letter"])
+    kept = sum(b.size for b in difflib.SequenceMatcher(None, draft, final, autojunk=False).get_matching_blocks())
+    longer = max(len(draft), len(final))
+    return f"{longer - kept} of {longer} sentences changed after the principal's notes"
+
+
+def sentences(text):
+    return [s.strip() for s in SENTENCE.split(text) if s.strip()]
+
+
+def sha256(text):
+    return hashlib.sha256(text.encode()).hexdigest()
 
 
 STYLE = """
 :root { --bg: #fafaf7; --ink: #1d1d1b; --muted: #66665f; --line: #deded6; --accent: #c0392b; --ok: #2e7d32; }
-@media (prefers-color-scheme: dark) { :root { --bg: #161614; --ink: #ececE6; --muted: #a3a39a; --line: #34342f; --accent: #ff6b5b; --ok: #7bd88f; } }
+@media screen and (prefers-color-scheme: dark) { :root { --bg: #161614; --ink: #ececE6; --muted: #a3a39a; --line: #34342f; --accent: #ff6b5b; --ok: #7bd88f; } }
 body { margin: 0 auto; max-width: 880px; padding: 24px 16px 64px; background: var(--bg); color: var(--ink);
        font: 16px/1.5 system-ui, sans-serif; }
 h1 { font-size: 1.8rem; margin: 0 0 4px; } h2 { margin-top: 40px; } .muted, .note { color: var(--muted); }
@@ -609,8 +696,13 @@ blockquote { margin: 16px 0; padding-left: 16px; border-left: 3px solid var(--ac
 cite { display: block; margin-top: 4px; font-style: normal; color: var(--muted); } a { color: inherit; }
 .letter:focus { outline: 2px solid var(--line); outline-offset: 6px; } .note.ok { color: var(--ok); }
 .note.bad { color: var(--accent); } ::highlight(unmeasured) { text-decoration: underline wavy #e5372a 2px; }
-@media print { a.clip { text-decoration: none; } a.clip::after { content: " (see clip " attr(data-clip) ")"; } }
-"""
+.filed { font-weight: 600; }
+@media print { a.clip { text-decoration: none; } a.clip::after { content: " (see clip " attr(data-clip) ")"; }
+               .letter-sheet { break-before: page; break-after: page; } }
+""" + (  # dark colours are for screens only (dark ink on white paper); on paper only the worst cards, so say so
+    f"@media print {{ article.card:nth-of-type(n+{PRINTED_CARDS + 1}) {{ display: none; }} "
+    + ", ".join(f'a.clip[data-clip="{i}"]::after' for i in range(PRINTED_CARDS + 1, SHOWN_EVENTS + 1))
+    + ' { content: " (clip " attr(data-clip) ", not printed)"; } }\n')
 
 
 def stats(events, seen):
@@ -630,7 +722,7 @@ def lead(lines):
     return "".join(f'<p class="{"note" if i else "lead"}">{html.escape(line)}</p>' for i, line in enumerate(lines))
 
 
-def page(site, events, seen, plan, images, fps, cost=None, full=None):
+def page(site, events, seen, plan, images, fps, cost=None, full=None, signoff=None):
     cards = "\n".join(event_card(i + 1, e, fps) for i, e in enumerate(events[:SHOWN_EVENTS])) or (
         f"<p>No conflicts under {road.CLOSE_PASS_S} s in these {html.escape(str(seen.get('minutes', '?')))} minutes. "
         "A short recording can miss rare events: record more school-run periods before drawing any conclusion.</p>")
@@ -646,12 +738,12 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None):
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Crossing Watch evidence</title>
 <style>{STYLE}{roadmap.STYLE}</style></head><body>
 <h1>Crossing Watch: near-miss evidence</h1>
-<p class="muted">{html.escape(site.get("name", ""))}</p>{lead(headline(events, seen, site))}
+<p class="muted">{html.escape(site.get("name", ""))}</p>{filed_line(site)}{lead(headline(events, seen, site))}
 <div class="stats">{stats(events, seen)}</div>{limit_note(full)}
 {engineering(seen, cost)}
 {map_section(events, site)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{legal_section(site)}
-{letter_section(plan, events[:SHOWN_EVENTS], facts(site, events, seen))}
-<section><h2>How this was measured</h2><p class="note">{html.escape(method)}</p></section></body></html>"""
+{letter_section(plan, events[:SHOWN_EVENTS], facts(site, events, seen), signoff)}
+{tct_section()}<section><h2>How this was measured</h2><p class="note">{html.escape(method)}</p></section></body></html>"""
 
 
 def share(out_dir, page_html):
@@ -682,17 +774,101 @@ def optional_key():
     except SystemExit:
         return None
 
-def main():
+def read_json(path):
+    """A JSON file an earlier run wrote, or None when it is missing or unreadable (said on stderr)."""
+    try:
+        return json.loads(path.read_text())
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError) as err:
+        print(f"{path} unreadable, ignored: {err}", file=sys.stderr)
+        return None
+
+
+def saved_plan(out_dir, prompt):
+    """plan.json when this same writer wrote it from this same prompt (the same measurements), else None: a re-run
+    reuses the paid-for letter, and never one written from other measurements."""
+    plan = read_json(out_dir / "plan.json")
+    if isinstance(plan, dict) and plan.get("prompt_sha256") == sha256(prompt) and plan.get("writer") == WRITER:
+        return plan
+    if plan is not None:
+        print("plan.json was written from other measurements or by another model: not reused", file=sys.stderr)
+    return None
+
+
+def new_plan(out_dir, prompt, measured, key, photo, revise=None, notes=""):
+    """A new fix and letter, or `revise`'s letter revised by the principal's notes, saved to plan.json with the sha256
+    of the prompt it came from. A revision also keeps every note so far (later checks read them as stated by the
+    principal) and the first AI draft, which the sign-off counts changed sentences against."""
+    stated = revise.get("notes", []) + [notes] if revise else []
+    ask = prompt + REVISE.format(letter=revise["letter"], notes=notes) if revise else prompt
+    plan = {**ask_plan(ask, measured, key, photo, stated=stated), "prompt_sha256": sha256(prompt)}
+    if revise:
+        plan = {**plan, "notes": stated, "draft_letter": revise.get("draft_letter", revise["letter"])}
+    (out_dir / "plan.json").write_text(json.dumps(plan, indent=1, ensure_ascii=False))  # the paid-for letter
+    return plan
+
+
+def sign(out_dir, plan, approved_by, school):
+    """signoff.json: who read and approved plan.json's letter, the day, and the sha256 of its exact text."""
+    record = {"approved_by": approved_by, "school": school, "date": datetime.date.today().isoformat(),
+              "letter_sha256": sha256(plan["letter"])}
+    (out_dir / "signoff.json").write_text(json.dumps(record, indent=1, ensure_ascii=False))
+    return record
+
+
+def read_signoff(out_dir):
+    """signoff.json, or None (the letter then shows as unsigned) when there is none or it is not a sign-off."""
+    record = read_json(out_dir / "signoff.json")
+    if record is None or isinstance(record, dict) and all(isinstance(record.get(k), str) for k in SIGNOFF_KEYS):
+        return record
+    print(f"signoff.json lacks {', '.join(SIGNOFF_KEYS)}: the letter shows as unsigned", file=sys.stderr)
+    return None
+
+
+def parse_args():
+    """The command line, the notes' text and (approved_by, school), refusing flags that cannot go together."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("out_dir")
     parser.add_argument("site")
+    parser.add_argument("--notes", metavar="FILE", help="the principal's notes on plan.json's letter: only the "
+                        "sentences they ask about change")
+    parser.add_argument("--approved-by", default="", metavar="NAME",
+                        help='who read and approved plan.json\'s letter, e.g. "A. Rao, Principal" (with --school)')
+    parser.add_argument("--school", default="", help="the school that sends the letter")
     args = parser.parse_args()
+    signer = (args.approved_by.strip(), args.school.strip())
+    if any(signer) and not all(signer):
+        parser.error("--approved-by and --school go together")
+    if all(signer) and args.notes:
+        parser.error("sign after reading the revised letter: run --notes first, then --approved-by")
+    try:
+        notes = Path(args.notes).read_text().strip() if args.notes else ""
+    except OSError as err:
+        parser.error(f"cannot read the notes: {err}")
+    if args.notes and not notes:
+        parser.error(f"{args.notes} is empty")
+    return args, notes, signer
+
+
+def main():
+    args, notes, signer = parse_args()
     out_dir, site = Path(args.out_dir), json.loads(Path(args.site).read_text())
+    try:
+        submitted(site)
+    except ValueError as err:
+        sys.exit(f"pack.py: {err}")
     data = json.loads((out_dir / "events.json").read_text())
     events = confirmed(data["events"])
     seen = real_crossers(data["events"],
                          data.get("exposure") or {"minutes": round(clip_minutes(out_dir / "clip.mp4", data["fps"]), 1)})
-    plan, images = None, None
+    measured = facts(site, events, seen)
+    prompt = LETTER_PROMPT.format(facts=measured, language=site.get("letter_language", "English"))
+    saved = saved_plan(out_dir, prompt)
+    if (notes or all(signer)) and not saved:
+        sys.exit("pack.py: --notes and --approved-by work on plan.json's letter from these same measurements, and "
+                 "there is none: run pack.py without them first, and have that letter read")
+    plan, images = saved, None  # saved stays if a revision fails
     if events:
         try:
             photo = street_photo(out_dir / "clip.mp4", out_dir / "street.jpg", site.get("person", "person"),
@@ -702,16 +878,20 @@ def main():
             photo = None
         try:
             key = optional_key()
-            measured = facts(site, events, seen)
-            prompt = LETTER_PROMPT.format(facts=measured, language=site.get("letter_language", "English"))
-            plan = ask_plan(prompt, measured, key, photo)
-            (out_dir / "plan.json").write_text(json.dumps(plan, indent=1, ensure_ascii=False))  # the paid-for letter
-            if photo and key:  # Muse Image draws the fix; without a key there is no street image on the page
-                images = (photo.name, draw_fix(photo, fix_instruction(plan), key, out_dir / "street-fixed.webp").name)
+            plan = (saved if saved and not notes else  # a re-run pays nothing
+                    new_plan(out_dir, prompt, measured, key, photo, saved if notes else None, notes))
+            drawn = out_dir / "street-fixed.webp"
+            if photo and saved and drawn.is_file() and fix_instruction(saved) == fix_instruction(plan):
+                images = (photo.name, drawn.name)  # drawn for this same fix by an earlier run: no new Muse Image call
+            elif photo and key:  # Muse Image draws the fix; without a key there is no street image on the page
+                images = (photo.name, draw_fix(photo, fix_instruction(plan), key, drawn).name)
         except (SystemExit, OSError, ValueError, KeyError, IndexError, TypeError, AttributeError,
                 http.client.HTTPException, subprocess.CalledProcessError) as err:
-            print(f"letter or fix image failed, page will show the measurements only: {err}", file=sys.stderr)
-    page_html = page(site, events, seen, plan, images, data["fps"], data.get("cost"), data.get("sam_full_requests"))
+            print(f"letter or fix image failed, the page shows plan.json's letter if any, else the measurements only: "
+                  f"{err}", file=sys.stderr)
+    signoff = sign(out_dir, plan, *signer) if plan and all(signer) else read_signoff(out_dir)
+    page_html = page(site, events, seen, plan, images, data["fps"], data.get("cost"), data.get("sam_full_requests"),
+                     signoff=signoff)
     (out_dir / "index.html").write_text(page_html)
     share(out_dir, page_html)  # the only folder to publish
     print(f"wrote {out_dir / 'index.html'}: {len(serious(events))} serious, {len(events) - len(serious(events))} close "

@@ -623,29 +623,157 @@ def test_letter_numbers_link_to_the_one_clip_they_measure_and_edits_are_rechecke
     assert '<p class="note ok" id="letter-check">Every number was checked' in page
 
 
-def test_pack_saves_the_letter_plan_next_to_the_page():
-    import contextlib, io, sys, tempfile
+def pack_folder(folder):
+    """An analyze.py output folder with one near-miss and its site file, for pack.main()."""
     from pathlib import Path
     e = {"person": "1/0", "vehicle": "car#1", "tier": "serious", "pet_s": 0.5, "vehicle_kmh": 30.0, "death_risk_pct": 1.5,
          "t_person_s": 3.0, "t_vehicle_s": 3.5, "gap_m": 0.4, "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5},
                                                                          "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
-    plan = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "PET 0.5 s, स्कूल.", "writer": "Muse Spark"}
-    with tempfile.TemporaryDirectory() as folder:
-        out = Path(folder)
-        (out / "events.json").write_text(json.dumps({"fps": 10, "exposure": {"minutes": 0.3}, "events": [e]}))
-        (out / "site.json").write_text(json.dumps({"name": "gate", "world_points": SQUARE_ROAD}))
-        old = sys.argv, pack.optional_key, pack.street_photo, pack.ask_plan
-        sys.argv = ["pack.py", folder, str(out / "site.json")]
-        pack.optional_key, pack.street_photo = lambda: None, lambda *args: None  # no key, no network, no photo
-        pack.ask_plan = lambda prompt, measured, key, photo: plan
-        try:
-            with contextlib.redirect_stdout(io.StringIO()):
-                pack.main()
-        finally:
-            sys.argv, pack.optional_key, pack.street_photo, pack.ask_plan = old
-        assert json.loads((out / "plan.json").read_text()) == plan and "speed table" in (out / "index.html").read_text()
-        assert (out / "share" / "index.html").read_text() == (out / "index.html").read_text()
+    out = Path(folder)
+    (out / "events.json").write_text(json.dumps({"fps": 10, "exposure": {"minutes": 0.3}, "events": [e]}))
+    (out / "site.json").write_text(json.dumps({"name": "gate", "world_points": SQUARE_ROAD}))
+    return out
 
+
+def run_pack(out, *flags, ask=None, key=None, draw=None):
+    """pack.main() on `out` with no network: `ask(prompt)` stands in for the letter model, `draw` for Muse Image (and
+    with it a street photo). Returns each (prompt, stated notes) the letter step was asked with."""
+    import contextlib, io, sys
+    calls, old = [], (sys.argv, pack.optional_key, pack.street_photo, pack.ask_plan, pack.draw_fix)
+    sys.argv = ["pack.py", str(out), str(out / "site.json"), *flags]
+    pack.optional_key = lambda: key
+    pack.street_photo = (lambda clip, path, *args: (path.write_bytes(b"jpeg"), path)[1]) if draw else lambda *args: None
+    pack.ask_plan = lambda prompt, measured, key, photo, stated=(): (calls.append((prompt, stated)), ask(prompt))[1]
+    pack.draw_fix = draw or pack.draw_fix
+    try:
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            pack.main()
+    finally:
+        sys.argv, pack.optional_key, pack.street_photo, pack.ask_plan, pack.draw_fix = old
+    return calls
+
+
+def exits(call):
+    try:
+        call()
+    except SystemExit:
+        return True
+    return False
+
+
+def test_pack_saves_the_letter_plan_and_a_rerun_pays_nothing():
+    """plan.json keeps the letter with its prompt's sha256: a re-run from the same measurements asks no model and
+    draws no new picture of the same fix; new measurements ask again."""
+    import tempfile
+    plan = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "PET 0.5 s, स्कूल.", "writer": pack.WRITER}
+    drawn = []
+    draw = lambda photo, words, key, path: (drawn.append(words), path.write_bytes(b"RIFF"), path)[2]
+    with tempfile.TemporaryDirectory() as folder:
+        out = pack_folder(folder)
+        assert len(run_pack(out, ask=lambda prompt: plan, key="key", draw=draw)) == 1 and len(drawn) == 1
+        saved = json.loads((out / "plan.json").read_text())
+        assert saved == {**plan, "prompt_sha256": saved["prompt_sha256"]} and len(saved["prompt_sha256"]) == 64
+        page = (out / "index.html").read_text()
+        assert "speed table" in page and 'src="street-fixed.webp"' in page
+        assert (out / "share" / "index.html").read_text() == page
+        assert run_pack(out, ask=None, key="key", draw=draw) == [] and len(drawn) == 1  # nothing paid
+        assert run_pack(out, ask=None, draw=draw) == [] and (out / "index.html").read_text() == page  # no key either
+        data = json.loads((out / "events.json").read_text())
+        data["events"][0]["vehicle_kmh"] = 31.0
+        (out / "events.json").write_text(json.dumps(data))
+        assert len(run_pack(out, ask=lambda prompt: plan)) == 1  # other measurements: a new letter
+
+
+def test_principal_notes_revise_the_letter_and_reach_the_checks_as_stated_not_measured():
+    """Reject with notes (Meta's legal-agent workshop): the notes go back with the letter, "change only the sentences
+    the notes ask for", and a number the principal stated passes the code check and reaches the judge labelled."""
+    import tempfile
+    letter = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "PET 0.4 s. Our 1,200 pupils cross."}
+    judged, old = [], (pack.model_plan, pack.judge_problems)
+    pack.model_plan = lambda prompt, key, photo=None: letter
+    pack.judge_problems = lambda text, measured, key: (judged.append(measured), [])[1]
+    try:
+        assert pack.ask_plan("PROMPT", '{"pet_s": 0.4}', "key")["unmeasured"] == ["1,200"] and judged == []
+        assert "unmeasured" not in pack.ask_plan("PROMPT", '{"pet_s": 0.4}', "key", stated=["We have 1,200 pupils."])
+    finally:
+        pack.model_plan, pack.judge_problems = old
+    assert judged == ['{"pet_s": 0.4}\n\nSTATED BY THE PRINCIPAL, NOT MEASURED (a letter may give these as the school\'s own '
+                      "statements):\nWe have 1,200 pupils."]
+    draft = {"fix": "speed table", "why": "w", "image_prompt": "i", "writer": pack.WRITER,
+             "letter": "Dear Sir. A car passed 0.5 s from a child. We ask for a speed table."}
+    revised = {**draft, "letter": "Dear Sir. A car passed 0.5 s from one of our 1,200 pupils. We ask for a speed table."}
+    with tempfile.TemporaryDirectory() as folder:
+        out = pack_folder(folder)
+        (out / "notes.txt").write_text("Say we have 1,200 pupils.\n")
+        assert exits(lambda: run_pack(out, "--notes", str(out / "notes.txt"), ask=lambda p: revised))  # no letter yet
+        run_pack(out, ask=lambda prompt: draft)
+        [(prompt, stated)] = run_pack(out, "--notes", str(out / "notes.txt"), ask=lambda p: revised)
+        assert "change only the sentences the notes ask for" in prompt and draft["letter"] in prompt
+        assert prompt.endswith("NOTES:\nSay we have 1,200 pupils.") and stated == ["Say we have 1,200 pupils."]
+        saved = json.loads((out / "plan.json").read_text())
+        assert saved["letter"] == revised["letter"] and saved["draft_letter"] == draft["letter"] and saved["notes"] == stated
+        page = (out / "index.html").read_text()
+        assert "from the measurements in this pack and the principal's notes." in page
+        assert "1200" in page.split('data-measured="')[1].split('"')[0].split()  # the browser check agrees
+        (out / "notes.txt").write_text("Shorter, please.")
+        [(prompt, stated)] = run_pack(out, "--notes", str(out / "notes.txt"), ask=lambda p: {**revised, "letter": "Short."})
+        assert revised["letter"] in prompt and stated == ["Say we have 1,200 pupils.", "Shorter, please."]
+        assert json.loads((out / "plan.json").read_text())["draft_letter"] == draft["letter"]  # the first AI draft
+
+
+def test_signoff_names_the_signer_only_while_the_letter_is_unchanged():
+    import datetime, hashlib, tempfile
+    draft = {"fix": "speed table", "why": "w", "image_prompt": "i", "writer": pack.WRITER,
+             "letter": "Dear Sir. A car passed 0.5 s from a child. We ask for a speed table."}
+    revised = {**draft, "letter": "Dear Sir. A car passed 0.5 s from a pupil. We ask for a speed table."}
+    sign = ["--approved-by", "A. Rao, Principal", "--school", "Gate School"]
+    with tempfile.TemporaryDirectory() as folder:
+        out = pack_folder(folder)
+        (out / "notes.txt").write_text("Say pupil, not child.")
+        for flags in (sign[:2], sign + ["--notes", str(out / "notes.txt")], sign):  # half a signer; unread; no letter
+            assert exits(lambda: run_pack(out, *flags, ask=lambda p: draft))
+        run_pack(out, ask=lambda p: draft)
+        run_pack(out, "--notes", str(out / "notes.txt"), ask=lambda p: revised)
+        assert run_pack(out, *sign) == []  # signing asks no model
+        record = json.loads((out / "signoff.json").read_text())
+        today = datetime.date.today().isoformat()
+        assert record == {"approved_by": "A. Rao, Principal", "school": "Gate School", "date": today,
+                          "letter_sha256": hashlib.sha256(revised["letter"].encode()).hexdigest()}
+        assert (f"Read and approved by: A. Rao, Principal, Gate School, {today} (1 of 3 sentences changed after the "
+                "principal&#x27;s notes).") in (out / "index.html").read_text()
+        saved = json.loads((out / "plan.json").read_text())
+        (out / "plan.json").write_text(json.dumps({**saved, "letter": saved["letter"] + " One more."}))
+        run_pack(out)
+        page = (out / "index.html").read_text()
+        assert f"Changed after sign-off by A. Rao, Principal on {today}, not signed." in page
+        assert "Read and approved by: ____ (name, role, date)." in page and "signoff.json" not in str(list(
+            (out / "share").iterdir()))
+    assert pack.edits({"letter": "A. B. C.", "draft_letter": "A. B. C. D."}) == (
+        "1 of 4 sentences changed after the principal's notes")  # a cut sentence counts
+    assert pack.edits({"letter": "A. B."}) == "as drafted, no notes"
+
+
+def test_filed_reference_under_the_title_tct_steps_and_a_print_view():
+    """Filing says only "filed, reference X"; the page places itself in the TCT toolkit; paper is light, holds the 3
+    worst cards, and gives the letter its own sheet."""
+    import tempfile
+    sent = {"to": "City Traffic Police", "channel": "CPGRAMS", "date": "2026-11-03", "reference": "REF/2026/1"}
+    page = pack.page({"name": "gate", "world_points": SQUARE_ROAD, "submitted": sent}, [], {"minutes": 1}, None, None, 10)
+    line = '<p class="filed">Filed with City Traffic Police on CPGRAMS, 2026-11-03: reference REF/2026/1.</p>'
+    assert page.index("</h1>") < page.index(line) < page.index('<div class="stats">') and pack.filed_line({}) == ""
+    assert raises_value_error(lambda: pack.filed_line({"submitted": {**sent, "reference": " "}}))
+    with tempfile.TemporaryDirectory() as folder:
+        out = pack_folder(folder)
+        (out / "site.json").write_text(json.dumps({"name": "gate", "world_points": SQUARE_ROAD, "submitted": {"to": "x"}}))
+        assert exits(lambda: run_pack(out, ask=lambda p: None))  # refused before any model is asked
+    assert "covers steps 5-7 (baseline counts, pre-intervention conflicts, analysis)" in page
+    assert "without the trained observers step 3 normally needs" in page and "observer severity scales" in page
+    assert "@media screen and (prefers-color-scheme: dark)" in pack.STYLE and "@media (prefers" not in pack.STYLE
+    assert "article.card:nth-of-type(n+4) { display: none; }" in pack.STYLE
+    assert 'a.clip[data-clip="4"]::after, a.clip[data-clip="5"]::after { content: " (clip " attr(data-clip) ", not ' \
+           'printed)"; }' in pack.STYLE
+    assert ".letter-sheet { break-before: page; break-after: page; }" in pack.STYLE
+    assert pack.letter_section({"letter": "x"}).startswith('<section class="letter-sheet">')
 
 def test_share_folder_holds_only_what_the_page_shows_and_never_the_unblurred_files():
     import tempfile
