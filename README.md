@@ -36,6 +36,8 @@ python3 pack.py out/VIDEO site.json      # letter, fix image, evidence page -> o
 python3 test_cw.py                       # self-checks
 ```
 
+Filming your own crossing: [`FILMING.md`](FILMING.md) (phone locked at 1080p 30 fps, tape marks, consent notice; `python3 filmcheck.py CLIP` checks the test clip).
+
 `pack.py` also writes `out/VIDEO/share/`: the page and only the files it shows (evidence clips, the blurred street
 photo, the Muse Image picture). Publish that folder and nothing else. The unblurred `clip.mp4` and the person crops
 Spark looked at never go in, even if a page names them; a self-check proves it.
