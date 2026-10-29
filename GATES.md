@@ -8,10 +8,44 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 | G2 Metres | A road distance NOT used for calibration (a second lane width, or crossing-line length) comes out within ±15% of its assumed value | same | Wed 28 Oct 22:00 |
 | G3 Conflicts | Checked by eye, at least 2 of the top 3 events are real close passes, and no event involves a parked or queued vehicle | same | Thu 29 Oct 22:00 |
 | G4 Own footage | Footage filmed from height at the user's college gate runs end to end, with calibration from measured points | user's video | Sun 1 Nov 22:00 |
+| G6 Speed | Against vehicles hand-timed between two lines taped 15 m apart, at least 80% of matched vehicles read within ±15% or ±2 km/h (whichever is larger), and the median error is within ±10%; at least 20 matched vehicles, or G6 is "not tested". Added Thu 29 Oct, before the taped lines are filmed; details below | user's video, with the lines taped | Sun 1 Nov 22:00 |
 
 **Scope cut if G3 fails:** report the closest approach in metres plus vehicle speed (no PET). The evidence pack and letter still ship.
 
 **Known limits (stated, not hidden):** a vehicle's lower box edge stands in for its footprint; up to 16 objects per SAM video request (found later: in all, not per frame); one concept per SAM request; calibration lengths on the news clip are assumed.
+
+## G6 pre-registration (written Thu 29 Oct 2026, before the taped lines are filmed)
+
+- **Lines.** Four tape marks, two on each kerb, make two lines across the road 15 m apart, centred on the crossing.
+  They are separate from the calibration rectangle (never its corners, or the check is not independent). Everything
+  is done from the footpath, and there are no staged rides. The marks are clicked in the calibration frame and saved
+  in the site file as `"trap"` (see the first lines of `validate_gate.py`).
+- **Truth.** For each vehicle, the moments its front wheel touches line A and line B, read frame by frame on the exact
+  video file given to analyze.py (the 30 fps original, never the 10 fps clip.mp4). Trap speed is the taped distance
+  divided by the time between them.
+- **Which vehicles.** From the start of that video, every vehicle of any kind that crosses both lines, in order, until
+  30 are logged (or all of them, if fewer cross). A vehicle is skipped only when its front wheel is hidden at either
+  line or it stops between the lines, and each skip is noted with why. The log is made without looking at the
+  pipeline's speeds.
+- **Ours.** `python3 validate_gate.py SITE.json OUT_DIR TRAP.csv` rebuilds the run's tracks from its cached SAM replies
+  at $0. It matches each logged vehicle to the one track within 1.5 m of line A and of line B at the logged moments,
+  and takes that track's median measured speed between them. A vehicle with no such track, with two or more, or with
+  fewer than 3 measured speeds is listed with the reason and left out of the error figures.
+- **Pass:** at least 20 matched vehicles; at least 80% of them within ±15% or ±2 km/h of their trap speed, whichever is
+  larger; and the median signed error within ±10%. **Fail:** fewer than 80% within the band, or a median error beyond
+  ±10%. **Not tested:** fewer than 20 matched vehicles. A failed or untested G6 is never reported as passed.
+- **If G6 fails or is not tested,** the README, the video and the X post give the trap's measured error (or say that
+  no own-camera speed check was possible) as the speed accuracy on our camera, not the DUT or SinD numbers.
+- **Why these bands.** In a synthetic rooftop-camera simulation (re-run offline on Thu 29 Oct), hand timing a 15 m
+  trap on a 30 fps original is good to 0.67-1.14 km/h at 25 km/h (95th percentile, half to one frame of picking
+  error); calibration from an 8 m rectangle adds 2.0-5.4% (95th percentile, 1-2 px clicks, two camera positions); and
+  up to 4 px of box jitter adds under 0.5 km/h (95th percentile) to today's speed estimator. The band leaves room for
+  all three; the ±10% bound on the median catches a scale error that the band alone would let through. The simulation
+  leaves out SAM's box drift on a real camera at an angle, so G6 can fail.
+- **Side check.** The script also prints how far apart the calibration puts the two lines. That is a road distance not
+  used for calibration, so it can also serve G2.
+- These conditions and the constants in `validate_gate.py` (`BAND_PCT`, `BAND_KMH`, `PASS_SHARE`, `MAX_LEAN_PCT`,
+  `MIN_VEHICLES`, `MATCH_M`, `MIN_SPEEDS`) do not change after the trap footage arrives.
 
 ## Status (Wed 28 Oct, evening, written by the agent)
 
