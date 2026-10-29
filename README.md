@@ -482,10 +482,11 @@ python3 vehicle_test.py out/indian-crowd --spend   # 60 cached crowd frames, abo
 
 All code in this repository was written during the hackathon, except the mask decoder in `masks.py`: a Python port
 of the one_bit decoder in Meta's meta-sam-parser (`_mask_codec.py`, Copyright (c) Meta Platforms, Inc. and
-affiliates), used under its SAM License (github.com/meta-models/meta-sam). The check-then-retry pattern for Spark's
-letter, the reject-with-notes revision and the JSON-mode request field follow Meta's legal-agent workshop
-(github.com/meta-models/legal-agent-workshop, shown at a hackathon session); no code was copied from it. The
-case agent follows the shape of that workshop's loop (one tool per turn, plain text sent back, a stop for a person,
+affiliates), used under its SAM License (github.com/meta-models/meta-sam). The full SAM License is in
+`LICENSES/SAM-License.txt`; `masks.py` is under it, and everything else is under MIT (`LICENSE`). The
+check-then-retry pattern for Spark's letter, the reject-with-notes revision and the JSON-mode request field follow
+Meta's legal-agent workshop (github.com/meta-models/legal-agent-workshop, shown at a hackathon session); no code was
+copied from it. The case agent follows the shape of that workshop's loop (one tool per turn, plain text sent back, a stop for a person,
 resume from saved progress, escalation after 3 refusals); its code is our own. No
 third-party libraries; Python standard library and ffmpeg only. Test videos from YouTube were used only for local
 testing and are not included. The SinD sample (SOTIF-AVLab, non-commercial use) was used only for validation and is
