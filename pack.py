@@ -24,6 +24,7 @@ import sys
 import unicodedata
 import urllib.request
 import uuid
+import zlib
 from pathlib import Path
 
 import ailabel
@@ -92,6 +93,13 @@ SENTENCE = re.compile(r"(?<=[.!?])\s+|\n")
 SHOWN_FILE = re.compile(r'\bsrc="([^"#?]+)')  # a file the page shows (a clip or a picture), without #t=...
 UNSHAREABLE = re.compile(r"clip\.mp4|person-.*\.jpg")  # the unblurred video and the unblurred crops Spark saw
 PLAN_KEYS = ("fix", "why", "image_prompt", "letter")
+PLAN_SCHEMA = {"type": "object", "properties": {k: {"type": "string"} for k in PLAN_KEYS}, "required": list(PLAN_KEYS),
+               "additionalProperties": False}  # the plan's shape only, for an open-weights server
+NUMBER_LOCK = os.environ.get("LETTER_MODEL_NUMBER_LOCK", "") == "1"  # opt-in: on Fireworks (29 Oct) the number
+# pattern trapped Muse Spark Open in "a0a0a0..." text that held no unmeasured number and so passed both checks
+MIN_TEXT_RATIO = 0.2       # compressed / raw size: prose stays near 0.4, one short piece repeated falls under 0.1
+REPEAT_CHECK_BYTES = 200   # shorter text compresses badly whatever it says, so it is not judged this way
+WORDLESS_CHARS = 20        # a field this long with no word of two letters is stuck ("a0a0a0..."), not terse
 JSON_ESCAPE = r'\\["\\/bfnrt]'  # an escape inside a JSON string, but never \u: "\u0032" is a hidden 2
 LETTER_PROMPT = """You help a school ask its road authority to make the crossing outside it safer.
 Below are measurements from a video of the crossing, made by Crossing Watch (SAM tracking, road-plane geometry,
@@ -487,13 +495,26 @@ def model_plan(prompt, api_key, photo=None, known=None):
     the plan. The blurred street photo, when there is one, lets the model see the street it is fixing. An
     open-weights server can write digits only as numbers in `known` (default: the prompt)."""
     image = "data:image/jpeg;base64," + base64.b64encode(photo.read_bytes()).decode() if photo else None
-    text, server = (open_model_reply(prompt, image, plan_schema(known or prompt)) if LETTER_URL
+    schema = plan_schema(known or prompt) if NUMBER_LOCK else PLAN_SCHEMA
+    text, server = (open_model_reply(prompt, image, schema) if LETTER_URL
                     else (spark_reply(prompt, image, api_key), {}))
     match = re.search(r"\{.*\}", text, re.S)
     plan = json.loads(match[0], strict=False) if match else {}  # a letter may hold raw newlines
     if not isinstance(plan, dict) or not all(isinstance(plan.get(k), str) and plan[k].strip() for k in PLAN_KEYS):
         raise ValueError(f"the plan is incomplete: {text[:200]!r}")
+    if LETTER_URL and (stuck := unreadable(plan)):
+        raise ValueError(f"{', '.join(stuck)} is not readable text: {plan[stuck[0]][:80]!r}")
     return {**plan, **server}
+
+
+def unreadable(plan):
+    """The plan's fields that are not readable text: no word of two letters, or long text that is one short piece
+    repeated. Gibberish holds no unmeasured number and no claim, so neither the number check nor a judge objects."""
+    def stuck(text):
+        raw = text.encode()
+        return (len(text) >= WORDLESS_CHARS and not re.search(r"[^\W\d_]{2,}", text)
+                or len(raw) >= REPEAT_CHECK_BYTES and len(zlib.compress(raw)) / len(raw) < MIN_TEXT_RATIO)
+    return [k for k in PLAN_KEYS if stuck(plan[k])]
 
 
 def spark_reply(prompt, image, api_key):

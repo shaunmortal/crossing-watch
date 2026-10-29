@@ -1860,14 +1860,14 @@ def test_open_model_letters_still_face_the_number_check_and_the_judge():
     good = {"fix": "speed table", "why": "cars at 27.3 km/h", "image_prompt": "add a speed table", "letter": "PET 0.4 s."}
     as_reply = lambda plan: {"choices": [{"message": {"content": json.dumps(plan)}, "finish_reason": "stop"}]}
     server, seen = fake_open_model([as_reply({**good, "letter": "It happened 12 times."}), as_reply(good)])
-    judged, old = [], (pack.LETTER_URL, pack.judge_problems)
-    pack.LETTER_URL = f"http://127.0.0.1:{server.server_port}/v1"
+    judged, old = [], (pack.LETTER_URL, pack.judge_problems, pack.NUMBER_LOCK)
+    pack.LETTER_URL, pack.NUMBER_LOCK = f"http://127.0.0.1:{server.server_port}/v1", True
     pack.judge_problems = lambda letter, measured, key: judged.append(letter) or []
     try:
         with contextlib.redirect_stderr(io.StringIO()):
             plan = pack.ask_plan("PROMPT", '{"pet_s": 0.4, "vehicle_kmh": 27.3}', "key")
     finally:
-        pack.LETTER_URL, pack.judge_problems = old
+        pack.LETTER_URL, pack.judge_problems, pack.NUMBER_LOCK = old
         server.shutdown()
         server.server_close()
     first, second = (body for _, body, _ in seen)
@@ -1875,6 +1875,35 @@ def test_open_model_letters_still_face_the_number_check_and_the_judge():
     assert "not in the measurements: 12" in second["messages"][0]["content"][0]["text"]
     assert pattern(second) == pattern(first) and not re.fullmatch(pattern(second), "It happened 12 times.")
     assert plan["letter"] == good["letter"] and judged == [good["letter"]] and plan["judged_by"] == pack.JUDGE
+
+
+def test_stuck_open_model_text_is_sent_back_and_the_number_lock_is_opt_in():
+    """Fireworks, 29 Oct: under the number pattern Muse Spark Open wrote "a0a0a0..." in every field. It held no
+    unmeasured number and no claim, so both checks passed it; now it goes back, and the pattern is off by default."""
+    import contextlib, io
+    real = ("The 2.0 minute video recorded 2 serious near-misses at the crossing outside our gate, with cars at 38.0 "
+            "km/h and 29.0 km/h passing the spot where pupils had just stood. We ask for a raised zebra crossing.")
+    good = {"fix": "raised zebra crossing", "why": "cars at 38.0 km/h", "image_prompt": "add a raised crossing",
+            "letter": real}
+    stuck = {k: "a0" * 40 for k in good}
+    assert pack.unreadable(stuck) == list(pack.PLAN_KEYS) and pack.unreadable(good) == []
+    assert pack.unreadable({**good, "letter": "aa0 " * 80}) == ["letter"]  # words, but one piece repeated
+    as_reply = lambda plan: {"choices": [{"message": {"content": json.dumps(plan)}, "finish_reason": "stop"}]}
+    server, seen = fake_open_model([as_reply(stuck), as_reply(good)])
+    old = pack.LETTER_URL, pack.judge_problems, pack.NUMBER_LOCK
+    pack.LETTER_URL, pack.NUMBER_LOCK = f"http://127.0.0.1:{server.server_port}/v1", False
+    pack.judge_problems = lambda letter, measured, key: []
+    try:
+        with contextlib.redirect_stderr(io.StringIO()):
+            plan = pack.ask_plan("PROMPT", '{"minutes": 2.0, "serious": 2, "kmh": [38.0, 29.0]}', "key")
+    finally:
+        pack.LETTER_URL, pack.judge_problems, pack.NUMBER_LOCK = old
+        server.shutdown()
+        server.server_close()
+    first, second = (body for _, body, _ in seen)
+    assert first["response_format"]["json_schema"]["schema"] == pack.PLAN_SCHEMA  # no "pattern" unless asked for
+    assert "not readable text" in second["messages"][0]["content"][0]["text"]
+    assert plan["letter"] == real and plan["tries"] == 2
 
 
 def test_glimmer_judges_through_its_own_url_and_judged_by_names_only_the_judges_that_ran():

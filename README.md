@@ -133,10 +133,12 @@ runs one 32,768-token slot with medium reasoning and the model card's sampling, 
 runs out of context, and writes `<removed-run-record>` (llama.cpp build, GPUs, timings, the letter's sha256, the git
 commit and pack.py's sha256). The page then says "Muse Glimmer 30B wrote this in N s on Kaggle 2 x T4", with N from
 the server's own timings. The Kaggle notebook was run by the author.
-The open-weights model is also sent a JSON schema whose strings may hold digits only as the measured numbers, each
-followed by a non-digit. By llama.cpp's source, llama-server turns it into a grammar that should still let Glimmer
-think first; that is not tested yet, as no Glimmer run has used it. The code check and the reviewer still run after
-it, and the run record counts Glimmer's tries.
+The open-weights model is sent a JSON schema that gives the plan's shape only. A number lock is opt-in:
+`LETTER_MODEL_NUMBER_LOCK=1` also holds every string to a pattern that allows digits only as the measured numbers.
+On Fireworks (29 Oct) that pattern trapped Muse Spark Open in "a0a0a0…" in every field. The text held no unmeasured
+number and no claim, so the code check and the reviewer both passed it. So the lock is off by default, and an
+open-weights reply whose fields are wordless, or one short piece repeated, now goes back as unreadable. The code
+check and the reviewer still run after that, and the run record counts the model's tries.
 `LETTER_MODEL_KEY` adds a Bearer token for a server that needs one, and the letter says "self-hosted" only when the
 server runs on the same machine.
 `JUDGE_MODEL_URL` makes the open-weights model a judge too: it reviews the letter beside Muse Spark, or alone without a
@@ -174,7 +176,9 @@ Fireworks sends no llama-server timings, so pack.py times the reply itself and w
 `plan.json`: model id, host, request id, token usage, wall seconds, the response format used, tries and the letter's
 sha256, never the key. The page then says "Muse Spark Open wrote this in N s on Fireworks", N being that wall time. If
 the server rejects the JSON schema with HTTP 400, pack.py asks once more for any JSON object and the record says
-`json_object`; the number check and the judges still run. No Fireworks run has been made with pack.py yet.
+`json_object`; the number check and the judges still run.
+
+First Fireworks run, 29 Oct, on `sample/`: Muse Spark Open wrote the fix and letter in one try, 55.5 s wall time (1,019 prompt and 2,732 completion tokens, 2,140 of them reasoning), and both the number check and Muse Spark as judge passed it. The record is `provenance/spark-open-fireworks-sample.json` (request id, usage and the letter's sha256; no key). An earlier attempt the same day, with the number lock on, came back as "a0a0a0..."; that is why the lock is now opt-in.
 
 Either model can judge the other's letter. `JUDGE_MODEL` (default: `LETTER_MODEL`) and `JUDGE_MODEL_KEY` belong to the
 judge server alone, and neither server is sent the other's key; a judge on the letter's own URL with no

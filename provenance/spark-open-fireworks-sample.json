@@ -1,0 +1,24 @@
+{
+ "model": "accounts/fireworks/models/muse-spark-open",
+ "host": "api.fireworks.ai",
+ "request_id": "chatcmpl-9e68cb0170d84c348eb29b1687354a4f",
+ "usage": {
+  "prompt_tokens": 1019,
+  "total_tokens": 3751,
+  "completion_tokens": 2732,
+  "prompt_tokens_details": {
+   "cached_tokens": 960
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 2140
+  },
+  "output_tokens_details": {
+   "reasoning_tokens": 2140
+  }
+ },
+ "wall_s": 55.5,
+ "timings": null,
+ "response_format": "json_schema",
+ "tries": 1,
+ "letter_sha256": "a721a428b83db1fc85ee4be25a3ea1003b164ffc0c7f54ce697908ad4b185262"
+}
