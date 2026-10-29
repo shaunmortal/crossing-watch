@@ -33,6 +33,11 @@ crossing: zebra corners, kerb corners, lane-line ends.</p>
 <canvas id="frame" width="640" height="360"></canvas>
 <p id="frameStatus" class="muted">Open a frame to begin.</p>
 <button id="frameUndo">Undo point</button>
+<p class="muted">Optional, for the speed check (gate G6): after the four rectangle corners, click the four speed-line
+tape marks, line A near kerb, line B near kerb, line B far kerb, line A far kerb, and give the taped distance between
+the lines. The page writes <code>trap</code> from them, and <code>check</code> (line A to line B along the near kerb,
+which the case agent asks a person to tape). SITE.json is empty at 5 to 7 points.</p>
+<label>Line A to line B (metres) <input type="number" id="trapM" min="1" step="0.1" value="15"></label>
 
 <section id="tapeInputs">
 <label>Length of side 1 → 2 (metres) <input type="number" id="w" min="0.5" step="0.1" value="3.5"></label>
@@ -112,7 +117,8 @@ function picker(name, labels, width) {
   return { state, canvas };
 }
 
-const frame = picker("frame", ["1", "2", "3", "4"], ANALYSIS_WIDTH);
+const TRAP_LABELS = ["A near", "B near", "B far", "A far"];
+const frame = picker("frame", ["1", "2", "3", "4", ...TRAP_LABELS], ANALYSIS_WIDTH);
 const map = picker("map", ["1", "2", "3", "4", "S1", "S2"], null);
 
 // Road metres for the four frame points, and a note saying where they came from; null until complete.
@@ -131,14 +137,25 @@ function worldPoints() {
            note: `Points matched to a satellite view; scale from its ${bar} m scale bar. Expect errors of a few percent.` };
 }
 
+// What to do next once the rectangle is done: the speed-line marks are optional, all four or none.
+function trapStatus(clicks, trapM) {
+  if (clicks === 4) return `Rectangle done. Optional, for the speed check: click point ${TRAP_LABELS[0]}.`;
+  if (clicks < 8) return `Click point ${TRAP_LABELS[clicks - 4]} (optional; SITE.json comes back at 8, or Undo to 4).`;
+  return trapM > 0 ? "Done: the rectangle, the speed-line marks and the along-road check."
+                   : "Trap dropped: give the distance from line A to line B, more than 0 m.";
+}
+
 function render() {
   const world = worldPoints();
-  if (frame.state.points.length !== 4 || !world) { field("out").value = ""; return; }
+  const clicks = frame.state.points.map(([x, y]) => [Math.round(x), Math.round(y)]);
+  const trapM = parseFloat(field("trapM").value);
+  if (clicks.length >= 4) field("frameStatus").textContent = trapStatus(clicks.length, trapM);
+  if (![4, 8].includes(clicks.length) || !world) { field("out").value = ""; return; }
   const site = {
     name: field("name").value.trim() || "Unnamed site",
     frame_size: [frame.canvas.width, frame.canvas.height],
     marked_on: field("fromclip").checked ? "clip" : "raw video frame",
-    image_points: frame.state.points.map(([x, y]) => [Math.round(x), Math.round(y)]),
+    image_points: clicks.slice(0, 4),
     world_points: world.points,
     calibration_note: world.note,
     person: "person",
@@ -146,6 +163,12 @@ function render() {
     ...(field("dense").checked ? { vehicle_mode: "crowd" } : {}),
     vehicles: field("vehicles").value.split(",").map(v => v.trim()).filter(Boolean),
     letter_language: field("lang").value.trim() || "English",
+    // never a number in "what": the case agent reads it to a person as the distance to tape (agent.py)
+    ...(clicks.length === 8 && trapM > 0 ? {
+      trap: { image_points: clicks.slice(4), distance_m: trapM },
+      check: { what: "line A to line B along the near kerb (the A near and B near speed-line tape marks)",
+               points: clicks.slice(4, 6) },
+    } : {}),
   };
   field("out").value = JSON.stringify(site, null, 1);
 }
@@ -155,7 +178,7 @@ document.querySelectorAll("input[name=mode]").forEach(radio => radio.addEventLis
   field("mapInputs").hidden = mode() !== "map";
   render();
 }));
-["w", "h", "bar", "name", "vehicles", "lang", "fromclip", "crowded", "dense"].forEach(id => field(id).addEventListener("input", render));
+["w", "h", "bar", "name", "vehicles", "lang", "fromclip", "crowded", "dense", "trapM"].forEach(id => field(id).addEventListener("input", render));
 field("save").addEventListener("click", () => {
   if (!field("out").value) return;
   const link = document.createElement("a");
