@@ -4107,7 +4107,7 @@ def test_writers_table_prices_each_letter_from_its_run_record_and_marks_what_it_
     assert lines[2] == ("| Muse Glimmer 30B | yes | Kaggle, 2 x Tesla T4, self-hosted | 313 | 962 (not reported) | 2,263 "
                         "| not reported | 2 | passed | none ran | $0 (free Kaggle GPU quota) |")
     assert lines[3] == ("| Muse Spark Open | yes | Fireworks (serverless) | 55.5 | 1,000 (600) | 2,000 | 1,500 | 1 "
-                        "| passed (kept before the last try) | NOT RECORDED | $0.0091 |")  # (400x1.25 + 600x0.15 + 2000x4.25) / 1M
+                        "| passed | NOT RECORDED | $0.0091 |")  # (400x1.25 + 600x0.15 + 2000x4.25) / 1M
     assert lines[4] == ("| Muse Spark | no | Meta API | 20 | 1,000,000 (not reported) | 1,000,000 | 7 | 3 | failed: 1 left "
                         "| none ran | $5.5000 |")
     assert lines[5].endswith("| 3 | NOT RECORDED | NOT RECORDED | NOT CHECKED |") and "example.com" in lines[5]
@@ -4344,6 +4344,16 @@ def test_letter_provenance_records_the_judge_or_what_the_checks_left():
     assert writers_table.judge_check({"tries": 1}) == "NOT RECORDED"
     sample = json.loads(Path(__file__).with_name("provenance").joinpath("spark-open-fireworks-sample.json").read_text())
     assert sample["judged_by"] == pack.JUDGE  # from that run's plan.json, same letter sha256
+
+
+def test_writers_table_says_passed_for_a_letter_kept_on_its_first_try():
+    """A record without the checks' lists: a letter kept on try 1 plainly passed; one kept on a later try (but before
+    the last) passed too, as ask_plan returns early only then; on the last try it is not known."""
+    import writers_table
+    assert writers_table.number_check({}, 1) == "passed"
+    assert writers_table.number_check({}, 2) == "passed (kept before the last try)"
+    assert writers_table.number_check({}, pack.LETTER_TRIES) == writers_table.number_check({}, None) == "NOT RECORDED"
+    assert writers_table.number_check({"unmeasured": ["40"], "mixed": []}, 1) == "failed: 1 left"
 
 if __name__ == "__main__":
     for name, check in list(globals().items()):

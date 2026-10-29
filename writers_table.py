@@ -61,10 +61,13 @@ def cost(record, usage):
 
 def number_check(letter, tries):
     """passed/failed from the lists pack.ask_plan leaves after the last try; a record without them passed when it was
-    kept before the last try, as ask_plan returns early only on a letter no check objected to."""
+    kept before the last try, as ask_plan returns early only on a letter no check objected to (plainly "passed" for
+    the first try, which no earlier try could have been kept instead of)."""
     if "unmeasured" in letter:
         bad = letter["unmeasured"] + letter.get("mixed", [])
         return f"failed: {len(bad)} left" if bad else "passed"
+    if tries == 1:
+        return "passed"
     return "passed (kept before the last try)" if isinstance(tries, int) and tries < pack.LETTER_TRIES else "NOT RECORDED"
 
 
