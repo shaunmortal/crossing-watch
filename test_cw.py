@@ -44,6 +44,14 @@ def raises_value_error(call):
     return False
 
 
+def raises_system_exit(call):
+    try:
+        call()
+    except SystemExit:
+        return True
+    return False
+
+
 def test_collinear_or_out_of_order_points_are_rejected():
     assert raises_value_error(lambda: road.homography([[0, 0], [1, 1], [2, 2], [3, 3]], SQUARE_ROAD))
     crossed = [SQUARE_IMG[0], SQUARE_IMG[2], SQUARE_IMG[1], SQUARE_IMG[3]]  # corners not in order round the area
@@ -813,6 +821,96 @@ def test_sam_text_parses_into_tracks():
             "<1f>0<|box;x1=1.5;y1=2.5;x2=3.5;y2=4.5;w=640;h=360|>")
     assert sam.parse(text) == {"0": {0: [1.0, 2.0, 3.0, 4.0], 1: [1.5, 2.5, 3.5, 4.5]}, "1": {0: [5.0, 6.0, 7.0, 8.0]}}
     assert sam.parse("<0f>0<|box;x1=5;y1=6;x2=5;y2=8;w=640;h=360|>") == {}  # zero-width box dropped
+
+
+def agent_case(folder):
+    """A case folder for the agent: one measured near-miss, and a site whose check distance reads 7.0 m in the video."""
+    from pathlib import Path
+    out = Path(folder)
+    e = {"person": "1/0", "vehicle": "car#1", "tier": "serious", "pet_s": 0.5, "vehicle_kmh": 30.0, "death_risk_pct": 1.5,
+         "t_person_s": 3.0, "t_vehicle_s": 3.5, "gap_m": 0.4, "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5},
+                                                                         "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
+    (out / "events.json").write_text(json.dumps({"fps": 10, "exposure": {"minutes": 0.3}, "events": [e]}))
+    site = {"name": "gate", "image_points": SQUARE_IMG, "world_points": SQUARE_ROAD, "vehicles": ["car"],
+            "check": {"what": "kerb to kerb at the zebra", "points": [[100, 200], [240, 200]]}}  # 140 px at 20 px/m
+    (out / "site.json").write_text(json.dumps(site))
+    return out, site, e
+
+
+def scripted_spark(script, bodies):
+    """A fake Muse Spark: each turn calls the next scripted (tool, arguments), or answers in plain text for None."""
+    def turn(body, key):
+        bodies.append(json.loads(json.dumps(body)))  # a copy: the agent keeps adding to its messages
+        step = script.pop(0)
+        said = ({"type": "function_call", "call_id": f"call-{len(bodies)}", "name": step[0], "arguments": json.dumps(step[1])}
+                if step else {"type": "message", "content": [{"type": "output_text", "text": "Done."}]})
+        return {"output": [{"type": "reasoning", "id": "rs_1", "summary": []}, said],
+                "usage": {"input_tokens": 2000, "output_tokens": 100}}
+    return turn
+
+
+def test_case_agent_stops_for_a_tape_measure_and_files_the_letter_only_when_it_agrees():
+    """The workshop's loop with a scripted Muse Spark (no network): one tool per turn, plain text sent back, SAM's
+    16-object limit switching people to crowd mode, three refused letters escalating to a person, a stop for a tape
+    measure, resume with the answer, notes from the head, the sign-off, and the page section."""
+    import agent, contextlib, io, tempfile
+    submit = ("submit_letter", {"notes": ""})
+    script = [("track", {"people": "video", "vehicles": "video"}), ("track", {"people": "crowd", "vehicles": "video"}),
+              None, submit, submit, submit, ("measure", {}), ("request_measurement", {}), submit,
+              ("submit_letter", {"notes": "Name the school gate."})]
+    bodies, tracked, prompts = [], [], []
+    plan = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "PET 0.5 s.", "writer": "Muse Spark"}
+    def tracker(p, site):
+        tracked.append(site["person_mode"])
+        return {"car": [0, 1]} if site["person_mode"] == "crowd" else {"person": [3, 3], "car": [0, 1]}
+    old = agent.spark_turn, agent.run_tracker, pack.ask_plan
+    agent.spark_turn, agent.run_tracker = scripted_spark(script, bodies), tracker
+    pack.ask_plan = lambda prompt, measured, key, photo: prompts.append(prompt) or plan
+    try:
+        with tempfile.TemporaryDirectory() as folder, contextlib.redirect_stdout(io.StringIO()):
+            out, site, e = agent_case(folder)
+            run = lambda **person: agent.work(out / "video.mp4", out / "site.json", out, "key", **person)
+            assert run() == "needs_input" and tracked == ["video", "crowd"]  # 3 refusals: R1 asks a person
+            assert raises_system_exit(run)  # waiting for the answer: no model call
+            assert run(answer=("R1", "Ask for the tape first.")) == "needs_input"  # measure, then R2 asks for the tape
+            assert raises_system_exit(lambda: run(answer=("R2", "about a car length")))
+            assert run(answer=("R2", "7.2 m")) == "needs_review"
+            assert run(notes="Name the school gate.") == "needs_review" and "Name the school gate." in prompts[-1]
+            assert run(approve=True) == "done" and raises_system_exit(run)
+            progress = json.loads((out / "case" / "progress.json").read_text())
+            log = (out / "case" / "agent_log.jsonl").read_text().splitlines()
+            page = (out / "index.html").read_text()
+    finally:
+        agent.spark_turn, agent.run_tracker, pack.ask_plan = old
+    assert script == [] and len(bodies) == progress["turn"] == 10 and len(log) == 14  # 10 turns, 4 person steps
+    assert all(b["parallel_tool_calls"] is False and b["store"] is False for b in bodies)
+    assert {t["name"] for t in bodies[0]["tools"]} == set(agent.RUNNERS)
+    assert bodies[3]["input"][-1] == {"role": "user", "content": agent.NUDGE}
+    assert not any(item.get("type") == "reasoning" for b in bodies for item in b["input"])
+    assert [r["kind"] for r in progress["requests"]] == ["letter_refused", "measurement"] and progress["tape_m"] == 7.2
+    assert abs(progress["usd"] - 10 * (2000 * 1.25 + 100 * 4.25) / 1e6) < 1e-9
+    assert '"tape_m": 7.2' in prompts[0] and '"video_m": 7.0' in prompts[0]  # measured, so the letter may quote it
+    assert "How the agent worked this case" in page and "Video 7.0 m, tape 7.2 m, 3% off: proven" in page
+    assert "Person: R2 answered: 7.2 m" in page and "approved" in page
+    assert "off" in agent.letter_blocker({"tape_m": 9.0}, site, [e], "")  # 22% off: mark the calibration again
+    assert "numbers" in agent.letter_blocker({"tape_m": 7.2}, site, [e], "say 3 times")
+    assert agent.tape_metres("720 cm") == 7.2
+
+
+def test_case_agent_stops_at_its_turn_and_dollar_caps():
+    import agent, contextlib, io, tempfile
+    bodies = []
+    old = agent.spark_turn, agent.MAX_TURNS, agent.MAX_USD
+    agent.spark_turn, agent.MAX_TURNS = scripted_spark([None] * 3, bodies), 3
+    try:
+        with tempfile.TemporaryDirectory() as folder, contextlib.redirect_stdout(io.StringIO()):
+            out, _, _ = agent_case(folder)
+            run = lambda: agent.work(out / "video.mp4", out / "site.json", out, "key")
+            assert run() == "paused" and len(bodies) == 3
+            agent.MAX_USD, agent.spark_turn = 0.01, scripted_spark([None], bodies)  # a turn costs $0.0029
+            assert run() == "over_budget" and len(bodies) == 4 and raises_system_exit(run)
+    finally:
+        agent.spark_turn, agent.MAX_TURNS, agent.MAX_USD = old
 
 
 if __name__ == "__main__":

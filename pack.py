@@ -453,7 +453,7 @@ def stats(events, seen):
     return "".join(f"<div><b>{html.escape(str(v))}</b>{html.escape(label)}</div>" for v, label in tiles)
 
 
-def page(site, events, seen, plan, images, fps, cost=None, full=None):
+def page(site, events, seen, plan, images, fps, cost=None, full=None, case=""):
     cards = "\n".join(event_card(i + 1, e, fps) for i, e in enumerate(events[:SHOWN_EVENTS])) or (
         f"<p>No conflicts under {road.CLOSE_PASS_S} s in these {html.escape(str(seen.get('minutes', '?')))} minutes. "
         "A short recording can miss rare events: record more school-run periods before drawing any conclusion.</p>")
@@ -472,7 +472,7 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None):
 <p class="muted">{html.escape(site.get("name", ""))}</p>
 <div class="stats">{stats(events, seen)}</div>{limit_note(full)}
 {engineering(seen, cost)}
-{map_section(events, site)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{letter_section(plan)}
+{map_section(events, site)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{letter_section(plan)}{case}
 <section><h2>How this was measured</h2><p class="note">{html.escape(method)}</p></section></body></html>"""
 
 

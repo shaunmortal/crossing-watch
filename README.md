@@ -72,6 +72,24 @@ Meta key, and the page names only the judges that ran. No Glimmer judge run has 
 LETTER_MODEL_URL=http://127.0.0.1:8080/v1 python3 pack.py out/VIDEO site.json
 ```
 
+### Case agent: it stops to ask for a tape measure
+
+`agent.py` is optional; analyze.py and pack.py never call it. Muse Spark works the case through five tools (track,
+review, measure, request_measurement, submit_letter), one tool per turn, with at most 25 turns per start and a $1
+cap on its own turns. Its one tracking decision: when SAM video hits its 16-object limit, it tracks that concept again
+in crowd mode. The site file marks a distance that was not used for calibration, `"check": {"what": "kerb to kerb at
+the zebra", "points": [[x, y], [x, y]]}`. The agent asks a person to tape it, and the letter is refused until the
+video and the tape agree within 15% (gate G2). Three refusals in a row go to a person. The head of the school then
+approves the letter or sends it back with notes. Every step goes to `out/VIDEO/case/agent_log.jsonl`, and the page
+shows "How the agent worked this case". No agent run has been made against the Meta API yet; a test drives it with
+a scripted model.
+
+```
+python3 agent.py VIDEO site.json                      # runs until it needs a person
+python3 agent.py VIDEO site.json --answer R1 "7.2 m"  # the taped length; the agent continues
+python3 agent.py VIDEO site.json --approve            # or --reject --notes "..."
+```
+
 ## Validation on ground-truth trajectories
 
 `validate_sind.py` runs the near-miss maths on the SinD public sample: 20 minutes of drone-measured trajectories in
@@ -179,5 +197,7 @@ The DUT data has no licence and was used only for internal testing; it is not in
 
 All code in this repository was written during the hackathon. The check-then-retry pattern for Spark's letter and the
 JSON-mode request field follow Meta's legal-agent workshop (github.com/meta-models/legal-agent-workshop, shown at a
-hackathon session); no code was copied from it. No third-party code or libraries; Python standard
+hackathon session); no code was copied from it. The case agent follows the shape of that workshop's loop (one tool
+per turn, plain text sent back, a stop for a person, resume from saved progress, escalation after 3 refusals); its
+code is our own. No third-party code or libraries; Python standard
 library and ffmpeg only. Test videos from YouTube were used only for local testing and are not included. The SinD sample (SOTIF-AVLab, non-commercial use) was used only for validation and is not included.
