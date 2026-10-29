@@ -3721,6 +3721,18 @@ def test_a_letter_saying_a_driver_broke_a_rule_goes_back_and_is_flagged_if_kept(
     assert 'id="letter-check" hidden' in section
 
 
+def test_filmcheck_help_prints_its_usage_and_a_non_video_file_is_refused_cleanly():
+    """`python3 filmcheck.py --help` prints the module's usage and exits 0 (it used to be read as a clip and crash in
+    ffprobe's JSON); a file that is not a video stops with one clear line, no traceback."""
+    import subprocess, sys
+    from pathlib import Path
+    here = Path(__file__).parent
+    helped = subprocess.run([sys.executable, "filmcheck.py", "--help"], cwd=here, capture_output=True, text=True)
+    assert helped.returncode == 0 and "Run: python3 filmcheck.py CLIP" in helped.stdout
+    refused = subprocess.run([sys.executable, "filmcheck.py", "README.md"], cwd=here, capture_output=True, text=True)
+    assert refused.returncode == 1 and "could not read it" in refused.stderr and "Traceback" not in refused.stderr
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):

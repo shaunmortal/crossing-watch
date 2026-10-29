@@ -26,7 +26,7 @@ rehearsal or the main recording was filmed.
 |---|---|---|
 | G1 Tracks | passed 28 Oct (news CCTV) | the table above; 'Status (Wed 28 Oct, evening)' below |
 | G2 Metres | not tested on the pre-registered clip (assumed lengths) | waits for our footage: the case agent's tape check and `validate_gate.py`'s line distance |
-| G3 Conflicts | not tested on its own footage; passed on DUT drone ground truth (29 Oct); phone angle pending | 'Status update (Thu 29 Oct, early)' below |
+| G3 Conflicts | not tested on its own footage; passed on DUT drone ground truth (29 Oct); phone angle pending | 'Status update, third pass' below |
 | G4 Own footage | not run | due Sun 1 Nov |
 | G5 Blind check | not run | no rater has labelled; rules in 'G5 Blind check, pre-registered' below |
 | G6 Speed | not run | no taped lines filmed yet; rules in 'G6 pre-registration' below |
@@ -66,7 +66,7 @@ rehearsal or the main recording was filmed.
 - These conditions and the constants in `validate_gate.py` (`BAND_PCT`, `BAND_KMH`, `PASS_SHARE`, `MAX_LEAN_PCT`,
   `MIN_VEHICLES`, `MATCH_M`, `MIN_SPEEDS`) do not change after the trap footage arrives.
 
-## Status (Wed 28 Oct, evening)
+## Status, first pass (written before the first commit, 28 Oct 19:19 IST)
 
 - **G1** passed (see table).
 - **G2 not yet tested.** Both test clips were calibrated from assumed lengths, so no independent measured distance exists. This waits for our footage with measured points.
@@ -90,7 +90,7 @@ rehearsal or the main recording was filmed.
   - prep_filter whitelist;
   - snapshot frame choice.
 
-## Status update (Wed 28 Oct, late night)
+## Status update, second pass (written before the first commit, 28 Oct 19:19 IST)
 
 - A second AI-assisted code review found 13 confirmed defects, all fixed:
   - a rejected pole came back through unreviewed events;
@@ -120,7 +120,7 @@ rehearsal or the main recording was filmed.
   - On the CCTV clip: 8 crossings, 5 moving vehicles, 85th-percentile speed 25 km/h, 0 serious, 0 close passes.
 - 26 self-checks pass.
 
-## Status update (Thu 29 Oct, early)
+## Status update, third pass (written before the first commit, 28 Oct 19:19 IST)
 
 - **Measurement layer validated on SinD ground truth.** See the README section "Validation on ground-truth trajectories".
   - Speed error: mean 0.26 km/h.
@@ -657,3 +657,4 @@ On the merged build (commit 5083592), with no key in the environment and no API 
   result. The G7 text is unchanged.
 - Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: a "Verdict now" table added under the
   pre-registered one, and the README's first screen links to it. No pre-registered text changed.
+- Thu 29 Oct 2026, night: the three status sections were headed by times of day (evening, late night, early 29 Oct), but git shows all three arrived in the first commit, 91b8c9b, at 19:19 IST on Wed 28 Oct, so they are now headed first, second and third pass, written before that commit. Their text is unchanged.

@@ -35,6 +35,8 @@ def probe(clip):
     """ffprobe's stream list for `clip`."""
     out = subprocess.run(["ffprobe", "-v", "error", "-show_streams", "-of", "json", str(clip)],
                          check=True, capture_output=True, text=True).stdout
+    if not out.strip():
+        raise SystemExit(f"{clip}: ffprobe found no streams (is this a video file?)")
     return json.loads(out).get("streams", [])
 
 
@@ -187,8 +189,9 @@ def main(clip, window=None):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) not in (2, 4):
-        raise SystemExit(__doc__)
+    if len(sys.argv) not in (2, 4) or sys.argv[1] in ("-h", "--help"):
+        print(__doc__.strip())
+        sys.exit(0 if len(sys.argv) == 2 else 2)
     window = tuple(map(float, sys.argv[2:])) or None
     if window and not 0 <= window[0] < window[1]:
         raise SystemExit(f"window {window}: want START END with 0 <= START < END (seconds)")
