@@ -257,10 +257,10 @@ def probe(path, entries, *extra):
                            "-of", "csv=p=0", str(path)], check=True, capture_output=True, text=True).stdout.strip()
 
 
-def write_events(out_dir, site, events, seen, cost, full):
+def write_events(out_dir, site, events, seen, cost, full, timeline=None):
     (out_dir / "events.json").write_text(json.dumps({"site": site.get("name", ""), "fps": FPS, "exposure": seen,
                                                      "cost": cost,
-                                                     "sam_full_requests": full,
+                                                     "sam_full_requests": full, "timeline": timeline,
                                                      "events": events}, indent=1))
 
 
@@ -380,16 +380,17 @@ def main():
     people, vehicles = road_tracks(site, H, person_boxes, vehicle_boxes, frame_size)
     events = placed(road.conflicts(people, vehicles, FPS), people, vehicles)
     seen = road.exposure(people, vehicles, FPS, total)
+    timeline = road.timeline(people, vehicles, FPS, total)  # the gap barcode's spans, kept out of `seen`
     full = full_requests(pieces, video_plan, frame_size)
     if full[0]:
         print(f"warning: {full[0]} of {full[1]} SAM requests hit the {sam.MAX_OBJECTS}-object limit; later arrivals "
               "in those parts were not tracked (use person_mode / vehicle_mode \"crowd\": the Crowded and Dense "
               "traffic boxes on the calibration page)", flush=True)
 
-    write_events(out_dir, site, events, seen, cost, full)  # saved before the slower, network-bound evidence step
+    write_events(out_dir, site, events, seen, cost, full, timeline)  # saved before the slower, network-bound evidence step
     review_people(clip, out_dir, events, people, person_boxes, key, frame_size, top_down)
     add_evidence(args.video, clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size)
-    write_events(out_dir, site, events, seen, cost, full)
+    write_events(out_dir, site, events, seen, cost, full, timeline)
     report(seen, events)
 
 

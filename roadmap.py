@@ -1,6 +1,7 @@
 """Bird's-eye map of the near-misses, in road metres: the measured calibration area, each event's pedestrian and
 vehicle paths around the moment, and where they met, over the street photo seen from above. It shows what SAM's
-boxes became after the homography, and tells a road engineer *where* on the crossing the danger is."""
+boxes became after the homography, and tells a road engineer *where* on the crossing the danger is.
+Also the gap barcode: the whole recording as one bar of the moments a vehicle was on the crossing and the gaps."""
 import base64
 import html
 import math
@@ -17,6 +18,9 @@ GRID_M = 5.0
 GROUND = "map-ground.jpg"  # the street photo seen from above, written next to the page and embedded in it
 GROUND_ZOOM = 2     # ground pixels per map pixel, sharp on high-density screens
 BISECT_STEPS = 20   # halvings when fitting the ground into the photo: a millionth of the map
+DOTS_PX, BAR_PX, AXIS_PX = 16, 24, 16  # the gap barcode's rows: near-miss dots, the bar, time labels
+LABEL_STEPS_S = (5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600)  # time labels every so many seconds...
+MAX_LABELS = 8      # ...the first step that needs no more labels than this
 
 
 def path_around(track, frame, fps, step=2):
@@ -153,6 +157,63 @@ def ground(photo, site, events, out_dir):
     return f"data:image/jpeg;base64,{data}", [round(v, 2) for v in rect]
 
 
+def clock(t):
+    return f"{int(t // 60)}:{int(t % 60):02d}"
+
+
+def time_labels(total):
+    """Seconds to label under the barcode: every LABEL_STEPS_S step that gives at most MAX_LABELS labels."""
+    step = next((s for s in LABEL_STEPS_S if total / s <= MAX_LABELS), LABEL_STEPS_S[-1])
+    return [step * k for k in range(int(total // step) + 1)]
+
+
+def strip_caption(total, gaps, n_events, shown, full):
+    """What the barcode shows, and the longest anyone needing a road.GAP_ADULT_S gap would have waited."""
+    longest = road.longest_without(gaps, total)
+    whole = ", the whole recording, so a real wait may be longer" if longest >= round(total, 1) else ""
+    missed = (" SAM reached its object limit, so some people or vehicles were not tracked: real gaps may be shorter."
+              if full and full[0] else "")
+    dots = (f" Dots: near-misses (filled: serious; rings: close passes); the first {min(shown, n_events)} link to "
+            "their cards below." if n_events else "")
+    return (f"The whole {clock(total)} of video, left to right. Red: a moving vehicle where people crossed. Green: a "
+            f"gap of {road.GAP_SLOW_S:g} s or more; amber: {road.GAP_ADULT_S:g}-{road.GAP_SLOW_S:g} s (see the UK "
+            f"Traffic Signs Manual line above). Hatched: cut short by the start or end of the video.{dots} Longest "
+            f"stretch with no gap of {road.GAP_ADULT_S:g} s: {longest:g} s{whole}.{missed}")
+
+
+def gap_strip(timeline, events, shown=5, full=None):
+    """The whole recording as one bar: red while a moving vehicle was on the crossing, gaps of road.GAP_SLOW_S or
+    more green, of road.GAP_ADULT_S or more amber, the first and last gaps hatched (the video cut them short), and a
+    dot per near-miss, the first `shown` linked to their cards. '' without a timeline (older events.json files)."""
+    if not timeline or not timeline.get("duration_s"):
+        return ""
+    total, spans = timeline["duration_s"], timeline["busy_s"]
+    gaps = road.gaps_between(spans, total)
+    at = lambda t: f"{min(max(t, 0), total) * WIDTH_PX / total:.1f}"
+    length = lambda a, b: round(b - a, 2)
+    bar = lambda a, b, cls: (f'<rect class="{cls}" x="{at(a)}" y="{DOTS_PX}" height="{BAR_PX}" '
+                             f'width="{max(1.0, length(a, b) * WIDTH_PX / total):.1f}"/>')  # a tenth of a second shows
+    marks = [bar(a, b, "gap12" if length(a, b) >= road.GAP_SLOW_S else "gap6")
+             for a, b in gaps if length(a, b) >= road.GAP_ADULT_S]
+    marks += [bar(a, b, "busy") for a, b in spans] + [bar(a, b, "cut") for a, b in gaps if a == 0 or b == total]
+    for i, e in reversed(list(enumerate(events))):  # the linked first few drawn last, on top
+        tier = e.get("tier", "serious")
+        label = html.escape(f'#{i + 1}, {tier} at {e["t_person_s"]:.1f} s: {e["vehicle"].split("#")[0]}, '
+                            f'{e["pet_s"]:.1f} s apart')
+        dot = (f'<circle class="{"hit" if tier == "serious" else "near"}" cx="{at(e["t_person_s"])}" '
+               f'cy="{DOTS_PX / 2:g}" r="4"><title>{label}</title></circle>')
+        marks.append(f'<a href="#event-{i + 1}">{dot}</a>' if i < shown else dot)
+    y = DOTS_PX + BAR_PX + AXIS_PX - 3
+    anchor = lambda t: "start" if t == 0 else "end" if t > 0.95 * total else "middle"  # no label past an edge
+    marks += [f'<text x="{at(t)}" y="{y}" text-anchor="{anchor(t)}">{clock(t)}</text>' for t in time_labels(total)]
+    caption = strip_caption(total, gaps, len(events), shown, full)
+    return (f'<section><h2>Gaps in traffic</h2><svg class="gaps" viewBox="0 0 {WIDTH_PX} {y + 3}" role="img" '
+            f'aria-label="Gaps in traffic across the whole video"><defs><pattern id="gap-cut" width="6" height="6" '
+            f'patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6"/>'
+            f'</pattern></defs><rect class="base" y="{DOTS_PX}" width="{WIDTH_PX}" height="{BAR_PX}"/>'
+            f'{"".join(marks)}</svg><p class="note">{html.escape(caption)}</p></section>')
+
+
 STYLE = """
 .map { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; }
 .map .ground { opacity: 0.85; }
@@ -167,4 +228,9 @@ STYLE = """
 .map text { fill: var(--ink); font: 12px system-ui, sans-serif; }
 .map text { paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
 .map .bar { stroke: var(--ink); stroke-width: 2; }
+.gaps { width: 100%; height: auto; } .gaps .base { fill: var(--line); } .gaps .busy { fill: var(--accent); }
+.gaps .gap12 { fill: #2e9e5b; } .gaps .gap6 { fill: #d98a00; } .gaps .cut { fill: url(#gap-cut); }
+.gaps pattern line { stroke: var(--bg); stroke-width: 2; opacity: 0.7; }
+.gaps .hit { fill: var(--accent); } .gaps .near { fill: none; stroke: #d98a00; stroke-width: 2; }
+.gaps text { fill: var(--muted); font: 11px system-ui, sans-serif; }
 """

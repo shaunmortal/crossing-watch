@@ -347,19 +347,41 @@ def crossing_cells(people, fps):
     return cells
 
 
-def traffic_gaps(vehicles, fps, cells, frames):
-    """Lengths in seconds of the stretches with no moving vehicle on the crossing (any of `cells`): the gaps a
-    pedestrian could cross in. The first and last are cut short by the video, so they are lower bounds."""
+def busy_spans(vehicles, fps, cells):
+    """[[start_s, end_s], ...] in order: the stretches with a moving vehicle on the crossing (any of `cells`)."""
     def on_crossing(shape):
         return any((math.floor(x / GRID_M), math.floor(y / GRID_M)) in cells for x, y in (*shape, centroid(shape)))
     busy = {f for edges in vehicles.values() for f, v in speeds(edges, fps).items()
             if v >= MOVING_MPS and on_crossing(edges[f])}
-    gaps, start = [], 0
-    for f in sorted(busy) + [frames]:
-        if f > start:
-            gaps.append((f - start) / fps)
-        start = f + 1
-    return gaps
+    starts, ends = sorted(f for f in busy if f - 1 not in busy), sorted(f + 1 for f in busy if f + 1 not in busy)
+    return [[round(a / fps, 2), round(b / fps, 2)] for a, b in zip(starts, ends)]
+
+
+def gaps_between(spans, duration_s):
+    """[[start_s, end_s], ...] of the gaps around busy `spans` in a video `duration_s` long. The first and last are
+    cut short by the video, so they are lower bounds."""
+    edges = [0.0, *(t for span in spans for t in span), duration_s]
+    return [[a, b] for a, b in zip(edges[::2], edges[1::2]) if b > a]
+
+
+def longest_without(gaps, duration_s, gap_s=GAP_ADULT_S):
+    """Longest stretch in seconds with no gap of `gap_s` or more starting: the longest anyone who needs that gap
+    could have waited. A lower bound, since the video cuts the first and last stretch."""
+    edges = [0.0, *(t for a, b in gaps if round(b - a, 2) >= gap_s for t in (a, b)), duration_s]
+    return round(max(b - a for a, b in zip(edges[::2], edges[1::2])), 1)
+
+
+def traffic_gaps(vehicles, fps, cells, frames):
+    """Lengths in seconds of the stretches with no moving vehicle on the crossing (any of `cells`): the gaps a
+    pedestrian could cross in. The first and last are cut short by the video, so they are lower bounds."""
+    return [round(b - a, 2) for a, b in gaps_between(busy_spans(vehicles, fps, cells), frames / fps)]
+
+
+def timeline(people, vehicles, fps, frames):
+    """The whole recording for the gap barcode: its length and the busy spans where people crossed, or None when
+    nobody crossed. Its own key in events.json, never in exposure(), so its arrays stay out of a letter's facts."""
+    cells = crossing_cells(people, fps)
+    return {"duration_s": round(frames / fps, 2), "busy_s": busy_spans(vehicles, fps, cells)} if cells else None
 
 
 def pv2(crossings, vehicles, minutes):
@@ -385,7 +407,9 @@ def exposure(people, vehicles, fps, frames):
     cells = crossing_cells(people, fps)
     if not cells:
         return seen
-    gaps = traffic_gaps(vehicles, fps, cells, frames)
+    gaps_at = gaps_between(busy_spans(vehicles, fps, cells), frames / fps)
+    gaps = [round(b - a, 2) for a, b in gaps_at]
     return {**seen, "gaps_6s": sum(g >= GAP_ADULT_S for g in gaps), "gaps_12s": sum(g >= GAP_SLOW_S for g in gaps),
             "longest_gap_s": round(max(gaps, default=0.0), 1),
-            "gap_6s_share_pct": round(100 * sum(g for g in gaps if g >= GAP_ADULT_S) * fps / frames, 1)}
+            "gap_6s_share_pct": round(100 * sum(g for g in gaps if g >= GAP_ADULT_S) * fps / frames, 1),
+            "longest_without_6s_gap_s": longest_without(gaps_at, frames / fps)}

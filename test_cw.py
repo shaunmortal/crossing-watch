@@ -632,6 +632,43 @@ def test_map_draws_each_event_where_it_happened():
     assert "Where it happened" in pack.map_section(events, site) and pack.map_section(events[2:], site) == ""
 
 
+def test_busy_spans_give_the_gaps_and_the_longest_wait_for_one():
+    cells = road.crossing_cells({"p": walking_across(40)}, 10)
+    moving, parked = edges_along_x(8.0, 10, 60), {f: ((-1.0, 2.0), (1.0, 2.0)) for f in range(600)}
+    assert road.busy_spans({"car#1": moving, "car#2": parked}, 10, cells) == [[2.9, 3.4]]  # frames 29-33
+    assert road.gaps_between([[2.9, 3.4]], 60.0) == [[0.0, 2.9], [3.4, 60.0]]
+    assert road.gaps_between([], 5.0) == [[0.0, 5.0]]
+    line = road.timeline({"p": walking_across(40)}, {"car#1": moving}, 10, 600)
+    assert line == {"duration_s": 60.0, "busy_s": [[2.9, 3.4]]}
+    assert road.timeline({}, {"car#1": moving}, 10, 600) is None  # nobody crossed: no crossing to time
+    assert road.exposure({"p": walking_across(40)}, {"car#1": moving}, 10, 600)["longest_without_6s_gap_s"] == 3.4
+    gaps = [[0.0, 2.0], [3.0, 10.0], [11.0, 24.0], [25.0, 52.0], [53.0, 60.0]]  # 2, 7, 13, 27, 7 s
+    assert road.longest_without(gaps, 60.0) == 3.0 and road.longest_without(gaps[:1], 60.0) == 60.0
+    assert road.longest_without([[2.9, 8.9]], 10.0) == 2.9  # exactly 6 s is a gap of 6 s, float error or not
+
+
+def test_gap_barcode_colours_every_gap_and_links_the_near_misses():
+    import analyze, tempfile
+    from pathlib import Path
+    import roadmap
+    timeline = {"duration_s": 60.0, "busy_s": [[2.0, 3.0], [10.0, 11.0], [24.0, 25.0], [52.0, 53.0]]}
+    events = [{"tier": "serious", "vehicle": "car#1", "pet_s": 0.4, "t_person_s": 10.5},
+              {"tier": "close pass", "vehicle": "bus#2", "pet_s": 2.0, "t_person_s": 24.2}]
+    strip = roadmap.gap_strip(timeline, events, shown=1)
+    assert strip.count('class="busy"') == 4 and strip.count('class="gap12"') == 2 and strip.count('class="gap6"') == 2
+    assert strip.count('class="cut"') == 2 and 'href="#event-1"' in strip and "#event-2" not in strip  # 1 card shown
+    assert strip.index('href="#event-1"') > strip.index("close pass at 24.2 s: bus")  # the linked dot is on top
+    assert "Longest stretch with no gap of 6 s: 3 s." in strip and "may be shorter" not in strip
+    assert "the whole recording" in roadmap.gap_strip({"duration_s": 39.0, "busy_s": [[0.2, 38.0]]}, [])
+    assert "may be shorter" in roadmap.gap_strip(timeline, events, 5, [2, 10])  # missed vehicles make false gaps
+    assert roadmap.gap_strip(None, events) == "" and roadmap.time_labels(39.0) == [0, 5, 10, 15, 20, 25, 30, 35]
+    page = pack.page({"world_points": SQUARE_ROAD}, [], {"minutes": 1}, None, None, 10, timeline=timeline)
+    assert "Gaps in traffic" in page
+    with tempfile.TemporaryDirectory() as folder:  # analyze keeps the spans apart from the facts' exposure
+        analyze.write_events(Path(folder), {}, [], {"minutes": 1}, None, None, timeline)
+        assert json.loads((Path(folder) / "events.json").read_text())["timeline"] == timeline
+
+
 def test_map_ground_is_the_photo_seen_from_above():
     """A 320 x 240 photo, 20 px a metre, road (0, 0) at pixel (100, 100): in view -5 to 11 m across, -5 to 7 m down."""
     import contextlib, io, subprocess, tempfile

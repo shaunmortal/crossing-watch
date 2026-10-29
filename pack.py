@@ -379,7 +379,7 @@ def stats(events, seen):
     return "".join(f"<div><b>{html.escape(str(v))}</b>{html.escape(label)}</div>" for v, label in tiles)
 
 
-def page(site, events, seen, plan, images, fps, cost=None, full=None, ground=None):
+def page(site, events, seen, plan, images, fps, cost=None, full=None, timeline=None, ground=None):
     cards = "\n".join(event_card(i + 1, e, fps) for i, e in enumerate(events[:SHOWN_EVENTS])) or (
         f"<p>No conflicts under {road.CLOSE_PASS_S} s in these {html.escape(str(seen.get('minutes', '?')))} minutes. "
         "A short recording can miss rare events: record more school-run periods before drawing any conclusion.</p>")
@@ -397,7 +397,7 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None, ground=Non
 <h1>Crossing Watch: near-miss evidence</h1>
 <p class="muted">{html.escape(site.get("name", ""))}</p>
 <div class="stats">{stats(events, seen)}</div>{limit_note(full)}
-{engineering(seen, cost)}
+{engineering(seen, cost)}{roadmap.gap_strip(timeline, events, SHOWN_EVENTS, full)}
 {map_section(events, site, ground)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{fixband.figure(images)}{letter_section(plan)}
 <section><h2>How this was measured</h2><p class="note">{html.escape(method)}</p></section>{overlay.SCRIPT}</body></html>"""
 
@@ -449,7 +449,7 @@ def main():
                 http.client.HTTPException, subprocess.CalledProcessError) as err:
             print(f"letter or fix image failed, page will show the measurements only: {err}", file=sys.stderr)
     (out_dir / "index.html").write_text(page(site, events, seen, plan, images, data["fps"], data.get("cost"),
-                                             data.get("sam_full_requests"), ground=ground))
+                                             data.get("sam_full_requests"), data.get("timeline"), ground))
     print(f"wrote {out_dir / 'index.html'}: {len(serious(events))} serious, {len(events) - len(serious(events))} close "
           f"passes, fix: {plan['fix'] if plan else 'none'}")
 
