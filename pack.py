@@ -873,8 +873,14 @@ def letter_section(plan, events=(), measured="", signoff=None):
             f"{LETTER_SCRIPT}</section>")
 
 
-# the same three checks as unmeasured(), re-run in the browser on every edit, and a linked number's click
+# the same three checks as unmeasured(), re-run in the browser on every edit, a linked number's click, and on paper
+# the letter first: moved to the top of the page while it prints (a flex `order` cuts lines across pages in WebKit)
 LETTER_SCRIPT = """<script>{  // a block, so its names never clash with another script on the page
+let sheet, after;
+addEventListener("beforeprint", () => {
+  sheet = document.querySelector(".letter-sheet"); after = sheet.nextSibling; document.body.prepend(sheet);
+});
+addEventListener("afterprint", () => sheet.parentNode.insertBefore(sheet, after));
 const letter = document.querySelector(".letter"), verdict = document.getElementById("letter-check");
 const known = new Set(letter.dataset.measured.split(" ").filter(Boolean).map(Number));
 const checks = [[new RegExp(%s, "g"), n => !known.has(Number(n.replaceAll(",", "")))],
@@ -984,6 +990,8 @@ cite { display: block; margin-top: 4px; font-style: normal; color: var(--muted);
 .pyramid i.tip { box-sizing: border-box; background: none; border: 2px dashed var(--accent); }
 @media print { a.clip { text-decoration: none; } a.clip::after { content: " (see clip " attr(data-clip) ")"; }
                .letter-sheet { break-before: page; break-after: page; } }
+@media print { h2, h3 { break-after: avoid; } figure, table, blockquote, .pair { break-inside: avoid; }
+               .letter-sheet:first-child { break-before: auto; } }
 """ + (  # dark colours are for screens only (dark ink on white paper); on paper only the worst cards, so say so
     f"@media print {{ article.card:nth-of-type(n+{PRINTED_CARDS + 1}) {{ display: none; }} "
     + ", ".join(f'a.clip[data-clip="{i}"]::after' for i in range(PRINTED_CARDS + 1, SHOWN_EVENTS + 1))

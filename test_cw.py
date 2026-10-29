@@ -1518,6 +1518,9 @@ def test_filed_reference_under_the_title_tct_steps_and_a_print_view():
     assert 'a.clip[data-clip="4"]::after, a.clip[data-clip="5"]::after { content: " (clip " attr(data-clip) ", not ' \
            'printed)"; }' in pack.STYLE
     assert ".letter-sheet { break-before: page; break-after: page; }" in pack.STYLE
+    assert ("@media print { h2, h3 { break-after: avoid; } figure, table, blockquote, .pair { break-inside: avoid; }\n"
+            "               .letter-sheet:first-child { break-before: auto; } }" in pack.STYLE
+            and "document.body.prepend(sheet)" in pack.letter_section({"letter": "x"}))  # on paper the letter is page 1
     assert pack.letter_section({"letter": "x"}).startswith('<section class="letter-sheet" id="letter">')
 
 def test_docs_folder_lets_in_only_blurred_evidence_clips():
