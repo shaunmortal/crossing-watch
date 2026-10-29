@@ -540,19 +540,16 @@ def test_pedestrian_pieces_shorter_than_a_second_are_dropped():
     assert set(people) == {"a/0"}
 
 
-def test_open_weights_letter_writer_gets_the_prompt_and_street_photo():
-    """With LETTER_MODEL_URL set, the plan comes from an OpenAI-compatible server (llama-server running Muse Glimmer)."""
-    import tempfile, threading
+def fake_open_model(replies):
+    """A local stand-in for llama-server: answers each POST with the next reply and keeps (path, body) of each."""
+    import threading
     from http.server import BaseHTTPRequestHandler, HTTPServer
-    from pathlib import Path
-    seen = {}
-    plan = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "l"}
+    seen = []
 
     class Fake(BaseHTTPRequestHandler):
         def do_POST(self):
-            seen["path"] = self.path
-            seen["body"] = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-            reply = json.dumps({"choices": [{"message": {"content": json.dumps(plan)}}]}).encode()
+            seen.append((self.path, json.loads(self.rfile.read(int(self.headers["Content-Length"])))))
+            reply = json.dumps(replies.pop(0)).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
@@ -562,21 +559,88 @@ def test_open_weights_letter_writer_gets_the_prompt_and_street_photo():
             pass
 
     server = HTTPServer(("127.0.0.1", 0), Fake)
-    threading.Thread(target=server.handle_request, daemon=True).start()
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server, seen
+
+
+def test_open_weights_letter_writer_gets_the_prompt_and_street_photo():
+    """With LETTER_MODEL_URL set, the plan comes from an OpenAI-compatible server (llama-server running Muse Glimmer),
+    and the server's own timings and usage travel with it into plan.json."""
+    import tempfile
+    from pathlib import Path
+    plan = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "l"}
+    timings, usage = {"prompt_ms": 2000.0, "predicted_ms": 410000.0}, {"prompt_tokens": 900, "completion_tokens": 5000}
+    server, seen = fake_open_model([{"choices": [{"message": {"content": json.dumps(plan)}, "finish_reason": "stop"}],
+                                     "timings": timings, "usage": usage}])
     old = pack.LETTER_URL
     pack.LETTER_URL = f"http://127.0.0.1:{server.server_port}/v1"
     try:
         with tempfile.TemporaryDirectory() as tmp:
             photo = Path(tmp) / "street.jpg"
             photo.write_bytes(b"\xff\xd8jpeg")
-            assert pack.model_plan("PROMPT", None, photo) == plan
+            assert pack.model_plan("PROMPT", None, photo) == {**plan, "timings": timings, "usage": usage}
     finally:
         pack.LETTER_URL = old
+        server.shutdown()
         server.server_close()
-    content = seen["body"]["messages"][0]["content"]
-    assert seen["path"] == "/v1/chat/completions" and seen["body"]["response_format"] == {"type": "json_object"}
+    path, body = seen[0]
+    content = body["messages"][0]["content"]
+    assert path == "/v1/chat/completions" and body["response_format"] == {"type": "json_object"}
     assert content[0] == {"type": "text", "text": "PROMPT"} and content[1]["image_url"]["url"].startswith("data:image/jpeg")
     assert "Muse Glimmer" in pack.letter_section({**plan, "writer": "Muse Glimmer 30B (open weights)"})
+
+
+def test_open_model_out_of_context_is_a_clear_error_not_an_empty_letter():
+    """llama-server says only finish_reason "length" with content "" when thinking fills the context."""
+    server, _ = fake_open_model([{"choices": [{"message": {"content": ""}, "finish_reason": "length"}],
+                                  "usage": {"completion_tokens": 32000}}])
+    old = pack.LETTER_URL
+    pack.LETTER_URL = f"http://127.0.0.1:{server.server_port}/v1"
+    try:
+        pack.open_model_reply("PROMPT", None)
+        raise AssertionError("an out-of-context reply was accepted")
+    except ValueError as err:
+        assert "ran out of context after 32000 tokens" in str(err) and "-c" in str(err)
+    finally:
+        pack.LETTER_URL = old
+        server.shutdown()
+        server.server_close()
+
+
+def test_open_model_footer_uses_the_server_timings_only():
+    plan = {"fix": "f", "why": "w", "image_prompt": "i", "letter": "l", "writer": "Muse Glimmer 30B (open weights, self-hosted)",
+            "timings": {"prompt_ms": 1500.0, "predicted_ms": 410700.0}}
+    old = pack.LETTER_URL, pack.LETTER_HOST
+    pack.LETTER_URL, pack.LETTER_HOST = "http://127.0.0.1:8080/v1", "Kaggle 2 x T4"
+    try:
+        assert f"{pack.LETTER_MODEL} wrote this in 412 s on Kaggle 2 x T4 (open weights)." in pack.letter_section(plan)
+        no_numbers = pack.letter_section({**plan, "timings": {"prompt_ms": "1500", "predicted_ms": None}})
+        assert "wrote this in" not in no_numbers and "Fix and letter written by Muse Glimmer 30B" in no_numbers
+        pack.LETTER_URL = ""  # Spark wrote it: timings in its JSON are never shown as a run time
+        assert "wrote this in" not in pack.letter_section(plan)
+    finally:
+        pack.LETTER_URL, pack.LETTER_HOST = old
+
+
+def test_glimmer_notebook_is_pinned_hash_checked_and_records_its_run():
+    """The Kaggle notebook runs unattended for 40 minutes, so its pins and its Python are checked here first."""
+    import ast, re
+    from pathlib import Path
+    notebook = json.loads(Path(__file__).with_name("kaggle").joinpath("<removed-run-record>").read_text())
+    code = ["".join(c["source"]) for c in notebook["cells"] if c["cell_type"] == "code"]
+    for cell in code:
+        if not cell.startswith("%%"):
+            ast.parse("\n".join(line for line in cell.splitlines() if not line.startswith("!")))
+    text = "\n".join(code)
+    for pin in ("--branch b11976", "revision=REVISION", "b44f1072cf75e918a1b82a3a17b45c4389b076e7",
+                "4cc57c0f51040a226e5a72cc47b7613f7772950e460a665f7083de89f183f60e",
+                "f48b452316f9b213758e8659444029b961a24a07f99a1abb2a9f88b06f7c00c6", "'-np', '1'", "(32768, 16384)",
+                "'reasoning_strength': 'medium'", "'--temp', '1.0', '--top-p', '0.95', '--top-k', '64'",
+                "LETTER_MODEL_HOST", "<removed-run-record>", "build_info", "GIT_SHA", "pack_py_sha256"):
+        assert pin in text, pin
+    assert re.search(r"assert sha256\(path\) == SHA256\[name\]", text)
+    assert "shaunmortal" in text
+    assert "billion" not in Path(__file__).with_name("README.md").read_text()  # the product name, not a parameter count
 
 
 def test_map_draws_each_event_where_it_happened():

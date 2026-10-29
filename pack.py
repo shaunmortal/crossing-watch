@@ -32,6 +32,7 @@ MIN_RATE_MINUTES = 15  # shortest video scaled to hourly rates (MUTCD Warrant 4 
 LETTER_URL = os.environ.get("LETTER_MODEL_URL", "")  # an OpenAI-compatible server, e.g. llama-server with Muse
 LETTER_MODEL = os.environ.get("LETTER_MODEL", "Muse Glimmer 30B")  # Glimmer; empty: Muse Spark writes the letter
 WRITER = f"{LETTER_MODEL} (open weights, self-hosted)" if LETTER_URL else "Muse Spark"
+LETTER_HOST = os.environ.get("LETTER_MODEL_HOST", "")  # where it ran, e.g. "Kaggle 2 x T4" (the notebook reads nvidia-smi)
 OPEN_MODEL_TIMEOUT_S = 900  # a 30B model on two T4s writes a letter in minutes, not seconds
 JUDGE = "Muse Spark (a separate reviewer)"
 JUDGE_PROMPT = """You review a letter before a school sends it to its road authority. MEASUREMENTS are the only facts.
@@ -197,12 +198,12 @@ def model_plan(prompt, api_key, photo=None):
     """One reply from the letter model, Muse Spark or (with LETTER_MODEL_URL) an open-weights model, parsed into
     the plan. The blurred street photo, when there is one, lets the model see the street it is fixing."""
     image = "data:image/jpeg;base64," + base64.b64encode(photo.read_bytes()).decode() if photo else None
-    text = open_model_reply(prompt, image) if LETTER_URL else spark_reply(prompt, image, api_key)
+    text, server = open_model_reply(prompt, image) if LETTER_URL else (spark_reply(prompt, image, api_key), {})
     match = re.search(r"\{.*\}", text, re.S)
     plan = json.loads(match[0], strict=False) if match else {}  # a letter may hold raw newlines
     if not isinstance(plan, dict) or not all(isinstance(plan.get(k), str) and plan[k].strip() for k in ("fix", "why", "image_prompt", "letter")):
         raise ValueError(f"the plan is incomplete: {text[:200]!r}")
-    return plan
+    return {**plan, **server}
 
 
 def spark_reply(prompt, image, api_key):
@@ -220,7 +221,8 @@ def spark_reply(prompt, image, api_key):
 
 
 def open_model_reply(prompt, image):
-    """Chat completion from an OpenAI-compatible server, e.g. llama-server running Muse Glimmer 30B on a GPU."""
+    """Chat completion from an OpenAI-compatible server, e.g. llama-server running Muse Glimmer 30B on a GPU: the
+    text, and the server's own timings and token usage (kept in plan.json for the run record)."""
     content = [{"type": "text", "text": prompt}] + ([{"type": "image_url", "image_url": {"url": image}}] if image else [])
     body = json.dumps({"model": LETTER_MODEL, "messages": [{"role": "user", "content": content}],
                        "response_format": {"type": "json_object"}}).encode()
@@ -228,7 +230,20 @@ def open_model_reply(prompt, image):
                                  headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=OPEN_MODEL_TIMEOUT_S) as response:
         reply = json.load(response)
-    return reply["choices"][0]["message"]["content"]
+    choice = reply["choices"][0]
+    if choice.get("finish_reason") == "length":  # llama-server's only sign: HTTP 200 and an empty answer
+        raise ValueError(f"{LETTER_MODEL} ran out of context after {(reply.get('usage') or {}).get('completion_tokens', '?')} "
+                         "tokens with no answer: start llama-server with a larger -c or a lower reasoning_strength")
+    return choice["message"]["content"], {"timings": reply.get("timings"), "usage": reply.get("usage")}
+
+
+def writer_note(plan):
+    """Who wrote the fix and letter. An open-weights model's time is its server's own timings, never a guess."""
+    timings = plan.get("timings") if LETTER_URL else None
+    if isinstance(timings, dict) and all(isinstance(timings.get(k), (int, float)) for k in ("prompt_ms", "predicted_ms")):
+        where = f" on {LETTER_HOST}" if LETTER_HOST else ""
+        return f"{LETTER_MODEL} wrote this in {(timings['prompt_ms'] + timings['predicted_ms']) / 1000:.0f} s{where} (open weights)."
+    return f"Fix and letter written by {plan['writer']}." if plan.get("writer") else ""
 
 
 def draw_fix(photo, instruction, api_key, out_path):
@@ -337,7 +352,7 @@ def letter_section(plan):
     checked = (f"Every number was checked against the measurements by code, and the claims by {plan['judged_by']}."
                if plan.get("judged_by") else "Every number was checked against the measurements by code.")
     check += f'<p class="note">{html.escape(checked)}</p>' if not plan.get("unmeasured") and not plan.get("unsupported") else ""
-    writer = f'<p class="note">Fix and letter written by {html.escape(plan["writer"])}.</p>' if plan.get("writer") else ""
+    writer = f'<p class="note">{html.escape(note)}</p>' if (note := writer_note(plan)) else ""
     return (f'<section><h2>Letter to the road authority</h2>{writer}<div class="letter">{paragraphs}</div>{check}'
             '</section>')
 
