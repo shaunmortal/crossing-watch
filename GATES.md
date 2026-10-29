@@ -130,3 +130,14 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
   10); synonym concepts shared one cache (now refused); letter check missed non-English facts and comma numbers, and
   flagged "SAM 3.1" from the prompt (fixed). DUT with vehicles at 10 a second: 12 of 36, every miss at the 10 km/h
   bar, speed bias +0.2 km/h; all non-threshold conflicts found, 1 real false alarm.
+
+## Letter check made stricter (Thu 29 Oct)
+
+- The fifth review's fix for "SAM 3.1" counted the prompt's numbers as measured, which also let any 3.1 through. The
+  check now reads the measurements only, and the letter prompt no longer names the SAM version.
+- Also sent back now: numbers in words (two to ninety, hundred, thousand, dozen; "one" is too common to flag, and a
+  two-wheeler is a vehicle), speeds in mph, and a sentence with one near-miss's speed and another near-miss's time gap.
+- On the two cached letters (`out/dut/15`, `out/dut-15s/15`; offline, no API calls): the word check catches "The four
+  worst were all serious" in dut-15s; both letters say "SAM 3.1", and 3.1 is not in their measurements, so both
+  would now go back; neither mixes two near-misses. Against today's events.json, 3 and 6 of their numbers become
+  clip links.

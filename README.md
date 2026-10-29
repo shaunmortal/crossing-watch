@@ -23,7 +23,7 @@ hit, instead of waiting for crash statistics.
 | Ear witness | **Muse Wonder** listens to the original audio around each near-miss for horns, screeching brakes and shouts | `listen.py` |
 | Where it happened | A bird's-eye map in road metres: each near-miss where it happened, with both paths 2 s either side | `roadmap.py` |
 | Evidence clips | ffmpeg, pedestrian boxed cyan, vehicle red, every tracked person's head blurred on every frame so clips of children can be shared | `render.py` |
-| Fix and letter | **Muse Spark** (JSON mode) picks a physical fix and writes the letter from the measurements only; verified in two layers before use: code checks every number against the measurements, then **Muse Spark as a separate reviewer** (LLM as judge) lists unsupported claims (a warrant said to be met, a death risk for a child); either objection sends the letter back with the reason, and after 3 tries what remains is shown for a person to check, and code adds an AI-draft line for a named person to sign; **Muse Image** draws the fix onto the real street (for a raised crossing, code adds the IRC size: 4 m wide, a speed hump 10-20 m before it) | `pack.py`, `ailabel.py` |
+| Fix and letter | **Muse Spark** (JSON mode) picks a physical fix and writes the letter from the measurements only; verified in two layers before use: code checks every number against the measurements (and sends back numbers in words, speeds in mph, and a sentence that puts one near-miss's speed beside another's time gap), then **Muse Spark as a separate reviewer** (LLM as judge) lists unsupported claims (a warrant said to be met, a death risk for a child); either objection sends the letter back with the reason, and after 3 tries what remains is shown for a person to check, and code adds an AI-draft line for a named person to sign; **Muse Image** draws the fix onto the real street (for a raised crossing, code adds the IRC size: 4 m wide, a speed hump 10-20 m before it) | `pack.py`, `ailabel.py` |
 | Why the authority can act (India) | With `"country": "IN"` in the site file, code (never a model) quotes the Supreme Court's order of 7 Oct 2025, 2025 INSC 1189: para 35.5 (in school zones, identify high-risk stretches "using accident data") and para 35.11 (an online grievance mechanism that takes "suggestions for pedestrian crossing"), each linked to its page. Para 35.6 is added when the site's `"city"` is one of the 50 in Annexure 46 of MoRTH's Road Accidents in India 2023. The page says near-misses are not accident data | `pack.py` |
 
 ## Run
@@ -48,6 +48,12 @@ Even the AI picture keeps Meta's made-by-AI tag: Muse Image's .webp is shipped e
 made from it (a composite, a video still) loses that tag, so `ailabel.burn()` writes the label into its pixels. After
 both letter checks, code (not the model) adds: "Drafted by Muse Spark from the measurements in this pack. Read and
 approved by: ____ (name, role, date)."
+
+Every number in the letter is one click from its evidence: a number with a unit that equals exactly one shown
+near-miss's speed, time gap or death risk links to that near-miss's card, and clicking it plays the clip from the
+moment (on paper it reads "(see clip N)"). The letter can be edited on the page before printing; each edit is
+re-checked in the browser against the same measurements, and a number that is not there, a number in words or a
+speed in mph gets a red underline.
 
 SAM replies are cached per output folder, so re-running costs nothing. An output folder refuses a different video.
 Videos are sent to SAM in 15-second parts that overlap by 2 s, so a person crossing a cut keeps one ID. Parts are
