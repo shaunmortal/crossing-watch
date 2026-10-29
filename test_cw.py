@@ -632,6 +632,74 @@ def test_map_draws_each_event_where_it_happened():
     assert "Where it happened" in pack.map_section(events, site) and pack.map_section(events[2:], site) == ""
 
 
+BAND_IMG = [[60, 120], [260, 120], [260, 220], [60, 220]]  # 20 px a metre on a 320 x 240 photo
+BAND_ROAD = [[0, 0], [10, 0], [10, 5], [0, 5]]
+BAND_EVENTS = [{"tier": "serious", "where": [3.0, 2.5], "path_person": [[3.0, 0.5], [3.0, 4.5]]},
+               {"tier": "close pass", "where": [5.0, 2.0], "path_person": [[5.0, 4.5], [5.0, 1.0]]}]  # the other way
+
+
+def test_fix_band_runs_along_the_walk_over_every_near_miss():
+    import fixband
+    assert fixband.band(BAND_EVENTS) == [[6.0, -0.5], [6.0, 5.5], [2.0, 5.5], [2.0, -0.5]]  # 1 m past paths and spots
+    one = fixband.band(BAND_EVENTS[:1])
+    assert math.dist(one[1], one[2]) == fixband.BAND_MIN_WIDTH_M and math.dist(one[0], one[1]) == 6.0
+    assert fixband.band([{"where": [3.0, 2.5]}]) is None and fixband.band([]) is None  # no walked path, no band
+    quad = fixband.pixels(road.homography(BAND_IMG, BAND_ROAD), fixband.band(BAND_EVENTS))
+    assert [tuple(round(v) for v in p) for p in quad] == [(180, 110), (180, 230), (100, 230), (100, 110)]
+    for corners in (quad, quad[::-1]):  # either way round
+        test = fixband.inside(corners)
+        assert [eval(test, {"gte": lambda a, b: a >= b, "X": x, "Y": y}) for x, y in ((140, 170), (90, 170), (140, 240))] == [1, 0, 0]
+    assert fixband.place(quad, (320, 240)) == "bottom centre" and fixband.place([(160, 120)] * 4, (320, 240)) == "centre"
+    assert fixband.place([(10, 10)] * 4, (320, 240)) == "top left"
+
+
+def test_fix_is_kept_only_inside_the_band_and_redrawn_once_when_muse_image_strays():
+    """Muse Image stubbed by local pictures: a first one flipped (it moved the street), then one that kept it."""
+    import contextlib, fixband, io, subprocess, tempfile
+    from pathlib import Path
+
+    def rgb(image, x, y):
+        raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(image), "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                             check=True, capture_output=True).stdout
+        return raw[3 * (y * 320 + x):3 * (y * 320 + x) + 3]
+
+    with tempfile.TemporaryDirectory() as tmp:
+        out, calls = Path(tmp), []
+        photo = out / "street.jpg"
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=s=320x240", "-frames:v", "1", "-q:v", "2",
+                        str(photo)], check=True)
+
+        def muse_image(image, words, path):
+            calls.append(words)
+            flip = ",hflip" if len(calls) == 1 else ""
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(image), "-vf", f"scale=640:480{flip}", "-f", "image2",
+                            "-c:v", "png", str(path)], check=True)
+            return path
+
+        site, plan = {"image_points": BAND_IMG, "world_points": BAND_ROAD}, {"fix": "a speed table", "image_prompt": "i"}
+        people = [{0: [150, 150, 170, 200]}, {3: [0, 0, 9, 9]}]  # someone in the band; someone seen only later
+        with contextlib.redirect_stderr(io.StringIO()) as said:
+            images = fixband.draw(photo, plan, BAND_EVENTS, site, people, muse_image, out)
+        assert "SSIM 0." in said.getvalue() and images == ("street-dots.svg", "street-fixed.webp", "street-band.svg") and len(calls) == 2
+        assert "magenta band in the bottom centre of the photo with a speed table" in calls[0]
+        assert calls[1] == calls[0] + fixband.STRONGER and not (out / fixband.RETRY).exists()  # the redraw was kept
+        kept, guide = out / fixband.KEPT, out / fixband.GUIDE
+        assert abs(rgb(kept, 40, 60)[1] - rgb(photo, 40, 60)[1]) < 30  # outside the band: the photo
+        assert abs(rgb(kept, 110, 200)[1] - rgb(guide, 110, 200)[1]) < 30 < abs(rgb(photo, 110, 200)[1] - rgb(guide, 110, 200)[1])
+        assert abs(rgb(kept, 160, 175)[1] - rgb(photo, 160, 175)[1]) < 30  # the person in the band: the photo
+        assert max(rgb(photo, 4, 231)) < 40 < 200 < min(rgb(kept, 4, 231))  # a dot of the "AI-generated" label's A
+        shown, today = (out / images[2]).read_text(), (out / images[0]).read_text()
+        assert "6.0 m" in shown and "4.0 m" in shown and fixband.CAPTION in shown and "data:image/jpeg;base64," in shown
+        assert shown.count("<circle") == today.count("<circle") == 2 and today.count('fill="#c0392b"') == 1
+        assert shown.count("<polyline") == 2 and "<polygon" in shown and "<polygon" not in today
+        page = pack.page(site, [], {"minutes": 0.3}, plan | {"why": "w", "letter": "l"}, images, 10)
+        assert '<img src="street-band.svg"' in page and fixband.CAPTION in page
+        assert fixband.figure(images[:2]) == "" and fixband.figure(None) == ""
+        calls.clear()  # no walked path: Muse Image edits the whole photo with Spark's prompt, as before
+        assert fixband.draw(photo, plan, [{"where": [3.0, 2.5]}], site, people, muse_image, out) == (
+            "street.jpg", "street-fixed.webp") and calls == ["i"]
+
+
 def test_fast_two_wheelers_keep_one_track_in_vehicle_crowd_mode():
     import crowd, analyze
     site = {"person": "person", "vehicles": ["motorcycle"], "person_mode": "crowd", "vehicle_mode": "crowd"}

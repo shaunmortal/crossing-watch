@@ -18,6 +18,7 @@ import uuid
 from pathlib import Path
 
 import crowd
+import fixband
 import overlay
 import render
 import review
@@ -253,16 +254,21 @@ def draw_fix(photo, instruction, api_key, out_path):
     return out_path
 
 
-def street_photo(clip, out_path, person_concept="person", crowd_mode=False):
-    """First frame of the clip with every head blurred (it is shown on the page and sent to Muse Image). Uses the
-    same SAM cache analyze wrote (crowd mode's first image, or part0/ for long videos); without it there is no
-    photo rather than unblurred faces."""
+def photo_people(clip, person_concept="person", crowd_mode=False):
+    """Person tracks of the clip's first frame, from the SAM cache analyze wrote (crowd mode's first image, or part0/
+    for long videos): the heads the street photo blurs, and the people the fix picture keeps real."""
     folder = clip.parent / "part0" if (clip.parent / "part0").is_dir() else clip.parent
     people_file = (crowd.cache_dir(clip.parent, person_concept) / f"{0:06d}.sam.txt" if crowd_mode
                    else sam.cache_path(folder, person_concept))
     if not people_file.exists():
         raise ValueError(f"no person tracks at {people_file}; not showing an unblurred street photo")
-    people = sam.parse(people_file.read_text()).values()
+    return list(sam.parse(people_file.read_text()).values())
+
+
+def street_photo(clip, out_path, person_concept="person", crowd_mode=False):
+    """First frame of the clip with every head blurred (it is shown on the page and sent to Muse Image); without
+    person tracks there is no photo rather than unblurred faces."""
+    people = photo_people(clip, person_concept, crowd_mode)
     size = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
                            "-of", "csv=p=0", str(clip)], check=True, capture_output=True, text=True).stdout.strip()
     filters = ",".join(render.blur_filters(people, 0, 0, tuple(int(v) for v in size.split(",")))) or "null"
@@ -390,7 +396,7 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None):
 <p class="muted">{html.escape(site.get("name", ""))}</p>
 <div class="stats">{stats(events, seen)}</div>{limit_note(full)}
 {engineering(seen, cost)}
-{map_section(events, site)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{letter_section(plan)}
+{map_section(events, site)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{fixband.figure(images)}{letter_section(plan)}
 <section><h2>How this was measured</h2><p class="note">{html.escape(method)}</p></section>{overlay.SCRIPT}</body></html>"""
 
 
@@ -432,8 +438,10 @@ def main():
             prompt = LETTER_PROMPT.format(facts=measured, language=site.get("letter_language", "English"))
             plan = ask_plan(prompt, measured, key, photo)
             (out_dir / "plan.json").write_text(json.dumps(plan, indent=1, ensure_ascii=False))  # the paid-for letter
-            if photo and key:  # Muse Image draws the fix; without a key there is no street image on the page
-                images = (photo.name, draw_fix(photo, plan["image_prompt"], key, out_dir / "street-fixed.jpg").name)
+            if photo and key:  # Muse Image draws the fix in the measured band; without a key there is no street image
+                people = photo_people(out_dir / "clip.mp4", site.get("person", "person"), site.get("person_mode") == "crowd")
+                images = fixband.draw(photo, plan, events, site, people,
+                                      lambda image, words, path: draw_fix(image, words, key, path), out_dir)
         except (SystemExit, OSError, ValueError, KeyError, IndexError, TypeError, AttributeError,
                 http.client.HTTPException, subprocess.CalledProcessError) as err:
             print(f"letter or fix image failed, page will show the measurements only: {err}", file=sys.stderr)
