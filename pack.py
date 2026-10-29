@@ -269,13 +269,15 @@ def street_photo(clip, out_path, person_concept="person", crowd_mode=False):
     return out_path
 
 
-def event_card(i, e):
+def event_card(i, e, fps):
+    """Card #i, linkable as #event-i; data-t is the second of its clip when the first of the two reached the spot."""
     verdict, at30, at20 = e.get("review") or {}, e["with_limit"]["30"], e["with_limit"]["20"]
     road_user = verdict.get("road_user", "pedestrian (not reviewed by Spark)")
     road_user = "pedestrian" if road_user == "unclear" else road_user
     who = html.escape(("an " if road_user[0] in "aeiou" else "a ") + road_user)
     video = f'<video src="{html.escape(e["clip"])}" controls muted loop playsinline></video>' if e.get("clip") else ""
-    return f"""<article class="card">{video}
+    moment_s = min(e["t_person_s"], e["t_vehicle_s"]) - render.window(e, fps)[0] / fps
+    return f"""<article class="card" id="event-{i}" data-t="{moment_s:.2f}">{video}
 <h3>#{i} &middot; {html.escape(e.get("tier", "serious"))} &middot; {html.escape(e["vehicle"].split("#")[0])} at {e["vehicle_kmh"]} km/h, {e["pet_s"]:.1f} s from {who}</h3>
 <table><tr><th></th><th>Impact speed if hit</th><th>Adult death risk</th></tr>
 <tr><td>As driven</td><td>{e.get("impact_kmh", e["vehicle_kmh"])} km/h</td><td>{e["death_risk_pct"]}%</td></tr>
@@ -367,8 +369,8 @@ def stats(events, seen):
     return "".join(f"<div><b>{html.escape(str(v))}</b>{html.escape(label)}</div>" for v, label in tiles)
 
 
-def page(site, events, seen, plan, images, cost=None, full=None):
-    cards = "\n".join(event_card(i + 1, e) for i, e in enumerate(events[:SHOWN_EVENTS])) or (
+def page(site, events, seen, plan, images, fps, cost=None, full=None):
+    cards = "\n".join(event_card(i + 1, e, fps) for i, e in enumerate(events[:SHOWN_EVENTS])) or (
         f"<p>No conflicts under {road.CLOSE_PASS_S} s in these {html.escape(str(seen.get('minutes', '?')))} minutes. "
         "A short recording can miss rare events: record more school-run periods before drawing any conclusion.</p>")
     method = (f"SAM 3.1 tracked every pedestrian and vehicle. Four points on the road turned pixels into metres. "
@@ -432,8 +434,8 @@ def main():
         except (SystemExit, OSError, ValueError, KeyError, IndexError, TypeError, AttributeError,
                 http.client.HTTPException, subprocess.CalledProcessError) as err:
             print(f"letter or fix image failed, page will show the measurements only: {err}", file=sys.stderr)
-    (out_dir / "index.html").write_text(page(site, events, seen, plan, images, data.get("cost"),
-                                                      data.get("sam_full_requests")))
+    (out_dir / "index.html").write_text(page(site, events, seen, plan, images, data["fps"], data.get("cost"),
+                                             data.get("sam_full_requests")))
     print(f"wrote {out_dir / 'index.html'}: {len(serious(events))} serious, {len(events) - len(serious(events))} close "
           f"passes, fix: {plan['fix'] if plan else 'none'}")
 

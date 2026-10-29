@@ -216,16 +216,26 @@ def test_spark_verdicts_are_validated():
 
 
 def test_pack_keeps_people_and_escapes_text():
-    base = {"person": "1/0", "vehicle": "car#1", "vehicle_kmh": 30.0, "pet_s": 0.5, "t_person_s": 3.0, "gap_m": 0.4, "death_risk_pct": 1.5,
+    base = {"person": "1/0", "vehicle": "car#1", "vehicle_kmh": 30.0, "pet_s": 0.5, "t_person_s": 3.0, "t_vehicle_s": 3.5,
+            "gap_m": 0.4, "death_risk_pct": 1.5,
             "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5}, "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
     pole = base | {"person": "9/0", "review": {"is_person": False, "road_user": "not a person", "reason": "pole"}}
     pole_again = base | {"person": "9/0", "vehicle": "car#2"}  # same pole, another car, never reviewed
     child = base | {"review": {"is_person": True, "road_user": "child", "reason": "<script>x</script>"}}
     unreviewed = base | {"person": "2/0"}
     assert pack.confirmed([pole, child, pole_again, unreviewed]) == [child, unreviewed]
-    card = pack.event_card(1, child)
+    card = pack.event_card(1, child, 10)
     assert "&lt;script&gt;" in card and "<script>" not in card and "from a child" in card
-    assert "from a pedestrian" in pack.event_card(2, base | {"review": {"is_person": True, "road_user": "unclear"}})
+    assert "from a pedestrian" in pack.event_card(2, base | {"review": {"is_person": True, "road_user": "unclear"}}, 10)
+
+
+def test_page_links_find_an_event_card_and_its_moment():
+    """A page link to #event-N finds card N, and data-t is when, in its clip, the near-miss begins."""
+    e = {"vehicle": "car#1", "vehicle_kmh": 30.0, "pet_s": 2.5, "t_person_s": 6.0, "t_vehicle_s": 3.5, "gap_m": 0.4,
+         "death_risk_pct": 1.5, "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5},
+                                               "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
+    assert '<article class="card" id="event-3" data-t="2.00">' in pack.event_card(3, e, 10)  # clip starts at 1.5 s
+    assert 'data-t="1.00"' in pack.event_card(1, e | {"t_vehicle_s": 1.0}, 10)  # clip starts at 0, not -1 s
 
 
 def test_long_videos_are_tracked_in_overlapping_parts_and_ids_joined():
@@ -435,10 +445,10 @@ def test_crowd_tracker_keeps_ids_through_a_short_gap_and_apart_from_neighbours()
 
 def test_event_cards_do_not_give_a_child_or_non_car_a_car_curve_risk_unqualified():
     e = {"person": "p/0", "vehicle": "motorcycle#3", "tier": "serious", "pet_s": 0.5, "vehicle_kmh": 30.0,
-         "impact_kmh": 30.0, "death_risk_pct": 1.5, "t_person_s": 2.0, "gap_m": 0.5,
+         "impact_kmh": 30.0, "death_risk_pct": 1.5, "t_person_s": 2.0, "t_vehicle_s": 2.5, "gap_m": 0.5,
          "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5}, "20": {"impact_kmh": 20.0, "death_risk_pct": 0.6}},
          "review": {"is_person": True, "road_user": "child", "reason": ""}}
-    card = pack.event_card(1, e)
+    card = pack.event_card(1, e, 10)
     assert "not a child&#x27;s risk" in card and "car fronts" in card
     assert "never state a death risk for a child" in pack.LETTER_PROMPT
 
