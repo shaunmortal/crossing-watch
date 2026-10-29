@@ -29,6 +29,7 @@ FPS = 10
 WIDTH = 640
 CHUNK_FRAMES = 150    # 15 s per SAM request: one request tracks at most sam.MAX_OBJECTS objects in all
 OVERLAP_FRAMES = 20   # consecutive parts share 2 s, so someone crossing the cut keeps one ID
+VIDEO_WORKERS = 4     # SAM video requests in flight at once (crowd mode sends 6 images at once without trouble)
 TILE_OVERLAP = 0.15   # neighbouring person tiles share this much of the frame
 LINK_SHARE = 0.6      # two tracks are one object when, on shared frames, the smaller box lies this much inside the other
 SAM_USD_PER_1K_FRAMES = 0.20  # SAM video, Meta's list price
@@ -93,13 +94,16 @@ def load_site(path):
     return site
 
 
-def check_source(video, out_dir, prep_filter):
-    """Refuse to reuse an output folder (its clip and paid SAM replies) made from another video or settings."""
+def check_source(video, out_dir, prep_filter, sha256=None):
+    """Refuse to reuse an output folder (its clip and paid SAM replies) made from another video or settings. The
+    video is known by its bytes and SHA-256, not its path: the same file moved or renamed keeps its paid replies."""
     stat = Path(video).stat()
-    stamp = {"video": str(Path(video).resolve()), "bytes": stat.st_size, "prep_filter": prep_filter, "fps": FPS,
-             "width": WIDTH, "chunk_frames": CHUNK_FRAMES, "overlap_frames": OVERLAP_FRAMES}
+    stamp = {"video": str(Path(video).resolve()), "bytes": stat.st_size, "sha256": sha256, "prep_filter": prep_filter,
+             "fps": FPS, "width": WIDTH, "chunk_frames": CHUNK_FRAMES, "overlap_frames": OVERLAP_FRAMES}
     stamp_file = out_dir / "source.json"
-    if stamp_file.exists() and json.loads(stamp_file.read_text()) != stamp:
+    old = json.loads(stamp_file.read_text()) if stamp_file.exists() else None
+    settings = lambda s: {k: v for k, v in s.items() if k not in ("video", "sha256")}
+    if old and (settings(old) != settings(stamp) or old.get("sha256", sha256) != sha256):  # older stamps: no sha256
         raise SystemExit(f"{out_dir} was made from a different video or settings; pass a new --out folder")
     stamp_file.write_text(json.dumps(stamp, indent=1))
 
@@ -286,6 +290,30 @@ def link(merged, new, share=LINK_SHARE):
                 out[mid][f] = b
     out.update({nid: dict(track) for nid, track in new.items() if nid not in joined})
     return out
+
+
+def prefetch(pieces, plan, key, frame_size, workers=VIDEO_WORKERS):
+    """Sends every SAM video request of `plan` ([(concept, grid)]) not cached yet, `workers` at a time (one at a time,
+    580 requests of ~11 s each are 1.8 hours); track_all then reads them all from cache."""
+    for concept, grid in plan:
+        if grid > 1:  # encoding the tiles takes minutes on a long video
+            print(f"cutting {len(pieces)} part(s) into {grid}x{grid} {concept} tiles", flush=True)
+    units = [(clip, concept, cache) for _, piece, folder in pieces for concept, grid in plan
+             for clip, cache in ([(piece, folder)] if grid == 1 else
+                                 [tile_clip(piece, folder, rect, frame_size) for rect in tiles(frame_size, grid)])
+             if not sam.cache_path(cache, concept).exists()]
+    sam.each(lambda u: sam.track(u[0], u[1], key, u[2]), units, workers)
+
+
+def auto_bill(site, total, out_dir, cap):
+    """The line saying what auto mode may add in SAM images if every auto concept fills up, printed before any
+    video request is paid for (auto_switch sends those first and checks the image bill only afterwards)."""
+    autos = crowd_concepts(site, "auto")
+    if not autos:
+        return ""
+    worst = image_requests(site, autos, total, out_dir)[0] * SAM_USD_PER_IMAGE
+    stop = f"; the run stops before sending them if they would pass the ${cap:.2f} cap" if math.isfinite(cap) else ""
+    return f"auto mode may add up to ${worst:.2f} of SAM images ({', '.join(autos)} frame by frame){stop}"
 
 
 def track_all(pieces, concept, key, frame_size=None, grid=1):
@@ -550,8 +578,8 @@ def main():
     site = load_site(args.site)
     out_dir = Path(args.out or Path("out") / Path(args.video).stem)
     out_dir.mkdir(parents=True, exist_ok=True)
-    check_source(args.video, out_dir, site.get("prep_filter", ""))
     started, source, before = time.monotonic(), seal.file_sha256(args.video), sam_replies(out_dir)  # pack receipt
+    check_source(args.video, out_dir, site.get("prep_filter", ""), source)
     clip = prepare(args.video, out_dir, site.get("prep_filter", ""))
     frame_size = tuple(int(v) for v in probe(clip, "stream=width,height").split(","))
     if site.get("frame_size") and tuple(site["frame_size"]) != frame_size:
@@ -568,6 +596,9 @@ def main():
     crowded, plan = crowd_concepts(site), video_plan(site)
     cap = spend_cap(args.budget, args.allow_cost)
     spent, sam_usd = check_cost(pieces, plan, frame_size, total, cap, *image_requests(site, crowded, total, out_dir))
+    if bill := auto_bill(site, total, out_dir, cap):
+        print(bill, flush=True)
+    prefetch(pieces, plan, key, frame_size)
     switched = auto_switch(site, pieces, plan, key, frame_size)
     notes = [switch_note(c, seconds, len(pieces)) for c, seconds in switched.items()]
     if switched:
