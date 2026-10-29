@@ -33,7 +33,7 @@ written: whether anything is approved or fixed is for the authority to say, and 
 | Evidence clips | ffmpeg, SAM silhouettes (boxes where no mask is cached): pedestrian cyan, vehicle red, every tracked person's head and the bottom quarter of every tracked vehicle (its number plate) blurred on every frame so clips of children can be shared; when a SAM video request for people is full, SAM image search finds the people it missed every 0.2 s of every published clip, with boxes filled in between, and the page says how many (check every public frame by eye) | `render.py`, `masks.py`, `analyze.py` |
 | The near-miss in one picture | A StroMotion still cut from the blurred clip: copies of the vehicle, then the pedestrian, every 0.5 s (1 s for a car), so wider spacing means faster | `render.py` |
 | Hero shot for the video | The blurred clip beside the same frames seen from above in road metres: footsteps, the vehicle's footprint, the 1 m ring and the gap clock. One SVG tile per frame, screenshotted once by headless Chrome, stepped through by ffmpeg | `video/split.py` |
-| Fix and letter | **Muse Spark** (JSON mode) picks a physical fix and writes the letter from the measurements only; verified in two layers before use: code checks every number against the measurements (and sends back numbers in words, speeds in mph, and a sentence that puts one near-miss's speed beside another's time gap), then **Muse Spark as a separate reviewer** (LLM as judge) lists unsupported claims (a warrant said to be met, a death risk for a child); either objection sends the letter back with the reason, and after 3 tries what remains is shown for a person to check, and code adds an AI-draft line for a named person to sign; **Muse Image** draws the fix onto the real street, kept only inside the strip where people were measured crossing (every other pixel stays the real, blurred street), or on the whole photo when no path was measured (there, for a raised crossing, code adds the IRC size: 4 m wide, a speed hump 10-20 m before it) | `pack.py`, `ailabel.py` |
+| Fix and letter | **Muse Spark** (JSON mode) picks a physical fix and writes the letter from the measurements only; verified in two layers before use: code checks every number against the measurements (and sends back numbers in words, speeds in mph, and a sentence that puts one near-miss's speed beside another's time gap), then **Muse Spark as a separate reviewer** (LLM as judge) lists unsupported claims (a warrant said to be met, a death risk for a child); either objection sends the letter back with the reason, and after 3 tries what remains is shown for a person to check, and code adds an AI-draft line for a named person to sign; **Muse Image** draws the fix onto the real street, kept only inside the strip where people were measured crossing (every other pixel stays the real, blurred street), or on the whole photo when no path was measured (there, for a raised crossing, code adds the IRC size: 4 m wide, a speed hump 10-20 m before it) | `pack.py`, `ailabel.py`, `openweights.py` |
 | Why the authority can act (India) | With `"country": "IN"` in the site file, code (never a model) quotes the Supreme Court's order of 7 Oct 2025, 2025 INSC 1189: para 35.5 (in school zones, identify high-risk stretches "using accident data") and para 35.11 (an online grievance mechanism that takes "suggestions for pedestrian crossing"), each linked to its page. Para 35.6 is added when the site's `"city"` is one of the 50 in Annexure 46 of MoRTH's Road Accidents in India 2023. The page says near-misses are not accident data | `pack.py` |
 
 ## Run
@@ -145,6 +145,50 @@ Meta key, and the page names only the judges that ran. No Glimmer judge run has 
 
 ```
 LETTER_MODEL_URL=http://127.0.0.1:8080/v1 python3 pack.py out/VIDEO site.json
+```
+
+#### Open weights: two paths
+
+`LETTER_MODEL` is the model id sent to the server; the page shows the product name and where it ran. A self-hosted
+server is named "self-hosted" only when it runs on the machine that ran pack.py, and Fireworks' API "on Fireworks".
+
+**Muse Glimmer 30B, self-hosted on Kaggle** (the notebook sets these; the page says "Muse Glimmer 30B (open weights,
+self-hosted)"):
+
+```
+LETTER_MODEL_URL=http://127.0.0.1:8080/v1
+LETTER_MODEL_HOST="Kaggle 2 x T4"
+```
+
+**Muse Spark Open on Fireworks**, a hackathon infra partner (the page says "Muse Spark Open (open weights, on
+Fireworks)"). With no `LETTER_MODEL_KEY`, pack.py reads `FIREWORKS_API_KEY` from the environment or `.env`, and sends
+it only to `api.fireworks.ai`:
+
+```
+LETTER_MODEL_URL=https://api.fireworks.ai/inference/v1
+LETTER_MODEL=accounts/fireworks/models/muse-spark-open
+FIREWORKS_API_KEY=...
+```
+
+Fireworks sends no llama-server timings, so pack.py times the reply itself and writes `letter-provenance.json` beside
+`plan.json`: model id, host, request id, token usage, wall seconds, the response format used, tries and the letter's
+sha256, never the key. The page then says "Muse Spark Open wrote this in N s on Fireworks", N being that wall time. If
+the server rejects the JSON schema with HTTP 400, pack.py asks once more for any JSON object and the record says
+`json_object`; the number check and the judges still run. No Fireworks run has been made with pack.py yet.
+
+Either model can judge the other's letter. `JUDGE_MODEL` (default: `LETTER_MODEL`) and `JUDGE_MODEL_KEY` belong to the
+judge server alone, and neither server is sent the other's key. A Glimmer writer on Kaggle with a Spark Open judge:
+
+```
+LETTER_MODEL_URL=http://127.0.0.1:8080/v1
+JUDGE_MODEL_URL=https://api.fireworks.ai/inference/v1
+JUDGE_MODEL=accounts/fireworks/models/muse-spark-open
+```
+
+A letter for `sample/` from Muse Spark Open (with `MODEL_API_KEY` set, Muse Spark judges it too):
+
+```
+LETTER_MODEL_URL=https://api.fireworks.ai/inference/v1 LETTER_MODEL=accounts/fireworks/models/muse-spark-open python3 pack.py sample sample/site.json
 ```
 
 ### Case agent: it stops to ask for a tape measure
