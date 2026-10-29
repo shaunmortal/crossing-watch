@@ -4,9 +4,13 @@ Muse models, judge with pack.JUDGE_PROMPT in a paid run. A judge's unreadable re
 a catch; a failed call is not recorded, so the next run asks again.
 
 Run: python3 judge_bench.py --out FILE [--spark N] [--glimmer N]
+     python3 judge_bench.py --public [--spark N] [--glimmer N]   (FILE: kaggle/judge-bench-public.json)
+--public builds the bench only from letters written from the synthetic sample/, safe to publish.
 FILE keeps the letters and every verdict: when it exists the bench reads its letters from it (so a Kaggle run needs
 only FILE), re-scores the code check and asks each judge only for the runs it still lacks. --glimmer needs
-LETTER_MODEL_URL (an OpenAI-compatible server, as in <removed-run-record>).
+LETTER_MODEL_URL (an OpenAI-compatible server, as in <removed-run-record>). With JUDGE_VOTES=2 each Glimmer
+run asks it twice and flags only when both replies list a problem (pack.vote); FILE keeps both raw replies and the vote
+under "glimmer_votes". Muse Spark is always asked once.
 """
 import argparse
 import html
@@ -22,6 +26,14 @@ from score_humans import wilson
 
 HERE = Path(__file__).parent
 GLIMMER_RUN = HERE / "kaggle" / "<removed-run-record>"  # Glimmer's v1 letter, written from sample/
+SPARK_OPEN_LETTER = HERE / "provenance" / "spark-open-sample-letter.txt"  # Spark Open's letter, written from sample/
+SPARK_OPEN_RECORD = HERE / "provenance" / "spark-open-fireworks-sample.json"  # its run: request id, tokens, sha256
+PUBLIC = HERE / "kaggle" / "judge-bench-public.json"
+SOURCES = {"glimmer": "Muse Glimmer 30B (open weights, self-hosted on Kaggle 2 x T4), v1 letter quoted in "
+                      "<removed-run-record>, written from the synthetic sample/ (made-up tracks, no video)",
+           "spark-open": "Muse Spark Open (open weights, on Fireworks), letter in provenance/spark-open-sample-letter.txt, "
+                         "its run in provenance/spark-open-fireworks-sample.json, written from the synthetic sample/ "
+                         "(made-up tracks, no video)"}  # every base of the public bench, by its id prefix
 UNITS = ("zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve")
 OLD_SAM = re.compile(r"\bSAM \d+(?:\.\d+)?")  # cached letters name SAM's version; the prompt no longer gives it
 COUNT = re.compile(r"(?<![\d.,])([2-9]|1[0-2]) (?=[a-z])")  # a whole count from 2 to 12 before a word: "3 crossings"
@@ -115,6 +127,20 @@ def glimmer_base():
     return "glimmer", " ".join(line[2:] for line in quoted.splitlines()), measurements(HERE / "sample" / "events.json", site)
 
 
+def spark_open_base():
+    """("spark-open", letter, facts): Spark Open's letter about sample/, checked against its run record's sha256."""
+    letter = SPARK_OPEN_LETTER.read_text().rstrip("\n")
+    if pack.sha256(letter) != json.loads(SPARK_OPEN_RECORD.read_text())["letter_sha256"]:
+        raise ValueError(f"{SPARK_OPEN_LETTER} is not the letter {SPARK_OPEN_RECORD} records")
+    site = json.loads((HERE / "sample" / "site.json").read_text())
+    return "spark-open", letter, measurements(HERE / "sample" / "events.json", site)
+
+
+def public_bench():
+    """The bench from sample/ letters only (no real footage behind any of them), each item naming its base's source."""
+    return [{**i, "source": SOURCES[i["id"].split("/")[0]]} for i in bench_letters([glimmer_base(), spark_open_base()])]
+
+
 def cached_letter(path):
     """The letter Muse Spark wrote in a cached plan.json or evidence page, or None (another writer, or no letter)."""
     text = path.read_text()
@@ -159,19 +185,23 @@ def code_flags(letter, measured):
     return pack.unmeasured(letter, measured) + pack.mixed(letter, json.loads(measured).get("worst", []))
 
 
-def judged(item, column, ask, runs):
+def judged(item, column, ask, runs, votes=1):
     """`item` with up to `runs` verdicts in `column`: True when the judge listed a problem, False when none, None
-    when its reply could not be read. A failed call stops there, for the next run to ask again."""
-    verdicts = list(item.get(column, []))
+    when its reply could not be read. Each run asks `votes` times and is pack.vote's verdict; with more than one, every
+    run's raw replies and vote are kept in `column`_votes. A failed call stops there (its run's other replies too),
+    for the next run to ask again."""
+    verdicts, held = list(item.get(column, [])), list(item.get(f"{column}_votes", []))
+    prompt = pack.JUDGE_PROMPT.format(facts=item["measured"], letter=item["letter"])
     while len(verdicts) < runs:
         try:
-            reply = ask(pack.JUDGE_PROMPT.format(facts=item["measured"], letter=item["letter"]))
+            replies = [ask(prompt) for _ in range(votes)]
         except (OSError, ValueError, KeyError, IndexError, http.client.HTTPException) as err:
             print(f"{item['id']}: {column} call failed, asked again next run: {err}", file=sys.stderr)
             break
-        problems = pack.read_problems(reply)
+        problems = pack.vote([pack.read_problems(reply) for reply in replies])
         verdicts.append(None if problems is None else bool(problems))
-    return {**item, column: verdicts}
+        held += [{"replies": replies, "vote": verdicts[-1]}] if votes > 1 else []
+    return {**item, column: verdicts, **({f"{column}_votes": held} if held else {})}
 
 
 def tally(items, column):
@@ -219,9 +249,21 @@ def table(items):
              row("**Clean controls: false alarms**", "", [i for i in items if not i["planted"]], letters, True)]
     unread = "; ".join(f"{name} {tally(items, c)[2]} of {sum(len(i.get(c, [])) for i in items)} replies"
                        for c, name in JUDGES)
+    voted = [votes_line(items, c, name) for c, name in JUDGES]
     return head + rows + ["", "In the rows per kind a checker's cell counts runs; every other cell counts letters, one "
                           "flagged if any of its readable runs flagged it, as runs on one letter are not independent.",
-                          f"Unreadable judge replies (in no cell above): {unread}."]
+                          f"Unreadable judge replies (in no cell above): {unread}."] + [v for v in voted if v]
+
+
+def votes_line(items, column, name):
+    """How many of this judge's runs were votes of several replies, or "" when none was."""
+    held = [v for item in items for v in item.get(f"{column}_votes", [])]
+    if not held:
+        return ""
+    asks = sorted({len(v["replies"]) for v in held})
+    return (f"{name}: {len(held)} of {sum(len(i.get(column, [])) for i in items)} runs asked "
+            f"{' or '.join(map(str, asks))} times, a problem counted only when every reply listed one; a run with an "
+            "unreadable reply is unreadable.")
 
 
 def asker(column):
@@ -238,12 +280,16 @@ def asker(column):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--out", required=True, help="the bench file: letters and every verdict so far (JSON)")
+    parser.add_argument("--out", help="the bench file: letters and every verdict so far (JSON)")
+    parser.add_argument("--public", action="store_true", help="a new bench only from sample/ letters (default --out "
+                        "kaggle/judge-bench-public.json)")
     for column, name in JUDGES:
         parser.add_argument(f"--{column}", type=int, default=0, metavar="N", help=f"runs of {name} as judge per letter")
     args = parser.parse_args()
-    out = Path(args.out)
-    bench = (json.loads(out.read_text()) if out.is_file()
+    if not (args.out or args.public):
+        parser.error("give --out FILE, or --public")
+    out = Path(args.out or PUBLIC)
+    bench = (json.loads(out.read_text()) if out.is_file() else public_bench() if args.public
              else bench_letters([glimmer_base()] + [b for b in [spark_base()] if b]))
     bench = [{**i, "code": [bool(code_flags(i["letter"], i["measured"]))]} for i in bench]
     out.write_text(json.dumps(bench, indent=1, ensure_ascii=False))
@@ -253,7 +299,7 @@ def main():
             continue
         ask = asker(column)
         for k, item in enumerate(bench):
-            bench[k] = judged(item, column, ask, runs)
+            bench[k] = judged(item, column, ask, runs, pack.JUDGE_VOTES if column == "glimmer" else 1)
             out.write_text(json.dumps(bench, indent=1, ensure_ascii=False))  # every paid reply kept at once
     print("\n".join(table(bench)))
 

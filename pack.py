@@ -529,7 +529,7 @@ def judge_problems(letter, measured, api_key):
     never passes a letter silently."""
     prompt = JUDGE_PROMPT.format(facts=measured, letter=letter)
     asks = (([lambda: spark_reply(prompt, None, api_key)] if api_key else [])
-            + ([lambda: open_model_reply(prompt, None, PROBLEMS_SCHEMA, judge=True)[0]] if JUDGE_URL else []))
+            + ([lambda: open_judge_reply(prompt)] if JUDGE_URL else []))
     found = [read_problems(judge_reply(ask)) for ask in asks]
     return [p for problems in found for p in ([JUDGE_FAILED] if problems is None else problems)]
 
@@ -553,6 +553,25 @@ def read_problems(text):
     if not isinstance(data, dict) or not isinstance(data.get("problems"), list):
         return None
     return [str(p)[:300] for p in data["problems"] if isinstance(p, str) and p.strip()]
+
+
+# opt-in: JUDGE_VOTES=2 asks the JUDGE_MODEL_URL judge twice per letter, a problem counted only when both replies list
+# one (Glimmer 30B as judge flagged 6 of 8 clean letters asked once). Muse Spark is always asked once.
+JUDGE_VOTES = max(1, int(os.environ.get("JUDGE_VOTES") or 1))
+
+
+def vote(found):
+    """One verdict from several replies' read_problems: None if any reply could not be read (counted on its own,
+    never a pass), the first reply's problems when every reply lists some, else []."""
+    return None if None in found else found[0] if all(found) else []
+
+
+def open_judge_reply(prompt, votes=None):
+    """The JUDGE_MODEL_URL judge's reply as judge_problems reads it, asked `votes` (JUDGE_VOTES) times: their vote as
+    {"problems": [...]}, or "" when a reply could not be read. One vote gives what the one reply said."""
+    replies = [open_model_reply(prompt, None, PROBLEMS_SCHEMA, judge=True)[0] for _ in range(votes or JUDGE_VOTES)]
+    problems = vote([read_problems(text) for text in replies])
+    return "" if problems is None else json.dumps({"problems": problems})
 
 
 def model_plan(prompt, api_key, photo=None, known=None):

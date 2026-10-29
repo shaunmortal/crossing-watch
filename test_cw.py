@@ -2086,12 +2086,11 @@ def test_glimmer_notebook_is_pinned_hash_checked_and_records_its_run():
                 "run.stderr.count('open model reply:')", "'tries': tries",  # pack.open_model_reply logs each try
                 "os.path.exists(f'{CW}/judge_bench.py')", "'JUDGE_MODEL_URL': 'http://127.0.0.1:8080/v1'",
                 "k != 'MODEL_API_KEY'", "<removed-run-record>", "'--out', BENCH_JSON, '--glimmer', '1'",  # the Glimmer-only judge pass, skipped without a bench
-                "glob.glob('/kaggle/input/**/judge-bench.json', recursive=True)",  # both bases: out/ is not in the zip
-                "shutil.copyfile(attached[0], BENCH_JSON)", "f'bench: {BENCH_FROM}"):
+                "f'bench: {BENCH_FROM}"):
         assert pin in text, pin
     assert re.search(r"assert sha256\(path\) == SHA256\[name\]", text)
     assert "run by the author" in text  # who ran it, as README says
-    assert "BENCH_JSON = '/tmp/judge-bench.json'" in text  # an attached bench never becomes a saved, public output
+    assert "/kaggle/input/**/judge-bench.json" not in text  # v3: the public sample/ bench only, never an attached one
     assert "billion" not in Path(__file__).with_name("README.md").read_text()  # the product name, not a parameter count
 
 
@@ -4000,6 +3999,121 @@ def test_a_judge_that_always_fails_costs_one_writer_call_and_a_real_objection_st
     finally:
         pack.model_plan, pack.spark_reply, pack.open_model_reply, pack.JUDGE_URL = old
 
+
+
+def test_judge_bench_public_is_built_only_from_sample_letters_with_each_source_recorded():
+    """kaggle/judge-bench-public.json holds the letters public_bench() builds: Glimmer v1's and Spark Open's letters
+    about the synthetic sample/, each item naming its source, and no word of DUT, SinD, YouTube or kids' footage."""
+    import judge_bench, re
+    real = re.compile(r"\bDUT\b|\bSinD\b|youtu|\bkids?\b|footage", re.I)
+    bases = [judge_bench.glimmer_base(), judge_bench.spark_open_base()]
+    assert [b[0] for b in bases] == list(judge_bench.SOURCES)
+    for name, letter, facts in bases:
+        assert not real.search(letter) and not judge_bench.code_flags(letter, facts)
+        assert json.loads(facts)["site"].startswith("Synthetic example crossing")
+        assert "synthetic sample/" in judge_bench.SOURCES[name]
+    bench = judge_bench.public_bench()
+    assert len(bench) == 31 and sum(not i["planted"] for i in bench) == 8  # Spark Open's letter has no swap to plant
+    assert all(i["source"] == judge_bench.SOURCES[i["id"].split("/")[0]] for i in bench)
+    assert not any(real.search(i["letter"] + i["measured"] + i["source"]) for i in bench)
+    published = json.loads(judge_bench.PUBLIC.read_text())
+    keys = ("id", "kind", "named", "planted", "letter", "measured", "source")
+    assert [{k: i[k] for k in keys} for i in published] == bench  # the file is the bench, judge verdicts aside
+    assert all(i["code"] == [bool(judge_bench.code_flags(i["letter"], i["measured"]))] for i in published)
+    record = json.loads(judge_bench.SPARK_OPEN_RECORD.read_text())
+    assert record["model"].endswith("muse-spark-open") and record["letter_sha256"].startswith("a721a428")
+
+
+
+def test_open_judge_with_two_votes_counts_a_problem_only_when_both_replies_list_one():
+    """JUDGE_VOTES=2: the JUDGE_MODEL_URL judge (a fake llama-server here) is asked twice per letter, in pack.py and in
+    judge_bench.py's Glimmer column; one flag of two is no problem, an unreadable reply is still never a pass, and the
+    bench keeps both raw replies with the vote. Muse Spark is still asked once."""
+    import contextlib, io, judge_bench
+    as_reply = lambda content: {"choices": [{"message": {"content": content}, "finish_reason": "stop"}]}
+    flag, clean = '{"problems": ["Says a warrant is met."]}', '{"problems": []}'
+    server, seen = fake_open_model([as_reply(r) for r in (flag, flag, flag, clean, flag, "no JSON here",
+                                                         flag, clean, flag, flag)])
+    sparks, old = [], (pack.JUDGE_URL, pack.LETTER_URL, pack.JUDGE_VOTES, pack.spark_reply)
+    pack.JUDGE_URL, pack.LETTER_URL, pack.JUDGE_VOTES = f"http://127.0.0.1:{server.server_port}/v1", "", 2
+    pack.spark_reply = lambda prompt, image, key: sparks.append(prompt) or clean
+    item = {"id": "x", "kind": "k", "named": True, "planted": True, "letter": "L", "measured": "{}"}
+    try:
+        with contextlib.redirect_stderr(io.StringIO()):
+            both, split, unread = (pack.judge_problems("letter", "{}", None) for _ in range(3))
+            ask = judge_bench.asker("glimmer")
+            one_of_two = judge_bench.judged(item, "glimmer", ask, 1, pack.JUDGE_VOTES)
+            two_of_two = judge_bench.judged(item, "glimmer", ask, 1, pack.JUDGE_VOTES)
+            pack.JUDGE_URL = ""
+            spark_only = pack.judge_problems("letter", "{}", "key")
+            spark_run = judge_bench.judged(item, "spark", lambda prompt: flag, 1)
+    finally:
+        pack.JUDGE_URL, pack.LETTER_URL, pack.JUDGE_VOTES, pack.spark_reply = old
+        server.shutdown()
+        server.server_close()
+    assert both == ["Says a warrant is met."] and split == [] and unread == ["The reviewer's reply could not be read."]
+    assert len(seen) == 10 and all(body["response_format"]["type"] == "json_schema" for _, body, _ in seen)
+    assert one_of_two["glimmer"] == [False] and one_of_two["glimmer_votes"] == [{"replies": [flag, clean], "vote": False}]
+    assert two_of_two["glimmer"] == [True] and two_of_two["glimmer_votes"][0]["vote"] is True
+    assert spark_only == [] and len(sparks) == 1  # Spark: one call, as before
+    assert spark_run["spark"] == [True] and "spark_votes" not in spark_run
+    assert pack.vote([["a"], ["b"]]) == ["a"] and pack.vote([["a"], []]) == [] and pack.vote([["a"], None]) is None
+    assert pack.vote([[]]) == [] and pack.vote([["a"]]) == ["a"]  # one vote: what the one reply said
+    text = "\n".join(judge_bench.table([one_of_two, two_of_two]))
+    assert "Muse Glimmer: 2 of 2 runs asked 2 times, a problem counted only when every reply listed one" in text
+    assert "Muse Spark:" not in text
+
+
+
+def test_kaggle_notebook_v3_judges_the_public_bench_twice_and_saves_the_letter():
+    """Version 3 of the Glimmer notebook: valid JSON, the bench from the repo's public sample/ file with JUDGE_VOTES=2
+    for Glimmer, the letter and plan.json saved as outputs, and who ran it in the agreed words."""
+    from pathlib import Path
+    raw = Path(__file__).with_name("kaggle").joinpath("<removed-run-record>").read_text()
+    notebook = json.loads(raw)
+    text = "\n".join("".join(c["source"]) for c in notebook["cells"])
+    for pin in ("'notebook': '<removed-run-record>, version 3'", "BENCH_FROM = f'{CW}/kaggle/judge-bench-public.json'",
+                "JUDGE_VOTES = '2'", "'JUDGE_VOTES': JUDGE_VOTES", "shutil.copyfile(BENCH_FROM, BENCH_JSON)",
+                "shutil.copyfile(f'{OUT}/plan.json', '/kaggle/working/plan.json')", "/kaggle/working/glimmer-letter.txt",
+                "OUT = f'{CW}/sample'", "-DCMAKE_CUDA_ARCHITECTURES=75"):
+        assert pin in text, pin
+    team = "The Kaggle notebook was run by the author."
+    assert text.count(team) == 2  # the first cell and <removed-run-record>'s "team"
+
+
+def test_writers_table_prices_each_letter_from_its_run_record_and_marks_what_it_cannot_check():
+    """writers_table.py on fixture records: Kaggle costs $0, Fireworks and the Meta API are tokens x the quoted price
+    (cached prompt at the cached price), an unpriced model is NOT CHECKED, and kaggle/open-weights.md holds the table
+    as the committed records produce it now."""
+    import tempfile
+    from pathlib import Path
+    import writers_table
+    kaggle = {"nvidia_smi": "| 0 Tesla T4 |\n| 1 Tesla T4 |", "pack_py_s": 313, "model": {"repo": "meta-models/x"},
+              "letter": {"writer": "Muse Glimmer 30B (open weights, self-hosted)", "tries": 2, "judged_by": None,
+                         "unmeasured": [], "unsupported": [], "usage": {"prompt_tokens": 962, "completion_tokens": 2263}}}
+    fireworks = {"model": "accounts/fireworks/models/muse-spark-open", "host": "api.fireworks.ai", "wall_s": 55.5,
+                 "tries": 1, "usage": {"prompt_tokens": 1000, "completion_tokens": 2000, "prompt_tokens_details": {
+                     "cached_tokens": 600}, "completion_tokens_details": {"reasoning_tokens": 1500}}}
+    meta = {"model": "muse-spark-1.3", "host": "api.meta.ai", "wall_s": 20, "tries": 3, "judged_by": None,
+            "unmeasured": ["40"], "usage": {"input_tokens": 1000000, "output_tokens": 1000000,
+                                            "output_tokens_details": {"reasoning_tokens": 7}}}
+    unknown = {"model": "some-model", "host": "example.com", "tries": 3, "usage": {"prompt_tokens": 1, "completion_tokens": 1}}
+    with tempfile.TemporaryDirectory() as tmp:
+        paths = []
+        for i, record in enumerate((kaggle, fireworks, meta, unknown)):
+            paths.append(Path(tmp) / f"{i}.json")
+            paths[-1].write_text(json.dumps(record))
+        lines = writers_table.table(paths)
+    assert lines[2] == ("| Muse Glimmer 30B | yes | Kaggle, 2 x Tesla T4, self-hosted | 313 | 962 (not reported) | 2,263 "
+                        "| not reported | 2 | passed | none ran | $0 (free Kaggle GPU quota) |")
+    assert lines[3] == ("| Muse Spark Open | yes | Fireworks (serverless) | 55.5 | 1,000 (600) | 2,000 | 1,500 | 1 "
+                        "| passed (kept before the last try) | NOT RECORDED | $0.0091 |")  # (400x1.25 + 600x0.15 + 2000x4.25) / 1M
+    assert lines[4] == ("| Muse Spark | no | Meta API | 20 | 1,000,000 (not reported) | 1,000,000 | 7 | 3 | failed: 1 left "
+                        "| none ran | $5.5000 |")
+    assert lines[5].endswith("| 3 | NOT RECORDED | NOT RECORDED | NOT CHECKED |") and "example.com" in lines[5]
+    assert all(line.count("|") == lines[0].count("|") for line in lines[1:6])
+    doc = Path(__file__).with_name("kaggle").joinpath("open-weights.md").read_text()
+    assert "\n".join(writers_table.table(writers_table.RECORDS)) in doc
 
 if __name__ == "__main__":
     for name, check in list(globals().items()):
