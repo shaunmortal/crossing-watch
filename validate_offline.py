@@ -112,6 +112,7 @@ def main():
     parser.add_argument("--json", type=Path, help="also save every clip's result here")
     args = parser.parse_args()
     sam.request = crowd.request = analyze.encode = offline
+    sam.RETRY_WAITS_S = ()  # a reply missing from the cache fails at once, not after the retries' waits
     results = {}
     for run in args.runs:
         clips = sorted(p.stem.removeprefix("site-") for p in run.glob("site-*.json"))

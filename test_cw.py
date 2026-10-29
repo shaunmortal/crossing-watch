@@ -2860,6 +2860,139 @@ def test_too_few_walking_pieces_are_not_judged():
     standing = {"1/0": {f: (0.0, 0.0) for f in range(100)}}  # a piece that never crossed is not a walker
     assert pace.walking(standing, 10) == {"median_mps": None, "pieces": 0, "flag": None}
 
+
+def test_a_dropped_request_is_sent_again_and_a_refusal_is_not():
+    """sam.fetch: a wifi drop or a 503 is sent again (after the server's Retry-After when longer), a 401 never; a
+    reply is written whole under its name, and a cached one is never sent again."""
+    import tempfile, time, urllib.error
+    from pathlib import Path
+    waits, real_sleep, real_waits = [], time.sleep, sam.RETRY_WAITS_S
+    time.sleep, sam.RETRY_WAITS_S = waits.append, (10, 30, 90)
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            calls = []
+
+            def flaky():
+                calls.append(1)
+                if len(calls) == 1:
+                    raise urllib.error.URLError("wifi dropped")
+                if len(calls) == 2:
+                    raise RuntimeError("SAM busy") from urllib.error.HTTPError("u", 503, "busy", {"Retry-After": "60"}, None)
+                return "<0f>"
+            assert sam.fetch(Path(tmp, "person.sam.txt"), flaky, "test") == "<0f>" and len(calls) == 3
+            assert waits == [10, 60] and not list(Path(tmp).glob("*.part"))
+            assert sam.fetch(Path(tmp, "person.sam.txt"), lambda: 1 / 0, "test") == "<0f>"  # cached: never sent again
+
+            def refused():
+                calls.append(1)
+                raise RuntimeError("SAM request failed: 401") from urllib.error.HTTPError("u", 401, "no", {}, None)
+            calls.clear()
+            try:
+                sam.fetch(Path(tmp, "car.sam.txt"), refused, "test")
+                raise AssertionError("a 401 was not raised")
+            except RuntimeError:
+                assert len(calls) == 1 and not Path(tmp, "car.sam.txt").exists()
+            def down():
+                raise urllib.error.URLError("down")
+            try:
+                sam.fetch(Path(tmp, "bus.sam.txt"), down, "test")
+                raise AssertionError("a long dropout did not end the run")
+            except urllib.error.URLError:
+                assert waits[-3:] == [10, 30, 90] and not Path(tmp, "bus.sam.txt").exists()
+    finally:
+        time.sleep, sam.RETRY_WAITS_S = real_sleep, real_waits
+
+
+
+def test_a_moved_video_keeps_its_paid_folder_but_another_video_is_refused():
+    import analyze, seal, tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as tmp:
+        a, b, out = Path(tmp, "a.MOV"), Path(tmp, "moved.MOV"), Path(tmp, "out")
+        out.mkdir()
+        a.write_bytes(b"x" * 10)
+        analyze.check_source(a, out, "", seal.file_sha256(a))
+        a.rename(b)
+        analyze.check_source(b, out, "", seal.file_sha256(b))  # same bytes, new path: accepted
+        b.write_bytes(b"y" * 10)
+        try:
+            analyze.check_source(b, out, "", seal.file_sha256(b))
+            raise AssertionError("a different video of the same size was accepted")
+        except SystemExit:
+            pass
+        stamp = json.loads((out / "source.json").read_text())
+        del stamp["sha256"]  # a folder stamped before the SHA-256 was kept
+        (out / "source.json").write_text(json.dumps(stamp))
+        analyze.check_source(b, out, "", seal.file_sha256(b))
+
+
+def test_video_requests_go_out_together_once_and_the_auto_bill_is_shown_first():
+    import analyze, tempfile, threading, time
+    from pathlib import Path
+    sent, lock = [], threading.Lock()
+
+    def fake(video, concept, key):
+        time.sleep(0.2)
+        with lock:
+            sent.append((str(video), concept))
+        return "<0f>1<|box;x1=1;y1=1;x2=5;y2=9|>"
+    old, sam.request = sam.request, fake
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            pieces = []
+            for k in range(8):
+                folder = Path(tmp, f"part{k}")
+                folder.mkdir()
+                Path(folder, "clip.mp4").write_bytes(b"")
+                pieces.append((k * 130, folder / "clip.mp4", folder))
+            start = time.monotonic()
+            analyze.prefetch(pieces, [("person", 1), ("car", 1)], "key", (640, 360))
+            took = time.monotonic() - start
+            assert len(sent) == 16 and len(set(sent)) == 16 and took < 16 * 0.2 / 2, took
+            analyze.track_all(pieces, "person", "key", (640, 360))
+            assert len(sent) == 16  # nothing sent twice
+            site = {"vehicles": ["car"], "vehicle_mode": "auto"}
+            assert analyze.auto_bill({"vehicles": ["car"]}, 600, Path(tmp), 10.0) == ""
+            assert analyze.auto_bill(site, 600, Path(tmp), 10.0) == (
+                "auto mode may add up to $1.50 of SAM images (car frame by frame); the run stops before sending them "
+                "if they would pass the $10.00 cap")
+            assert "cap" not in analyze.auto_bill(site, 600, Path(tmp), math.inf)  # --allow-cost: no "$inf cap"
+    finally:
+        sam.request = old
+
+
+
+def test_window_s_prepares_only_those_seconds_of_the_recording():
+    import analyze, contextlib, io, subprocess, tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as tmp:
+        video = Path(tmp, "rec.mp4")
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=160x90:rate=30", "-t", "40",
+                        "-c:v", "libx264", "-pix_fmt", "yuv420p", str(video)], check=True)
+        clip = analyze.prepare(video, Path(tmp), "", [10, 25])
+        assert analyze.frame_count(clip) == 15 * analyze.FPS
+        site = Path(tmp, "site.json")
+        square = [[0, 0], [1, 0], [1, 1], [0, 1]]
+        for bad in ([25, 10], [-1, 5], [5], "10-25"):
+            site.write_text(json.dumps({"image_points": square, "world_points": square, "vehicles": ["car"],
+                                        "window_s": bad}))
+            try:
+                analyze.load_site(site)
+                raise AssertionError(f"window_s {bad} accepted")
+            except SystemExit:
+                pass
+        site.write_text(json.dumps({"image_points": square, "world_points": square, "vehicles": ["car"],
+                                    "window_s": [10, 25]}))
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            assert analyze.load_site(site)["window_s"] == [10, 25]
+        assert "under 15 minutes" in printed.getvalue()  # the page will give no hourly rates
+        analyze.write_events(Path(tmp), {}, [], {"minutes": 0.3, "window_s": [10, 25]}, None, None, recording_s=40.0)
+        assert json.loads(Path(tmp, "events.json").read_text())["recording_s"] == 40.0  # the page's "of a 40 s recording"
+        analyze.write_events(Path(tmp), {}, [], {"minutes": 0.7}, None, None)
+        assert "recording_s" not in json.loads(Path(tmp, "events.json").read_text())  # no window: events.json as before
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):
