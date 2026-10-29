@@ -22,7 +22,8 @@ hit, instead of waiting for crash statistics.
 | Second look | **Muse Spark** checks each clip: is that a person, and who (child, elderly, wheelchair user...) | `review.py` |
 | Ear witness | **Muse Wonder** listens to the original audio around each near-miss for horns, screeching brakes and shouts | `listen.py` |
 | Where it happened | A bird's-eye map in road metres: each near-miss where it happened, with both paths 2 s either side | `roadmap.py` |
-| Evidence clips | ffmpeg, pedestrian boxed cyan, vehicle red, every tracked person's head blurred on every frame so clips of children can be shared | `render.py` |
+| Evidence clips | ffmpeg, SAM silhouettes (boxes where no mask is cached): pedestrian cyan, vehicle red, every tracked person's head blurred on every frame so clips of children can be shared | `render.py`, `masks.py` |
+| The near-miss in one picture | A StroMotion still cut from the blurred clip: copies of the vehicle, then the pedestrian, every 0.5 s (1 s for a car), so wider spacing means faster | `render.py` |
 | Fix and letter | **Muse Spark** (JSON mode) picks a physical fix and writes the letter from the measurements only; verified in two layers before use: code checks every number against the measurements, then **Muse Spark as a separate reviewer** (LLM as judge) lists unsupported claims (a warrant said to be met, a death risk for a child); either objection sends the letter back with the reason, and after 3 tries what remains is shown for a person to check; **Muse Image** draws the fix onto the real street | `pack.py` |
 
 ## Run
@@ -164,7 +165,11 @@ The DUT data has no licence and was used only for internal testing; it is not in
 
 ## Declarations
 
-All code in this repository was written during the hackathon. The check-then-retry pattern for Spark's letter and the
-JSON-mode request field follow Meta's legal-agent workshop (github.com/meta-models/legal-agent-workshop, shown at a
-hackathon session); no code was copied from it. No third-party code or libraries; Python standard
-library and ffmpeg only. Test videos from YouTube were used only for local testing and are not included. The SinD sample (SOTIF-AVLab, non-commercial use) was used only for validation and is not included.
+All code in this repository was written during the hackathon, except the mask decoder in `masks.py`: a Python port
+of the one_bit decoder in Meta's meta-sam-parser (`_mask_codec.py`, Copyright (c) Meta Platforms, Inc. and
+affiliates), used under its SAM License (github.com/meta-models/meta-sam). The check-then-retry pattern for Spark's
+letter and the JSON-mode request field follow Meta's legal-agent workshop
+(github.com/meta-models/legal-agent-workshop, shown at a hackathon session); no code was copied from it. No
+third-party libraries; Python standard library and ffmpeg only. Test videos from YouTube were used only for local
+testing and are not included. The SinD sample (SOTIF-AVLab, non-commercial use) was used only for validation and is
+not included.

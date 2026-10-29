@@ -321,7 +321,8 @@ def review_people(clip, out_dir, events, people, person_boxes, key, frame_size, 
 
 def add_evidence(video, clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size):
     """Evidence clip and sound check for the top events Spark did not reject; one failure costs that event's
-    evidence, not the run. Only the frames of the track piece that made the event are boxed."""
+    evidence, not the run. Only the frames of the track piece that made the event are drawn (SAM silhouettes, boxes
+    where no mask is cached)."""
     kept = [e for e in events if (e.get("review") or {}).get("is_person", True)]
     for i, e in enumerate(kept[:EVIDENCE_CLIPS]):
         pair = piece_boxes(person_boxes, people, e["person"]), vehicle_boxes[e["vehicle"]]
