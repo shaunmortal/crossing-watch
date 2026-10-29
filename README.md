@@ -2,51 +2,45 @@
 
 Near-miss evidence for a dangerous crossing, from one phone video.
 
-Put a phone somewhere high (a first-floor window, a wall, or a 2.5-3 m stand on the footpath) looking at the
-crossing outside a school or college, record the pick-up rush, and Crossing Watch finds every moment a moving
-vehicle and a pedestrian were on the same spot less than 1.5 seconds apart. It measures the vehicle's speed, the
-adult death risk had they collided, and what a 20 or 30 km/h limit would have changed. The output is an evidence
-pack a principal can send to the road authority: clips, numbers, a proposed fix drawn onto the real street, and a
-ready letter. That is proof before a child is hit, instead of waiting for crash statistics.
-
-## Judges, start here
-
-**3-minute video:** GATE-TBD · **Release:** GATE-TBD · **Evidence page:** GATE-TBD · **X post:** GATE-TBD
+**Demo (3 min):** GATE-TBD · **Evidence page:** GATE-TBD · **Release:** GATE-TBD · **X post:** GATE-TBD
 
 GATE-TBD: one blurred StroMotion still from Monday's run (`event1-strobe.jpg`), checked by eye.
 
-**Our crossing:** GATE-TBD (the headline from Monday's events.json). **Filed:** not yet. The plan is to file the pack
-with the road authority through CPGRAMS online on Tue 3 Nov 2026, in a named person's name. Its reference number will
-be added here and in the site file's `"submitted"` key. Only "filed, reference X" is ever written: whether anything is
-approved or fixed is for the authority to say, and no resolution date is promised.
+**For** a school head who knows the gate is dangerous and has no data. **Out:** clips with every tracked head and number
+plate blurred, a map in road metres, each vehicle's speed and the adult death risk at it, a letter whose every number
+is code-checked, and the fix drawn onto the real street. Solo entry, all work from 28 Oct 2026 ([declarations](#declarations)).
 
-| Meta model | Its job here | Files | Ran on real data | Measured (caveats behind the link) |
-|---|---|---|---|---|
-| SAM 3.1 | tracks people and vehicles | `sam.py`, `crowd.py` | yes: DUT drone clips, news CCTV | the geometry on its tracks finds 49 of 52 DUT conflicts (crowd mode); speed error 0.16 km/h mean, 0.55 at the 95th percentile (vehicle crowd mode) ([DUT](#end-to-end-against-ground-truth-dut)) |
-| Muse Spark, reviewer | is that a person, and who | `review.py`, `blind_set.py` | yes: DUT | after its review 48 of 52 (vehicle crowd mode, no net change) and 44 of 52 (crowd mode, 5 fewer) ([DUT](#end-to-end-against-ground-truth-dut)) |
-| Muse Spark, writer and judge | picks the fix, writes the letter, checks it apart | `pack.py`, `judge_bench.py` | yes: a DUT clip's letter | as judge it flagged 24 of 24 planted lies and 1 of 8 clean letters; code alone 4 of 24; a Muse judge is not independent of Muse letters ([bench](#checking-the-checks)) |
-| Muse Spark, case agent | works the case, stops for a tape measure | `agent.py` | not yet: GATE-TBD | none: a test drives it with a scripted model |
-| Muse Image | draws the fix onto the real street | `pack.py`, `fixband.py`, `ailabel.py` | yes: a DUT frame, the news CCTV street | GATE-TBD |
-| Muse Wonder | listens for horns, brakes and shouts | `listen.py` | yes: our college clip | none: heard brakes there, not ground truth ([GATES](GATES.md#status-update-wed-28-oct-late-night)) |
-| Muse Glimmer 30B, open weights | the letter, self-hosted on Kaggle 2 x T4 | `<removed-run-record>`, `pack.py` | no: the synthetic sample | v1: 592 s, every number passed the code check; v2 checked the weights' sha256; as judge it flagged 6 of 8 clean letters ([v2](<removed-run-record>)) |
-| Muse Spark Open, open weights | the letter, on Fireworks | `pack.py`, `openweights.py` | no: the synthetic sample | one try, 55.5 s ([record](provenance/spark-open-fireworks-sample.json)) |
+**Six Meta models and what each did** (the DUT and bench numbers re-checked at $0: [GATES.md](GATES.md#the-readmes-first-screen-numbers-re-checked-at-0-thu-29-oct-2026)):
+- **SAM 3.1** tracks people and vehicles. Against DUT's top-down drone ground truth: 49 of 52 conflicts found (crowd mode); speed error 0.16 km/h mean, 0.55 km/h at the 95th percentile (vehicle crowd mode). [DUT](#end-to-end-against-ground-truth-dut)
+- **Muse Spark** reviews each person (after it: 48 of 52 in vehicle crowd mode, 44 of 52 in crowd mode), writes the fix and the letter, and as judge flagged 24 of 24 planted lies and 1 of 8 clean letters (code alone: 4 of 24); a Muse judge is not independent of Muse letters. It also runs the [case agent](#case-agent-it-stops-to-ask-for-a-tape-measure), which stops to ask for a tape measure; no live run yet. [bench](#checking-the-checks)
+- **Muse Image** draws the fix only inside the strip where people were measured crossing; every other pixel stays the real, blurred street (the whole photo when no path was measured). Nothing measured. [how](#how-it-works)
+- **Muse Wonder** listens around each near-miss for horns, brakes and shouts. On our college clip it heard brakes, which a spectrogram corroborates; not ground truth. [GATES](GATES.md#status-update-second-pass-written-before-the-first-commit-28-oct-1919-ist)
+- **Muse Glimmer 30B (open weights)**, self-hosted on Kaggle 2 x T4 from sha256-checked weights, wrote the synthetic sample's letter in 313 s (2 tries; every number passed the code check). As judge: 24 of 24 lies flagged, but 6 of 8 clean letters too. [record](<removed-run-record>)
+- **Muse Spark Open (open weights)** on Fireworks wrote the synthetic sample's letter in one try, 55.5 s. Our crossing's letter: GATE-TBD. [record](provenance/spark-open-fireworks-sample.json)
 
-**Checked against ground truth:** the near-miss maths on SinD's drone trajectories
-([Validation on ground-truth trajectories](#validation-on-ground-truth-trajectories)), and the whole pipeline against
-DUT's own tracked people and cars ([End to end, against ground truth (DUT)](#end-to-end-against-ground-truth-dut)).
-**Gates, pre-registered in [GATES.md](GATES.md#verdict-now):** G1 passed (news CCTV); G3 passed on DUT drone ground
-truth only; G2, G4, G5, G6 and G8 not run yet; G7 has no verdict before submission. GATE-TBD: Tuesday's verdicts.
+**Our crossing:** GATE-TBD. **Filed:** not yet; planned through CPGRAMS on Tue 3 Nov 2026, and only "filed, reference X" is ever written here.
+**Gates**, [pre-registered](GATES.md#verdict-now): G1 passed (news CCTV); G3 passed on DUT ground truth only; G2, G4, G5, G6 and G8 not run yet; G7 has no verdict before submission.
 
-**Try it, no key and no video** (Python 3.11+ and ffmpeg):
-
+**Try it, no key and no video** (Python 3.11+ and ffmpeg; the fix and the letter need `MODEL_API_KEY` or `LETTER_MODEL_URL`):
 ```
-python3 test_cw.py                        # self-checks, about 20 s
+python3 test_cw.py                        # self-checks, under a minute
 python3 pack.py sample sample/site.json   # the synthetic sample (made-up tracks) -> sample/index.html
 open sample/index.html                    # macOS; elsewhere open the file in a browser
 ```
 
-Without a key the page shows the measurements only; the fix and the letter need `MODEL_API_KEY` (Meta Model API) or
-`LETTER_MODEL_URL` (open weights).
+## Check it yourself
+
+| Claim | Command | Public file | At $0 by a judge? |
+|---|---|---|---|
+| The self-checks pass | `python3 test_cw.py` | this repo | yes |
+| The page builds offline from a synthetic sample | `python3 pack.py sample sample/site.json` | `sample/` | yes |
+| Our crossing's headline and clips | open the evidence page | `docs/` (GitHub Pages), release zip | yes, read |
+| Every published file is unchanged | `shasum -a 256 -c SHA256SUMS` or `python3 pack.py --verify docs/GATE-TBD` | `docs/GATE-TBD/SHA256SUMS` | yes |
+| Near-miss maths: speed error 0.24 / 0.91 km/h, 37 of 63 crossings within 3 s (SinD) | `python3 validate_sind.py data/sind` | SinD public sample (download it; non-commercial) | yes, after the download |
+| SAM 3.1 end to end: 49 of 52, 48 and 44 of 52, speed 0.16 / 0.55 km/h (DUT, top-down) | `python3 validate_offline.py DUT_REPO out/dut-15s out/dut-vcrowd` | not public: DUT has no licence and `out/` is our paid cache; run recorded in [GATES.md](GATES.md#the-readmes-first-screen-numbers-re-checked-at-0-thu-29-oct-2026) | no: read the record |
+| Judge bench: code 4 of 24 and 0 of 8; Muse Spark 24 of 24 and 1 of 8 | `python3 judge_bench.py --out COPY` | the table only, in the release (the bench file holds a letter written from DUT footage) | partly: the code column with your own letters; the Spark column is paid |
+| Muse Glimmer 30B wrote the sample's letter on Kaggle 2 x T4 (313 s, 2 tries) and judged 24 of 24 / 6 of 8 | re-run the public notebook, GATE-TBD | `<removed-run-record>`, `<removed-run-record>`, `<removed-run-record>` | yes, on Kaggle's free GPUs; without our DUT-derived bench file it judges Glimmer's letter only (12 lies, 4 controls) |
+| Muse Spark Open wrote the sample's letter on Fireworks in 55.5 s, one try | `LETTER_MODEL_URL=https://api.fireworks.ai/inference/v1 LETTER_MODEL=accounts/fireworks/models/muse-spark-open python3 pack.py sample sample/site.json` | `provenance/spark-open-fireworks-sample.json` | yes, read; a re-run needs a Fireworks key |
 
 ## Files
 
@@ -56,7 +50,8 @@ Without a key the page shows the measurements only; the fix and the letter need 
   `openweights.py`, `passmark.py` and `gazette.py`.
 - **Case agent:** `agent.py`.
 - **Checks:** `test_cw.py`; `validate_sind.py`, `validate_dut.py` and `validate_offline.py` (ground truth);
-  `validate_gate.py` (G6, G8); `blind_set.py` and `score_humans.py` (G5); `judge_bench.py`; `vehicle_test.py`.
+  `validate_gate.py` (G6, G8); `blind_set.py` and `score_humans.py` (G5); `judge_bench.py`; `vehicle_test.py`;
+  `feet_overlap.py` (feet on a vehicle's box, at an angle).
 - **Video and X:** `video/split.py` (the hero shot); `guess.py` (X replies' speed guesses against the measured speed).
 - **Docs and records:** `FILMING.md`, `GATES.md`, `sites/`, `sample/`, `kaggle/`, `provenance/`, `LICENSES/`.
 
@@ -231,8 +226,17 @@ timings. Two runs have a record, both on the synthetic sample, which has no pers
   sha256 checks passed and pack.py took 313 s. Glimmer needed two tries (the log does not say why the first went
   back); the letter kept, 2,263 tokens at 13.6 tokens a second, proposes a raised zebra crossing with entry deflection
   and passed the code check. No judge read it: the run had no Meta key. The same run then judged the planted-lies
-  bench (below): every lie flagged, but also 6 of 8 clean letters. The output files, `<removed-run-record>`
-  among them, are not downloaded yet; the record is copied from the run's log.
+  bench (below): every lie flagged, but also 6 of 8 clean letters. Its output files were downloaded and checked
+  against the log: `<removed-run-record>` and `<removed-run-record>` are committed in `kaggle/`; the server log
+  and the bench file are not (the bench file holds a letter written from DUT footage).
+
+**Before the notebook goes public.** Version 2's dataset and outputs carry that DUT-derived bench file, and DUT has no
+licence, so the notebook (Versions 1 and 2) and its dataset stay private. The public run will be a new dataset, a `git
+archive` of one commit with nothing attached, and a new notebook copied from this one and run with Save & Run All.
+Today's notebook keeps any bench file in `/tmp`, so it never becomes a saved output, and with none attached it judges
+Glimmer's letter alone (12 lies and 4 controls). Its outputs will be searched for "judge-bench" and "DUT" before they go
+public. Glimmer's 24 of 24 and 6 of 8 as judge stay Version 2's figures, from the committed record; the public run's record
+will be `<removed-run-record>`.
 
 No Glimmer run has been sent a street photo yet, and Muse Spark stays the default writer.
 The Kaggle notebook was run by the author.
@@ -283,6 +287,8 @@ the server rejects the JSON schema with HTTP 400, pack.py asks once more for any
 `json_object`; the number check and the judges still run.
 
 First Fireworks run, 29 Oct, on `sample/`: Muse Spark Open wrote the fix and letter in one try, 55.5 s wall time (1,019 prompt and 2,732 completion tokens, 2,140 of them reasoning), and both the number check and Muse Spark as judge passed it. The record is `provenance/spark-open-fireworks-sample.json` (request id, usage and the letter's sha256; no key). An earlier attempt the same day, with the number lock on, came back as "a0a0a0..."; that is why the lock is now opt-in.
+
+Our crossing's letter from Muse Spark Open, written on a copy of the folder after Monday's paid run (never the folder the principal signs): GATE-TBD (record `provenance/spark-open-fireworks-gate.json`, with the gate pack's sha256).
 
 Either model can judge the other's letter. `JUDGE_MODEL` (default: `LETTER_MODEL`) and `JUDGE_MODEL_KEY` belong to the
 judge server alone, and neither server is sent the other's key; a judge on the letter's own URL with no
@@ -350,7 +356,7 @@ everything, so its 24 of 24 shows little, and Muse Spark stays the default judge
 problem; whether it named the planted one is not checked. Both are Muse models, so neither is an independent judge of
 Muse letters, and 8 controls are few. No reply was unreadable (0 of 64 from Spark, 0 of 32 from Glimmer); one that
 cannot be read is counted on its own, never as a catch. Glimmer's figures are from the Kaggle log
-([`<removed-run-record>`](<removed-run-record>)); its output files are not downloaded yet. Code's
+([`<removed-run-record>`](<removed-run-record>)), checked against its downloaded output files. Code's
 rule-broken check came after these runs; neither base letter nor any added sentence has its words, and the judge's
 prompt is unchanged, so the numbers stand as measured.
 
@@ -417,6 +423,38 @@ a rectangle of the vehicle type's size, turned to its direction of travel and mo
 (the lowest corner on the box's bottom edge, centred on the box), its centre median-smoothed over ±2 frames. Phone
 6 m up and 15 m back: 29 serious in truth, 42 from the lower edge, 31 from footprints; 15 m up and 20 m back: 37, 64
 and 38. This is a simulation: the box noise is independent per frame, and no real phone footage was checked.
+
+**Lower phones, as on a footpath.** The same check with the phone lower (re-run on 29 Oct at $0:
+`--oblique 6,15`, `3,8` and `3,12`), car-shaped footprints against SinD's true footprints, counting the people in
+view. **No occlusion modelled:** every person is an exact point and nothing hides anyone.
+
+| Phone | Serious, truth | Serious, footprints | Serious missed | Serious extra | PET vs truth (mean) |
+|---|---|---|---|---|---|
+| 10 m up, 25 m back | 35 | 37 | 3 | 5 | -0.01 s |
+| 6 m up, 15 m back | 29 | 31 | 3 | 5 | +0.00 s |
+| 3 m up, 12 m back | 22 | 24 | 5 | 7 | +0.02 s |
+| 3 m up, 8 m back | 18 | 17 | 4 | 3 | +0.08 s |
+
+**What a phone on a footpath adds.** A separate $0 simulation of a 1x lens 3 m up over a 7.5 m road (flat road;
+the lens's focal length is assumed, not checked) puts numbers on the errors the tape and the angle bring:
+
+- **Clicks** (95th percentile over 2,000 random click sets): a 1-pixel click error in the 640-px clip, 6 m back,
+  moves the 15 m speed line's scale by 1.0% and a speed at the crossing centre by 0.9%. Extended 10-14 m along the
+  road, past what the lens sees from there, it moves speeds by 15.4% and positions by 1.23 m: speeds hold near the
+  tape, not far beyond it.
+- **Tape on the kerb top, not the road:** 4 m back, a kerb 0.10 / 0.15 / 0.20 m high makes vehicle speeds read
+  3.3% / 5.0% / 6.7% low and moves the crossing centre 0.26 / 0.39 / 0.52 m.
+- **Road crown** 0.075 / 0.125 m above the kerbs, same camera: the centre point reads 0.20 / 0.34 m off, the
+  along-road scale x1.026 / x1.043.
+- **Feet hidden** by someone in front, every person's box bottom 10 / 20 / 40 px above the feet (simulated camera
+  pixels), against the same camera with the feet seen: 3 m up and 8 m back, 18 serious become 18 / 19 / 17 (missed
+  0 / 0 / 2, extra 0 / 1 / 1); 3 m up and 12 m back, 25 become 26 / 23 / 23 (missed 0 / 3 / 4, extra 1 / 1 / 2).
+
+So the speed and PET maths transfer (SinD, true positions), and at an angle the footprints keep serious conflicts
+within a few of the truth in simulation. What does not transfer is DUT's end-to-end tracking: from a drone no one is
+hidden. `python3 feet_overlap.py SITE OUT_DIR` counts, at $0 from a run's cached SAM replies, how often a person's box
+bottom sits on a vehicle's box, the frames the feet-hidden rule drops. That is a proxy for occlusion, not a measured
+error, and its share for the gate run is added after Monday's recording.
 
 ### End to end, against ground truth (DUT)
 
@@ -584,6 +622,10 @@ python3 vehicle_test.py out/indian-crowd --spend   # 60 cached crowd frames, abo
   $33. Crowd mode costs more: 15 minutes of people at 5 images a second plus three vehicle concepts at 10 a second
   is 31,500 images, about $79 (about $34 with the single concept "vehicle", if `vehicle_test.py` shows it finds 95%
   of what the three concepts find; not run yet). The page prints the SAM cost for each video.
+- Every ground-truth number here, DUT and SinD alike, comes from a drone looking straight down, where boxes never
+  overlap and no one is hidden behind a vehicle. From a phone at an angle, people pass behind vehicles and each
+  other, so keeping their IDs and finding their feet is harder; DUT does not test that, and its numbers are a best
+  case for it. The phone-angle numbers above are simulations with no occlusion modelled, not measurements.
 - Box jitter alone gives a queued car an apparent speed of a few km/h. That is well under the 10 km/h "moving"
   threshold, so it does not create events, but very slow vehicles are not measured precisely.
 
@@ -648,7 +690,7 @@ Measuring near-misses from video is not new, in India either. Each line says onl
 ## Declarations
 
 Solo entry by Ayush Kumar, built with Claude Code as a coding assistant. All work here was done during the hackathon,
-from 28 Oct 2026; the one ported piece is the mask decoder below.
+from 28 Oct 2026; the one ported piece is the mask decoder below. The Kaggle notebook was run by the author.
 
 - **Licences.** `masks.py` ports the one_bit mask decoder from Meta's meta-sam-parser (`_mask_codec.py`, Copyright (c)
   Meta Platforms, Inc. and affiliates) under its SAM License, in `LICENSES/SAM-License.txt`; everything else is MIT
