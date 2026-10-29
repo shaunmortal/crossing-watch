@@ -362,7 +362,8 @@ def write_page(p, images=None):
                      data.get("sam_full_requests"), data.get("privacy"), signoff=pack.read_signoff(out),
                      receipt=pack.receipt_line(data, p["letter"], images), source_sha256=data.get("source_sha256"),
                      timeline=data.get("timeline"), paths=paths, case=case_section(out), walking=data.get("walking"),
-                     ground=roadmap.ground(photo, site, events, out, paths) if photo.exists() else None)
+                     ground=roadmap.ground(photo, site, events, out, paths) if photo.exists() else None,
+                     recording_s=data.get("recording_s"), removed=pack.removed_note(data["events"]))
     page = with_measured(page, p.get("measured", ""))
     (out / "index.html").write_text(page)
     seal.write_sums(pack.share(out, page))
