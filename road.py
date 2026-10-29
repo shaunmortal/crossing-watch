@@ -82,6 +82,12 @@ def to_ground(H, x, y):
     return ((H[0][0] * x + H[0][1] * y + H[0][2]) / w, (H[1][0] * x + H[1][1] * y + H[1][2]) / w)
 
 
+def to_image(H, u, v):
+    """Image pixel over road point (u, v), the inverse of to_ground, or None when the point is behind the camera."""
+    x, y, w = solve(H, [u, v, 1.0])  # to_ground divides by 1 / w at that pixel, so w <= 0 is never in view
+    return None if w <= 0 else (x / w, y / w)
+
+
 def zone_around(world_points, margin=ZONE_MARGIN_M):
     """(x_min, y_min, x_max, y_max) in road metres: the calibration area plus a margin."""
     xs, ys = [p[0] for p in world_points], [p[1] for p in world_points]

@@ -27,6 +27,15 @@ def test_homography_handles_perspective():
         assert math.dist(road.to_ground(H, x, y), want) < 1e-6
 
 
+def test_road_points_map_back_to_their_pixels():
+    trapezoid = [[250, 100], [350, 100], [500, 300], [100, 300]]  # its sides meet at the horizon, y = 33.3
+    H = road.homography(trapezoid, SQUARE_ROAD)
+    for x, y in trapezoid + [[300, 200], [123, 287], [420, 60]]:
+        assert math.dist(road.to_image(H, *road.to_ground(H, x, y)), (x, y)) < 1e-6
+    assert 100 / 3 < road.to_image(H, 5, -1000)[1] < 35  # far up the road: just under the horizon
+    assert road.to_image(H, 5, 1000) is None  # behind the camera
+
+
 def raises_value_error(call):
     try:
         call()
