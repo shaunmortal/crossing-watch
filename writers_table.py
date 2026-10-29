@@ -15,7 +15,8 @@ import openweights
 import pack
 
 HERE = Path(__file__).parent
-RECORDS = (HERE / "kaggle" / "<removed-run-record>", HERE / "provenance" / "spark-open-fireworks-sample.json")
+RECORDS = (HERE / "kaggle" / "<removed-run-record>", HERE / "provenance" / "spark-open-fireworks-sample.json",
+           HERE / "provenance" / "spark-api-sample.json")
 META_HOST = "api.meta.ai"
 NAMES = {**openweights.NAMES, "muse-spark-1.3": "Muse Spark"}  # API model id -> product name
 # USD per 1M tokens (input, cached input, output) by API model id, each quoted from its page on the day it was read

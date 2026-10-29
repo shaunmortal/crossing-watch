@@ -364,8 +364,7 @@ one per turn (`tool_choice` "required", or "auto" from a server that rejects it,
 `AGENT_MODEL_KEY`, else `FIREWORKS_API_KEY` on Fireworks' API only; the Meta key never goes there and is needed only
 for what Muse Spark does inside the tools (the letter, unless `LETTER_MODEL_URL` is set). Every turn's model, usage and
 wall seconds go to `agent_log.jsonl`, the page names the model ("Muse Spark Open (open weights, on Fireworks)"), and a
-case stays on the model it started with. No Fireworks agent run has been made yet; tests drive it with a local fake
-server.
+case stays on the model it started with. First run, 30 Oct, on a copy of the synthetic sample/ (no video): 29 turns, the tape request answered, then a person asked after the letter was refused 3 times because there was nothing to track; about $0.19 at Fireworks' price (provenance/spark-open-agent-sample.json). Since then a tool that fails twice in a row stops the case and asks a person.
 
 ## Checking the checks
 

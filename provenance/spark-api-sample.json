@@ -1,11 +1,23 @@
 {
  "model": "muse-spark-1.3",
  "host": "api.meta.ai",
- "writer": "Muse Spark",
+ "request_id": "resp_6ae3aaffdd081757692e4092",
+ "usage": {
+  "input_tokens": 899,
+  "input_tokens_details": {
+   "cached_tokens": 0
+  },
+  "output_tokens": 3961,
+  "output_tokens_details": {
+   "reasoning_tokens": 3472
+  },
+  "total_tokens": 4860
+ },
+ "wall_s": 17.0,
+ "timings": null,
+ "response_format": "json_object",
  "tries": 1,
  "judged_by": "Muse Spark (a separate reviewer)",
- "unmeasured": [],
- "fix": "20.0 km/h zone with signs",
- "letter_sha256": "dabbf40f6b13860d430f1827f83ccfe564676caa653c9eb1d1b08c3427a760cc",
- "note": "Written 30 Oct 2026 for sample/ through the Meta Model API; pack.py does not record wall time or token usage for Muse Spark."
+ "letter_sha256": "ccb6ccdb7f3bdc17ad0999df824d787292bc0047be4669726d80c0d932cce9f2",
+ "note": "Muse Spark's sample/ letter through the Meta Model API, 30 Oct 2026, recorded by pack.py's letter-provenance.json."
 }
