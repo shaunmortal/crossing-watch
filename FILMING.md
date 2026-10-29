@@ -14,15 +14,22 @@ below on the first 2 minutes of Monday's footage before the paid run.
 - Written OK from the college office to film and to publish blurred clips (in the demo video, the public project
   page and one X post). In the same request, ask for the filming spot (see Position) and whether the principal's
   name and role may appear on the evidence page.
-- Ask the office two numbers for the site file: school days a year (`"school_days"`) and how long dismissal lasts
-  (`"dismissal_minutes"`). With both and at least 15 analysed minutes, the page adds a school-year line.
+- Ask the office two numbers for the site file: school days a year (`"school_days"`, the same key at a college) and
+  how long dismissal lasts (`"dismissal_minutes"`). With both and at least 15 analysed minutes, the page adds a
+  school-year line. Also ask: when the last period ends on each shoot day, a half day or not, is there a bell, and
+  the posted speed limit.
+- Write these keys, with `"country"` and `"city"` (an Indian site's page quotes the law only with `"country": "IN"`),
+  the vehicles list and the taped sizes, into a site template before the shoot. After calibrating, merge it into
+  the saved site file: a missing key drops its line from the page without any error.
 - Print an A3 notice and tape it at the gate: "Road-safety study by [student], [college]. Vehicles are measured.
   The video and its sound are analysed with Meta's AI services. Only clips and pictures with faces blurred are
   published. The raw video stays with the study team and is deleted when the study ends. Contact: ___."
   The recording phone never films it: film it with another phone as B-roll, or leave it taped where it already
   sits inside the fixed frame. Frame 0 of the analysed video becomes the public street photo and Muse Image's input.
-- Tape measure (15 m or longer), chalk, coloured tape, the stand or a tripod (or tape to fix the phone), a power
-  bank, paper and a pen.
+- Tape measure (15 m or longer), chalk, coloured tape, 8 big marks plus 2 spare (30 cm tape crosses or A4 sheets:
+  small marks vanish at 640 px wide), 4 tall kerb markers (bottles or cones, knee height or more), the stand or a
+  tripod (or tape to fix the phone), a sandbag or heavy bag for the stand, a phone level app, a power bank, paper
+  and a pen.
 
 ## Phone
 
@@ -37,8 +44,8 @@ below on the first 2 minutes of Monday's footage before the paid run.
 - **1x lens.** No zoom, no 0.5x.
 - Landscape. Touch and hold on the road until "AE/AF LOCK" shows, so exposure and focus stay put. If the shoot will
   run into dusk, skip the lock: Auto FPS off already holds 30 fps.
-- On the stand or a tripod, or wedged or taped at the window or terrace edge. It must not move or turn for the
-  whole recording.
+- On the stand or a tripod, or wedged or taped at the window or terrace edge, with the stand weighed down by a
+  sandbag. It must not move or turn for the whole recording.
 - Start at 100% battery, phone in shade (heat throttles it), airplane mode. At least 5 GB free: 25 minutes is about
   1.5 GB in HEVC and about 3.3 GB in H.264. Leave the power bank unplugged unless the battery will not last; then
   plug it in before recording starts, never during.
@@ -59,11 +66,19 @@ alike and the G6 speed check is timed on a 30 fps original.
   blocked about three times as often from 3 m up as from 10 m up.
 - In frame: the gate, the whole crossing kerb to kerb, and 20-30 m of approach road on both sides.
 - If there is a zebra, all of it.
+- No pillar, pole or tree between the camera and the crossing band: a hidden person is a missed crossing.
+- All 8 tape marks must show in the 10-second test clip. If not, move back or up, or aim diagonally along the road,
+  and test again.
+- Once the phone is fixed, tape where the camera is: lens height above the footpath, set-back from the kerb,
+  distance along the kerb from the zero point, and the tilt (a level app). Photograph the stand. A second shoot at
+  the same spot is re-taped to these four numbers.
 
 ## Tape and chalk (kerb and footpath only; nobody stands in the road)
 
 Mark everything before the rush, and photograph each mark with the tape visible. Write every distance in
-`notes.txt` (it is never committed).
+`notes.txt` (it is never committed). Chalk each mark **on the road at the foot of the kerb**, not on top of the
+kerb: the ground plane is the road, and a mark on a kerb 15 cm high sits off it. Measure the kerb height once and
+write it in `notes.txt`. Put the rectangle on the real desire line, where people actually cross.
 
 1. **One zero point** on the near kerb, such as a gate post. Write the along-kerb distance from it to all 8 marks:
    the 4 rectangle corners and the 4 speed-line marks. A far mark sits straight across from its near mark.
@@ -73,13 +88,14 @@ Mark everything before the rush, and photograph each mark with the tape visible.
    can be the rectangle.
 3. **Two speed lines, 15 m apart.** Four more tape marks, two on EACH kerb, making two lines across the road 15 m
    apart and centred on the crossing (7.5 m either side). Not the rectangle's corners. Vehicles timed between them
-   check our speeds (G6).
+   check our speeds (G6). Stand a tall marker on the kerb at each of the 4 marks: the moment a front wheel reaches
+   a line is then easy to see in the video.
    - **This 15 m is the held-out distance, and it must never enter any fit.** calibrate.html writes it as the
      site's `check` from the A near and B near clicks; G2, G6 and the agent's tape-measure question rely on it.
    - Never use the kerb-to-kerb width as the check: it is a calibration input, so it can never fail.
 4. Carriageway width where students queue.
-5. One parked car, one auto-rickshaw and one college bus: length and width. A motorcycle is optional (a default size
-   is built in). Measuring the bus is not claimed to improve accuracy.
+5. One parked car, one auto rickshaw and one motorcycle: length and width. A college bus too if one is there; with
+   no bus taped, take `bus` off the vehicles list. Measuring the bus is not claimed to improve accuracy.
 6. Notes: gate position, zebra yes or no, speed breakers, kerb parking, where autos and buses stop. Photograph any
    speed-limit board.
 
@@ -92,7 +108,8 @@ python3 filmcheck.py TEST.MOV
 ```
 
 It prints `fit` or what to change: the size, the frame rate, the sound, HDR, Spatial Audio, and whether the camera
-moved or the picture darkened. Then by eye: the view matches the 1x lens (no fish-eye bend, not zoomed).
+moved or the picture darkened. Then by eye: the view matches the 1x lens (no fish-eye bend, not zoomed), all 8
+tape marks are visible when zoomed in, and nothing stands between the camera and the crossing band.
 
 ## Recording
 
@@ -100,13 +117,16 @@ moved or the picture darkened. Then by eye: the view matches the 1x lens (no fis
   if it has one for video), so nobody setting up is filmed.
 - Record 20-25 minutes: the dismissal rush plus a quieter stretch. A window under 15 minutes is analysed, but the
   page then gives no hourly rates, PV² or school-year line; the window rule asks for 15 minutes (see below).
-- First: one sentence with the place, date, bell time and posted speed limit. Then silence to the end. No spoken
+- First: one sentence with the wall-clock time to the second ("it is 14:32:10"), the place, date, bell time and
+  posted speed limit. Then silence to the end. No spoken
   calls such as "close": Muse Wonder listens for shouts around each near-miss, and the filmer's own word would be
   reported as another witness's.
 - Do not touch the phone until the end.
-- Optional: a second person, away from the phone, writes the clock time of each near-miss they see on paper, and
-  the time of one thing easy to find in the video (the bell, the first bus). Nothing reads these yet. To line them
-  up, take the recording's start time from the clip's info in Photos, or from
+- A second person, away from the phone, writes the bell's wall-clock time to the second and tallies crossings per
+  minute from 8 minutes before the bell to 17 after (a new line each minute). The tally shows whether the window
+  rule covers the rush; if it does not, that goes in a dated GATES.md note before the main shoot, and the rule's
+  numbers stay unchanged. Optional: the clock time of each near-miss they see. To line the times up, take the
+  recording's start time from the clip's info in Photos, or from
   `ffprobe -v error -show_entries format_tags=creation_time -of default=nw=1:nk=1 CLIP.MOV` (UTC: add 5 h 30 min
   for IST), and check it against that one event.
 
@@ -176,10 +196,19 @@ moved or the picture darkened. Then by eye: the view matches the 1x lens (no fis
   G2: the 15 m between the speed lines must come out within ±15%.
 - Add the taped vehicle sizes to the saved site file by hand (calibrate.html does not write them), length first,
   under the names in `"vehicles"`: `"vehicle_sizes_m": {"car": [L, W], "auto rickshaw": [L, W], "bus": [L, W]}`.
+- Add the carriageway, so the crossings count (n) counts people on the road, not people walking along the footpath:
+  `"roadway_m": [[-40, 0], [40, 0], [40, W], [-40, W]]`, with W the taped kerb-to-kerb width (the rectangle's side
+  from corner 2 to corner 3). calibrate.html puts corner 1 at x = 0 on the near kerb (y = 0) and the far kerb at
+  y = W. Two limits: the kerbs are taken as straight and parallel for 40 m either way, and someone who steps 2 m
+  into the road and back counts as a crosser.
+- Check the file loads before any re-encoding:
+  `python3 -c "import sys, analyze, agent; s = analyze.load_site(sys.argv[1]); agent.check_distance(s); print('ok')" SITE.json`
 - Free estimate: `python3 analyze.py CLIP.MOV SITE.json --budget 0` prints the minutes it would analyse and "SAM
-  cost about $X", then, on a first run, stops before any request. It does not include auto mode's worst case: a
-  site with `"person_mode"` or `"vehicle_mode"` set to `"auto"` can switch to frame-by-frame after the video
-  requests are paid. Pick the modes and the budget from the estimate.
+  cost about $X", then, on a first run, stops before any request. A site with `"person_mode"` or `"vehicle_mode"` set
+  to `"auto"` first prints "auto mode may add up to $Y of SAM images": what auto mode would add if every auto
+  concept switched to frame by frame after the video requests are paid. Pick the modes and the budget from both.
+  For 15 minutes with a person and four vehicles: about $10.40 all in video mode, and about $22.50 more for each
+  vehicle concept that switches (a $0 count from the code's own frame and price constants, Thu 29 Oct).
 - A dropped SAM request is retried after 10, 30 and 90 s (130 s in all; longer when Meta's Retry-After asks, e.g.
   60 s on a 503). A longer dropout still ends the run, and a re-run resumes from the cache.
 
