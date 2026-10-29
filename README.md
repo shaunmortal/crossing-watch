@@ -123,6 +123,37 @@ the code check, in 627 s and 592 s (Muse Spark: about 20 s). The committed run's
 LETTER_MODEL_URL=http://127.0.0.1:8080/v1 python3 pack.py out/VIDEO site.json
 ```
 
+## Checking the checks
+
+**Judge bench: planted lies.** `judge_bench.py` plants one lie at a time in two real letters, Glimmer's v1 letter and
+a Muse Spark letter from our cache, and scores each letter check on them: 24 copies with 12 kinds of lie, half of
+them kinds the judge's prompt does not name (a near-miss called a collision, "every school day", two near-misses'
+speeds swapped...), and 8 clean controls. The 18 added sentences have no digit, and the 2 swaps use only measured
+numbers. Run offline today, the code check caught 4 of 24 (the numbers in words and the speeds in mph; Wilson 95%
+7-36%) and flagged 0 of 8 controls (0-32%): the rest is the judge's job. Muse Spark and Muse Glimmer as judges are
+not run yet; both are Muse models, so neither is an independent judge of Muse letters. A judge reply that cannot be
+read is counted on its own, never as a catch. Details in [`GATES.md`](GATES.md).
+
+```
+python3 judge_bench.py --out out/judge-bench.json             # build the letters, score the code check
+python3 judge_bench.py --out out/judge-bench.json --spark 2   # Muse Spark judges each letter twice (paid)
+LETTER_MODEL_URL=http://127.0.0.1:8080/v1 python3 judge_bench.py --out out/judge-bench.json --glimmer 1
+```
+
+The bench file keeps every letter and verdict, so a later run only asks for what is missing.
+
+**Blind check (G5).** `blind_set.py` mixes the pipeline's near-misses with decoys (a pedestrian and a moving vehicle
+on the same spot 5 to 8 s apart, each pedestrian checked by Spark to be a person), cuts every clip to the same 12 s,
+shuffles them and writes a page where a rater picks serious, close, none or can't tell for each, then downloads the
+answers. The key stays apart. `score_humans.py` scores each rater against the key as danger vs none: agreement with
+its Wilson 95% interval, Cohen's kappa, positive and negative agreement. The pass rule was written in `GATES.md`
+before any clip was made. No rater has labelled yet.
+
+```
+python3 blind_set.py out/VIDEO site.json --review-decoys   # out/VIDEO/blind/ for the rater, blind-key.json kept
+python3 score_humans.py out/VIDEO/blind-key.json answers-*.json
+```
+
 ## Validation on ground-truth trajectories
 
 `validate_sind.py` runs the near-miss maths on the SinD public sample: 20 minutes of drone-measured trajectories in

@@ -8,6 +8,7 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 | G2 Metres | A road distance NOT used for calibration (a second lane width, or crossing-line length) comes out within ±15% of its assumed value | same | Wed 28 Oct 22:00 |
 | G3 Conflicts | Checked by eye, at least 2 of the top 3 events are real close passes, and no event involves a parked or queued vehicle | same | Thu 29 Oct 22:00 |
 | G4 Own footage | Footage filmed from height at the user's college gate runs end to end, with calibration from measured points | user's video | Sun 1 Nov 22:00 |
+| G5 Blind check | A transport or civil engineering lecturer, not told which clips the pipeline flagged, agrees with it on danger vs none with Cohen's kappa of 0.6 or more (rules below, written before any clip is made) | the gate pack | Tue 3 Nov 22:00 |
 
 **Scope cut if G3 fails:** report the closest approach in metres plus vehicle speed (no PET). The evidence pack and letter still ship.
 
@@ -172,3 +173,48 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
   page as CHANGED and a deleted file as MISSING.
 - No cached events.json has the crosser list yet (all predate it), so the pyramid has not been drawn from a real
   pack. The first gate pack will be the first. With SinD's 63 crossings, 0 collisions would still allow up to 5.7%.
+
+## G5 Blind check, pre-registered (Thu 29 Oct, before any clip is made or labelled)
+
+These rules do not change after anyone labels.
+
+- **Clips** (`blind_set.py OUT_DIR SITE.json --review-decoys`, on the gate pack after G4):
+  - the near-misses Spark did not reject, as the page counts them, most dangerous first, at most 12;
+  - as many decoys: a pedestrian and a moving vehicle on the same spot 5 to 8 s apart, closest first, each
+    pedestrian one Muse Spark says is a person, so a pole is never a decoy;
+  - every clip 12 s long from 2 s before the first of the two reached the spot, the pedestrian boxed cyan and the
+    vehicle red, every tracked person's head blurred, no sound, shuffled with a fixed seed as clip01, clip02...;
+  - the key (`blind-key.json`) stays with us; the rater gets only the `blind/` folder.
+- **Rater:** one transport or civil engineering lecturer decides the gate. Classmates, if any, are reported
+  separately as non-experts.
+- **Scoring** (`score_humans.py`): the rater's serious or close is "danger", none is "none"; can't tell and unanswered
+  clips are left out and counted. Reported for each rater: agreement k of n with its Wilson 95% interval, Cohen's
+  kappa, the pipeline's near-misses called danger and the decoys called none (each with Wilson 95%), and positive
+  and negative agreement.
+- **Pass:** the lecturer's kappa is 0.6 or more (substantial, Landis & Koch 1977). Fail below it, reported the same way.
+- **Not decidable:** fewer than 6 near-misses or 6 decoys in the set, or more than a quarter of the clips can't tell
+  or unanswered. The answers are then reported as descriptive only.
+- `score_humans.py` prints this verdict itself, so the rule is applied as written.
+
+Tooling dry run (offline, not the gate): on the cached dense Indian clip, with the vehicle sampling rate its cache
+was made at and no `--review-decoys`, `blind_set.py` rebuilt the tracks from cache with no SAM request and wrote
+20 clips of 121 frames: 12 near-misses and 8 decoys (decoys limited to pedestrians Spark had already looked at).
+
+## Judge bench, Spark side (Thu 29 Oct)
+
+`judge_bench.py` plants one lie at a time in two real letters and scores each letter check on them.
+
+- Bases: Glimmer's v1 letter (`<removed-run-record>`, facts rebuilt from `sample/`) and the Muse Spark letter
+  cached in `out/dut-15s/15`, written before the stricter check: the bench writes its "SAM 3.1" as "SAM" and "four"
+  as "4", after which every number passes the code check against facts rebuilt from that folder's events.json.
+- 12 kinds of lie on each base, 24 copies: the four kinds JUDGE_PROMPT names (a standard said to be met, a death
+  risk for a child, a named person blamed, a number in words) and two plain invented facts (injuries, a cause); and
+  six kinds it does not name (every school day, deaths prevented, a near-miss called a collision, children claimed,
+  km/h written as mph, two near-misses' speeds swapped). The 18 inserted sentences have no digit.
+- 8 clean controls: each base as written, and with one fact-free or true sentence added (a site visit asked for, the
+  serious count restated, "near-misses, not recorded accidents").
+- **Code check, offline, run today:** 4 of 24 lies caught (Wilson 95% 7-36%): the 2 numbers in words and the 2 mph
+  speeds. It missed every inserted sentence and both swaps, as built: those need a judge. 0 of 8 controls flagged
+  (Wilson 95% 0-32%).
+- Not run yet (paid): Muse Spark twice per letter, and Muse Glimmer once on Kaggle. Both are Muse models, so neither
+  is an independent judge of Muse letters. A reply that cannot be read is counted on its own, not as a catch.
