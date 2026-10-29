@@ -239,7 +239,7 @@ def submit_letter(p, args, key):
     kept = {k: v for k, v in (p.get("letter") or {}).items() if k in HEAD_NOTES}  # the sign-off counts edits after them
     p["letter"] = {**pack.ask_plan(prompt, measured, key, photo), **kept}
     pack.write_plan(out_dir, p["letter"])
-    left = len(p["letter"].get("unmeasured", [])) + len(p["letter"].get("unsupported", []))
+    left = sum(len(p["letter"].get(k, [])) for k in ("unmeasured", "unsupported", "accuses"))
     return {"status": "needs_review", "fix": p["letter"]["fix"], "letter": p["letter"]["letter"],
             "summary": f"Video {video_m:.1f} m, tape {tape:g} m, {off_share(video_m, tape):.0%} off: proven. "
                        f"Letter written by {p['letter']['writer']}" + (f", with {left} points for a person to check" if left else "")
