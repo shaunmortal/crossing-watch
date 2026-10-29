@@ -3733,6 +3733,29 @@ def test_filmcheck_help_prints_its_usage_and_a_non_video_file_is_refused_cleanly
     assert refused.returncode == 1 and "could not read it" in refused.stderr and "Traceback" not in refused.stderr
 
 
+def test_judge_bench_public_is_built_only_from_sample_letters_with_each_source_recorded():
+    """kaggle/judge-bench-public.json holds the letters public_bench() builds: Glimmer v1's and Spark Open's letters
+    about the synthetic sample/, each item naming its source, and no word of DUT, SinD, YouTube or kids' footage."""
+    import judge_bench, re
+    real = re.compile(r"\bDUT\b|\bSinD\b|youtu|\bkids?\b|footage", re.I)
+    bases = [judge_bench.glimmer_base(), judge_bench.spark_open_base()]
+    assert [b[0] for b in bases] == list(judge_bench.SOURCES)
+    for name, letter, facts in bases:
+        assert not real.search(letter) and not judge_bench.code_flags(letter, facts)
+        assert json.loads(facts)["site"].startswith("Synthetic example crossing")
+        assert "synthetic sample/" in judge_bench.SOURCES[name]
+    bench = judge_bench.public_bench()
+    assert len(bench) == 31 and sum(not i["planted"] for i in bench) == 8  # Spark Open's letter has no swap to plant
+    assert all(i["source"] == judge_bench.SOURCES[i["id"].split("/")[0]] for i in bench)
+    assert not any(real.search(i["letter"] + i["measured"] + i["source"]) for i in bench)
+    published = json.loads(judge_bench.PUBLIC.read_text())
+    keys = ("id", "kind", "named", "planted", "letter", "measured", "source")
+    assert [{k: i[k] for k in keys} for i in published] == bench  # the file is the bench, judge verdicts aside
+    assert all(i["code"] == [bool(judge_bench.code_flags(i["letter"], i["measured"]))] for i in published)
+    record = json.loads(judge_bench.SPARK_OPEN_RECORD.read_text())
+    assert record["model"].endswith("muse-spark-open") and record["letter_sha256"].startswith("a721a428")
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):

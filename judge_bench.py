@@ -4,6 +4,8 @@ Muse models, judge with pack.JUDGE_PROMPT in a paid run. A judge's unreadable re
 a catch; a failed call is not recorded, so the next run asks again.
 
 Run: python3 judge_bench.py --out FILE [--spark N] [--glimmer N]
+     python3 judge_bench.py --public [--spark N] [--glimmer N]   (FILE: kaggle/judge-bench-public.json)
+--public builds the bench only from letters written from the synthetic sample/, safe to publish.
 FILE keeps the letters and every verdict: when it exists the bench reads its letters from it (so a Kaggle run needs
 only FILE), re-scores the code check and asks each judge only for the runs it still lacks. --glimmer needs
 LETTER_MODEL_URL (an OpenAI-compatible server, as in <removed-run-record>).
@@ -22,6 +24,14 @@ from score_humans import wilson
 
 HERE = Path(__file__).parent
 GLIMMER_RUN = HERE / "kaggle" / "<removed-run-record>"  # Glimmer's v1 letter, written from sample/
+SPARK_OPEN_LETTER = HERE / "provenance" / "spark-open-sample-letter.txt"  # Spark Open's letter, written from sample/
+SPARK_OPEN_RECORD = HERE / "provenance" / "spark-open-fireworks-sample.json"  # its run: request id, tokens, sha256
+PUBLIC = HERE / "kaggle" / "judge-bench-public.json"
+SOURCES = {"glimmer": "Muse Glimmer 30B (open weights, self-hosted on Kaggle 2 x T4), v1 letter quoted in "
+                      "<removed-run-record>, written from the synthetic sample/ (made-up tracks, no video)",
+           "spark-open": "Muse Spark Open (open weights, on Fireworks), letter in provenance/spark-open-sample-letter.txt, "
+                         "its run in provenance/spark-open-fireworks-sample.json, written from the synthetic sample/ "
+                         "(made-up tracks, no video)"}  # every base of the public bench, by its id prefix
 UNITS = ("zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve")
 OLD_SAM = re.compile(r"\bSAM \d+(?:\.\d+)?")  # cached letters name SAM's version; the prompt no longer gives it
 COUNT = re.compile(r"(?<![\d.,])([2-9]|1[0-2]) (?=[a-z])")  # a whole count from 2 to 12 before a word: "3 crossings"
@@ -113,6 +123,20 @@ def glimmer_base():
     quoted = re.search(r"\*\*Letter to the road authority\*\*.*?\n\n((?:> .*\n?)+)", record)[1]
     site = json.loads((HERE / "sample" / "site.json").read_text())
     return "glimmer", " ".join(line[2:] for line in quoted.splitlines()), measurements(HERE / "sample" / "events.json", site)
+
+
+def spark_open_base():
+    """("spark-open", letter, facts): Spark Open's letter about sample/, checked against its run record's sha256."""
+    letter = SPARK_OPEN_LETTER.read_text().rstrip("\n")
+    if pack.sha256(letter) != json.loads(SPARK_OPEN_RECORD.read_text())["letter_sha256"]:
+        raise ValueError(f"{SPARK_OPEN_LETTER} is not the letter {SPARK_OPEN_RECORD} records")
+    site = json.loads((HERE / "sample" / "site.json").read_text())
+    return "spark-open", letter, measurements(HERE / "sample" / "events.json", site)
+
+
+def public_bench():
+    """The bench from sample/ letters only (no real footage behind any of them), each item naming its base's source."""
+    return [{**i, "source": SOURCES[i["id"].split("/")[0]]} for i in bench_letters([glimmer_base(), spark_open_base()])]
 
 
 def cached_letter(path):
@@ -238,12 +262,16 @@ def asker(column):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--out", required=True, help="the bench file: letters and every verdict so far (JSON)")
+    parser.add_argument("--out", help="the bench file: letters and every verdict so far (JSON)")
+    parser.add_argument("--public", action="store_true", help="a new bench only from sample/ letters (default --out "
+                        "kaggle/judge-bench-public.json)")
     for column, name in JUDGES:
         parser.add_argument(f"--{column}", type=int, default=0, metavar="N", help=f"runs of {name} as judge per letter")
     args = parser.parse_args()
-    out = Path(args.out)
-    bench = (json.loads(out.read_text()) if out.is_file()
+    if not (args.out or args.public):
+        parser.error("give --out FILE, or --public")
+    out = Path(args.out or PUBLIC)
+    bench = (json.loads(out.read_text()) if out.is_file() else public_bench() if args.public
              else bench_letters([glimmer_base()] + [b for b in [spark_base()] if b]))
     bench = [{**i, "code": [bool(code_flags(i["letter"], i["measured"]))]} for i in bench]
     out.write_text(json.dumps(bench, indent=1, ensure_ascii=False))
