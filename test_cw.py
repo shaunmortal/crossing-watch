@@ -46,6 +46,14 @@ def raises_value_error(call):
     return False
 
 
+def raises_system_exit(call):
+    try:
+        call()
+    except SystemExit:
+        return True
+    return False
+
+
 def test_collinear_or_out_of_order_points_are_rejected():
     assert raises_value_error(lambda: road.homography([[0, 0], [1, 1], [2, 2], [3, 3]], SQUARE_ROAD))
     crossed = [SQUARE_IMG[0], SQUARE_IMG[2], SQUARE_IMG[1], SQUARE_IMG[3]]  # corners not in order round the area
@@ -1199,7 +1207,7 @@ def test_letters_quoting_unmeasured_numbers_go_back_to_spark():
     good = {"fix": "speed table", "why": "cars at 27.3 km/h", "image_prompt": "add a speed table", "letter": "PET 0.4 s."}
     replies, prompts = [{**good, "letter": "It happened 12 times."}, good], []
     old = pack.model_plan, pack.judge_problems
-    pack.model_plan = lambda prompt, key, photo=None: (prompts.append(prompt), replies.pop(0))[1]
+    pack.model_plan = lambda prompt, key, photo=None, known=None: (prompts.append(prompt), replies.pop(0))[1]
     pack.judge_problems = lambda letter, measured, key: []
     try:
         assert pack.ask_plan("PROMPT", facts, "key") == {**good, "writer": pack.WRITER, "tries": 2,
@@ -1222,7 +1230,7 @@ def test_a_second_model_judges_the_letter_and_its_objections_go_back():
         judged.append(letter)
         return ["Says a warrant is met."] if "warrant" in letter else []
     old = pack.model_plan, pack.judge_problems
-    pack.model_plan = lambda prompt, key, photo=None: (prompts.append(prompt), replies.pop(0))[1]
+    pack.model_plan = lambda prompt, key, photo=None, known=None: (prompts.append(prompt), replies.pop(0))[1]
     pack.judge_problems = judge
     try:
         plan = pack.ask_plan("PROMPT", "{}", "key")
@@ -1620,19 +1628,16 @@ def test_pedestrian_pieces_shorter_than_a_second_are_dropped():
     assert set(people) == {"a/0"}
 
 
-def test_open_weights_letter_writer_gets_the_prompt_and_street_photo():
-    """With LETTER_MODEL_URL set, the plan comes from an OpenAI-compatible server (llama-server running Muse Glimmer)."""
-    import tempfile, threading
+def fake_open_model(replies):
+    """A local stand-in for llama-server: answers each POST with the next reply and keeps (path, body, headers)."""
+    import threading
     from http.server import BaseHTTPRequestHandler, HTTPServer
-    from pathlib import Path
-    seen = {}
-    plan = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "l"}
+    seen = []
 
     class Fake(BaseHTTPRequestHandler):
         def do_POST(self):
-            seen["path"] = self.path
-            seen["body"] = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-            reply = json.dumps({"choices": [{"message": {"content": json.dumps(plan)}}]}).encode()
+            seen.append((self.path, json.loads(self.rfile.read(int(self.headers["Content-Length"]))), dict(self.headers)))
+            reply = json.dumps(replies.pop(0)).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
@@ -1642,21 +1647,172 @@ def test_open_weights_letter_writer_gets_the_prompt_and_street_photo():
             pass
 
     server = HTTPServer(("127.0.0.1", 0), Fake)
-    threading.Thread(target=server.handle_request, daemon=True).start()
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server, seen
+
+
+def test_open_weights_letter_writer_gets_the_prompt_and_street_photo():
+    """With LETTER_MODEL_URL set, the plan comes from an OpenAI-compatible server (llama-server running Muse Glimmer),
+    and the server's own timings and usage travel with it into plan.json."""
+    import contextlib, io, tempfile
+    from pathlib import Path
+    plan = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "l"}
+    timings, usage = {"prompt_ms": 2000.0, "predicted_ms": 410000.0}, {"prompt_tokens": 900, "completion_tokens": 5000}
+    server, seen = fake_open_model([{"choices": [{"message": {"content": json.dumps(plan)}, "finish_reason": "stop"}],
+                                     "timings": timings, "usage": usage}])
     old = pack.LETTER_URL
     pack.LETTER_URL = f"http://127.0.0.1:{server.server_port}/v1"
     try:
         with tempfile.TemporaryDirectory() as tmp:
             photo = Path(tmp) / "street.jpg"
             photo.write_bytes(b"\xff\xd8jpeg")
-            assert pack.model_plan("PROMPT", None, photo) == plan
+            with contextlib.redirect_stderr(io.StringIO()):
+                assert pack.model_plan("PROMPT", None, photo) == {**plan, "timings": timings, "usage": usage}
     finally:
         pack.LETTER_URL = old
+        server.shutdown()
         server.server_close()
-    content = seen["body"]["messages"][0]["content"]
-    assert seen["path"] == "/v1/chat/completions" and seen["body"]["response_format"] == {"type": "json_object"}
+    path, body, _ = seen[0]
+    content = body["messages"][0]["content"]
+    assert path == "/v1/chat/completions" and body["response_format"]["type"] == "json_schema"
     assert content[0] == {"type": "text", "text": "PROMPT"} and content[1]["image_url"]["url"].startswith("data:image/jpeg")
     assert "Muse Glimmer" in pack.letter_section({**plan, "writer": "Muse Glimmer 30B (open weights)"})
+
+
+def test_open_model_out_of_context_is_a_clear_error_not_an_empty_letter():
+    """llama-server says only finish_reason "length" with content "" when thinking fills the context."""
+    import contextlib, io
+    server, _ = fake_open_model([{"choices": [{"message": {"content": ""}, "finish_reason": "length"}],
+                                  "usage": {"completion_tokens": 32000}}])
+    old = pack.LETTER_URL
+    pack.LETTER_URL = f"http://127.0.0.1:{server.server_port}/v1"
+    try:
+        with contextlib.redirect_stderr(io.StringIO()) as log:
+            pack.open_model_reply("PROMPT", None, {"type": "object"})
+        raise AssertionError("an out-of-context reply was accepted")
+    except ValueError as err:
+        assert "ran out of context after 32000 tokens" in str(err) and "-c" in str(err)
+        assert "open model reply: finish_reason length" in log.getvalue()  # still a try in the notebook's count
+    finally:
+        pack.LETTER_URL = old
+        server.shutdown()
+        server.server_close()
+
+
+def test_open_model_footer_uses_the_server_timings_only():
+    plan = {"fix": "f", "why": "w", "image_prompt": "i", "letter": "l", "writer": "Muse Glimmer 30B (open weights, self-hosted)",
+            "timings": {"prompt_ms": 1500.0, "predicted_ms": 410700.0}}
+    old = pack.LETTER_URL, pack.LETTER_HOST
+    pack.LETTER_URL, pack.LETTER_HOST = "http://127.0.0.1:8080/v1", "Kaggle 2 x T4"
+    try:
+        assert f"{pack.LETTER_MODEL} wrote this in 412 s on Kaggle 2 x T4 (open weights)." in pack.letter_section(plan)
+        no_numbers = pack.letter_section({**plan, "timings": {"prompt_ms": "1500", "predicted_ms": None}})
+        assert "wrote this in" not in no_numbers and "Fix and letter written by Muse Glimmer 30B" in no_numbers
+        pack.LETTER_URL = ""  # Spark wrote it: timings in its JSON are never shown as a run time
+        assert "wrote this in" not in pack.letter_section(plan)
+    finally:
+        pack.LETTER_URL, pack.LETTER_HOST = old
+
+
+def test_open_model_can_write_digits_only_as_measured_numbers():
+    """The plan's JSON schema holds every string to a "pattern" that llama-server turns into a grammar. Python's re reads
+    the same pattern, so here it stands in for the grammar: every measured number gets through, nothing else does."""
+    import re
+    e = {"person": "1/0", "vehicle": "car#1", "tier": "serious", "pet_s": 0.4, "vehicle_kmh": 27.3, "death_risk_pct": 1.1,
+         "with_limit": {"20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
+    measured = pack.facts({"name": "स्कूल गेट"}, [e], {"minutes": 2.0, "crossings": 3, "vehicles": 1200})
+    known = pack.LETTER_PROMPT.format(facts=measured, language="Hindi") + "\n" + measured
+    schema = pack.plan_schema(known)
+    pattern = schema["properties"]["letter"]["pattern"]
+    assert schema["required"] == list(pack.PLAN_KEYS) and {p["pattern"] for p in schema["properties"].values()} == {pattern}
+    written = lambda text: re.fullmatch(pattern, json.dumps(text, ensure_ascii=False)[1:-1])  # as between the quotes
+    for n in pack.NUMBER.findall(known):
+        assert written(f"{n} km/h, {n}.\nस्कूल के बाहर \"{n}\"") and not pack.unmeasured(n, known), n
+    for lie in ("It happened 7 times.", "27.35 km/h", "0.427.3", "27.3.4", "७ बार", "۳0"):  # ۳0 reads as 30
+        assert not written(lie) and pack.unmeasured(lie, known), lie
+    assert not written("27.3<s>0.4")  # llama.cpp drops a special token's text from the reply: "27.30.4"
+    assert not re.fullmatch(pattern, r"\u0032") and re.fullmatch(pattern, r"\n\"\\")  # \u0032 is a hidden 2
+    assert pack.number_pattern("no numbers") == pack.number_pattern("") and not re.fullmatch(pack.number_pattern(""), "1")
+
+
+
+def test_open_model_letters_still_face_the_number_check_and_the_judge():
+    """The schema is only the first layer: a server that ignores it is still caught by unmeasured(), then the judge.
+    The retry note quotes the bad number, so the schema comes from the measurements alone and 12 stays out of it."""
+    import contextlib, io, re
+    good = {"fix": "speed table", "why": "cars at 27.3 km/h", "image_prompt": "add a speed table", "letter": "PET 0.4 s."}
+    as_reply = lambda plan: {"choices": [{"message": {"content": json.dumps(plan)}, "finish_reason": "stop"}]}
+    server, seen = fake_open_model([as_reply({**good, "letter": "It happened 12 times."}), as_reply(good)])
+    judged, old = [], (pack.LETTER_URL, pack.judge_problems)
+    pack.LETTER_URL = f"http://127.0.0.1:{server.server_port}/v1"
+    pack.judge_problems = lambda letter, measured, key: judged.append(letter) or []
+    try:
+        with contextlib.redirect_stderr(io.StringIO()):
+            plan = pack.ask_plan("PROMPT", '{"pet_s": 0.4, "vehicle_kmh": 27.3}', "key")
+    finally:
+        pack.LETTER_URL, pack.judge_problems = old
+        server.shutdown()
+        server.server_close()
+    first, second = (body for _, body, _ in seen)
+    pattern = lambda body: body["response_format"]["json_schema"]["schema"]["properties"]["letter"]["pattern"]
+    assert "not in the measurements: 12" in second["messages"][0]["content"][0]["text"]
+    assert pattern(second) == pattern(first) and not re.fullmatch(pattern(second), "It happened 12 times.")
+    assert plan["letter"] == good["letter"] and judged == [good["letter"]] and plan["judged_by"] == pack.JUDGE
+
+
+def test_glimmer_judges_through_its_own_url_and_judged_by_names_only_the_judges_that_ran():
+    """JUDGE_MODEL_URL makes the open-weights model a judge, with Spark or alone; its objection goes back like Spark's,
+    an unreadable reply is a problem, and the letter server's key never goes to a judge on another server."""
+    import contextlib, io
+    good = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "Cars passed close to children."}
+    as_reply = lambda content: {"choices": [{"message": {"content": content}, "finish_reason": "stop"}]}
+    server, seen = fake_open_model([as_reply('{"problems": ["Says a warrant is met."]}'), as_reply('{"problems": []}'),
+                                    as_reply('{"problems": []}'), as_reply("no JSON here")])
+    url, prompts, sparks = f"http://127.0.0.1:{server.server_port}/v1", [], []
+    old = pack.model_plan, pack.spark_reply, pack.JUDGE_URL, pack.LETTER_URL, pack.LETTER_KEY
+    pack.model_plan = lambda prompt, key, photo=None, known=None: prompts.append(prompt) or good
+    pack.spark_reply = lambda prompt, image, key: sparks.append(prompt) or '{"problems": []}'
+    pack.JUDGE_URL, pack.LETTER_URL, pack.LETTER_KEY = url, "http://127.0.0.1:9/v1", "letter-key"  # writer elsewhere
+    try:
+        with contextlib.redirect_stderr(io.StringIO()):
+            alone = pack.ask_plan("PROMPT", "{}", None)  # no Meta key: Glimmer judges alone, objects once, then passes
+            both = pack.ask_plan("PROMPT", "{}", "key")
+            unreadable = pack.judge_problems("letter", "{}", None)
+    finally:
+        pack.model_plan, pack.spark_reply, pack.JUDGE_URL, pack.LETTER_URL, pack.LETTER_KEY = old
+        server.shutdown()
+        server.server_close()
+    glimmer = pack.writer_label(url)
+    assert alone["judged_by"] == glimmer and "Says a warrant is met." in prompts[1] and len(sparks) == 1
+    assert both["judged_by"] == f"{pack.JUDGE} and {glimmer}" and unreadable == ["The reviewer's reply could not be read."]
+    assert "and the claims by Muse Spark (a separate reviewer) and Muse Glimmer" in pack.letter_section(both)
+    path, body, headers = seen[0]
+    assert path == "/v1/chat/completions" and body["response_format"]["json_schema"]["schema"] == pack.PROBLEMS_SCHEMA
+    assert good["letter"] in body["messages"][0]["content"][0]["text"] and "Authorization" not in headers
+
+
+def test_glimmer_notebook_is_pinned_hash_checked_and_records_its_run():
+    """The Kaggle notebook runs unattended for 40 minutes, so its pins and its Python are checked here first."""
+    import ast, re
+    from pathlib import Path
+    notebook = json.loads(Path(__file__).with_name("kaggle").joinpath("<removed-run-record>").read_text())
+    code = ["".join(c["source"]) for c in notebook["cells"] if c["cell_type"] == "code"]
+    for cell in code:
+        if not cell.startswith("%%"):
+            ast.parse("\n".join(line for line in cell.splitlines() if not line.startswith("!")))
+    text = "\n".join(code)
+    for pin in ("--branch b11976", "revision=REVISION", "b44f1072cf75e918a1b82a3a17b45c4389b076e7",
+                "4cc57c0f51040a226e5a72cc47b7613f7772950e460a665f7083de89f183f60e",
+                "f48b452316f9b213758e8659444029b961a24a07f99a1abb2a9f88b06f7c00c6", "'-np', '1'", "(32768, 16384)",
+                "'reasoning_strength': 'medium'", "'--temp', '1.0', '--top-p', '0.95', '--top-k', '64'",
+                "LETTER_MODEL_HOST", "<removed-run-record>", "build_info", "GIT_SHA", "pack_py_sha256",
+                "run.stderr.count('open model reply:')", "'tries': tries",  # pack.open_model_reply logs each try
+                "os.path.exists(f'{CW}/judge_bench.py')", "'JUDGE_MODEL_URL': 'http://127.0.0.1:8080/v1'",
+                "k != 'MODEL_API_KEY'", "<removed-run-record>"):  # the Glimmer-only judge pass, skipped without a bench
+        assert pin in text, pin
+    assert re.search(r"assert sha256\(path\) == SHA256\[name\]", text)
+    assert "shaunmortal" in text
+    assert "billion" not in Path(__file__).with_name("README.md").read_text()  # the product name, not a parameter count
 
 
 def test_map_draws_each_event_where_it_happened():
@@ -2167,6 +2323,129 @@ def test_score_humans_scores_danger_against_none_with_kappa_and_wilson():
     lines = score_humans.report(rater, truth, read)
     assert "Agreed with the pipeline on 10 of 11" in lines[1] and "kappa 0.81" in lines[1] and lines[-1].endswith("PASS")
     assert "NOT DECIDABLE" in score_humans.report(rater, dict(list(truth.items())[3:9]), read)[-1]
+
+
+
+def scripted_spark(script, bodies):
+    """A fake Muse Spark: each turn calls the next scripted (tool, arguments), or answers in plain text for None."""
+    def turn(body, key):
+        bodies.append(json.loads(json.dumps(body)))  # a copy: the agent keeps adding to its messages
+        step = script.pop(0)
+        said = ({"type": "function_call", "call_id": f"call-{len(bodies)}", "name": step[0], "arguments": json.dumps(step[1])}
+                if step else {"type": "message", "content": [{"type": "output_text", "text": "Done."}]})
+        return {"output": [{"type": "reasoning", "id": "rs_1", "summary": []}, said],
+                "usage": {"input_tokens": 2000, "output_tokens": 100}}
+    return turn
+
+
+def test_case_agent_stops_for_a_tape_measure_and_files_the_letter_only_when_it_agrees():
+    """The workshop's loop with a scripted Muse Spark (no network): one tool per turn, plain text sent back, SAM's
+    16-object limit switching people to crowd mode, three refused letters escalating to a person, a stop for a tape
+    measure, resume with the answer, notes from the head, the sign-off, and the page section."""
+    import agent, contextlib, io, tempfile
+    submit = ("submit_letter", {"notes": ""})
+    script = [("track", {"people": "video", "vehicles": "video"}), ("track", {"people": "crowd", "vehicles": "video"}),
+              None, submit, submit, submit, ("measure", {}), ("request_measurement", {}), submit,
+              ("submit_letter", {"notes": "Name the school gate."})]
+    bodies, tracked, prompts = [], [], []
+    plan = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "PET 0.5 s.", "writer": "Muse Spark"}
+    def tracker(p, site):
+        tracked.append(site["person_mode"])
+        return {"car": [0, 1]} if site["person_mode"] == "crowd" else {"person": [3, 3], "car": [0, 1]}
+    old = agent.spark_turn, agent.run_tracker, pack.ask_plan
+    agent.spark_turn, agent.run_tracker = scripted_spark(script, bodies), tracker
+    pack.ask_plan = lambda prompt, measured, key, photo: prompts.append(prompt) or plan
+    try:
+        with tempfile.TemporaryDirectory() as folder, contextlib.redirect_stdout(io.StringIO()):
+            out, site, e = agent_case(folder)
+            run = lambda **person: agent.work(out / "video.mp4", out / "site.json", out, "key", **person)
+            assert run() == "needs_input" and tracked == ["video", "crowd"]  # 3 refusals: R1 asks a person
+            assert raises_system_exit(run)  # waiting for the answer: no model call
+            assert run(answer=("R1", "Ask for the tape first.")) == "needs_input"  # measure, then R2 asks for the tape
+            assert raises_system_exit(lambda: run(answer=("R2", "about a car length")))
+            assert run(answer=("R2", "7.2 m")) == "needs_review"
+            assert run(notes="Name the school gate.") == "needs_review" and "Name the school gate." in prompts[-1]
+            assert run(approve=True) == "done" and raises_system_exit(run)
+            progress = json.loads((out / "case" / "progress.json").read_text())
+            log = (out / "case" / "agent_log.jsonl").read_text().splitlines()
+            page = (out / "index.html").read_text()
+    finally:
+        agent.spark_turn, agent.run_tracker, pack.ask_plan = old
+    assert script == [] and len(bodies) == progress["turn"] == 10 and len(log) == 14  # 10 turns, 4 person steps
+    assert all(b["parallel_tool_calls"] is False and b["store"] is False for b in bodies)
+    assert {t["name"] for t in bodies[0]["tools"]} == set(agent.RUNNERS)
+    assert bodies[3]["input"][-1] == {"role": "user", "content": agent.NUDGE}
+    assert not any(item.get("type") == "reasoning" for b in bodies for item in b["input"])
+    assert [r["kind"] for r in progress["requests"]] == ["letter_refused", "measurement"] and progress["tape_m"] == 7.2
+    assert abs(progress["usd"] - 10 * (2000 * 1.25 + 100 * 4.25) / 1e6) < 1e-9
+    assert '"tape_m": 7.2' in prompts[0] and '"video_m": 7.0' in prompts[0]  # measured, so the letter may quote it
+    assert "How the agent worked this case" in page and "Video 7.0 m, tape 7.2 m, 3% off: proven" in page
+    assert "Person: R2 answered: 7.2 m" in page and "approved" in page
+    assert "off" in agent.letter_blocker({"tape_m": 9.0}, site, [e], "")  # 22% off: mark the calibration again
+    assert "numbers" in agent.letter_blocker({"tape_m": 7.2, "tracked_with": agent.calibration(site)}, site, [e], "3")
+    assert agent.tape_metres("720 cm") == agent.tape_metres(" 7.2M ") == 7.2
+    assert all(raises_system_exit(lambda t=t: agent.tape_metres(t))
+               for t in ("7 ft", "24 feet", "7,2 m", "1,200 cm", "2 m 20 cm", "720", "7.2 mm"))  # never read as metres
+
+
+
+def test_case_agent_stops_at_its_turn_and_dollar_caps():
+    import agent, contextlib, io, tempfile
+    bodies = []
+    old = agent.spark_turn, agent.MAX_TURNS, agent.MAX_USD
+    agent.spark_turn, agent.MAX_TURNS = scripted_spark([None] * 3, bodies), 3
+    try:
+        with tempfile.TemporaryDirectory() as folder, contextlib.redirect_stdout(io.StringIO()):
+            out, _, _ = agent_case(folder)
+            run = lambda: agent.work(out / "video.mp4", out / "site.json", out, "key")
+            assert run() == "paused" and len(bodies) == 3
+            agent.MAX_USD, agent.spark_turn = 0.01, scripted_spark([None], bodies)  # a turn costs $0.0029
+            assert run() == "over_budget" and len(bodies) == 4 and raises_system_exit(run)
+    finally:
+        agent.spark_turn, agent.MAX_TURNS, agent.MAX_USD = old
+
+
+def test_guesses_keep_5_to_150_kmh_and_the_chart_draws_the_measured_speed_in_red():
+    import contextlib, guess, io, sys, tempfile
+    from pathlib import Path
+    replies = "40 🏍️\n@ravi99 about 25 km/h\nlol no way\n2\n500 kmph\n30-35\n\n150\n४५\n"
+    assert guess.guesses(replies) == [40, 25, 30, 150, 45]  # handle, joke, 2, 500 and the blank line dropped
+    chart = guess.svg([40, 25, 30, 150, 45], 34.0)
+    x = f"{guess.LEFT_PX + 34 / guess.MAX_KMH * (guess.WIDTH_PX - guess.LEFT_PX - guess.RIGHT_PX):.1f}"
+    assert f'<line class="measured" x1="{x}"' in chart and f'x2="{x}"' in chart and guess.RED in chart
+    assert chart.count('<rect class="bar"') == 4 and "median 40 km/h" in chart  # 40 and 45 share one; 150 is in 140-150
+    edge = f'x1="{guess.WIDTH_PX - guess.RIGHT_PX:.1f}"'
+    assert edge in guess.svg([5], 200.0).split('class="measured"')[1]  # a pass over 150 km/h widens the axis
+    with tempfile.TemporaryDirectory() as folder:
+        out = Path(folder)
+        (out / "replies.txt").write_text(replies, encoding="utf-8")
+        rejected = {"person": "7/0", "vehicle_kmh": 61.0, "review": {"is_person": False}}  # Spark: a pole
+        pole = [rejected, {"person": "7/0", "vehicle_kmh": 50.0}]  # its unreviewed pairing goes too
+        cards = [{"person": "3/0", "vehicle_kmh": 87.9}, {"person": "4/0", "vehicle_kmh": 34.0}]
+        (out / "events.json").write_text(json.dumps({"events": pole[:1] + cards[:1] + pole[1:] + cards[1:]}))
+        (out / "jokes.txt").write_text("lol\n2\n500\n")
+        old = sys.argv
+        try:
+            sys.argv = ["guess.py", str(out / "replies.txt"), str(out / "events.json"), "--event", "2"]
+            printed = io.StringIO()
+            with contextlib.redirect_stdout(printed):
+                guess.main()
+            assert "5 guesses, median 40 km/h. Measured: 34 km/h." in printed.getvalue()
+            assert (out / "guess.svg").read_text() == chart
+            sys.argv[-1] = "1"
+            with contextlib.redirect_stdout(io.StringIO()) as printed:
+                guess.main()
+            assert "Measured: 87.9 km/h." in printed.getvalue()  # card #1 is the first event Spark did not reject
+            sys.argv[-1] = "3"
+            assert raises_system_exit(guess.main)  # the pole's two events are no cards, so there is no card #3
+            many = [{"person": f"{i}/0", "vehicle_kmh": 30.0} for i in range(pack.SHOWN_EVENTS + 1)]
+            (out / "events.json").write_text(json.dumps({"events": many}))
+            sys.argv[-1] = str(pack.SHOWN_EVENTS + 1)
+            assert raises_system_exit(guess.main)  # the page shows only SHOWN_EVENTS cards
+            sys.argv[1:] = [str(out / "jokes.txt"), str(out / "events.json")]
+            assert raises_system_exit(guess.main)  # no guesses at all
+        finally:
+            sys.argv = old
 
 
 if __name__ == "__main__":

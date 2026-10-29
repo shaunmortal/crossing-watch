@@ -118,15 +118,50 @@ says when it filled (on the Indian clip: "person: 16 objects taken within 1.0-1.
 
 Set `LETTER_MODEL_URL` to any OpenAI-compatible server and the fix and letter come from that model instead of Muse
 Spark, with the same number check. `<removed-run-record>` runs Meta's official 4-bit **Muse Glimmer 30B**
-(`meta-models/Muse-Glimmer-30B-GGUF`, Apache 2.0) with llama.cpp on Kaggle's free 2 x T4, shows it the blurred
-street photo when there is one, and writes the evidence page. Run end to end twice on Kaggle's 2 x T4 with the
-synthetic sample: both times Glimmer proposed a raised zebra crossing and wrote a letter whose every number passed
-the code check, in 627 s and 592 s (Muse Spark: about 20 s). The committed run's log and Glimmer's text are in
-[`<removed-run-record>`](<removed-run-record>). Its letter was correct but stiff, so Muse Spark stays the default writer.
+(`meta-models/Muse-Glimmer-30B-GGUF`, Apache 2.0) with llama.cpp on Kaggle's free 2 x T4 and writes the evidence
+page; when the pack has a blurred street photo, Glimmer is shown it too. One run has a record so far,
+[`<removed-run-record>`](<removed-run-record>): on the synthetic sample, which has no person tracks and so no
+photo, Glimmer's part took 592 s; it proposed a raised zebra crossing and wrote a letter whose every number passed the
+code check. No Glimmer run has been sent a street photo yet. The letter was correct but stiff, so Muse Spark stays the
+default writer. Version 1 ran with llama-server's default sampling and the template's default "high" reasoning. The
+notebook now pins llama.cpp `b11976` and the Hugging Face revision, checks both files against their published sha256,
+runs one 32,768-token slot with medium reasoning and the model card's sampling, stops with a clear error if Glimmer
+runs out of context, and writes `<removed-run-record>` (llama.cpp build, GPUs, timings, the letter's sha256, the git
+commit and pack.py's sha256). The page then says "Muse Glimmer 30B wrote this in N s on Kaggle 2 x T4", with N from
+the server's own timings. The Kaggle notebook was run by the author.
+The open-weights model is also sent a JSON schema whose strings may hold digits only as the measured numbers, each
+followed by a non-digit; llama-server turns it into a grammar that still lets Glimmer think first. No Glimmer run has
+used it yet, the code check and the reviewer still run after it, and the run record counts Glimmer's tries.
+`LETTER_MODEL_KEY` adds a Bearer token for a server that needs one, and the letter says "self-hosted" only when the
+server runs on the same machine.
+`JUDGE_MODEL_URL` makes the open-weights model a judge too: it reviews the letter beside Muse Spark, or alone without a
+Meta key, and the page names only the judges that ran. No Glimmer judge run has been made yet.
 `sample/` is a synthetic example (made-up tracks, no video) for trying the letter step anywhere.
 
 ```
 LETTER_MODEL_URL=http://127.0.0.1:8080/v1 python3 pack.py out/VIDEO site.json
+```
+
+### Case agent: it stops to ask for a tape measure
+
+`agent.py` is optional; analyze.py and pack.py never call it. Muse Spark works the case through five tools (track,
+review, measure, request_measurement, submit_letter), one tool per turn, with at most 25 turns per start and a $1
+cap on its own turns. That cap is an estimate at Muse Spark Open's Fireworks list price ($1.25 / $4.25 per million
+input / output tokens); the Meta API price of muse-spark-1.3 is NOT CHECKED. Tracking is outside the cap: SAM, Spark's
+pedestrian reviews and the sound check in analyze.py are billed apart, and analyze.py still refuses a SAM estimate
+over $10 without `--allow-cost`. Its one tracking decision: when SAM video hits its 16-object limit, it tracks that
+concept again in crowd mode, which bills SAM per image. The site file marks a distance that was not used for
+calibration, `"check": {"what": "kerb to kerb at the zebra", "points": [[x, y], [x, y]]}`. The agent asks a person to
+tape it (answered in m or cm), and the letter is refused until the video and the tape agree within 15% (gate G2) and
+the near-misses were tracked with the site's current calibration points. Three refusals in a row go to a person.
+The head of the school then approves the letter or sends it back with notes. Every step goes to
+`out/VIDEO/case/agent_log.jsonl`, and the page shows "How the agent worked this case". No agent run has been made
+against the Meta API yet; a test drives it with a scripted model.
+
+```
+python3 agent.py VIDEO site.json                      # runs until it needs a person
+python3 agent.py VIDEO site.json --answer R1 "7.2 m"  # the taped length; the agent continues
+python3 agent.py VIDEO site.json --approve            # or --reject --notes "..."
 ```
 
 ## Checking the checks
@@ -355,7 +390,9 @@ All code in this repository was written during the hackathon, except the mask de
 of the one_bit decoder in Meta's meta-sam-parser (`_mask_codec.py`, Copyright (c) Meta Platforms, Inc. and
 affiliates), used under its SAM License (github.com/meta-models/meta-sam). The check-then-retry pattern for Spark's
 letter, the reject-with-notes revision and the JSON-mode request field follow Meta's legal-agent workshop
-(github.com/meta-models/legal-agent-workshop, shown at a hackathon session); no code was copied from it. No
+(github.com/meta-models/legal-agent-workshop, shown at a hackathon session); no code was copied from it. The
+case agent follows the shape of that workshop's loop (one tool per turn, plain text sent back, a stop for a person,
+resume from saved progress, escalation after 3 refusals); its code is our own. No
 third-party libraries; Python standard library and ffmpeg only. Test videos from YouTube were used only for local
 testing and are not included. The SinD sample (SOTIF-AVLab, non-commercial use) was used only for validation and is
 not included.

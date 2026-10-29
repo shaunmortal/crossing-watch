@@ -21,6 +21,8 @@ import re
 import shutil
 import subprocess
 import sys
+import unicodedata
+import urllib.parse
 import urllib.request
 import uuid
 from pathlib import Path
@@ -46,7 +48,22 @@ BISECTIONS = 50   # halvings to find a range's end: 1e-15 of the span, and a sha
 SCHOOL_YEAR = ("school_days", "dismissal_minutes")  # optional site keys: the "if every dismissal" line needs both
 LETTER_URL = os.environ.get("LETTER_MODEL_URL", "")  # an OpenAI-compatible server, e.g. llama-server with Muse
 LETTER_MODEL = os.environ.get("LETTER_MODEL", "Muse Glimmer 30B")  # Glimmer; empty: Muse Spark writes the letter
-WRITER = f"{LETTER_MODEL} (open weights, self-hosted)" if LETTER_URL else "Muse Spark"
+LETTER_KEY = os.environ.get("LETTER_MODEL_KEY", "")  # sent as a Bearer token, for a letter server that needs one
+JUDGE_URL = os.environ.get("JUDGE_MODEL_URL", "")  # an OpenAI-compatible server whose model also judges the letter
+LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")  # a letter server here runs on the machine that ran pack.py
+
+
+def writer_label(url):
+    """Who runs at `url`, the letter's writer or its open-weights judge. "Self-hosted" only when the server is this
+    machine; a remote URL could be anyone's."""
+    if not url:
+        return "Muse Spark"
+    local = urllib.parse.urlsplit(url).hostname in LOCAL_HOSTS
+    return f"{LETTER_MODEL} (open weights{', self-hosted' if local else ''})"
+
+
+WRITER = writer_label(LETTER_URL)
+LETTER_HOST = os.environ.get("LETTER_MODEL_HOST", "")  # where it ran, e.g. "Kaggle 2 x T4" (the notebook reads nvidia-smi)
 OPEN_MODEL_TIMEOUT_S = 900  # a 30B model on two T4s writes a letter in minutes, not seconds
 JUDGE = "Muse Spark (a separate reviewer)"
 JUDGE_PROMPT = """You review a letter before a school sends it to its road authority. MEASUREMENTS are the only facts.
@@ -60,6 +77,8 @@ MEASUREMENTS:
 
 LETTER:
 {letter}"""
+PROBLEMS_SCHEMA = {"type": "object", "properties": {"problems": {"type": "array", "items": {"type": "string"}}},
+                   "required": ["problems"], "additionalProperties": False}  # the judge's reply, for a JUDGE_MODEL_URL server
 LETTER_TRIES = 3     # Spark gets this many tries at a letter whose every number was measured
 NUMBER = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?")  # 1,200 is one number
 WORDS = ("two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|"
@@ -73,6 +92,8 @@ UNIT_FIELD = {"k": "vehicle_kmh", "s": "pet_s", "%": "death_risk_pct", "p": "dea
 SENTENCE = re.compile(r"(?<=[.!?])\s+|\n")
 SHOWN_FILE = re.compile(r'\bsrc="([^"#?]+)')  # a file the page shows (a clip or a picture), without #t=...
 UNSHAREABLE = re.compile(r"clip\.mp4|person-.*\.jpg")  # the unblurred video and the unblurred crops Spark saw
+PLAN_KEYS = ("fix", "why", "image_prompt", "letter")
+JSON_ESCAPE = r'\\["\\/bfnrt]'  # an escape inside a JSON string, but never \u: "\u0032" is a hidden 2
 LETTER_PROMPT = """You help a school ask its road authority to make the crossing outside it safer.
 Below are measurements from a video of the crossing, made by Crossing Watch (SAM tracking, road-plane geometry,
 post-encroachment time). Use ONLY these facts; never invent numbers, names, places or dates.
@@ -369,6 +390,37 @@ def retry_note(bad, crossed, problems):
     return "\n\n" + " ".join(reasons)
 
 
+def number_pattern(known):
+    """A JSON-schema "pattern" for a string as written between its quotes: digits only as the numbers NUMBER finds in
+    `known`, each followed by a non-digit (so "2" then "0.6" never reads "20.6"), and no \\u escapes. Digits of every
+    script count, as in Python's \\d, so "۳0" (30) or ०-९ in a Hindi letter cannot slip through either."""
+    zeros = [c for c in range(0x80, sys.maxunicode + 1) if unicodedata.decimal(chr(c), -1) == 0]  # each 0 starts 0-9
+    non_ascii = "".join(f"\\U{a:08x}-\\U{b:08x}" for a, b in zip([0x80] + [z + 10 for z in zeros],
+                                                                   [z - 1 for z in zeros] + [sys.maxunicode]) if a <= b)
+
+    def char(banned=""):
+        """One character of a JSON string that is no digit and not in `banned`. Positive classes only: llama.cpp's
+        grammar rejects half a character whose range touches a negated class, so [^०-९] would also ban ि ी ु े ्."""
+        ascii_ok = "".join(f"\\x{c:02x}" for c in range(0x20, 0x7f) if chr(c) not in f'0123456789"\\{banned}')
+        return f"[{ascii_ok}]|[{non_ascii}]|{JSON_ESCAPE}"
+
+    numbers = "|".join(re.escape(n) for n in sorted(set(NUMBER.findall(known))))
+    if not numbers:
+        return f"^({char()})*$"
+    # No "<" straight after a number either: llama.cpp's grammar reads a special token such as "<s>" as its text, but
+    # the reply leaves it out, so "2<s>0.6" would arrive as "20.6" (seen on a local llama-server)
+    after = f"{char('.,<')}|[.,]({char('<')})"  # "27.3." ends a sentence; "27.3.5" is not 27.3
+    return f"^({char()}|({numbers})({after}))*(({numbers})[.,]?)?$"
+
+
+def plan_schema(known):
+    """The plan as a JSON schema whose strings follow number_pattern(known). llama-server turns it into a grammar that
+    still lets Glimmer think first; a bare GBNF "grammar" would bind from the first token and block its thinking."""
+    text = {"type": "string", "pattern": number_pattern(known)}
+    return {"type": "object", "properties": {k: text for k in PLAN_KEYS}, "required": list(PLAN_KEYS),
+            "additionalProperties": False}
+
+
 def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES, stated=()):
     """The model's fix and letter, verified before use in two layers (Meta's verifiable-agents workshop): code
     checks that every number was measured, then Muse Spark as a separate reviewer (LLM as judge) lists claims the
@@ -381,7 +433,7 @@ def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES, stated=(
     worst, measured = json.loads(measured).get("worst", []), measured + stated_text(stated)
     for attempt in range(tries):
         try:
-            plan = model_plan(prompt + note, api_key, photo)
+            plan = model_plan(prompt + note, api_key, photo, measured)  # not the note: it quotes the bad numbers
         except ValueError as err:  # JSONDecodeError included
             if attempt == tries - 1 and plan is None:
                 raise
@@ -389,9 +441,10 @@ def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES, stated=(
             continue
         bad = unmeasured(plan["letter"] + " " + plan["why"], measured)
         crossed = mixed(plan["letter"], worst)
-        problems = [] if bad or crossed or not api_key else judge_problems(plan["letter"], measured, api_key)
+        judged = api_key or JUDGE_URL
+        problems = [] if bad or crossed or not judged else judge_problems(plan["letter"], measured, api_key)
         if not bad and not crossed and not problems:
-            return {**plan, "writer": WRITER, "tries": attempt + 1, **({"judged_by": JUDGE} if api_key else {})}
+            return {**plan, "writer": WRITER, "tries": attempt + 1, **({"judged_by": judges(api_key)} if judged else {})}
         note = retry_note(bad, crossed, problems)
     return {**plan, "writer": WRITER, "tries": tries, "unmeasured": bad, "mixed": crossed, "unsupported": problems}
 
@@ -401,11 +454,20 @@ def stated_text(notes):
     return STATED + "\n\n".join(notes) if notes else ""
 
 
+def judges(api_key):
+    """The judges that run, by name: Muse Spark with a key, the JUDGE_MODEL_URL model with that URL."""
+    return " and ".join(([JUDGE] if api_key else []) + ([writer_label(JUDGE_URL)] if JUDGE_URL else []))
+
+
 def judge_problems(letter, measured, api_key):
-    """Muse Spark, as a reviewer separate from the writer, lists the letter's unsupported claims ([] if none). A
-    reply it cannot read counts as one problem, so a broken judge never passes a letter silently."""
-    problems = read_problems(spark_reply(JUDGE_PROMPT.format(facts=measured, letter=letter), None, api_key))
-    return ["The reviewer's reply could not be read."] if problems is None else problems
+    """Each judge, Muse Spark with a key and the JUDGE_MODEL_URL model with that URL, separate from the writer's call,
+    lists the letter's unsupported claims ([] if none). A reply it cannot read counts as one problem, so a broken judge
+    never passes a letter silently."""
+    prompt = JUDGE_PROMPT.format(facts=measured, letter=letter)
+    replies = (([spark_reply(prompt, None, api_key)] if api_key else [])
+               + ([open_model_reply(prompt, None, PROBLEMS_SCHEMA, JUDGE_URL)[0]] if JUDGE_URL else []))
+    found = [read_problems(text) for text in replies]
+    return [p for problems in found for p in (["The reviewer's reply could not be read."] if problems is None else problems)]
 
 
 def read_problems(text):
@@ -419,16 +481,18 @@ def read_problems(text):
     return [str(p)[:300] for p in data["problems"] if isinstance(p, str) and p.strip()]
 
 
-def model_plan(prompt, api_key, photo=None):
+def model_plan(prompt, api_key, photo=None, known=None):
     """One reply from the letter model, Muse Spark or (with LETTER_MODEL_URL) an open-weights model, parsed into
-    the plan. The blurred street photo, when there is one, lets the model see the street it is fixing."""
+    the plan. The blurred street photo, when there is one, lets the model see the street it is fixing. An
+    open-weights server can write digits only as numbers in `known` (default: the prompt)."""
     image = "data:image/jpeg;base64," + base64.b64encode(photo.read_bytes()).decode() if photo else None
-    text = open_model_reply(prompt, image) if LETTER_URL else spark_reply(prompt, image, api_key)
+    text, server = (open_model_reply(prompt, image, plan_schema(known or prompt)) if LETTER_URL
+                    else (spark_reply(prompt, image, api_key), {}))
     match = re.search(r"\{.*\}", text, re.S)
     plan = json.loads(match[0], strict=False) if match else {}  # a letter may hold raw newlines
-    if not isinstance(plan, dict) or not all(isinstance(plan.get(k), str) and plan[k].strip() for k in ("fix", "why", "image_prompt", "letter")):
+    if not isinstance(plan, dict) or not all(isinstance(plan.get(k), str) and plan[k].strip() for k in PLAN_KEYS):
         raise ValueError(f"the plan is incomplete: {text[:200]!r}")
-    return plan
+    return {**plan, **server}
 
 
 def spark_reply(prompt, image, api_key):
@@ -445,16 +509,36 @@ def spark_reply(prompt, image, api_key):
                    for c in o.get("content", []))
 
 
-def open_model_reply(prompt, image):
-    """Chat completion from an OpenAI-compatible server, e.g. llama-server running Muse Glimmer 30B on a GPU."""
+def open_model_reply(prompt, image, schema, url=None):
+    """Chat completion from an OpenAI-compatible server, e.g. llama-server running Muse Glimmer 30B on a GPU, held to
+    a JSON schema: the text, and the server's own timings and token usage (kept in plan.json for the run record).
+    `url` defaults to LETTER_MODEL_URL, read at call time; LETTER_MODEL_KEY goes to that server only."""
+    url = url or LETTER_URL
     content = [{"type": "text", "text": prompt}] + ([{"type": "image_url", "image_url": {"url": image}}] if image else [])
+    schema_format = {"type": "json_schema", "json_schema": {"name": "plan", "schema": schema}}
     body = json.dumps({"model": LETTER_MODEL, "messages": [{"role": "user", "content": content}],
-                       "response_format": {"type": "json_object"}}).encode()
-    req = urllib.request.Request(LETTER_URL.rstrip("/") + "/chat/completions", data=body,
-                                 headers={"Content-Type": "application/json"})
+                       "response_format": schema_format}).encode()
+    key = LETTER_KEY if url == LETTER_URL else ""  # never the letter server's key to a judge on another server
+    headers = {"Content-Type": "application/json", **({"Authorization": f"Bearer {key}"} if key else {})}
+    req = urllib.request.Request(url.rstrip("/") + "/chat/completions", data=body, headers=headers)
     with urllib.request.urlopen(req, timeout=OPEN_MODEL_TIMEOUT_S) as response:
         reply = json.load(response)
-    return reply["choices"][0]["message"]["content"]
+    choice = reply["choices"][0]
+    print(f"open model reply: finish_reason {choice.get('finish_reason')}, "  # the Kaggle notebook counts these as tries
+          f"{(reply.get('usage') or {}).get('completion_tokens', '?')} tokens", file=sys.stderr)
+    if choice.get("finish_reason") == "length":  # llama-server's only sign: HTTP 200 and an empty answer
+        raise ValueError(f"{LETTER_MODEL} ran out of context after {(reply.get('usage') or {}).get('completion_tokens', '?')} "
+                         "tokens with no answer: start llama-server with a larger -c or a lower reasoning_strength")
+    return choice["message"]["content"], {"timings": reply.get("timings"), "usage": reply.get("usage")}
+
+
+def writer_note(plan):
+    """Who wrote the fix and letter. An open-weights model's time is its server's own timings, never a guess."""
+    timings = plan.get("timings") if LETTER_URL else None
+    if isinstance(timings, dict) and all(isinstance(timings.get(k), (int, float)) for k in ("prompt_ms", "predicted_ms")):
+        where = f" on {LETTER_HOST}" if LETTER_HOST else ""
+        return f"{LETTER_MODEL} wrote this in {(timings['prompt_ms'] + timings['predicted_ms']) / 1000:.0f} s{where} (open weights)."
+    return f"Fix and letter written by {plan['writer']}." if plan.get("writer") else ""
 
 
 def draw_fix(photo, instruction, api_key, out_path):
@@ -722,7 +806,8 @@ def letter_section(plan, events=(), measured="", signoff=None):
                if plan.get("judged_by") else f"Every number was checked against {sources} by code.")
     clean = not (plan.get("unmeasured") or plan.get("mixed") or plan.get("unsupported"))
     known = " ".join(sorted({n.replace(",", "") for n in NUMBER.findall(measured + stated_text(plan.get("notes")))}))
-    return (f'<section class="letter-sheet"><h2>Letter to the road authority</h2><div class="letter" '
+    writer = f'<p class="note">{html.escape(note)}</p>' if (note := writer_note(plan)) else ""
+    return (f'<section class="letter-sheet"><h2>Letter to the road authority</h2>{writer}<div class="letter" '
             f'contenteditable="plaintext-only" spellcheck="false" role="textbox" aria-multiline="true" '
             f'aria-label="Letter, editable" data-measured="{known}">{paragraphs}</div>{check}<p class="note ok" id="letter-check"'
             f'{"" if clean else " hidden"}>{html.escape(checked) if clean else ""}</p>{disclosure(plan, signoff)}'
@@ -843,7 +928,7 @@ def lead(lines):
 
 
 def page(site, events, seen, plan, images, fps, cost=None, full=None, privacy=None, signoff=None, receipt="",
-         source_sha256=None, timeline=None, ground=None, paths=None):
+         source_sha256=None, timeline=None, ground=None, paths=None, case=""):
     cards = "\n".join(event_card(i + 1, e, fps, overlay.strip(e, site, events[:SHOWN_EVENTS]))
                       for i, e in enumerate(events[:SHOWN_EVENTS])) or (
         f"<p>No conflicts under {road.CLOSE_PASS_S} s in these {html.escape(str(seen.get('minutes', '?')))} minutes. "
@@ -864,7 +949,7 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None, privacy=No
 <div class="stats">{stats(events, seen)}</div>{limit_note(full)}{privacy_note(privacy)}{pyramid(events, seen)}
 {engineering(seen, cost)}{roadmap.gap_strip(timeline, events, SHOWN_EVENTS, full)}
 {map_section(events, site, ground, paths)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{fixband.figure(images)}{legal_section(site)}
-{letter_section(plan, events[:SHOWN_EVENTS], facts(site, events, seen, paths), signoff)}
+{letter_section(plan, events[:SHOWN_EVENTS], facts(site, events, seen, paths), signoff)}{case}
 {tct_section()}<section><h2>How this was measured</h2><p class="note">{html.escape(method)}</p>
 {f'<p class="note">{html.escape(receipt)}</p>' if receipt else ""}{hash_line(source_sha256, site)}</section>{overlay.SCRIPT}</body></html>"""
 
