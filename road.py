@@ -27,6 +27,7 @@ BORDER_PX = 1             # a box touching the frame edge is cut off, so its low
 MIN_SPEED_STEPS = 3       # a speed needs this many frame-to-frame steps in its window; one jump is noise
 RIDER_OVERLAP = 0.6       # a "person" box this much inside a vehicle box is its rider or driver, not a pedestrian
 RIDER_FEET_PX = 3         # ...if their feet are not below the vehicle's (a pedestrian in front has lower feet)
+HIDDEN_FEET_PX = 2        # feet_hidden: a box bottom from this far above a vehicle's top to this far above its bottom
 MIN_PIECE_S = 1.0         # a pedestrian or vehicle piece shorter than this has no trustworthy path, timing or speed
 MAX_WALK_MPS = 10.0       # faster than a sprint: the track's ID has jumped to someone (or something) else
 GRID_M = 2.0              # spatial index cell; any size >= 0 gives the same answers, this one is fast
@@ -137,8 +138,8 @@ def inside_share(inner, outer):
 
 
 def boxes_by_frame(tracks):
-    """{frame: [box, ...]} of all `tracks`: the index without_riders looks a frame's vehicles up in, built once per
-    run."""
+    """{frame: [box, ...]} of all `tracks`: the index without_riders and feet_hidden look a frame's vehicles up in,
+    built once per run."""
     out = {}
     for track in tracks:
         for f, b in track.items():
@@ -154,6 +155,19 @@ def without_riders(person_track, vehicle_tracks, share=RIDER_OVERLAP):
     on = vehicle_tracks if isinstance(vehicle_tracks, dict) else boxes_by_frame(vehicle_tracks)
     return {f: b for f, b in person_track.items()
             if not any(inside_share(b, v) >= share and b[3] <= v[3] + RIDER_FEET_PX for v in on.get(f, ()))}
+
+
+def feet_hidden(person_track, on_frame, margin=HIDDEN_FEET_PX):
+    """The person track minus frames whose box bottom, at its centre, lies inside a vehicle's box: that bottom is on
+    the vehicle, not on the road. A scooter rider whose box sits on the bike's (too little of it inside for
+    without_riders), or someone whose feet a nearer vehicle hides. For a camera at an angle only; a pedestrian in
+    front of a bus has feet below its box and is kept. `on_frame`: the vehicles' boxes_by_frame."""
+    # ponytail: fixed 2 px margin at any resolution; riders a few px above the bike box are still missed (51 boxes
+    # within 10 px on the Indian cache). Scale it with the vehicle box's height if gate footage shows them.
+    def hidden(f, b):
+        x = (b[0] + b[2]) / 2
+        return any(v[0] <= x <= v[2] and v[1] - margin <= b[3] <= v[3] - margin for v in on_frame.get(f, ()))
+    return {f: b for f, b in person_track.items() if not hidden(f, b)}
 
 
 def person_points(track, H, zone=None, roadway=None, frame_size=None, top_down=False):

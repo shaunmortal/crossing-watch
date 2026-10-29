@@ -3352,6 +3352,24 @@ def test_a_saved_verdict_is_reused_until_its_inputs_change_and_a_failure_is_not_
         assert len(asked) == 4  # one Spark look and one Wonder listen for the two runs
 
 
+def test_feet_on_a_vehicle_box_are_not_on_the_road_at_an_angle():
+    """road.feet_hidden drops a scooter rider whose box only sits on the bike's (too little inside for without_riders)
+    and keeps a walker in front of the bike and a pedestrian in front of a bus; analyze uses it at an angle only."""
+    import analyze
+    bike, bus = {0: [100, 100, 160, 200]}, {0: [0, 0, 400, 300]}
+    rider, walker, in_front = {0: [115, 20, 145, 110]}, {0: [120, 90, 140, 215]}, {0: [200, 150, 240, 310]}
+    assert road.without_riders(rider, [bike]) == rider  # 0.11 of its box inside the bike's: today's filter keeps it
+    assert road.feet_hidden(rider, road.boxes_by_frame([bike])) == {}
+    assert road.feet_hidden(walker, road.boxes_by_frame([bike])) == walker
+    assert road.feet_hidden(in_front, road.boxes_by_frame([bus])) == in_front
+    site, H = {"image_points": SQUARE_IMG, "world_points": SQUARE_ROAD}, road.homography(SQUARE_IMG, SQUARE_ROAD)
+    riding = {"r": {f: [190, 100 + 5 * f, 210, 140 + 5 * f] for f in range(20)}}  # 0.25 m a frame, 2 s
+    scooter = {"motorcycle#1": {f: [180, 130 + 5 * f, 220, 200 + 5 * f] for f in range(20)}}
+    pieces = lambda s: set(analyze.road_tracks(s, H, riding, scooter, (400, 400))[0])
+    assert pieces(site) == set() and pieces({**site, "feet_hidden": False}) == {"r/0"}
+    assert pieces({**site, "view": "top-down"}) == {"r/0"}  # a drone sees box centres: untouched
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):

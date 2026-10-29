@@ -78,6 +78,9 @@ def load_site(path):
         raise SystemExit(f"{path}: person_grid must be 1, 2 or 3 (use 2 or 3 when more than ~16 people are in view)")
     if site.get("view", "oblique") not in ("oblique", "top-down"):
         raise SystemExit(f"{path}: view must be \"oblique\" (a phone up high, looking across) or \"top-down\" (drone)")
+    if not isinstance(site.get("feet_hidden", True), bool):
+        raise SystemExit(f"{path}: feet_hidden must be true (drop a person's frames whose feet sit on a vehicle's box; "
+                         "the default at an angle) or false")
     sizes = site.get("vehicle_sizes_m", {})
     if not (isinstance(sizes, dict) and all(k in vehicles and isinstance(v, list) and len(v) == 2
                                             and all(isinstance(x, (int, float)) and x > 0 for x in v) and v[0] >= v[1]
@@ -416,13 +419,15 @@ def write_events(out_dir, site, events, seen, cost, full, privacy=None, source_s
 
 
 def road_tracks(site, H, person_boxes, vehicle_boxes, frame_size):
-    """SAM boxes -> (pedestrian track pieces, vehicle shapes) in road metres, cleaned: riders dropped, tracks split
-    where the ID jumps, pieces under road.MIN_PIECE_S dropped, only the analysis zone (and carriageway, if marked)
-    kept. A vehicle seen at an angle is a car-shaped footprint when its concept has a size (vehicle_size)."""
+    """SAM boxes -> (pedestrian track pieces, vehicle shapes) in road metres, cleaned: riders dropped, frames whose
+    feet sit on a vehicle's box dropped at an angle (road.feet_hidden), tracks split where the ID jumps, pieces under
+    road.MIN_PIECE_S dropped, only the analysis zone (and carriageway, if marked) kept. A vehicle seen at an angle is a car-shaped footprint when its concept has a size (vehicle_size)."""
     zone = site.get("zone_m") or road.zone_around(site["world_points"])
     top_down = site.get("view") == "top-down"
     on_frame = road.boxes_by_frame(vehicle_boxes.values())
     walkers = {pid: road.without_riders(t, on_frame) for pid, t in person_boxes.items()}
+    if not top_down and site.get("feet_hidden", True):  # the site file's "feet_hidden": false switches it off
+        walkers = {pid: road.feet_hidden(t, on_frame) for pid, t in walkers.items()}
     people = {f"{pid}/{k}": piece for pid, t in walkers.items()
               for k, piece in enumerate(road.split_at_jumps(road.moving_frames(  # stillness judged before cutting
                   road.person_points(t, H, zone, site.get("roadway_m"), frame_size, top_down), FPS), FPS))
