@@ -12,7 +12,8 @@ re-reads the SAM replies an earlier analyze.py run cached (--budget 0): new SAM 
 stop the run, and the tool fails instead of paying.
 The site file marks the distance to tape, in clip pixels, along the road and apart from the calibration points (kerb
 to kerb is a calibration input when the rectangle runs kerb to kerb, so that check could never fail):
-"check": {"what": "line A to line B along the near kerb", "points": [[x, y], [x, y]]}.
+"check": {"what": "line A to line B along the near kerb (the A near and B near speed-line tape marks)",
+          "points": [[x, y], [x, y]]}.
 """
 import argparse
 import datetime
@@ -332,10 +333,10 @@ def case_section(out_dir):
     items = "".join(f"<li>{step_time(s)}{'Person: ' if s.get('person') else ''}{html.escape(s['summary'])}</li>"
                     for s in steps)
     turns, usd = sum("turn" in s for s in steps), max([s.get("usd", 0) for s in steps] or [0])
-    return (f'<section><h2>How the agent worked this case</h2><ol>{items}</ol><p class="note">Muse Spark chose one '
-            f"tool per turn: {turns} turns, about ${usd:.2f}, estimated at the {PRICE}, with cached input counted at "
-            "the full input price. Tracking (SAM, Spark's pedestrian reviews, the sound check) is billed apart and is "
-            "not in this figure. Steps marked Person were a person's answers.</p></section>")
+    return (f'<section id="case"><h2>How the agent worked this case</h2><ol>{items}</ol><p class="note">Muse Spark '
+            f"chose one tool per turn: {turns} turns, about ${usd:.2f}, estimated at the {PRICE}, with cached input "
+            "counted at the full input price. Tracking (SAM, Spark's pedestrian reviews, the sound check) is billed "
+            "apart and is not in this figure. Steps marked Person were a person's answers.</p></section>")
 
 
 def step_time(step):
