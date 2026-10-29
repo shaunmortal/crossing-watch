@@ -79,6 +79,27 @@ tricycles, buses, trucks). It needs no Meta API.
 
 This checks the measurement layer on true positions.
 
+**A phone at an angle.** SinD is filmed from above. `python3 validate_sind.py data/sind --oblique 10,25` films the
+same 20 minutes with a simulated phone 10 m up and 25 m back (focal length 1,500 px), calibrated from four road points
+as `calibrate.html` is. Each vehicle becomes the box SAM would draw round it (1.3-3 m tall by type), and the
+conflicts found from those boxes are compared with the conflicts from SinD's true footprints on the same frames.
+Footprint sizes are SinD's median per vehicle type, as a tape-measured `vehicle_sizes_m` would give:
+
+| Vehicle shape | Conflicts | Serious | Serious missed | Serious extra | PET vs truth (mean) |
+|---|---|---|---|---|---|
+| SinD footprints (truth) | 55 | 35 | 0 | 0 | +0.00 s |
+| lower box edge (before) | 93 | 63 | 6 | 34 | -0.10 s |
+| car-shaped footprint | 57 | 37 | 3 | 5 | -0.01 s |
+| footprint, boxes off by 3 px | 58 | 38 | 2 | 5 | -0.04 s |
+| footprint, lengths 20% too long | 59 | 35 | 4 | 4 | -0.05 s |
+
+The lower box edge lies under the vehicle's near side, not its middle, and nearly doubled the serious
+conflicts. A view that is not top-down now uses a car-shaped footprint instead (`road.vehicle_footprints`):
+a rectangle of the vehicle type's size, turned to its direction of travel and moved until its image fits the SAM box
+(the lowest corner on the box's bottom edge, centred on the box), its centre median-smoothed over ±2 frames. Phone
+6 m up and 15 m back: 29 serious in truth, 42 from the lower edge, 31 from footprints; 15 m up and 20 m back: 37, 64
+and 38. This is a simulation: the box noise is independent per frame, and no real phone footage was checked.
+
 ### End to end, against ground truth (DUT)
 
 `validate_dut.py` runs the whole pipeline (SAM 3.1, metres, near-misses, Muse Spark) on 8 drone clips of a campus
@@ -162,7 +183,10 @@ The DUT data has no licence and was used only for internal testing; it is not in
 
 ## Limits, stated
 
-- A vehicle's lower box edge stands in for its footprint.
+- From a phone at an angle, a vehicle is a car-shaped footprint of its type's size: car 4.6 x 1.8 m, motorcycle
+  1.7 x 0.8 m, auto rickshaw 2.4 x 1.1 m, or tape-measured sizes in the site file
+  (`"vehicle_sizes_m": {"car": [3.9, 1.7]}`). Other concepts, including the single concept "vehicle", and vehicles
+  that never move far enough for a heading, keep the lower box edge (see the simulation above).
 - SAM 3.1 video tracking keeps at most 16 objects per request, so crowded sites need crowd mode, which costs more
   (one image request per 0.2 s). Dense traffic fills even a 15-second part: on our Indian intersection clip every
   vehicle concept hit the limit within 2 s, so there vehicle counts are a minimum. For people it did not track,
