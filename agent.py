@@ -49,6 +49,7 @@ PRICE = (f"Meta API Standard list price for muse-spark-1.3 (${USD_PER_M_IN:g} / 
          "$0.15 cached input; list price fetched 29 Oct 2026 from https://dev.meta.ai/docs/pricing-rate-limits.md)")
 TRACK_BUDGET_USD = "0"   # analyze.py --budget for the agent's tracking: it re-reads the paid run's SAM cache
 MAX_REFUSALS = 3         # submit_letter refused this often in a row: a person is asked (the workshop's memo_refused)
+MAX_FAILURES = 2         # the same tool failed this often in a row: a person is asked (calling it again rarely helps)
 CHECK_TOLERANCE = 0.15   # GATES.md G2: a distance not used for calibration agrees with the tape within 15%
 TAPE = re.compile(r"\s*([0-9]+(?:\.[0-9]+)?)\s*(m|cm)\s*", re.I)  # the whole answer: "7.2 m", "7.2m" or "720 cm"
 LOG = "agent_log.jsonl"
@@ -279,10 +280,26 @@ def run_tool(p, call, key):
         args = json.loads(arguments) if isinstance(arguments, str) else arguments
         if not runner or not isinstance(args, dict):
             raise ValueError(f"no tool {call.get('name')!r} with arguments {str(arguments)[:100]}")
-        return runner(p, args, key)
+        result = runner(p, args, key)
     except (SystemExit, OSError, ValueError, KeyError, TypeError, subprocess.CalledProcessError,
             http.client.HTTPException) as err:
-        return {"summary": f"{call.get('name')} failed: {str(err)[:300]}"}
+        return tool_failed(p, call.get("name"), f"{call.get('name')} failed: {str(err)[:300]}")
+    p["failed_tool"], p["failures"] = None, 0
+    return result
+
+
+def tool_failed(p, name, failure):
+    """A failed tool's result. The same tool failing MAX_FAILURES times in a row asks a person, as refused letters do:
+    on a case with no video, track failed about 20 turns running before the refusals stopped the case."""
+    failures = p.get("failures", 0) + 1 if p.get("failed_tool") == name else 1
+    if failures < MAX_FAILURES:
+        p["failed_tool"], p["failures"] = name, failures
+        return {"summary": failure}
+    p["failed_tool"], p["failures"] = None, 0
+    rid = ask_person(p, "tool_failed", f"{name} failed {MAX_FAILURES} times in a row, last with: {failure}. "
+                                       "What should the agent do?")
+    return {"status": "needs_input", "request": rid,
+            "summary": f"{failure} ({MAX_FAILURES} times in a row); asked a person ({rid})."}
 
 
 def model_label():

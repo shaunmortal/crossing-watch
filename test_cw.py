@@ -4276,6 +4276,38 @@ def test_case_agent_without_agent_model_url_talks_to_muse_spark_as_before():
     assert log[0]["input_tokens"] == 2000 and log[0]["usage"] == {"input_tokens": 2000, "output_tokens": 100}
     assert f"Muse Spark chose one tool per turn: 2 turns, about $0.01, estimated at the {agent.PRICE}" in section
 
+
+def test_case_agent_asks_a_person_when_the_same_tool_fails_twice_in_a_row():
+    """On a case with no video, track failed about 20 turns running (provenance/spark-open-agent-sample.json): two
+    failures of the same tool in a row now stop the case with a tool_failed request; a success in between does not."""
+    import agent, contextlib, io, tempfile
+    track = ("track", {"people": "video", "vehicles": "video"})
+    outcomes = []
+    def tracker(p, site):
+        if outcomes.pop(0):
+            raise ValueError("no video")
+        return {}
+    old = agent.spark_turn, agent.run_tracker, agent.MAX_TURNS
+    agent.run_tracker = tracker
+    try:
+        with tempfile.TemporaryDirectory() as folder, contextlib.redirect_stdout(io.StringIO()):
+            out, _, _ = agent_case(folder)
+            outcomes[:], agent.spark_turn = [True, True], scripted_spark([track, track], [])
+            assert agent.work(out / "video.mp4", out / "site.json", out, "key") == "needs_input"
+            stopped = json.loads((out / "case" / "progress.json").read_text())
+        with tempfile.TemporaryDirectory() as folder, contextlib.redirect_stdout(io.StringIO()):
+            out, _, _ = agent_case(folder)
+            outcomes[:], agent.MAX_TURNS = [True, False, True], 3
+            agent.spark_turn = scripted_spark([track, track, track], [])
+            assert agent.work(out / "video.mp4", out / "site.json", out, "key") == "paused"
+            kept_going = json.loads((out / "case" / "progress.json").read_text())
+    finally:
+        agent.spark_turn, agent.run_tracker, agent.MAX_TURNS = old
+    request = stopped["requests"][-1]
+    assert stopped["turn"] == 2 and request["kind"] == "tool_failed" and request["answer"] is None
+    assert "track failed" in request["question"] and "no video" in request["question"]
+    assert kept_going["turn"] == 3 and kept_going["requests"] == [] and kept_going["failures"] == 1
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):
