@@ -2719,7 +2719,7 @@ def agent_case(folder):
                                                                          "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
     (out / "events.json").write_text(json.dumps({"fps": 10, "exposure": {"minutes": 0.3}, "events": [e]}))
     site = {"name": "gate", "image_points": SQUARE_IMG, "world_points": SQUARE_ROAD, "vehicles": ["car"],
-            "check": {"what": "kerb to kerb at the zebra", "points": [[100, 200], [240, 200]]}}  # 140 px at 20 px/m
+            "check": {"what": "line A to line B along the near kerb", "points": [[100, 200], [240, 200]]}}  # 140 px at 20 px/m
     (out / "site.json").write_text(json.dumps(site))
     return out, site, e
 
@@ -2740,13 +2740,14 @@ def test_case_agent_stops_for_a_tape_measure_and_files_the_letter_only_when_it_a
     """The workshop's loop with a scripted Muse Spark (no network): one tool per turn, plain text sent back, SAM's
     16-object limit switching people to crowd mode, three refused letters escalating to a person, a stop for a tape
     measure, resume with the answer, notes from the head, the sign-off, and the page section."""
-    import agent, contextlib, io, tempfile
+    import agent, contextlib, io, re, seal, tempfile
     submit = ("submit_letter", {"notes": ""})
     script = [("track", {"people": "video", "vehicles": "video"}), ("track", {"people": "crowd", "vehicles": "video"}),
               None, submit, submit, submit, ("measure", {}), ("request_measurement", {}), submit,
               ("submit_letter", {"notes": "Name the school gate."})]
     bodies, tracked, prompts = [], [], []
-    plan = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "PET 0.5 s.", "writer": "Muse Spark"}
+    plan = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "PET 0.5 s.", "writer": "Muse Spark",
+            "tries": 1}
     def tracker(p, site):
         tracked.append(site["person_mode"])
         return {"car": [0, 1]} if site["person_mode"] == "crowd" else {"person": [3, 3], "car": [0, 1]}
@@ -2763,10 +2764,15 @@ def test_case_agent_stops_for_a_tape_measure_and_files_the_letter_only_when_it_a
             assert raises_system_exit(lambda: run(answer=("R2", "about a car length")))
             assert run(answer=("R2", "7.2 m")) == "needs_review"
             assert run(notes="Name the school gate.") == "needs_review" and "Name the school gate." in prompts[-1]
-            assert run(approve=True) == "done" and raises_system_exit(run)
+            assert run(approve=("A. Rao, Principal", "LNCT")) == "done"
+            assert raises_system_exit(lambda: run(approve=("A. Rao, Principal", "LNCT")))  # signed once
+            (out / "index.html").unlink()
+            assert run() == "done"  # a page fix after sign-off: the page and share/ written again, no turn
             progress = json.loads((out / "case" / "progress.json").read_text())
             log = (out / "case" / "agent_log.jsonl").read_text().splitlines()
             page = (out / "index.html").read_text()
+            shared = sorted(f.name for f in (out / "share").iterdir())
+            sealed = seal.verify(out / "share")
     finally:
         agent.spark_turn, agent.run_tracker, pack.ask_plan = old
     assert script == [] and len(bodies) == progress["turn"] == 10 and len(log) == 14  # 10 turns, 4 person steps
@@ -2778,7 +2784,14 @@ def test_case_agent_stops_for_a_tape_measure_and_files_the_letter_only_when_it_a
     assert abs(progress["usd"] - 10 * (2000 * 1.25 + 100 * 4.25) / 1e6) < 1e-9
     assert '"tape_m": 7.2' in prompts[0] and '"video_m": 7.0' in prompts[0]  # measured, so the letter may quote it
     assert "How the agent worked this case" in page and "Video 7.0 m, tape 7.2 m, 3% off: proven" in page
-    assert "Person: R2 answered: 7.2 m" in page and "approved" in page
+    assert "Person: R2 answered: 7.2 m" in page and "Person: A. Rao, Principal, LNCT, approved the letter." in page
+    assert "Read and approved by: A. Rao, Principal, LNCT, " in page and "____" not in page
+    assert "0 of 1 sentences changed after the principal&#x27;s notes" in page  # the head sent it back once
+    assert "Receipt: " in page and "Muse Spark wrote the letter in 1 try" in page
+    assert shared == ["SHA256SUMS", "index.html"] and sealed == {"index.html": "MATCH"}
+    assert len(re.findall(r"<li>(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d\d:\d\d ", page)) == 14  # every step timed
+    known = re.search(r'data-measured="([^"]*)"', page)[1].split()
+    assert {"7.2", "7.0", "3"} <= set(known)  # the tape check the letter may quote passes the in-browser check
     assert "off" in agent.letter_blocker({"tape_m": 9.0}, site, [e], "")  # 22% off: mark the calibration again
     assert "numbers" in agent.letter_blocker({"tape_m": 7.2, "tracked_with": agent.calibration(site)}, site, [e], "3")
     assert agent.tape_metres("720 cm") == agent.tape_metres(" 7.2M ") == 7.2
@@ -2797,6 +2810,46 @@ def test_case_agent_page_is_the_pack_page_with_its_privacy_note_and_gap_barcode(
         agent.write_page({"site": str(out / "site.json"), "out": str(out), "letter": None})
         page = (out / "index.html").read_text()
     assert "up to 2 found by SAM image search" in page and "Gaps in traffic" in page
+
+
+def test_case_agent_sign_off_draws_the_fix_in_the_measured_band_once():
+    """--approve: Muse Image (stubbed) draws only inside the measured band, as pack.main does, the share/ folder holds
+    the band picture under SHA256SUMS, and writing the page again after sign-off pays for no new picture."""
+    import agent, contextlib, io, seal, subprocess, tempfile
+    calls, old = [], (pack.draw_fix, pack.photo_people)
+
+    def muse_image(image, words, key, path):
+        calls.append(words)
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(image), "-f", "image2", "-c:v", "png", str(path)],
+                       check=True)
+        return path
+
+    pack.draw_fix, pack.photo_people = muse_image, lambda clip, concept="person": []
+    try:
+        with tempfile.TemporaryDirectory() as folder, contextlib.redirect_stdout(io.StringIO()), \
+                contextlib.redirect_stderr(io.StringIO()):
+            out, site, e = agent_case(folder)
+            walked = {**e, "where": [3.0, 5.0], "path_person": [[3.0, 1.0], [3.0, 9.0]]}  # road metres
+            (out / "events.json").write_text(json.dumps({"fps": 10, "exposure": {"minutes": 0.3}, "events": [walked]}))
+            subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=s=400x400", "-frames:v", "1",
+                            str(out / "street.jpg")], check=True)
+            (out / "case").mkdir()
+            letter = {"fix": "a speed table", "why": "w", "image_prompt": "i", "letter": "PET 0.5 s.",
+                      "writer": "Muse Spark"}
+            p = {"out": str(out), "site": str(out / "site.json"), "status": "needs_review", "letter": letter,
+                 "requests": []}
+            assert agent.person_step(p, "key", approve=("A. Rao, Principal", "LNCT")) is None and p["status"] == "done"
+            drawn = len(calls)
+            assert agent.person_step(p, "key") is None and len(calls) == drawn == 1  # the page again, no new picture
+            page = (out / "index.html").read_text()
+            shared = sorted(f.name for f in (out / "share").iterdir())
+            sealed = seal.verify(out / "share")
+    finally:
+        pack.draw_fix, pack.photo_people = old
+    assert "magenta band" in calls[0] and "Where the fix goes" in page and 'src="street-band.svg"' in page
+    assert "Read and approved by: A. Rao, Principal, LNCT, " in page and "as drafted, no notes" in page
+    assert shared == ["SHA256SUMS", "index.html", "street-band.svg", "street-dots.svg", "street-fixed.webp"]
+    assert set(sealed.values()) == {"MATCH"} and len(sealed) == 4
 
 def test_case_agent_refuses_a_letter_tracked_before_the_calibration_points_were_marked_again():
     """The check distance is re-read from the site file, but the near-misses come from the last track: after the
@@ -2836,6 +2889,23 @@ def test_case_agent_stops_at_its_turn_and_dollar_caps():
             assert run() == "over_budget" and len(bodies) == 4 and raises_system_exit(run)
     finally:
         agent.spark_turn, agent.MAX_TURNS, agent.MAX_USD = old
+
+
+def test_case_agent_tracks_from_the_sam_cache_only():
+    """The agent's track tool runs analyze.py with --budget 0, so a request SAM has not answered before stops the run
+    with its cost, which goes back to the model, instead of paying."""
+    import agent, subprocess, tempfile
+    calls, old = [], agent.subprocess.run
+    agent.subprocess.run = lambda argv, **kw: calls.append(argv) or subprocess.CompletedProcess(argv, 1, stderr="over")
+    try:
+        with tempfile.TemporaryDirectory() as folder:
+            out, site, _ = agent_case(folder)
+            (out / "case").mkdir()
+            p = {"out": str(out), "video": str(out / "video.mp4")}
+            assert raises_value_error(lambda: agent.run_tracker(p, {**site, "person_mode": "crowd", "vehicle_mode": "video"}))
+    finally:
+        agent.subprocess.run = old
+    assert calls[0][-2:] == ["--budget", "0"] and calls[0][1].endswith("analyze.py")
 
 
 def test_guesses_keep_5_to_150_kmh_and_the_chart_draws_the_measured_speed_in_red():

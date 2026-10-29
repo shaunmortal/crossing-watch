@@ -3,12 +3,16 @@ the letter only when the video's metres agree with the tape (GATES.md G2).
 
 Run: python3 agent.py VIDEO SITE.json [--out DIR]               start, or continue a paused case
      python3 agent.py VIDEO SITE.json --answer R1 "7.2 m"       a person answers request R1
-     python3 agent.py VIDEO SITE.json --approve                 the head of the school signs the letter off
+     python3 agent.py VIDEO SITE.json --approve --approved-by "A. Rao, Principal" --school "..."
+                                                                the head of the school signs the letter off
      python3 agent.py VIDEO SITE.json --reject --notes "..."    ...or sends it back with notes
 The case lives in DIR/case/: progress.json (the whole conversation, so a stopped case resumes) and agent_log.jsonl (one
-line per step). analyze.py and pack.py never call the agent: without this script nothing changes.
-The site file marks the distance to tape, in clip pixels, apart from the calibration points:
-"check": {"what": "kerb to kerb along the zebra", "points": [[x, y], [x, y]]}.
+line per step). analyze.py and pack.py never call the agent: without this script nothing changes. Its tracking
+re-reads the SAM replies an earlier analyze.py run cached (--budget 0): new SAM requests that round to a cent or more
+stop the run, and the tool fails instead of paying.
+The site file marks the distance to tape, in clip pixels, along the road and apart from the calibration points (kerb
+to kerb is a calibration input when the rectangle runs kerb to kerb, so that check could never fail):
+"check": {"what": "line A to line B along the near kerb", "points": [[x, y], [x, y]]}.
 """
 import argparse
 import datetime
@@ -23,21 +27,26 @@ import urllib.request
 from pathlib import Path
 
 import analyze
+import fixband
 import pace
 import pack
 import review
 import road
+import roadmap
 import sam
+import seal
 
 MAX_TURNS = 25           # model turns per start or resume (the workshop's turn limit); then the case pauses
 MAX_USD = 1.00           # estimated Spark spend on agent turns per case; tracking and pack.ask_plan's calls are apart
-# an estimate per 1M input / output tokens: Muse Spark Open's Fireworks list price (muse-spark-1.3's Meta API price
-# is not checked)
-USD_PER_M_IN, USD_PER_M_OUT = 1.25, 4.25
+USD_PER_M_IN, USD_PER_M_OUT = 1.25, 4.25  # per 1M input / output tokens, an estimate at PRICE (cached input in full)
+PRICE = (f"Meta API Standard list price for muse-spark-1.3 (${USD_PER_M_IN:g} / ${USD_PER_M_OUT:g} per 1M tokens, "
+         "$0.15 cached input; list price fetched 29 Oct 2026 from https://dev.meta.ai/docs/pricing-rate-limits.md)")
+TRACK_BUDGET_USD = "0"   # analyze.py --budget for the agent's tracking: it re-reads the paid run's SAM cache
 MAX_REFUSALS = 3         # submit_letter refused this often in a row: a person is asked (the workshop's memo_refused)
 CHECK_TOLERANCE = 0.15   # GATES.md G2: a distance not used for calibration agrees with the tape within 15%
 TAPE = re.compile(r"\s*([0-9]+(?:\.[0-9]+)?)\s*(m|cm)\s*", re.I)  # the whole answer: "7.2 m", "7.2m" or "720 cm"
 LOG = "agent_log.jsonl"
+HEAD_NOTES = ("notes", "draft_letter")  # what a revised letter keeps of the one sent back, as pack.new_plan does
 NUDGE = "Plain text is not accepted. Call exactly one tool."
 INSTRUCTIONS = """You work one near-miss case for a school. A phone filmed the crossing outside it; the head of the
 school will send the road authority a letter built only from what the video measured. Your tools:
@@ -103,13 +112,14 @@ def check_distance(site):
 
 
 def run_tracker(p, site):
-    """analyze.py on the case's video with `site` (SAM replies are cached, so a re-run pays only for what is new);
-    per concept SAM video tracked, [requests that hit its object limit, requests]."""
+    """analyze.py on the case's video with `site`, from SAM's cache only (--budget 0: a reply not cached stops it
+    with its cost, which goes back to the model); per concept SAM video tracked, [requests that hit its object
+    limit, requests]."""
     out_dir = Path(p["out"])
     copy = out_dir / "case" / f"site-{site['person_mode']}-{site['vehicle_mode']}.json"
     copy.write_text(json.dumps(site, indent=1, ensure_ascii=False))
     run = subprocess.run([sys.executable, str(Path(__file__).with_name("analyze.py")), p["video"], str(copy),
-                          "--out", str(out_dir)], stderr=subprocess.PIPE, text=True)
+                          "--out", str(out_dir), "--budget", TRACK_BUDGET_USD], stderr=subprocess.PIPE, text=True)
     if run.returncode:
         raise ValueError(run.stderr.strip()[-500:] or f"analyze.py exited with {run.returncode}")
     clip = out_dir / "clip.mp4"
@@ -216,7 +226,7 @@ def submit_letter(p, args, key):
     measured = {**json.loads(pack.facts(site, events, seen)), "calibration_check": {
         "what": site["check"]["what"], "video_m": round(video_m, 1), "tape_m": tape,
         "off_pct": round(100 * off_share(video_m, tape))}}  # measured, so the letter may quote it
-    measured = json.dumps(measured, indent=1, ensure_ascii=False)
+    p["measured"] = measured = json.dumps(measured, indent=1, ensure_ascii=False)  # the page's number check too
     prompt = pack.LETTER_PROMPT.format(facts=measured, language=site.get("letter_language", "English"))
     prompt += f"\n\nThe head of the school asks for these changes: {notes}" if notes else ""
     out_dir = Path(p["out"])
@@ -225,7 +235,8 @@ def submit_letter(p, args, key):
                                   site.get("vehicles", []))
     except (ValueError, OSError, subprocess.CalledProcessError):
         photo = None
-    p["letter"] = pack.ask_plan(prompt, measured, key, photo)
+    kept = {k: v for k, v in (p.get("letter") or {}).items() if k in HEAD_NOTES}  # the sign-off counts edits after them
+    p["letter"] = {**pack.ask_plan(prompt, measured, key, photo), **kept}
     pack.write_plan(out_dir, p["letter"])
     left = len(p["letter"].get("unmeasured", [])) + len(p["letter"].get("unsupported", []))
     return {"status": "needs_review", "fix": p["letter"]["fix"], "letter": p["letter"]["letter"],
@@ -318,35 +329,61 @@ def case_section(out_dir):
     if not log.exists():
         return ""
     steps = [json.loads(line) for line in log.read_text().splitlines() if line.strip()]
-    items = "".join(f"<li>{'Person: ' if s.get('person') else ''}{html.escape(s['summary'])}</li>" for s in steps)
+    items = "".join(f"<li>{step_time(s)}{'Person: ' if s.get('person') else ''}{html.escape(s['summary'])}</li>"
+                    for s in steps)
     turns, usd = sum("turn" in s for s in steps), max([s.get("usd", 0) for s in steps] or [0])
     return (f'<section><h2>How the agent worked this case</h2><ol>{items}</ol><p class="note">Muse Spark chose one '
-            f"tool per turn: {turns} turns, about ${usd:.2f}, estimated at Muse Spark Open's Fireworks list price of "
-            f"${USD_PER_M_IN:g} / ${USD_PER_M_OUT:g} per million input / output tokens; the Meta API price of "
-            f"{review.MODEL} was not checked. Tracking (SAM, Spark's pedestrian reviews, the sound check) is billed "
-            "apart and is not in this figure. Steps marked Person were a person's answers.</p></section>")
+            f"tool per turn: {turns} turns, about ${usd:.2f}, estimated at the {PRICE}, with cached input counted at "
+            "the full input price. Tracking (SAM, Spark's pedestrian reviews, the sound check) is billed apart and is "
+            "not in this figure. Steps marked Person were a person's answers.</p></section>")
+
+
+def step_time(step):
+    """When a step happened, in this computer's time zone ("Mon 21:05 IST "); "" for a step logged without one."""
+    if not step.get("time"):
+        return ""
+    return datetime.datetime.fromisoformat(step["time"]).astimezone().strftime("%a %H:%M %Z ")
+
+
+def with_measured(page_html, measured):
+    """The page with every number of the agent's measurements, the tape check included (pack.page knows only the
+    site's), added to the letter's in-browser number check, so an edit leaves a quoted "tape 7.2 m" unflagged."""
+    numbers = " ".join(n.replace(",", "") for n in pack.NUMBER.findall(measured))
+    return page_html.replace('data-measured="', f'data-measured="{numbers} ', 1) if numbers else page_html
 
 
 def write_page(p, images=None):
-    site, (data, events, seen) = case_site(p), case_data(p)
+    """pack.main's page for this case, with its sign-off, receipt and street seen from above, and the share/ folder
+    with the SHA256SUMS the page says is there."""
+    out, site, (data, events, seen) = Path(p["out"]), case_site(p), case_data(p)
+    paths, photo = data.get("paths") or {}, out / "street.jpg"
     page = pack.page(site, events, seen, p["letter"], images, data["fps"], data.get("cost"),
-                     data.get("sam_full_requests"), data.get("privacy"), source_sha256=data.get("source_sha256"),
-                     timeline=data.get("timeline"), paths=data.get("paths") or {}, case=case_section(p["out"]),
-                     walking=data.get("walking"))
-    (Path(p["out"]) / "index.html").write_text(page)
+                     data.get("sam_full_requests"), data.get("privacy"), signoff=pack.read_signoff(out),
+                     receipt=pack.receipt_line(data, p["letter"], images), source_sha256=data.get("source_sha256"),
+                     timeline=data.get("timeline"), paths=paths, case=case_section(out), walking=data.get("walking"),
+                     ground=roadmap.ground(photo, site, events, out, paths) if photo.exists() else None)
+    page = with_measured(page, p.get("measured", ""))
+    (out / "index.html").write_text(page)
+    seal.write_sums(pack.share(out, page))
 
 
-def sign_off(p, key):
-    """The head of the school approved the letter: Muse Image draws the fix and the page is written. No agent turn."""
-    photo, images = Path(p["out"]) / "street.jpg", None
+def sign_off(p, key, approved_by, school):
+    """The head of the school approved the letter: signoff.json (pack.sign), Muse Image draws the fix inside the
+    measured band as pack.main does (fixband.draw), and the page is written. No agent turn. The pictures are kept in
+    progress.json, so writing the page again pays for none."""
+    out, site, images = Path(p["out"]), case_site(p), None
+    photo = out / "street.jpg"
+    pack.sign(out, p["letter"], approved_by, school)
     if photo.exists() and key:
         try:
-            images = (photo.name, pack.draw_fix(photo, pack.fix_instruction(p["letter"]), key,
-                                                Path(p["out"]) / "street-fixed.webp").name)  # kept untouched: AI tag
-        except (OSError, ValueError, http.client.HTTPException, subprocess.CalledProcessError) as err:
+            images = fixband.draw(photo, p["letter"]["fix"], pack.fix_instruction(p["letter"]), case_data(p)[1], site,
+                                  pack.photo_people(out / "clip.mp4", site.get("person", "person")),
+                                  lambda image, words, path: pack.draw_fix(image, words, key, path), out)
+        except (SystemExit, OSError, ValueError, KeyError, IndexError, TypeError, AttributeError,
+                http.client.HTTPException, subprocess.CalledProcessError) as err:  # pack.main's: signed all the same
             print(f"fix image failed, the page has the letter only: {err}", file=sys.stderr)
-    p["status"] = "done"
-    save(p, {"person": "approve", "summary": "The head of the school approved the letter."})
+    p["status"], p["images"] = "done", images
+    save(p, {"person": "approve", "summary": f"{approved_by}, {school}, approved the letter."})
     write_page(p, images)
 
 
@@ -359,8 +396,9 @@ def tape_metres(text):
     return metres
 
 
-def person_step(p, key, answer=None, approve=False, notes=None):
-    """Apply what a person did since the case stopped: the message for the model, or None when no turn follows."""
+def person_step(p, key, answer=None, approve=None, notes=None):
+    """Apply what a person did since the case stopped: the message for the model, or None when no turn follows.
+    `approve` is (approved_by, school). A done case gets its page written again (a page fix after sign-off)."""
     status, open_requests = p["status"], [r for r in p["requests"] if r["answer"] is None]
     if answer:
         request = next((r for r in open_requests if r["id"] == answer[0]), None)
@@ -375,21 +413,27 @@ def person_step(p, key, answer=None, approve=False, notes=None):
         if status != "needs_review":
             raise SystemExit("no letter is waiting for sign-off")
         if approve:
-            return sign_off(p, key)
+            return sign_off(p, key, *approve)
+        first = p["letter"]  # as pack.new_plan keeps them: every note so far and the first AI draft
+        p["letter"] = {**first, "notes": first.get("notes", []) + [notes],
+                       "draft_letter": first.get("draft_letter", first["letter"])}
         save(p, {"person": "reject", "summary": f"The head of the school sent the letter back: {notes}"})
         return f"The head of the school sent the letter back with these notes: {notes}. Revise it with submit_letter."
     if status == "needs_input":
         raise SystemExit(f"waiting for a person: {open_requests[-1]['question']} "
                          f"Reply with --answer {open_requests[-1]['id']} \"...\"")
-    if status in ("needs_review", "done", "over_budget"):
+    if status == "done":
+        write_page(p, p.get("images"))
+        print(f"this case is done: {Path(p['out']) / 'index.html'} and share/ written again", flush=True)
+        return None
+    if status in ("needs_review", "over_budget"):
         raise SystemExit({"needs_review": "the letter waits for --approve or --reject --notes \"...\"",
-                          "done": "this case is done; the page is index.html",
                           "over_budget": f"this case reached the ${MAX_USD:.2f} cap"}[status])
     return ("You have more turns. Continue." if p["turn"] else
             f"Work the case for the crossing \"{case_site(p).get('name', '')}\" and file the letter.")
 
 
-def work(video, site, out_dir, key, answer=None, approve=False, notes=None):
+def work(video, site, out_dir, key, answer=None, approve=None, notes=None):
     """Start or resume the case in out_dir/case; returns its status."""
     case_dir = Path(out_dir) / "case"
     case_dir.mkdir(parents=True, exist_ok=True)
@@ -412,14 +456,23 @@ def main():
     parser.add_argument("site")
     parser.add_argument("--out", help="output folder (default out/<video name>)")
     parser.add_argument("--answer", nargs=2, metavar=("REQUEST", "TEXT"), help='e.g. --answer R1 "7.2 m"')
-    parser.add_argument("--approve", action="store_true", help="sign the letter off")
+    parser.add_argument("--approve", action="store_true", help="sign the letter off; needs --approved-by and --school")
+    parser.add_argument("--approved-by", default="", metavar="NAME", help='who read and approved the letter, e.g. '
+                        '"A. Rao, Principal"')
+    parser.add_argument("--school", default="", help="the school that sends the letter")
     parser.add_argument("--reject", action="store_true", help="send the letter back; needs --notes")
     parser.add_argument("--notes", help="what to change, with --reject")
     args = parser.parse_args()
     if args.reject != (args.notes is not None):
         parser.error("--reject and --notes go together")
+    signer = (args.approved_by.strip(), args.school.strip())
+    if not args.approve == all(signer) == any(signer):
+        parser.error("--approve, --approved-by and --school go together")
+    if args.approve and args.reject:
+        parser.error("--approve or --reject, not both")
     out_dir = Path(args.out or Path("out") / Path(args.video).stem)
-    status = work(args.video, args.site, out_dir, sam.load_api_key(), args.answer, args.approve, args.notes)
+    status = work(args.video, args.site, out_dir, sam.load_api_key(), args.answer, signer if args.approve else None,
+                  args.notes)
     print(f"case {status}: {out_dir / 'case' / 'progress.json'}")
 
 
