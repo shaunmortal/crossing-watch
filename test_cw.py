@@ -574,6 +574,72 @@ def test_top_down_view_uses_box_centre_and_whole_box():
     assert len(road.vehicle_edges(car, H, top_down=True)[0]) == 4 and len(road.vehicle_edges(car, H)[0]) == 2
 
 
+def filmed_at_an_angle(centres, heading=0.0, size=(4.6, 1.8)):
+    """(SAM-like boxes, H) of a 1.5 m tall vehicle at `centres` ({frame: road point}) seen by a phone 10 m up and
+    25 m back, calibrated on the road as calibrate.html would be (validate_sind's simulated camera)."""
+    import validate_sind
+    project = validate_sind.camera((0.0, 0.0), 10.0, 25.0)
+    boxes = {f: validate_sind.box(project, road.rectangle(c, heading, size), 1.5) for f, c in centres.items()}
+    return boxes, validate_sind.calibration(project, (0.0, 0.0))
+
+
+def test_car_shaped_footprint_stands_under_the_box_at_an_angle():
+    drive = {f: (-8.0 + 0.8 * f, 1.0) for f in range(20)}  # 8 m/s along x at 10 fps...
+    centres = drive | {f: drive[19] for f in range(20, 40)}  # ...then 2 s standing still
+    boxes, H = filmed_at_an_angle(centres)
+    feet = road.vehicle_footprints(boxes, H, (4.6, 1.8), 10)
+    assert feet.keys() == centres.keys() and all(len(s) == 4 for s in feet.values())  # heading carried while still
+    assert all(math.dist(road.centroid(feet[f]), c) < 0.25 for f, c in centres.items() if f >= road.SMOOTH_FRAMES)
+    assert all(abs(math.dist(s[0], s[1]) - 1.8) < 1e-9 and abs(math.dist(s[1], s[2]) - 4.6) < 1e-9
+               for s in feet.values())
+    edges = road.vehicle_edges(boxes, H)  # the lower box edge is the near side, about a metre off the middle
+    assert all(math.dist(road.centroid(edges[f]), c) > 0.8 for f, c in centres.items())
+    parked = {f: boxes[39] for f in range(30)}  # never moved: no heading, so lower edges throughout
+    assert road.vehicle_footprints(parked, H, (4.6, 1.8), 10) == road.vehicle_edges(parked, H)
+
+
+def test_footprint_centre_is_median_smoothed_over_two_frames():
+    centres = {f: (-8.0 + 0.8 * f, 1.0) for f in range(20)}
+    boxes, H = filmed_at_an_angle(centres)
+    boxes[10] = [v + 12 for v in boxes[10]]  # one SAM box 12 px off
+    alone = road.fit_centre(road.inverse(H), boxes[10], 0.0, (4.6, 1.8), centres[10])
+    smoothed = road.centroid(road.vehicle_footprints(boxes, H, (4.6, 1.8), 10)[10])
+    assert math.dist(alone, centres[10]) > 0.5 and math.dist(smoothed, centres[10]) < 0.25
+
+
+def test_footprints_only_at_an_angle_and_top_down_shapes_unchanged():
+    import analyze
+    centres = {f: (-8.0 + 0.8 * f, 1.0) for f in range(20)}
+    boxes, H = filmed_at_an_angle(centres)
+    site = {"image_points": SQUARE_IMG, "world_points": SQUARE_ROAD, "zone_m": [-50, -50, 50, 50],
+            "vehicles": ["car", "bus"], "vehicle_sizes_m": {"bus": [10.0, 2.5]}}
+    tracks = {"car#1": boxes, "bus#2": boxes, "vehicle#3": boxes}
+    _, angled = analyze.road_tracks(site, H, {}, tracks, None)
+    car = road.VEHICLE_SIZES_M["car"]
+    assert angled["car#1"] == road.vehicle_footprints(boxes, H, car, analyze.FPS, site["zone_m"])
+    assert abs(math.dist(*angled["bus#2"][0][:2]) - 2.5) < 1e-9  # the site's tape-measured size
+    assert angled["vehicle#3"] == road.vehicle_edges(boxes, H, site["zone_m"])  # no size: the lower box edge
+    _, top = analyze.road_tracks({**site, "view": "top-down"}, H, {}, tracks, None)
+    assert top == {vid: road.vehicle_edges(t, H, site["zone_m"], None, True) for vid, t in tracks.items()}
+    event = {"person": "p/0", "vehicle": "car#1", "t_person_s": 1.0, "t_vehicle_s": 1.0}
+    [where] = analyze.placed([event], {"p/0": {10: (0.0, 0.0)}}, angled)
+    assert where["footprint"] == [[round(v, 1) for v in q] for q in angled["car#1"][10]]
+    import roadmap
+    assert roadmap.svg([{**where, "tier": "serious", "vehicle_kmh": 28.8, "pet_s": 0.0}],
+                       SQUARE_ROAD).count('<polygon class="foot"') == 1
+
+
+def test_sind_oblique_table_compares_vehicle_shapes_with_the_truth():
+    import validate_sind
+    person = {"7": {f: (0.0, 0.0) for f in range(40)}}  # standing in the road while a car passes 0.1 m away
+    car = {"car#1": {f: road.rectangle((-16.0 + 0.8 * f, 1.0), 0.0, (4.6, 1.8)) for f in range(40)}}
+    rows = validate_sind.oblique_rows(person, car, 10.0, 25.0)
+    table = validate_sind.oblique_table(person, rows)
+    assert len(rows) == 5 and table.count("\n") == 6
+    assert "| SinD footprints (truth) | 1 | 1 | 0 | 0 | +0.00 s |" in table
+    assert "| car-shaped footprint | 1 | 1 | 0 | 0 |" in table
+
+
 def test_spark_crop_stays_inside_the_frame():
     assert review.crop_window([0, 0, 10, 20], (640, 360)) == (0, 0, 80)          # small box: minimum crop, clamped
     assert review.crop_window([600, 300, 640, 360], (640, 360)) == (460, 180, 180)  # 3 x 60 px, pushed inside
@@ -917,6 +983,15 @@ def test_site_concepts_must_not_share_a_cache_name():
             raise AssertionError("unknown mode accepted")
         except SystemExit as err:
             assert "vehicle_mode" in str(err) and '"auto"' in str(err)
+        path.write_text(json.dumps(one | {"vehicle_sizes_m": {"vehicle": [4.2, 1.7]}}))
+        assert analyze.load_site(path)["vehicle_sizes_m"] == {"vehicle": [4.2, 1.7]}
+        for sizes in ({"car": [4.2, 1.7]}, {"vehicle": [1.7, 4.2]}, {"vehicle": [4.2]}, {"vehicle": [4.2, 0]}):
+            path.write_text(json.dumps(one | {"vehicle_sizes_m": sizes}))  # not a site concept, width first, ...
+            try:
+                analyze.load_site(path)
+                raise AssertionError(f"bad vehicle_sizes_m accepted: {sizes}")
+            except SystemExit as err:
+                assert "vehicle_sizes_m" in str(err)
 
 
 def test_number_check_reads_grouped_numbers_and_non_english_facts():

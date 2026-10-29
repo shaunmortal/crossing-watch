@@ -68,6 +68,12 @@ def load_site(path):
         raise SystemExit(f"{path}: person_grid must be 1, 2 or 3 (use 2 or 3 when more than ~16 people are in view)")
     if site.get("view", "oblique") not in ("oblique", "top-down"):
         raise SystemExit(f"{path}: view must be \"oblique\" (a phone up high, looking across) or \"top-down\" (drone)")
+    sizes = site.get("vehicle_sizes_m", {})
+    if not (isinstance(sizes, dict) and all(k in vehicles and isinstance(v, list) and len(v) == 2
+                                            and all(isinstance(x, (int, float)) and x > 0 for x in v) and v[0] >= v[1]
+                                            for k, v in sizes.items())):
+        raise SystemExit(f"{path}: vehicle_sizes_m must map vehicle concepts to tape-measured [length, width] in "
+                         "metres, length first, e.g. {\"car\": [3.9, 1.7]}")
     if not PREP_FILTER.match(site.get("prep_filter", "") or "crop"):
         raise SystemExit(f"{path}: prep_filter may only use crop, scale, transpose, hflip or vflip")
     return site
@@ -331,7 +337,7 @@ def write_events(out_dir, site, events, seen, cost, full, privacy=None):
 def road_tracks(site, H, person_boxes, vehicle_boxes, frame_size):
     """SAM boxes -> (pedestrian track pieces, vehicle shapes) in road metres, cleaned: riders dropped, tracks split
     where the ID jumps, pieces under road.MIN_PIECE_S dropped, only the analysis zone (and carriageway, if marked)
-    kept."""
+    kept. A vehicle seen at an angle is a car-shaped footprint when its concept has a size (vehicle_size)."""
     zone = site.get("zone_m") or road.zone_around(site["world_points"])
     top_down = site.get("view") == "top-down"
     walkers = {pid: road.without_riders(t, vehicle_boxes.values()) for pid, t in person_boxes.items()}
@@ -339,20 +345,34 @@ def road_tracks(site, H, person_boxes, vehicle_boxes, frame_size):
               for k, piece in enumerate(road.split_at_jumps(road.moving_frames(  # stillness judged before cutting
                   road.person_points(t, H, zone, site.get("roadway_m"), frame_size, top_down), FPS), FPS))
               if len(piece) >= road.MIN_PIECE_S * FPS}
-    vehicles = {vid: road.vehicle_edges(t, H, zone, frame_size, top_down) for vid, t in vehicle_boxes.items()}
+    sizes = {vid: vehicle_size(site, vid) for vid in vehicle_boxes}
+    vehicles = {vid: road.vehicle_footprints(t, H, sizes[vid], FPS, zone, frame_size) if sizes[vid]
+                else road.vehicle_edges(t, H, zone, frame_size, top_down) for vid, t in vehicle_boxes.items()}
     return people, vehicles
+
+
+def vehicle_size(site, vid):
+    """(length, width) in metres of a vehicle id's concept for a car-shaped footprint: the site's tape-measured
+    "vehicle_sizes_m", else road.VEHICLE_SIZES_M. None from a top-down camera, where the box is the footprint, and
+    for a concept with no size (such as the single concept "vehicle"), which keeps the lower box edge."""
+    if site.get("view") == "top-down":
+        return None
+    concept = vid.split("#")[0]
+    return site.get("vehicle_sizes_m", {}).get(concept) or road.VEHICLE_SIZES_M.get(concept.lower())
 
 
 
 def placed(events, people, vehicles):
-    """The events with where each happened and both paths around the moment, in road metres, for the map."""
+    """The events with where each happened, both paths around the moment and the vehicle's footprint (or lower
+    edge) at its moment, in road metres, for the map."""
     out = []
     for e in events:
         fp, fv = round(e["t_person_s"] * FPS), round(e["t_vehicle_s"] * FPS)
         feet = people[e["person"]]
         centres = {f: road.centroid(shape) for f, shape in vehicles[e["vehicle"]].items()}
         out.append({**e, "where": [round(c, 1) for c in feet[fp]] if fp in feet else None,
-                    "path_person": roadmap.path_around(feet, fp, FPS), "path_vehicle": roadmap.path_around(centres, fv, FPS)})
+                    "path_person": roadmap.path_around(feet, fp, FPS), "path_vehicle": roadmap.path_around(centres, fv, FPS),
+                    "footprint": [[round(v, 1) for v in q] for q in vehicles[e["vehicle"]][fv]]})
     return out
 
 

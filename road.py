@@ -39,6 +39,15 @@ BRAKING_MPS2 = 7.0
 # so risks are not overstated. Children are not covered by the study.
 DEATH_RISK_INTERCEPT = 6.9
 DEATH_RISK_PER_KMH = 0.090
+# Car-shaped footprints for a camera at an angle: (length, width) in metres per vehicle concept; a site's
+# "vehicle_sizes_m" (tape-measured) overrides these. Other concepts keep the lower box edge.
+VEHICLE_SIZES_M = {"car": (4.6, 1.8), "motorcycle": (1.7, 0.8), "auto rickshaw": (2.4, 1.1)}
+HEADING_S = 0.5       # direction of travel from where the vehicle was this long before and after
+MIN_HEADING_M = 0.3   # ...when it moved at least this far; otherwise the nearest frame's heading is carried
+SMOOTH_FRAMES = 2     # footprint centre: median over this many frames either side
+FIT_STEPS = 8         # Gauss-Newton steps placing a footprint under its SAM box
+FIT_STEP_M = 0.01     # finite-difference step for the fit's slopes
+FIT_DONE_M = 0.001    # the fit stops once a step moves the centre less than this
 
 
 def solve(rows, rhs):
@@ -87,6 +96,12 @@ def to_image(H, u, v):
     """Image pixel over road point (u, v), the inverse of to_ground, or None when the point is behind the camera."""
     x, y, w = solve(H, [u, v, 1.0])  # to_ground divides by 1 / w at that pixel, so w <= 0 is never in view
     return None if w <= 0 else (x / w, y / w)
+
+
+def inverse(H):
+    """H inverted once: to_ground(inverse(H), u, v) is to_image(H, u, v) without a solve per point."""
+    columns = [solve(H, [float(i == j) for i in range(3)]) for j in range(3)]
+    return [[columns[j][i] for j in range(3)] for i in range(3)]
 
 
 def zone_around(world_points, margin=ZONE_MARGIN_M):
@@ -182,7 +197,8 @@ def vehicle_edges(track, H, zone=None, frame_size=None, top_down=False):
     """frame -> road shape of the vehicle inside the zone: the segment under its lower box edge, or, when the camera
     looks straight down, the whole box (it is the footprint). Boxes cut off by the frame edge are skipped, since
     their edge is the frame's, not the vehicle's."""
-    # ponytail: lower box edge only stands in for the footprint; use mask ground contact if misses show up
+    # ponytail: at an angle the lower box edge only stands in for the footprint; vehicle_footprints replaces it for
+    # concepts with a size
     edges = {}
     for f, b in track.items():
         if frame_size and (b[0] <= BORDER_PX or b[2] >= frame_size[0] - 1 - BORDER_PX
@@ -193,6 +209,78 @@ def vehicle_edges(track, H, zone=None, frame_size=None, top_down=False):
         if all(in_zone(q, zone) for q in shape):
             edges[f] = shape
     return edges
+
+
+def rectangle(centre, heading, size):
+    """Corners, in order round it, of a (length, width) rectangle on the road turned to `heading` (radians)."""
+    c, s = math.cos(heading), math.sin(heading)
+    half_l, half_w = size[0] / 2, size[1] / 2
+    return tuple((centre[0] + dx * c - dy * s, centre[1] + dx * s + dy * c)
+                 for dx, dy in ((half_l, half_w), (half_l, -half_w), (-half_l, -half_w), (-half_l, half_w)))
+
+
+def headings(mids, fps, half_s=HEADING_S, min_m=MIN_HEADING_M):
+    """frame -> direction of travel (radians) from where the vehicle was `half_s` before and after; a frame where it
+    moved less than `min_m` in that time takes the nearest such frame's heading. Empty if it never moved that far."""
+    frames, half = sorted(mids), max(1, round(half_s * fps))
+    known = {}
+    for f in frames:
+        lo = mids[frames[bisect.bisect_left(frames, f - half)]]
+        hi = mids[frames[bisect.bisect_right(frames, f + half) - 1]]
+        if math.dist(lo, hi) >= min_m:
+            known[f] = math.atan2(hi[1] - lo[1], hi[0] - lo[0])
+    order = sorted(known)
+
+    def nearest(f):
+        i = bisect.bisect_left(order, f)
+        return min(order[max(0, i - 1):i + 1], key=lambda k: abs(k - f))
+    return {f: known[nearest(f)] for f in frames} if known else {}
+
+
+def fit_centre(H_inv, box, heading, size, start):
+    """Road point where a `size` rectangle turned to `heading` stands so that its image fits the SAM box: lowest
+    corner on the box's bottom edge, corners centred on the box's centre. Gauss-Newton on the two unknowns from
+    `start`; None if the rectangle leaves the camera's view. `H_inv` is inverse(H)."""
+    def residual(c):
+        pixels = [to_ground(H_inv, *q) for q in rectangle(c, heading, size)]
+        if None in pixels:
+            return None
+        return (max(p[1] for p in pixels) - box[3], sum(p[0] for p in pixels) / 4 - (box[0] + box[2]) / 2)
+
+    c = start
+    for _ in range(FIT_STEPS):
+        r, rx, ry = residual(c), residual((c[0] + FIT_STEP_M, c[1])), residual((c[0], c[1] + FIT_STEP_M))
+        if None in (r, rx, ry):
+            return None
+        a, b = (rx[0] - r[0]) / FIT_STEP_M, (ry[0] - r[0]) / FIT_STEP_M  # bottom pixel per metre in x, y
+        d, e = (rx[1] - r[1]) / FIT_STEP_M, (ry[1] - r[1]) / FIT_STEP_M  # centre pixel per metre in x, y
+        det = a * e - b * d
+        if abs(det) < 1e-9:
+            return None
+        dx, dy = (e * r[0] - b * r[1]) / det, (a * r[1] - d * r[0]) / det
+        c = (c[0] - dx, c[1] - dy)
+        if math.hypot(dx, dy) < FIT_DONE_M:
+            break
+    return c
+
+
+def vehicle_footprints(track, H, size, fps, zone=None, frame_size=None):
+    """frame -> road footprint of a vehicle seen at an angle: a `size` (length, width) rectangle turned to its
+    heading and placed where its image fits the SAM box (fit_centre), the centre median-smoothed over
+    +-SMOOTH_FRAMES frames. The lower box edge (vehicle_edges) lies along the near side of the vehicle's bulk, not
+    under it: in a SinD simulation of a phone at an angle it nearly doubled the serious conflicts. A track that never
+    moves far enough for a heading keeps its lower edges, so no track mixes the two shapes."""
+    edges = vehicle_edges(track, H, zone, frame_size)
+    turn = headings({f: centroid(e) for f, e in edges.items()}, fps)
+    if not turn:
+        return edges
+    H_inv = inverse(H)
+    centres = {f: c for f in edges if (c := fit_centre(H_inv, track[f], turn[f], size, centroid(edges[f])))}
+    # ponytail: the window is one-sided at a track's ends, pulling them in by up to a frame of travel; narrowing it
+    # there measured no closer to SinD's truth (validate_sind --oblique). The zone was checked on the lower edge: a
+    # footprint behind it crossing the zone's far side must not cut the track short.
+    near = lambda f: [centres[g] for g in range(f - SMOOTH_FRAMES, f + SMOOTH_FRAMES + 1) if g in centres]
+    return {f: rectangle(median_point(near(f)), turn[f], size) for f in centres}
 
 
 def segment_distance(p, a, b):
