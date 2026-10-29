@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 
 import crowd
+import filmcheck
 import listen
 import pace
 import render
@@ -38,6 +39,10 @@ SAM_USD_PER_IMAGE = 0.0025    # crowd mode: SAM images, Meta's list price of $2.
 MAX_COST_USD = 10.0  # above this estimate, --allow-cost (or a --budget) is required
 MIN_WINDOW_S = 900   # a shorter window_s gets no hourly rates, PV² or school-year line on the page (pack.MIN_RATE_MINUTES)
 MODES = ("video", "crowd", "auto")  # person_mode / vehicle_mode values
+# HDR source only: scale to SDR (BT.709) colours; 42.8 dB PSNR against the SDR original on a synthetic HLG clip,
+# untested on a real iPhone HLG file, and it may clip a bright sky
+TO_SDR = ":out_transfer=bt709:out_primaries=bt709:out_color_matrix=bt709:out_range=tv"
+STEADY_MIN_S = 2      # a clip this short after its reference frame gets no camera check (as filmcheck.py)
 PREP_FILTER = re.compile(r"^((crop|scale|transpose|hflip|vflip)(=[\w.*:+\-/]+)?)(,(crop|scale|transpose|hflip|vflip)(=[\w.*:+\-/]+)?)*$")
 
 
@@ -123,12 +128,14 @@ def check_source(video, out_dir, prep_filter, sha256=None, window=None):
 
 def prepare(video, out_dir, extra_filter="", window=None):
     """Re-encode to what SAM wants: H.264 with faststart, FPS frames a second, WIDTH pixels wide; only the seconds
-    `window` [start, end] of the video when given (clip time 0 is then the video's `start`)."""
+    `window` [start, end] of the video when given (clip time 0 is then the video's `start`). An HDR source (iPhone
+    HDR Video) is mapped to SDR colours, else the clip comes out dark and washed out."""
     clip = out_dir / "clip.mp4"
     if clip.exists():
         return clip
     partial = out_dir / "clip.part.mp4"
-    filters = ",".join(f for f in (extra_filter, f"fps={FPS}", f"scale={WIDTH}:-2") if f)
+    hdr = probe(video, "stream=color_transfer") in filmcheck.HDR_TRANSFERS
+    filters = ",".join(f for f in (extra_filter, f"fps={FPS}", f"scale={WIDTH}:-2" + (TO_SDR if hdr else "")) if f)
     cut = ["-ss", f"{window[0]:.3f}", "-t", f"{window[1] - window[0]:.3f}"] if window else []
     try:
         subprocess.run(["ffmpeg", "-v", "error", "-y", *cut, "-i", str(video), "-vf", filters, "-an", "-c:v", "libx264",
@@ -137,6 +144,20 @@ def prepare(video, out_dir, extra_filter="", window=None):
     finally:
         partial.unlink(missing_ok=True)
     return clip
+
+
+def camera_check(clip, total, window=None):
+    """filmcheck.steadiness on the analysed clip: how far the view moved from the frame the calibration was clicked on
+    (clip time 0 with window_s, else filmcheck.REF_S), and whether it darkened. Its times are clip seconds, like
+    t_person_s. None for a clip too short to check, or one ffmpeg could not read."""
+    start, end = (0.0 if window else filmcheck.REF_S), total / FPS
+    if end - start < STEADY_MIN_S:
+        return None
+    try:
+        return filmcheck.steadiness(clip, start, end)
+    except subprocess.CalledProcessError as err:
+        print(f"camera check failed: {err}", flush=True)
+        return None
 
 
 def frame_count(clip):
@@ -407,15 +428,16 @@ def run_record(out_dir, started, replies_before):
 
 
 def write_events(out_dir, site, events, seen, cost, full, privacy=None, source_sha256=None, run=None, timeline=None,
-                 paths=None, walking=None, recording_s=None):
-    """events.json; `recording_s`, the whole recording's length, only when window_s analysed part of it."""
+                 paths=None, walking=None, recording_s=None, camera=None):
+    """events.json; `recording_s`, the whole recording's length, only when window_s analysed part of it; `camera`,
+    camera_check's dict (kept out of exposure, so the letter's facts stay the same)."""
     (out_dir / "events.json").write_text(json.dumps({"site": site.get("name", ""), "fps": FPS, "exposure": seen,
                                                      "cost": cost,
                                                      "sam_full_requests": full, "privacy": privacy,
                                                      "source_sha256": source_sha256,
                                                      **({"recording_s": recording_s} if recording_s else {}), "run": run,
                                                      "timeline": timeline, "paths": paths, "walking": walking,
-                                                     "events": events}, indent=1))
+                                                     "camera": camera, "events": events}, indent=1))
 
 
 def road_tracks(site, H, person_boxes, vehicle_boxes, frame_size):
@@ -669,10 +691,11 @@ def main():
               "in those parts were not tracked (use person_mode / vehicle_mode \"crowd\": the Crowded and Dense "
               "traffic boxes on the calibration page; or \"auto\")", flush=True)
 
+    camera = camera_check(clip, total, window)  # one calibration holds only while the phone stays put
     # saved before the slower, network-bound evidence step
     write_events(out_dir, site, events, seen, cost(), full, source_sha256=source,
                  run=run_record(out_dir, started, before), timeline=timeline, paths=paths, walking=walk,
-                 recording_s=recording_s)
+                 recording_s=recording_s, camera=camera)
     reused, reviewed = review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size,
                                      top_down)
     if reviewed:  # same footage, same numbers: delete person-*.json for a fresh look
@@ -686,7 +709,7 @@ def main():
                  everyone, (window or [0.0])[0])
     write_events(out_dir, site, events, seen, cost(len(searched)), full, privacy, source,
                  {**run_record(out_dir, started, before), "spark_reviewed": reviewed, "spark_reused": reused}, timeline,
-                 paths, walk, recording_s)
+                 paths, walk, recording_s, camera)
     report(seen, events, untrusted)
 
 

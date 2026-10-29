@@ -3448,6 +3448,29 @@ def test_exposure_counts_vehicles_over_indias_school_zone_speed():
     assert road.exposure({}, {}, fps, 600)["over_25_kmh"] == 0
 
 
+def test_analyze_keeps_the_camera_check_and_maps_hdr_to_sdr():
+    """events.json's camera: filmcheck.steadiness against the frame the calibration was clicked on (clip time 0 with
+    window_s, else filmcheck.REF_S), none for a clip too short; prepare maps an HDR (HLG) source to BT.709."""
+    import subprocess, tempfile
+    from pathlib import Path
+    import analyze, filmcheck
+    asked, real = [], filmcheck.steadiness
+    filmcheck.steadiness = lambda clip, start, end: asked.append((start, end)) or {"max_shift_px": 2}
+    try:
+        assert analyze.camera_check("clip", 9000) == analyze.camera_check("clip", 9000, [45, 945]) == {"max_shift_px": 2}
+        assert analyze.camera_check("clip", 25) is None  # 2.5 s: under STEADY_MIN_S after the 1 s reference
+    finally:
+        filmcheck.steadiness = real
+    assert asked == [(filmcheck.REF_S, 900.0), (0.0, 900.0)]
+    with tempfile.TemporaryDirectory() as tmp:
+        hlg = Path(tmp, "hlg.mp4")
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=10:duration=1", "-vf",
+                        "setparams=color_trc=arib-std-b67:color_primaries=bt2020:colorspace=bt2020nc",
+                        "-pix_fmt", "yuv420p", str(hlg)], check=True)
+        assert analyze.probe(hlg, "stream=color_transfer") == "arib-std-b67"
+        assert analyze.probe(analyze.prepare(hlg, Path(tmp)), "stream=color_transfer") == "bt709"
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):
