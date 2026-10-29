@@ -500,6 +500,67 @@ def test_a_second_model_judges_the_letter_and_its_objections_go_back():
     assert pack.read_problems('{"problems": ["a", 3, ""]}') == ["a"] and pack.read_problems("nonsense") is None
 
 
+def test_number_check_flags_words_and_mph_and_reads_the_measurements_only():
+    facts = '{"worst": [{"vehicle_kmh": 38.0, "pet_s": 0.2}]}'
+    assert pack.unmeasured("The four worst; thirty-eight km/h; 38 mph; dozens of times", facts) == [
+        "four", "thirty-eight", "dozens", "38 mph"]
+    assert pack.unmeasured("One car and two-wheelers, three wheelers, at 38.0 km/h, 0.2 s, by the Triumph", facts) == []
+    letter = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "SAM 3.1 measured 38.0 km/h."}
+    old = pack.model_plan
+    pack.model_plan = lambda prompt, key, photo=None: letter
+    try:
+        assert pack.ask_plan("PROMPT naming SAM 3.1", facts, None)["unmeasured"] == ["3.1"]  # the prompt is no source
+    finally:
+        pack.model_plan = old
+    assert "3.1" not in pack.LETTER_PROMPT and "every number in digits" in pack.LETTER_PROMPT
+    assert "in words, not in\ndigits" in pack.JUDGE_PROMPT
+
+
+def test_a_sentence_never_puts_one_near_miss_speed_beside_another_ones_gap():
+    worst = [{"vehicle_kmh": 38.0, "pet_s": 0.2}, {"vehicle_kmh": 20.0, "pet_s": 0.9}, {"vehicle_kmh": 11.2, "pet_s": 0.9}]
+    crossed = "A car at 38.0 km/h passed 0.9 s from a child."
+    assert pack.mixed(crossed + " Later one at 20.0 km/h came 0.9 s after a man.", worst) == [crossed]
+    assert pack.mixed("Cars at 38.0 km/h (0.2 s apart), 20.0 km/h (0.9 s) and 11.2 km/h (0.9 seconds).", worst) == []
+    assert pack.mixed("The worst were 0.2 s to 0.9 s apart, with cars at 20.0 km/h to 38.0 km/h.", worst) == []
+    assert pack.mixed("In 6.9 s of video the 85th percentile was 18.3 km/h.", worst) == []  # no event's numbers
+    good = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "A car at 38.0 km/h, 0.2 s from a child."}
+    replies, prompts = [{**good, "letter": crossed}, good], []
+    old = pack.model_plan, pack.judge_problems
+    pack.model_plan = lambda prompt, key, photo=None: (prompts.append(prompt), replies.pop(0))[1]
+    pack.judge_problems = lambda letter, measured, key: []
+    try:
+        facts = json.dumps({"worst": worst})
+        assert pack.ask_plan("PROMPT", facts, "key")["letter"] == good["letter"]
+        assert crossed in prompts[1] and "Keep each near-miss's numbers together" in prompts[1]
+        replies[:] = [{**good, "letter": crossed}] * pack.LETTER_TRIES
+        stubborn = pack.ask_plan("PROMPT", facts, "key")
+    finally:
+        pack.model_plan, pack.judge_problems = old
+    section = pack.letter_section(stubborn)
+    assert stubborn["mixed"] == [crossed] and "mixes two near-misses" in section and "Every number was" not in section
+
+
+def test_letter_numbers_link_to_the_one_clip_they_measure_and_edits_are_rechecked():
+    """Click 38 km/h in the letter and that car's clip plays; printed, it says "(see clip 1)"."""
+    shown = [{"vehicle_kmh": 38.0, "pet_s": 0.2, "death_risk_pct": 4.1}, {"vehicle_kmh": 20.0, "pet_s": 0.5,
+             "death_risk_pct": 0.6}, {"vehicle_kmh": 20.0, "pet_s": 1.1, "death_risk_pct": 0.6}]
+    text = pack.linked("At 38.0 km/h, 0.5 seconds apart; two at 20.0 km/h (0.6%); the driver's 27 s; 12 schools <b>", shown)
+    assert '<a class="clip" href="#event-1" data-clip="1" title="Play clip 1">38.0 km/h</a>' in text
+    assert '<a class="clip" href="#event-2" data-clip="2" title="Play clip 2">0.5 seconds</a>' in text
+    assert text.count("<a ") == 2 and "driver&#x27;s 27 s" in text and "&lt;b&gt;" in text  # 20.0 and 0.6%: two cards
+    assert 'a.clip::after { content: " (see clip " attr(data-clip) ")"; }' in pack.STYLE
+    e = {"person": "1/0", "vehicle": "car#1", "tier": "serious", "pet_s": 0.2, "vehicle_kmh": 38.0, "death_risk_pct": 4.1,
+         "t_person_s": 3.0, "t_vehicle_s": 3.2, "gap_m": 0.4, "clip": "event1.mp4",
+         "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5}, "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
+    plan = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "A car at 38.0 km/h.", "writer": "Muse Spark"}
+    page = pack.page({"name": "gate", "world_points": SQUARE_ROAD}, [e], {"minutes": 1}, plan, None, 10)
+    assert 'id="event-1"' in page and 'href="#event-1"' in page and 'contenteditable="plaintext-only"' in page
+    measured = page.split('data-measured="')[1].split('"')[0].split()
+    assert "38.0" in measured and "0.2" in measured and "3.1" not in measured  # the browser checks the same facts
+    assert "Edited here: numbers re-checked in your browser." in page and "::highlight(unmeasured)" in page
+    assert '<p class="note ok" id="letter-check">Every number was checked' in page
+
+
 def test_pack_saves_the_letter_plan_next_to_the_page():
     import contextlib, io, sys, tempfile
     from pathlib import Path
@@ -660,6 +721,8 @@ def test_map_draws_each_event_where_it_happened():
     assert roadmap.svg([], [[0, 0], [1, 0], [1, 1], [0, 1]]) == ""
     site = {"world_points": [[-2, -2], [2, -2], [2, 2], [-2, 2]]}
     assert "Where it happened" in pack.map_section(events, site) and pack.map_section(events[2:], site) == ""
+    unplaced_first = roadmap.svg(events[2:] + events[:1], [[-2, -2], [2, -2], [2, 2], [-2, 2]])
+    assert ">#2</text>" in unplaced_first and ">#1</text>" not in unplaced_first  # the dot keeps card #2's number
 
 
 def test_fast_two_wheelers_keep_one_track_in_vehicle_crowd_mode():

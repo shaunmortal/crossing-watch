@@ -38,8 +38,9 @@ WRITER = f"{LETTER_MODEL} (open weights, self-hosted)" if LETTER_URL else "Muse 
 OPEN_MODEL_TIMEOUT_S = 900  # a 30B model on two T4s writes a letter in minutes, not seconds
 JUDGE = "Muse Spark (a separate reviewer)"
 JUDGE_PROMPT = """You review a letter before a school sends it to its road authority. MEASUREMENTS are the only facts.
-List every problem: a claim or number the measurements do not support; saying a standard or warrant is met; a death
-risk stated for a child; blaming a named person. Tone, wording and the choice of fix are not problems.
+List every problem: a claim or number the measurements do not support; a number above one written in words, not in
+digits; saying a standard or warrant is met; a death risk stated for a child; blaming a named person. Tone, wording
+and the choice of fix are not problems.
 Reply JSON only: {{"problems": ["<one short sentence each>"]}}, with [] if there are none.
 
 MEASUREMENTS:
@@ -49,11 +50,22 @@ LETTER:
 {letter}"""
 LETTER_TRIES = 3     # Spark gets this many tries at a letter whose every number was measured
 NUMBER = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?")  # 1,200 is one number
+WORDS = ("two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|"
+         "eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundreds?|thousands?|dozens?")
+# a number in words, which code cannot check: "one" is too common to flag, and a two-wheeler is a vehicle
+NUMBER_WORD = re.compile(rf"\b(?:{WORDS})(?:-(?:{WORDS}))?\b(?![- ]wheel)", re.I)
+MPH = re.compile(rf"(?:(?:{NUMBER.pattern})\s?)?(?<![a-z])(?:mph|miles (?:per|an) hour)\b", re.I)  # measured in km/h
+# a number with the unit of an event's speed, PET or death risk ("s" never matches "12 schools")
+WITH_UNIT = re.compile(rf"({NUMBER.pattern})\s?(km/h|kmph|s(?:ec(?:ond)?s?)?|%|per ?cent)(?![\w/])", re.I)
+UNIT_FIELD = {"k": "vehicle_kmh", "s": "pet_s", "%": "death_risk_pct", "p": "death_risk_pct"}  # unit's 1st letter
+SENTENCE = re.compile(r"(?<=[.!?])\s+|\n")
 SHOWN_FILE = re.compile(r'\bsrc="([^"#?]+)')  # a file the page shows (a clip or a picture), without #t=...
 UNSHAREABLE = re.compile(r"clip\.mp4|person-.*\.jpg")  # the unblurred video and the unblurred crops Spark saw
 LETTER_PROMPT = """You help a school ask its road authority to make the crossing outside it safer.
-Below are measurements from a video of the crossing, made by Crossing Watch (SAM 3.1 tracking, road-plane geometry,
+Below are measurements from a video of the crossing, made by Crossing Watch (SAM tracking, road-plane geometry,
 post-encroachment time). Use ONLY these facts; never invent numbers, names, places or dates.
+Write every number in digits, exactly as given (speeds in km/h), and never put one near-miss's speed in a sentence
+with another near-miss's time gap.
 Death-risk figures are for adults hit by a car front: never state a death risk for a child.
 From the engineering lines, mention at most PV² and the share of time in gaps, briefly, with their main caveat;
 never say a standard is met.
@@ -183,18 +195,57 @@ def limit_note(full):
             "limit, so some people or vehicles were not tracked: counts and near-misses here are a minimum.</p>")
 
 def unmeasured(text, facts_text):
-    """Numbers in `text` that appear nowhere in the measured facts: a letter to an authority must not invent any."""
+    """Numbers in `text` that appear nowhere in the measured facts, then numbers in words and speeds in mph, which
+    code cannot check against them: a letter to an authority must not invent any."""
     value = lambda n: float(n.replace(",", ""))
     known = {value(n) for n in NUMBER.findall(facts_text)}
-    return sorted({n for n in NUMBER.findall(text) if value(n) not in known}, key=value)
+    unchecked = dict.fromkeys(m[0] for pattern in (NUMBER_WORD, MPH) for m in pattern.finditer(text))
+    return sorted({n for n in NUMBER.findall(text) if value(n) not in known}, key=value) + list(unchecked)
+
+
+def owners(match, events):
+    """(field, card numbers) of a WITH_UNIT match: the shown events whose speed, PET or death risk it equals."""
+    field = UNIT_FIELD[match[2][0].lower()]
+    return field, [i for i, e in enumerate(events, 1) if e.get(field) == float(match[1].replace(",", ""))]
+
+
+def mixed(letter, worst):
+    """Sentences that put one near-miss's speed beside another's PET ("a car at 38 km/h passed 0.2 s from a child"
+    with 38 from #1 and 0.2 from #3). Only numbers that are some shown event's speed or PET count."""
+    out = []
+    for sentence in SENTENCE.split(letter):
+        found = {"vehicle_kmh": [], "pet_s": []}
+        for match in WITH_UNIT.finditer(sentence):
+            field, cards = owners(match, worst)
+            if cards and field in found:
+                found[field].append(set(cards))
+        speeds, pets = found.values()
+        # ponytail: only a sentence with one speed and one PET is paired; a list or a range ("0.0 s to 0.1 s at
+        # 11.3 km/h to 12.8 km/h", whose ends are not one event) is left to the judge
+        if len(speeds) == len(pets) == 1 and not speeds[0] & pets[0]:
+            out.append(sentence.strip())
+    return out
+
+
+def retry_note(bad, crossed, problems):
+    """Why the previous letter goes back, for the next try."""
+    reasons = ([f"Your previous letter used numbers that are not in the measurements: {', '.join(bad)}. Use only "
+                "numbers given above, written in digits, with speeds in km/h."] if bad else [])
+    reasons += [f'Your previous letter put one near-miss\'s speed beside another near-miss\'s time gap: "{s}". Keep '
+                "each near-miss's numbers together." for s in crossed]
+    reasons += ([f"A reviewer found claims in your previous letter that the measurements do not support: "
+                 f"{' '.join(problems)} Fix them."] if problems else [])
+    return "\n\n" + " ".join(reasons)
 
 
 def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES):
     """The model's fix and letter, verified before use in two layers (Meta's verifiable-agents workshop): code
     checks that every number was measured, then Muse Spark as a separate reviewer (LLM as judge) lists claims the
     measurements do not support. An invalid reply or either objection goes back with the reason; after the last try
-    the letter is kept with what remains listed for a person to check before sending."""
-    note, plan, bad, problems = "", None, [], []
+    the letter is kept with what remains listed for a person to check before sending. Numbers are checked against
+    `measured` only, never the prompt (its wording would let "3.1" from "SAM 3.1" pass)."""
+    note, plan, bad, crossed, problems = "", None, [], [], []
+    worst = json.loads(measured).get("worst", [])
     for attempt in range(tries):
         try:
             plan = model_plan(prompt + note, api_key, photo)
@@ -203,15 +254,13 @@ def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES):
                 raise
             note = f"\n\nYour previous output was invalid: {str(err)[:200]}. Reply with the JSON object only."
             continue
-        bad = unmeasured(plan["letter"] + " " + plan["why"], prompt + "\n" + measured)
-        problems = [] if bad or not api_key else judge_problems(plan["letter"], measured, api_key)
-        if not bad and not problems:
+        bad = unmeasured(plan["letter"] + " " + plan["why"], measured)
+        crossed = mixed(plan["letter"], worst)
+        problems = [] if bad or crossed or not api_key else judge_problems(plan["letter"], measured, api_key)
+        if not bad and not crossed and not problems:
             return {**plan, "writer": WRITER, **({"judged_by": JUDGE} if api_key else {})}
-        note = (f"\n\nYour previous letter used numbers that are not in the measurements: {', '.join(bad)}. "
-                "Use only numbers given above." if bad else
-                "\n\nA reviewer found claims in your previous letter that the measurements do not support: "
-                + " ".join(problems) + " Fix them.")
-    return {**plan, "writer": WRITER, "unmeasured": bad, "unsupported": problems}
+        note = retry_note(bad, crossed, problems)
+    return {**plan, "writer": WRITER, "unmeasured": bad, "mixed": crossed, "unsupported": problems}
 
 
 def judge_problems(letter, measured, api_key):
@@ -385,18 +434,71 @@ def legal_section(site):
             f'<p class="note">Source: {html.escape(ORDER)} (<a href="{ORDER_PDF}">PDF</a>).</p></section>')
 
 
-def letter_section(plan):
+def linked(text, events):
+    """`text` as HTML, each number with a unit that equals exactly one shown event's speed, PET or death risk linked
+    to that event's card. The raw text is split first and each piece escaped: escaping first would let the number
+    pattern match the 27 inside &#x27;."""
+    out, end = [], 0
+    for match in WITH_UNIT.finditer(text):
+        cards = owners(match, events)[1]
+        if len(cards) == 1:
+            out += [html.escape(text[end:match.start()]), f'<a class="clip" href="#event-{cards[0]}" data-clip="'
+                    f'{cards[0]}" title="Play clip {cards[0]}">{html.escape(match[0])}</a>']
+            end = match.end()
+    return "".join(out) + html.escape(text[end:])
+
+
+def letter_section(plan, events=(), measured=""):
+    """The letter, editable in the browser. A number that is one shown event's own links to its clip ("see clip N"
+    when printed); an edit re-checks every number against `measured` as it is typed."""
     if not plan:
         return ""
-    paragraphs = "".join(f"<p>{html.escape(p)}</p>" for p in plan["letter"].split("\n") if p.strip())
+    paragraphs = "".join(f"<p>{linked(p, events)}</p>" for p in plan["letter"].split("\n") if p.strip())
     check = "".join(f'<p class="note">Check before sending: {html.escape(text)}</p>' for text in (
         [f'these numbers are not in the measurements: {", ".join(plan["unmeasured"])}.'] if plan.get("unmeasured") else [])
+        + [f"this sentence mixes two near-misses: {s}" for s in plan.get("mixed", [])]
         + [f"the reviewer says: {p}" for p in plan.get("unsupported", [])])
     checked = (f"Every number was checked against the measurements by code, and the claims by {plan['judged_by']}."
                if plan.get("judged_by") else "Every number was checked against the measurements by code.")
-    check += f'<p class="note">{html.escape(checked)}</p>' if not plan.get("unmeasured") and not plan.get("unsupported") else ""
-    return (f'<section><h2>Letter to the road authority</h2><div class="letter">{paragraphs}</div>{check}'
-            f'{disclosure(plan)}</section>')
+    clean = not (plan.get("unmeasured") or plan.get("mixed") or plan.get("unsupported"))
+    known = " ".join(sorted({n.replace(",", "") for n in NUMBER.findall(measured)}))
+    return (f'<section><h2>Letter to the road authority</h2><div class="letter" contenteditable="plaintext-only" '
+            f'spellcheck="false" role="textbox" aria-multiline="true" aria-label="Letter, editable" '
+            f'data-measured="{known}">{paragraphs}</div>{check}<p class="note ok" id="letter-check"'
+            f'{"" if clean else " hidden"}>{html.escape(checked) if clean else ""}</p>{disclosure(plan)}'
+            f"{LETTER_SCRIPT}</section>")
+
+
+# the same three checks as unmeasured(), re-run in the browser on every edit, and a linked number's click
+LETTER_SCRIPT = """<script>{  // a block, so its names never clash with another script on the page
+const letter = document.querySelector(".letter"), verdict = document.getElementById("letter-check");
+const known = new Set(letter.dataset.measured.split(" ").filter(Boolean).map(Number));
+const checks = [[new RegExp(%s, "g"), n => !known.has(Number(n.replaceAll(",", "")))],
+                [new RegExp(%s, "gi"), () => true], [new RegExp(%s, "gi"), () => true]];
+letter.addEventListener("input", () => {
+  const ranges = [], bad = [], walk = document.createTreeWalker(letter, NodeFilter.SHOW_TEXT);
+  for (let node; (node = walk.nextNode());)
+    for (const [pattern, flagged] of checks)
+      for (const m of node.data.matchAll(pattern)) if (flagged(m[0])) {
+        const range = new Range();
+        range.setStart(node, m.index); range.setEnd(node, m.index + m[0].length);
+        ranges.push(range); bad.push(m[0]);
+      }
+  if (window.Highlight) CSS.highlights.set("unmeasured", new Highlight(...ranges));
+  verdict.hidden = false;
+  verdict.className = bad.length ? "note bad" : "note ok";
+  verdict.textContent = "Edited here: numbers re-checked in your browser." +
+    (bad.length ? " Not in the measurements: " + [...new Set(bad)].join(", ") + "." : "");
+});
+document.addEventListener("click", event => {
+  const link = event.target.closest("a.clip"), card = link && document.querySelector(link.getAttribute("href"));
+  if (!card) return;
+  event.preventDefault();
+  card.scrollIntoView({behavior: "smooth", block: "center"});
+  const video = card.querySelector("video");
+  if (video) { video.currentTime = Number(card.dataset.t); video.play(); }
+});
+}</script>""" % (json.dumps(NUMBER.pattern), json.dumps(NUMBER_WORD.pattern), json.dumps(MPH.pattern))
 
 
 def disclosure(plan):
@@ -407,8 +509,8 @@ def disclosure(plan):
 
 
 STYLE = """
-:root { --bg: #fafaf7; --ink: #1d1d1b; --muted: #66665f; --line: #deded6; --accent: #c0392b; }
-@media (prefers-color-scheme: dark) { :root { --bg: #161614; --ink: #ececE6; --muted: #a3a39a; --line: #34342f; --accent: #ff6b5b; } }
+:root { --bg: #fafaf7; --ink: #1d1d1b; --muted: #66665f; --line: #deded6; --accent: #c0392b; --ok: #2e7d32; }
+@media (prefers-color-scheme: dark) { :root { --bg: #161614; --ink: #ececE6; --muted: #a3a39a; --line: #34342f; --accent: #ff6b5b; --ok: #7bd88f; } }
 body { margin: 0 auto; max-width: 880px; padding: 24px 16px 64px; background: var(--bg); color: var(--ink);
        font: 16px/1.5 system-ui, sans-serif; }
 h1 { font-size: 1.8rem; margin: 0 0 4px; } h2 { margin-top: 40px; } .muted, .note { color: var(--muted); }
@@ -421,6 +523,9 @@ figure { margin: 0; position: relative; } .letter { border-left: 3px solid var(-
             font-size: 0.8rem; } .disclosure { border: 1px dashed var(--muted); padding: 8px 12px; }
 blockquote { margin: 16px 0; padding-left: 16px; border-left: 3px solid var(--accent); }
 cite { display: block; margin-top: 4px; font-style: normal; color: var(--muted); } a { color: inherit; }
+.letter:focus { outline: 2px solid var(--line); outline-offset: 6px; } .note.ok { color: var(--ok); }
+.note.bad { color: var(--accent); } ::highlight(unmeasured) { text-decoration: underline wavy #e5372a 2px; }
+@media print { a.clip { text-decoration: none; } a.clip::after { content: " (see clip " attr(data-clip) ")"; } }
 """
 
 
@@ -457,7 +562,8 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None):
 <p class="muted">{html.escape(site.get("name", ""))}</p>
 <div class="stats">{stats(events, seen)}</div>{limit_note(full)}
 {engineering(seen, cost)}
-{map_section(events, site)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{legal_section(site)}{letter_section(plan)}
+{map_section(events, site)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{legal_section(site)}
+{letter_section(plan, events[:SHOWN_EVENTS], facts(site, events, seen))}
 <section><h2>How this was measured</h2><p class="note">{html.escape(method)}</p></section></body></html>"""
 
 

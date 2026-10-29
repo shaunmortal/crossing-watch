@@ -42,7 +42,9 @@ def svg(events, area, shown=5):
         for key, cls in (("path_vehicle", "veh"), ("path_person", "ped")):
             if len(e.get(key, [])) > 1:
                 marks.append(f'<polyline class="{cls}" points="{" ".join(at(p) for p in e[key])}"/>')
-    for i, e in enumerate(placed):  # dots on top of every path
+    for i, e in enumerate(events):  # dots on top of every path, numbered like the cards even when one has no "where"
+        if not e.get("where"):
+            continue
         serious = e.get("tier", "serious") == "serious"
         label = html.escape(f'{e.get("tier", "serious")}: {e["vehicle"].split("#")[0]} at {e["vehicle_kmh"]} km/h, '
                             f'{e["pet_s"]:.1f} s apart')
