@@ -98,8 +98,8 @@ moved or the picture darkened. Then by eye: the view matches the 1x lens (no fis
 
 - Put up the stand, fix and frame the phone, and only then start recording (a watch remote, or the camera's timer
   if it has one for video), so nobody setting up is filmed.
-- Record 20-25 minutes: the dismissal rush plus a quieter stretch. Only a window of 15 minutes or more is analysed
-  (see below).
+- Record 20-25 minutes: the dismissal rush plus a quieter stretch. A window under 15 minutes is analysed, but the
+  page then gives no hourly rates, PV² or school-year line; the window rule asks for 15 minutes (see below).
 - First: one sentence with the place, date, bell time and posted speed limit. Then silence to the end. No spoken
   calls such as "close": Muse Wonder listens for shouts around each near-miss, and the filmer's own word would be
   reported as another witness's.
@@ -152,12 +152,14 @@ moved or the picture darkened. Then by eye: the view matches the 1x lens (no fis
   pricing page says, "your content is not used to train Meta models" (README, Standard mode only).
 - The unblurred files stay in `out/VIDEO/`: `clip.mp4` (and the parts cut from it), the `person-*.jpg` crops Spark
   saw and the `event*.wav` sound. When the study ends (the letter filed, the hackathon judged), delete them in each
-  video's folder (Monday's and the rehearsal's), with the raw videos, the test clip, the calibration frame and any
-  cut file, as the notice says:
+  video's folder (Monday's and the rehearsal's), with the raw videos, the test clip, the calibration frame, any
+  cut file and the phone's photos of the tape marks, boards and B-roll, as the notice says:
 
   ```
   find out/VIDEO \( -name clip.mp4 -o -name 'person-*.jpg' -o -name '*.wav' \) -delete
-  rm -f CLIP.MOV TEST.MOV REH.MOV CUT.MOV frame.jpg first.png last.png
+  rm -f CLIP.MOV TEST.MOV REH.MOV CUT.MOV
+  find . -maxdepth 1 \( -iname '*.heic' -o -iname '*.heif' -o -iname '*.dng' -o -iname '*.jpg' -o -iname '*.jpeg' \
+    -o -iname '*.png' \) -delete
   ```
 
   Then delete the backups and the phone's own copies (Photos, then Recently Deleted). The SAM replies (`*.sam.txt`:

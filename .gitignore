@@ -27,9 +27,23 @@ guess.svg
 *.webm
 *.wav
 *.m4a
-/frame.jpg
-/first.png
-/last.png
+# the phone's photos (tape marks, boards, B-roll stills) and any frame or still at the top level, unblurred.
+# Only top-level pictures: docs/ keeps street.jpg and the strobe stills
+*.heic
+*.HEIC
+*.heif
+*.HEIF
+*.dng
+*.DNG
+/*.jpg
+/*.jpeg
+/*.JPG
+/*.JPEG
+/*.png
+/*.PNG
+docs/**/frame*.jpg
+docs/**/first.png
+docs/**/last.png
 notes.txt
 answers-*.json
 plan-*.json

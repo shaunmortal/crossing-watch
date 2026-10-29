@@ -48,6 +48,8 @@ CHECK_TOLERANCE = 0.15   # GATES.md G2: a distance not used for calibration agre
 TAPE = re.compile(r"\s*([0-9]+(?:\.[0-9]+)?)\s*(m|cm)\s*", re.I)  # the whole answer: "7.2 m", "7.2m" or "720 cm"
 LOG = "agent_log.jsonl"
 HEAD_NOTES = ("notes", "draft_letter")  # what a revised letter keeps of the one sent back, as pack.new_plan does
+# a sent-back letter on the public page: the notes may name a pupil or a teacher, so only agent_log.jsonl keeps them
+NOTES_HIDDEN = "The head of the school sent the letter back with notes (kept in the case log, not shown here)."
 NUDGE = "Plain text is not accepted. Call exactly one tool."
 INSTRUCTIONS = """You work one near-miss case for a school. A phone filmed the crossing outside it; the head of the
 school will send the road authority a letter built only from what the video measured. Your tools:
@@ -330,8 +332,8 @@ def case_section(out_dir):
     if not log.exists():
         return ""
     steps = [json.loads(line) for line in log.read_text().splitlines() if line.strip()]
-    items = "".join(f"<li>{step_time(s)}{'Person: ' if s.get('person') else ''}{html.escape(s['summary'])}</li>"
-                    for s in steps)
+    items = "".join(f"<li>{step_time(s)}{'Person: ' if s.get('person') else ''}"
+                    f"{html.escape(NOTES_HIDDEN if s.get('person') == 'reject' else s['summary'])}</li>" for s in steps)
     turns, usd = sum("turn" in s for s in steps), max([s.get("usd", 0) for s in steps] or [0])
     return (f'<section id="case"><h2>How the agent worked this case</h2><ol>{items}</ol><p class="note">Muse Spark '
             f"chose one tool per turn: {turns} turns, about ${usd:.2f}, estimated at the {PRICE}, with cached input "

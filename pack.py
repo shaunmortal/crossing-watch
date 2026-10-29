@@ -1025,9 +1025,9 @@ def stale_line(signoff):
 
 def letter_status(site, plan, signoff):
     """Where the letter stands, for the first screen: changed after its sign-off, filed, approved while the sign-off
-    is still the letter's, or a draft."""
+    is still the letter's, or a draft. A changed letter that was filed says both."""
     if signoff and not is_signed(plan, signoff):
-        return stale_line(signoff)
+        return stale_line(signoff) + filed_line(site)
     if submitted(site):
         return filed_line(site)
     if signoff:

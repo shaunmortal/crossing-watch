@@ -1535,13 +1535,15 @@ def test_docs_folder_lets_in_only_blurred_evidence_clips():
         ignored = lambda name: subprocess.run(["git", "-C", tmp, "-c", "core.ignorecase=false", "check-ignore", "-q",
                                                name]).returncode == 0
         for name in ("docs/event1.mp4", "docs/gate/event12-hero.mp4", "docs/gate/index.html", "docs/gate/street.jpg",
-                     "<removed-run-record>", "provenance/spark-open-fireworks-sample.json"):
+                     "<removed-run-record>", "provenance/spark-open-fireworks-sample.json",
+                     "docs/gate/event1-strobe.jpg"):
             assert not ignored(name), name
         for name in ("docs/clip.mp4", "docs/gate/clip.mp4", "docs/gate/part0/clip.mp4", "docs/gate/person-c1-0.jpg",
                      "docs/gate/blind/clip01.mp4", "docs/gate/blind/index.html", "docs/gate/blind-key.json",
                      "out/gate/event1.mp4", ".env", "CLIP.MOV", "TEST.MOV", "first.png", "last.png", "frame.jpg",
                      "notes.txt", "answers-a.json", "docs/gate/event1.wav", "docs/gate/raw.mov", ".env.local",
-                     "sample/plan-1a2b3c4d.json", "docs/gate/person-c1.json"):
+                     "sample/plan-1a2b3c4d.json", "docs/gate/person-c1.json", "IMG_0001.HEIC", "frame0.jpg",
+                     "IMG_0002.JPG", "docs/gate/frame.jpg", "docs/gate/first.png"):
             assert ignored(name), name
 
 
@@ -2088,7 +2090,8 @@ def test_glimmer_notebook_is_pinned_hash_checked_and_records_its_run():
                 "shutil.copyfile(attached[0], BENCH_JSON)", "f'bench: {BENCH_FROM}"):
         assert pin in text, pin
     assert re.search(r"assert sha256\(path\) == SHA256\[name\]", text)
-    assert "shaunmortal" in text
+    assert "run by the author" in text  # who ran it, as README says
+    assert "BENCH_JSON = '/tmp/judge-bench.json'" in text  # an attached bench never becomes a saved, public output
     assert "billion" not in Path(__file__).with_name("README.md").read_text()  # the product name, not a parameter count
 
 
@@ -3320,6 +3323,32 @@ def test_first_screen_says_the_school_asks_only_while_the_letter_is_the_signed_o
     assert "<video" not in warned and 'class="ask"' not in warned and "Not measurements." in warned
     assert "pedestrian crossings watched" in warned and "serious near-misses" not in warned and "km/h" not in warned
 
+
+def test_first_screen_keeps_the_filing_line_when_the_filed_letter_changed_after_sign_off():
+    """A filed pack whose letter changed after its sign-off says both: not signed, and filed with its reference."""
+    import hashlib
+    plan = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "Dear Sir, edited.", "writer": "Muse Spark"}
+    signoff = {"approved_by": "A. Rao, Principal", "school": "Gate School", "date": "2026-11-03",
+               "letter_sha256": hashlib.sha256(b"Dear Sir.").hexdigest()}
+    sent = {"to": "City Traffic Police", "channel": "CPGRAMS", "date": "2026-11-03", "reference": "REF/2026/1"}
+    site = {"name": "gate", "world_points": SQUARE_ROAD, "submitted": sent}
+    top = first_screen(pack.page(site, [], {"minutes": 1, "crossings": 3}, plan, None, 10, signoff=signoff))
+    assert "Changed after sign-off by A. Rao, Principal on 2026-11-03, not signed." in top and "AI draft" in top
+    assert top.count("reference REF/2026/1") == 1 and "The school asks for" not in top
+
+
+def test_case_agent_page_keeps_the_heads_notes_out():
+    """A letter sent back shows on the public page without its notes, which may name a pupil or a teacher; the case
+    log keeps them."""
+    import agent, html, tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as folder:
+        log = Path(folder) / "case" / agent.LOG
+        log.parent.mkdir()
+        log.write_text(json.dumps({"person": "reject", "summary": "The head of the school sent the letter back: "
+                                                                 "Ravi of class 5B was nearly hit."}) + "\n")
+        section = agent.case_section(folder)
+    assert f"Person: {html.escape(agent.NOTES_HIDDEN)}" in section and "Ravi" not in section
 
 def test_share_folder_holds_the_first_clips_poster_and_never_clip_mp4():
     import tempfile

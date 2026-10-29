@@ -146,7 +146,8 @@ through Meta's API; the unblurred files stay in `out/VIDEO/` on the machine that
 gives the command).
 
 **Standard mode only.** Meta's Model API pricing page (https://dev.meta.ai/docs/pricing-rate-limits.md, fetched 29 Oct 2026) says: "Contributor mode
-offers discounted pricing or more usage in exchange for permission to use your content to train future Meta models"
+offers discounted pricing or more usage in exchange for permission to use your content — the prompts, code, files,
+and context you send, plus the model responses you get back — to train future Meta models"
 and "In Standard mode, you pay standard prices and your content is not used to train Meta models." Crossing Watch
 calls only Standard-mode model ids, never a `-contributor` one, because what it sends is unblurred video and crops of
 people on the street, and street sound. A self-check fails if a default model id is a Contributor-mode one (a model
@@ -319,7 +320,8 @@ The head of the school then approves the letter or sends it back with notes; `--
 `--school` and writes the same `signoff.json` as pack.py, so the page names who signed. The case page carries
 pack.py's receipt, the street seen from above, the Muse Image fix drawn only inside the measured band, and a `share/`
 folder with its `SHA256SUMS`. Every step goes to
-`out/VIDEO/case/agent_log.jsonl`, and the page shows "How the agent worked this case". No agent run has been made
+`out/VIDEO/case/agent_log.jsonl`, and the page shows "How the agent worked this case", without the notes of a letter
+sent back (they may name a pupil or a teacher; the log keeps them). No agent run has been made
 against the Meta API yet; a test drives it with a scripted model.
 
 ```
@@ -359,9 +361,10 @@ LETTER_MODEL_URL=http://127.0.0.1:8080/v1 python3 judge_bench.py --out out/judge
 ```
 
 The bench file keeps every letter and verdict, so a later run only asks for what is missing. For the notebook's
-Glimmer pass on Kaggle, attach `out/judge-bench.json` with Add Input: the Spark letter lives in `out/`, which the repo
-zip leaves out, so without the file the notebook benches Glimmer's letter alone (12 lies and 4 controls) and its
-record says so.
+Glimmer pass on Kaggle, attach a bench file built from our own pack with Add Input, never one built from DUT: the
+local `out/judge-bench.json` takes its Spark letter from the DUT cache. The Spark letter lives in `out/`, which the
+repo zip leaves out, so without the file the notebook benches Glimmer's letter alone (12 lies and 4 controls) and
+its record says so. The notebook keeps the attached file out of its saved outputs.
 
 **Blind check (G5).** `blind_set.py` mixes the pipeline's near-misses with decoys (a pedestrian and a moving vehicle
 on the same spot 5 to 8 s apart, each pedestrian checked by Spark to be a person), cuts every clip to the same 12 s,
