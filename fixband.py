@@ -233,7 +233,7 @@ def figure(images):
     """The band picture, under the before/after pair, when there is one."""
     if not images or len(images) < 3:
         return ""
-    return (f'<section><h2>Where the fix goes</h2><figure><img src="{html.escape(images[2])}" alt="The proposed fix '
+    return (f'<section id="band"><h2>Where the fix goes</h2><figure><img src="{html.escape(images[2])}" alt="The proposed fix '
             f'drawn only inside the measured band on the real street"><figcaption>{html.escape(CAPTION)} Muse Image '
             "drew only inside the magenta outline; the people in it and every pixel outside it are the real, blurred "
             "street. Red: serious near-misses; orange rings: close passes; blue: where each pedestrian walked; sizes "

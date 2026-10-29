@@ -806,7 +806,7 @@ def test_close_passes_and_exposure_never_read_as_safe():
     seen = road.exposure({"p": walking_across(40)}, {"car#1": edges_along_x(8.0, fps, frames)}, fps, 600)
     assert {k: seen[k] for k in ("minutes", "crossings", "vehicles", "speed_85th_kmh")} == {
         "minutes": 1.0, "crossings": 1, "vehicles": 1, "speed_85th_kmh": 28.8}
-    tiles = pack.stats([], seen)
+    tiles = " ".join(pack.stats([], seen))  # the tiles and the line of other counts
     assert "pedestrian crossings watched" in tiles and "85% of vehicles" in tiles and "conflicts per 100" not in tiles
     assert pack.headline([], seen, {})[0] == "0 of 1 crossings had a moving vehicle through the same spot within 3 s " \
                                              "of the person; 0 of 1 within 1.5 s."
@@ -1359,7 +1359,8 @@ def test_letter_numbers_link_to_the_one_clip_they_measure_and_edits_are_rechecke
          "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5}, "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
     plan = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "A car at 38.0 km/h.", "writer": "Muse Spark"}
     page = pack.page({"name": "gate", "world_points": SQUARE_ROAD}, [e], {"minutes": 1}, plan, None, 10)
-    assert 'id="event-1"' in page and 'href="#event-1"' in page and 'contenteditable="plaintext-only"' in page
+    assert 'id="event-1"' in page and 'contenteditable="plaintext-only"' in page
+    assert 'href="#event-1"' in page.split('id="letter"')[1]  # the letter's own link, not the first screen's
     measured = page.split('data-measured="')[1].split('"')[0].split()
     assert "38.0" in measured and "0.2" in measured and "3.1" not in measured  # the browser checks the same facts
     assert "Edited here: numbers re-checked in your browser." in page and "::highlight(unmeasured)" in page
@@ -1516,7 +1517,7 @@ def test_filed_reference_under_the_title_tct_steps_and_a_print_view():
     assert 'a.clip[data-clip="4"]::after, a.clip[data-clip="5"]::after { content: " (clip " attr(data-clip) ", not ' \
            'printed)"; }' in pack.STYLE
     assert ".letter-sheet { break-before: page; break-after: page; }" in pack.STYLE
-    assert pack.letter_section({"letter": "x"}).startswith('<section class="letter-sheet">')
+    assert pack.letter_section({"letter": "x"}).startswith('<section class="letter-sheet" id="letter">')
 
 def test_docs_folder_lets_in_only_blurred_evidence_clips():
     """docs/ is published (GitHub Pages): *.mp4 stays ignored there except eventN.mp4 and eventN-hero.mp4, and the
@@ -2914,6 +2915,89 @@ def test_pack_never_overwrites_the_case_agents_letter_or_page():
         calls = []
         assert "agent.py --approve" in stopped(lambda: calls.extend(run_pack(out, ask=lambda p: 1 / 0, key="key")))
         assert calls == [] and not (out / "index.html").exists() and not (out / "plan.json").exists()
+
+
+def first_screen(page):
+    """The page above its jump bar."""
+    return page.split('<nav class="jump"')[0]
+
+
+def test_first_screen_plays_the_first_shown_clip_beside_the_counts_and_the_ask():
+    """Summary first: what was filmed, the site's name, the headline, then the first shown near-miss with a clip of
+    its own (eventN.mp4, the only autoplay, its strobe the poster, its card's title as caption) beside the tiles and
+    the fix; a jump bar links only the sections the page has."""
+    import summary
+    e = {"person": "1/0", "vehicle": "car#1", "tier": "serious", "pet_s": 0.5, "vehicle_kmh": 30.0, "death_risk_pct": 1.5,
+         "t_person_s": 3.0, "t_vehicle_s": 3.5, "gap_m": 0.4, "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5},
+                                                                         "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
+    strobe = {"image": "event2-strobe.jpg", "moments": 9, "step_s": 0.5}
+    events = [e, e | {"clip": "event2.mp4", "strobe": strobe, "tier": "close pass", "pet_s": 2.0}, e | {"clip": "event3.mp4"}]
+    site = {"name": "Gate School", "world_points": SQUARE_ROAD, "dismissal_minutes": 20}
+    seen = {"minutes": 12.5, "crossings": 40, "vehicles": 90, "speed_85th_kmh": 31.0}
+    plan = {"fix": "raised zebra crossing", "why": "w", "image_prompt": "i", "letter": "Dear Sir.", "writer": "Muse Spark"}
+    page = pack.page(site, events, seen, plan, ("today.svg", "street-fixed.webp", "street-band.svg"), 10)
+    top = first_screen(page)
+    assert "Crossing Watch &middot; near-miss evidence &middot; 12.5 minutes of video of one school dismissal" in top
+    assert "<h1>Gate School</h1>" in top and page.count("autoplay") == 1 and 'class="letter"' not in top
+    assert '<video src="event2.mp4" poster="event2-strobe.jpg" autoplay muted loop playsinline controls>' in top
+    assert f'<a href="#event-2">{pack.card_title(2, events[1])}</a>. The car reached the pedestrian&#x27;s spot 2.0 s' in top
+    assert f"<h3>{pack.card_title(2, events[1])}</h3>" in page and pack.first_clip(events[:1]) is None
+    assert pack.first_clip([e | {"clip": "clip.mp4"}, *events[1:]])[0] == 2  # never the unblurred video
+    assert ('<div class="serious"><b>2</b>serious near-misses (under 1.5 s)</div><div class="close"><b>1</b>close '
+            'passes (1.5-3.0 s)</div><div class="watched"><b>40</b>pedestrian crossings watched</div>') in top
+    assert "90 moving vehicles · 12.5 minutes of video · 31.0 km/h, 85% of vehicles at or below" in top
+    assert 'src="street-band.svg"' in top and pack.fixband.CAPTION in top and "AI draft" in top
+    assert '<a class="btn" href="#letter">Read the letter</a>' in top
+    bar = page.split('<nav class="jump"')[1].split("</nav>")[0]
+    assert [t for k, t in summary.SECTIONS if f'href="#{k}"' in bar] == ["Clips", "Map", "Fix", "Letter", "Method"]
+    assert "@media print { .hero video, nav.jump { display: none; } }" in page
+    whole = first_screen(pack.page({**site, "country": "IN"}, events[:1], seen, plan, ("street.jpg", "street-fixed.webp"), 10))
+    assert "<video" not in whole and "dismissal" in whole and summary.AI_DRAWN in whole and 'class="ai-label"' in whole
+    assert 'href="#law"' in pack.page({**site, "country": "IN"}, [], seen, None, None, 10)
+    assert "school dismissal" not in first_screen(pack.page({"world_points": SQUARE_ROAD}, [], seen, None, None, 10))
+    assert pack.SHOWN_FILE.findall('<video src="event2.mp4" poster="event2-strobe.jpg">') == ["event2.mp4",
+                                                                                              "event2-strobe.jpg"]
+
+
+def test_first_screen_says_the_school_asks_only_while_the_letter_is_the_signed_one():
+    """Draft, approved, changed after sign-off, filed: the status line under the fix, and "The school asks for" only
+    while signoff.json's sha256 is the letter's. Under the pace warning: no clip and no ask, only the watched counts."""
+    import hashlib, pace
+    plan = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "Dear Sir.", "writer": "Muse Spark"}
+    signed = {"approved_by": "A. Rao, Principal", "school": "Gate School", "date": "2026-11-03",
+              "letter_sha256": hashlib.sha256(b"Dear Sir.").hexdigest()}
+    sent = {"to": "City Traffic Police", "channel": "CPGRAMS", "date": "2026-11-03", "reference": "REF/2026/1"}
+    site, seen = {"name": "gate", "world_points": SQUARE_ROAD}, {"minutes": 1, "crossings": 3}
+    top = lambda signoff=None, at=site: first_screen(pack.page(at, [], seen, plan, None, 10, signoff=signoff))
+    assert "Proposed fix (AI draft)" in top() and "Draft, not yet approved." in top() and "asks for" not in top()
+    assert "The school asks for" in top(signed) and "Approved by A. Rao, Principal, Gate School, 2026-11-03." in top(signed)
+    stale = top({**signed, "letter_sha256": "0" * 64})
+    assert "AI draft" in stale and "Changed after sign-off by A. Rao, Principal on 2026-11-03, not signed." in stale
+    filed = top(signed, {**site, "submitted": sent})
+    assert "The school asks for" in filed and filed.count("reference REF/2026/1") == 1 and "Approved by" not in filed
+    e = {"person": "1/0", "vehicle": "car#1", "tier": "serious", "pet_s": 0.5, "vehicle_kmh": 30.0, "death_risk_pct": 1.5,
+         "t_person_s": 3.0, "t_vehicle_s": 3.5, "gap_m": 0.4, "clip": "event1.mp4",
+         "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5}, "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
+    warned = first_screen(pack.page(site, [e], seen, plan, None, 10, signoff=signed,
+                                    walking=pace.walking(walkers(pace.MIN_PIECES, 3.0), 10)))
+    assert "<video" not in warned and 'class="ask"' not in warned and "Not measurements." in warned
+    assert "pedestrian crossings watched" in warned and "serious near-misses" not in warned and "km/h" not in warned
+
+
+def test_share_folder_holds_the_first_clips_poster_and_never_clip_mp4():
+    import tempfile
+    from pathlib import Path
+    e = {"person": "1/0", "vehicle": "car#1", "tier": "serious", "pet_s": 0.5, "vehicle_kmh": 30.0, "death_risk_pct": 1.5,
+         "t_person_s": 3.0, "t_vehicle_s": 3.5, "gap_m": 0.4, "clip": "event1.mp4",
+         "strobe": {"image": "event1-strobe.jpg", "moments": 9, "step_s": 0.5},
+         "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5}, "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
+    with tempfile.TemporaryDirectory() as folder:
+        out = Path(folder)
+        for name in ("event1.mp4", "event1-strobe.jpg", "clip.mp4"):
+            (out / name).write_bytes(b"x")
+        page = pack.page({"name": "gate", "world_points": SQUARE_ROAD}, [e], {"minutes": 1}, None, None, 10)
+        shared = sorted(f.name for f in pack.share(out, page).iterdir())
+    assert 'poster="event1-strobe.jpg"' in page and shared == ["event1-strobe.jpg", "event1.mp4", "index.html"]
 
 if __name__ == "__main__":
     for name, check in list(globals().items()):
