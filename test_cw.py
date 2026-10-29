@@ -3311,6 +3311,50 @@ def test_page_reads_without_colour_and_on_a_phone():
     assert "22 minutes of video" in pack.stats([], {"minutes": 22.0, "vehicles": 3})[1]
 
 
+def test_after_fix_pass_mark_is_a_one_sided_fisher_exact_test():
+    """G7's numbers (GATES.md): one-sided [[3,0],[0,3]] is exactly 0.05 (0.1 is the two-sided value), so 0 of 3 after
+    3 of 3 passes and 1 of 3 does not; the plan's prototypes: 25 of 63 passes at 15 or fewer (83% if the share halved),
+    10 of 300 at 3 or fewer (26% with one after-film, 33% with two), 20 of 150 at 10 or fewer (58%); 4 of 63 has no
+    mark at all."""
+    import passmark
+    assert passmark.fisher_drop_p(3, 3, 0, 3) == 0.05 and passmark.fisher_drop_p(3, 3, 1, 3) == 0.2
+    assert passmark.mark(3, 3, 3) == 0
+    assert (passmark.mark(25, 63, 63), round(100 * passmark.chance(25, 63, 63))) == (15, 83)
+    assert (passmark.mark(10, 300, 300), round(100 * passmark.chance(10, 300, 300)),
+            round(100 * passmark.chance(10, 300, 600))) == (3, 26, 33)
+    assert (passmark.mark(20, 150, 150), round(100 * passmark.chance(20, 150, 150))) == (10, 58)
+    assert [passmark.mark(k, 63, 63) for k in (4, 5)] == [None, 0] and passmark.chance(4, 63, 63) == 0.0
+
+
+def test_page_shows_the_pre_registered_after_fix_pass_mark():
+    """G7 on the page from the headline's own k and n: the mark for an after-film as long and its power for one and
+    two after-films; a group passed by one bus is one vehicle in V, so V = 1 asks for 19 after-films; nothing without
+    the crosser list or under the pace warning, and never in the letter's facts."""
+    import pace, passmark
+    limits = {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5}, "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}
+    hit = lambda i, vehicle: {"person": f"c{i}/0", "vehicle": vehicle, "tier": "close pass", "pet_s": 2.0,
+                              "vehicle_kmh": 30.0, "death_risk_pct": 1.5, "t_person_s": float(i), "t_vehicle_s": i + 2.0,
+                              "gap_m": 0.4, "with_limit": limits}
+    crossers = [f"c{i}" for i in range(63)]
+    seen = {"minutes": 15.0, "duration_s": 900.0, "crossings": 63, "crossers": crossers}
+    spread = [hit(i, f"car#{i}") for i in range(25)]
+    mark = passmark.after_mark(spread, seen)
+    assert ("15 or fewer of about 63 crossings have a moving vehicle through the same spot within 3 s (now 25 of 63) "
+            "and 15 or fewer distinct vehicles do (now 25)") in mark and "83% chance" in mark and "together 97%" in mark
+    site = {"name": "gate", "world_points": SQUARE_ROAD}
+    assert html.escape(mark) in pack.page(site, spread, seen, None, None, 10)
+    assert "Fisher" not in pack.facts(site, spread, seen)
+    fast = pace.walking(walkers(pace.MIN_PIECES, 3.0), 10)
+    assert "Fisher" not in pack.page(site, spread, seen, None, None, 10, walking=fast)
+    group = [hit(i, "bus#1") for i in range(25)] + [{**hit(0, "car#9"), "t_person_s": 99.0}]
+    assert passmark.counts(group, set(crossers)) == (25, 1)
+    assert ("no after-film this long can show a drop" in passmark.after_mark(group, seen)
+            and "film 19 dismissals after the fix" in passmark.after_mark(group, seen))
+    assert "film 2 dismissals" in passmark.after_mark([hit(i, f"car#{i}") for i in range(3)], seen)
+    assert passmark.after_mark([], seen).startswith("None of the 63 crossings had")
+    assert passmark.after_mark(spread, {"minutes": 15.0, "crossings": 63}) == ""
+
+
 def test_method_says_sam_and_spark_made_the_tracks_only_when_sam_ran():
     """sample/'s made-up tracks have no SAM request counts, so the method never says SAM tracked them or Spark checked
     them; a SAM run's says SAM tracked what it found, at most MAX_OBJECTS a request, never 'every' person."""

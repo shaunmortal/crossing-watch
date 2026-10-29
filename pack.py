@@ -34,6 +34,7 @@ import fixband
 import openweights
 import overlay
 import pace
+import passmark
 import render
 import review
 import roadmap
@@ -787,14 +788,17 @@ def filed_line(site):
     return f'<p class="filed">Filed with {to} on {channel}, {date}: reference {reference}.</p>'
 
 
-def tct_section():
-    """Where this pack sits in the school-zone Traffic Conflict Technique toolkit, and the step left after the fix."""
+def tct_section(mark=""):
+    """Where this pack sits in the school-zone Traffic Conflict Technique toolkit, and the step left after the fix:
+    `mark`, G7's pass mark (passmark.after_mark), in its own paragraph when there is one."""
+    step9 = (f"Step 9 comes after the fix is in place.</p><p>{html.escape(mark)}" if mark else
+             "Step 9 comes after the fix is in place: film the same dismissal from the same spot for as long, run "
+             "this pack again and compare.")
     return ('<section><h2>Where this fits in a conflict study</h2><p class="note">This pack covers steps 5-7 (baseline '
             f'counts, pre-intervention conflicts, analysis) of the CDC/FIA school-zone <a href="{TCT_TOOLKIT}">Traffic '
             "Conflict Technique toolkit</a>, without the trained observers step 3 normally needs. Severity here is "
             "post-encroachment time and the measured speed, not the toolkit's observer severity scales, so the two do "
-            "not compare one to one. Step 9 comes after the fix is in place: film the same dismissal from the same spot "
-            "for as long, run this pack again and compare.</p></section>")
+            f"not compare one to one. {step9}</p></section>")
 
 
 def pyramid(events, seen):
@@ -1092,7 +1096,7 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None, privacy=No
     body = f"""{measured}
 {map_section(events, site, ground, paths, not warning)}<section id="clips"><h2>{moments}</h2>{cards}</section>{fix_section(plan, images)}{fixband.figure(images)}{legal_section(site)}
 {letter_section(plan, events[:SHOWN_EVENTS], facts(site, events, seen, paths), signoff)}{case}
-{tct_section()}<section id="method"><h2>How this was measured</h2><p class="note">{html.escape(method)}</p>{privacy_note(privacy)}
+{tct_section("" if warning else passmark.after_mark(events, seen))}<section id="method"><h2>How this was measured</h2><p class="note">{html.escape(method)}</p>{privacy_note(privacy)}
 {f'<p class="note">{html.escape(receipt)}</p>' if receipt else ""}{hash_line(source_sha256, site, seen.get("window_s"), recording_s)}</section>"""
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Crossing Watch evidence</title>
