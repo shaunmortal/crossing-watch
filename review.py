@@ -14,6 +14,7 @@ import road
 import sam
 import seal
 
+# Standard mode only: never a -contributor id (Meta trains on Contributor-mode content).
 MODEL = "muse-spark-1.3"
 TIMEOUT_S = 120
 CROP_FACTOR = 3     # crop this many box-sizes around the person

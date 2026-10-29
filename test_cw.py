@@ -3471,6 +3471,14 @@ def test_analyze_keeps_the_camera_check_and_maps_hdr_to_sdr():
         assert analyze.probe(analyze.prepare(hlg, Path(tmp)), "stream=color_transfer") == "bt709"
 
 
+def test_every_default_model_id_is_standard_mode():
+    """No model id is a Contributor-mode one (Meta trains on Contributor-mode content). Contributor variants exist
+    only for Muse Spark 1.3 and 1.2, so in practice this guards the Spark ids. It checks the defaults only: a
+    LETTER_MODEL or JUDGE_MODEL set in the environment is not covered."""
+    for model in (sam.MODEL, review.MODEL, listen.MODEL, pack.IMAGE_MODEL, pack.LETTER_MODEL, pack.JUDGE_MODEL):
+        assert "contributor" not in model.lower(), model
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):
