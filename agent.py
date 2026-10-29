@@ -78,7 +78,8 @@ def case_data(p):
     """events.json, the events Spark did not reject, and what was watched, as pack.main reads them."""
     out_dir = Path(p["out"])
     data = json.loads((out_dir / "events.json").read_text())
-    seen = data.get("exposure") or {"minutes": round(pack.clip_minutes(out_dir / "clip.mp4", data["fps"]), 1)}
+    seen = pack.real_crossers(data["events"], data.get("exposure")
+                              or {"minutes": round(pack.clip_minutes(out_dir / "clip.mp4", data["fps"]), 1)})
     return data, pack.confirmed(data["events"]), seen
 
 
@@ -217,7 +218,7 @@ def submit_letter(p, args, key):
     out_dir = Path(p["out"])
     try:
         photo = pack.street_photo(out_dir / "clip.mp4", out_dir / "street.jpg", site.get("person", "person"),
-                                  site.get("person_mode") == "crowd")
+                                  site.get("vehicles", []))
     except (ValueError, OSError, subprocess.CalledProcessError):
         photo = None
     p["letter"] = pack.ask_plan(prompt, measured, key, photo)
@@ -325,7 +326,8 @@ def case_section(out_dir):
 def write_page(p, images=None):
     site, (data, events, seen) = case_site(p), case_data(p)
     page = pack.page(site, events, seen, p["letter"], images, data["fps"], data.get("cost"),
-                     data.get("sam_full_requests"), case=case_section(p["out"]))
+                     data.get("sam_full_requests"), data.get("privacy"), source_sha256=data.get("source_sha256"),
+                     timeline=data.get("timeline"), paths=data.get("paths") or {}, case=case_section(p["out"]))
     (Path(p["out"]) / "index.html").write_text(page)
 
 
@@ -334,8 +336,8 @@ def sign_off(p, key):
     photo, images = Path(p["out"]) / "street.jpg", None
     if photo.exists() and key:
         try:
-            images = (photo.name, pack.draw_fix(photo, p["letter"]["image_prompt"], key,
-                                                Path(p["out"]) / "street-fixed.jpg").name)
+            images = (photo.name, pack.draw_fix(photo, pack.fix_instruction(p["letter"]), key,
+                                                Path(p["out"]) / "street-fixed.webp").name)  # kept untouched: AI tag
         except (OSError, ValueError, http.client.HTTPException, subprocess.CalledProcessError) as err:
             print(f"fix image failed, the page has the letter only: {err}", file=sys.stderr)
     p["status"] = "done"

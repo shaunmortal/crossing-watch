@@ -1252,7 +1252,7 @@ def test_number_check_flags_words_and_mph_and_reads_the_measurements_only():
     assert pack.unmeasured("One car and two-wheelers, three wheelers, at 38.0 km/h, 0.2 s, by the Triumph", facts) == []
     letter = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "SAM 3.1 measured 38.0 km/h."}
     old = pack.model_plan
-    pack.model_plan = lambda prompt, key, photo=None: letter
+    pack.model_plan = lambda prompt, key, photo=None, known=None: letter
     try:
         assert pack.ask_plan("PROMPT naming SAM 3.1", facts, None)["unmeasured"] == ["3.1"]  # the prompt is no source
     finally:
@@ -1271,7 +1271,7 @@ def test_a_sentence_never_puts_one_near_miss_speed_beside_another_ones_gap():
     good = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "A car at 38.0 km/h, 0.2 s from a child."}
     replies, prompts = [{**good, "letter": crossed}, good], []
     old = pack.model_plan, pack.judge_problems
-    pack.model_plan = lambda prompt, key, photo=None: (prompts.append(prompt), replies.pop(0))[1]
+    pack.model_plan = lambda prompt, key, photo=None, known=None: (prompts.append(prompt), replies.pop(0))[1]
     pack.judge_problems = lambda letter, measured, key: []
     try:
         facts = json.dumps({"worst": worst})
@@ -1373,7 +1373,7 @@ def test_principal_notes_revise_the_letter_and_reach_the_checks_as_stated_not_me
     import tempfile
     letter = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "PET 0.4 s. Our 1,200 pupils cross."}
     judged, old = [], (pack.model_plan, pack.judge_problems)
-    pack.model_plan = lambda prompt, key, photo=None: letter
+    pack.model_plan = lambda prompt, key, photo=None, known=None: letter
     pack.judge_problems = lambda text, measured, key: (judged.append(measured), [])[1]
     try:
         assert pack.ask_plan("PROMPT", '{"pet_s": 0.4}', "key")["unmeasured"] == ["1,200"] and judged == []
@@ -1719,7 +1719,7 @@ def test_open_model_can_write_digits_only_as_measured_numbers():
     the same pattern, so here it stands in for the grammar: every measured number gets through, nothing else does."""
     import re
     e = {"person": "1/0", "vehicle": "car#1", "tier": "serious", "pet_s": 0.4, "vehicle_kmh": 27.3, "death_risk_pct": 1.1,
-         "with_limit": {"20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
+         "t_person_s": 3.0, "t_vehicle_s": 3.4, "with_limit": {"20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
     measured = pack.facts({"name": "स्कूल गेट"}, [e], {"minutes": 2.0, "crossings": 3, "vehicles": 1200})
     known = pack.LETTER_PROMPT.format(facts=measured, language="Hindi") + "\n" + measured
     schema = pack.plan_schema(known)
@@ -1734,6 +1734,41 @@ def test_open_model_can_write_digits_only_as_measured_numbers():
     assert not re.fullmatch(pattern, r"\u0032") and re.fullmatch(pattern, r"\n\"\\")  # \u0032 is a hidden 2
     assert pack.number_pattern("no numbers") == pack.number_pattern("") and not re.fullmatch(pack.number_pattern(""), "1")
 
+
+
+def test_open_model_grammar_allows_the_measured_numbers_not_the_prompts():
+    """The grammar's numbers are the ones the code check accepts, the measurements and the principal's notes, never
+    the prompt's wording (its "SAM 3.1" would let 3.1 through)."""
+    seen, old = [], pack.model_plan
+    pack.model_plan = lambda prompt, key, photo=None, known=None: seen.append(known) or {
+        "fix": "f", "why": "w", "image_prompt": "i", "letter": "l"}
+    try:
+        pack.ask_plan("PROMPT naming SAM 3.1", '{"pet_s": 0.4}', None, stated=["We have 1,200 pupils."])
+    finally:
+        pack.model_plan = old
+    assert "3.1" not in seen[0] and "0.4" in seen[0] and "1,200" in seen[0]
+
+def test_open_model_sends_its_key_only_when_set_and_says_where_it_ran():
+    import contextlib, io
+    reply = {"choices": [{"message": {"content": "{}"}, "finish_reason": "stop"}]}
+    server, seen = fake_open_model([reply, reply])
+    old = pack.LETTER_URL, pack.LETTER_KEY
+    pack.LETTER_URL = f"http://127.0.0.1:{server.server_port}/v1"
+    try:
+        with contextlib.redirect_stderr(io.StringIO()) as log:
+            for key in ("", "test-key"):
+                pack.LETTER_KEY = key
+                pack.open_model_reply("PROMPT", None, {"type": "object"})
+    finally:
+        pack.LETTER_URL, pack.LETTER_KEY = old
+        server.shutdown()
+        server.server_close()
+    assert "Authorization" not in seen[0][2] and seen[1][2]["Authorization"] == "Bearer test-key"
+    assert seen[1][1]["response_format"] == {"type": "json_schema", "json_schema": {"name": "plan", "schema": {"type": "object"}}}
+    assert log.getvalue().count("open model reply:") == 2 and "test-key" not in log.getvalue()
+    assert pack.writer_label("") == "Muse Spark"
+    assert pack.writer_label("http://127.0.0.1:8080/v1") == f"{pack.LETTER_MODEL} (open weights, self-hosted)"
+    assert pack.writer_label("https://api.example.com/v1") == f"{pack.LETTER_MODEL} (open weights)"  # could be anyone's
 
 
 def test_open_model_letters_still_face_the_number_check_and_the_judge():
@@ -1808,7 +1843,7 @@ def test_glimmer_notebook_is_pinned_hash_checked_and_records_its_run():
                 "LETTER_MODEL_HOST", "<removed-run-record>", "build_info", "GIT_SHA", "pack_py_sha256",
                 "run.stderr.count('open model reply:')", "'tries': tries",  # pack.open_model_reply logs each try
                 "os.path.exists(f'{CW}/judge_bench.py')", "'JUDGE_MODEL_URL': 'http://127.0.0.1:8080/v1'",
-                "k != 'MODEL_API_KEY'", "<removed-run-record>"):  # the Glimmer-only judge pass, skipped without a bench
+                "k != 'MODEL_API_KEY'", "<removed-run-record>", "'--out', BENCH_JSON, '--glimmer', '1'"):  # the Glimmer-only judge pass, skipped without a bench
         assert pin in text, pin
     assert re.search(r"assert sha256\(path\) == SHA256\[name\]", text)
     assert "shaunmortal" in text
@@ -2326,6 +2361,35 @@ def test_score_humans_scores_danger_against_none_with_kappa_and_wilson():
 
 
 
+def test_judge_bench_asks_glimmer_through_judge_model_url_with_the_problems_schema():
+    """The Kaggle cell sets only JUDGE_MODEL_URL; the bench's Glimmer column must reach that server, held to the
+    judge's schema, and read the reply's text."""
+    import judge_bench
+    calls, old = [], (pack.open_model_reply, pack.JUDGE_URL, pack.LETTER_URL)
+    pack.open_model_reply = lambda prompt, image, schema, url=None: (calls.append((schema, url)), ('{"problems": []}', {}))[1]
+    pack.JUDGE_URL, pack.LETTER_URL = "http://127.0.0.1:8080/v1", ""
+    try:
+        reply = judge_bench.asker("glimmer")("JUDGE")
+        pack.JUDGE_URL = ""
+        assert exits(lambda: judge_bench.asker("glimmer"))  # no server named: no Glimmer column
+    finally:
+        pack.open_model_reply, pack.JUDGE_URL, pack.LETTER_URL = old
+    assert reply == '{"problems": []}' and calls == [(pack.PROBLEMS_SCHEMA, "http://127.0.0.1:8080/v1")]
+
+def agent_case(folder):
+    """A case folder for the agent: one measured near-miss, and a site whose check distance reads 7.0 m in the video."""
+    from pathlib import Path
+    out = Path(folder)
+    e = {"person": "1/0", "vehicle": "car#1", "tier": "serious", "pet_s": 0.5, "vehicle_kmh": 30.0, "death_risk_pct": 1.5,
+         "t_person_s": 3.0, "t_vehicle_s": 3.5, "gap_m": 0.4, "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5},
+                                                                         "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
+    (out / "events.json").write_text(json.dumps({"fps": 10, "exposure": {"minutes": 0.3}, "events": [e]}))
+    site = {"name": "gate", "image_points": SQUARE_IMG, "world_points": SQUARE_ROAD, "vehicles": ["car"],
+            "check": {"what": "kerb to kerb at the zebra", "points": [[100, 200], [240, 200]]}}  # 140 px at 20 px/m
+    (out / "site.json").write_text(json.dumps(site))
+    return out, site, e
+
+
 def scripted_spark(script, bodies):
     """A fake Muse Spark: each turn calls the next scripted (tool, arguments), or answers in plain text for None."""
     def turn(body, key):
@@ -2387,6 +2451,41 @@ def test_case_agent_stops_for_a_tape_measure_and_files_the_letter_only_when_it_a
     assert all(raises_system_exit(lambda t=t: agent.tape_metres(t))
                for t in ("7 ft", "24 feet", "7,2 m", "1,200 cm", "2 m 20 cm", "720", "7.2 mm"))  # never read as metres
 
+
+
+def test_case_agent_page_is_the_pack_page_with_its_privacy_note_and_gap_barcode():
+    import agent, tempfile
+    with tempfile.TemporaryDirectory() as folder:
+        out, site, e = agent_case(folder)
+        data = json.loads((out / "events.json").read_text())
+        data |= {"privacy": {"heads_tracked": 4, "heads_found": 2}, "timeline": {"duration_s": 18.0, "busy_s": [[2.0, 3.0]]}}
+        (out / "events.json").write_text(json.dumps(data))
+        agent.write_page({"site": str(out / "site.json"), "out": str(out), "letter": None})
+        page = (out / "index.html").read_text()
+    assert "up to 2 found by SAM image search" in page and "Gaps in traffic" in page
+
+def test_case_agent_refuses_a_letter_tracked_before_the_calibration_points_were_marked_again():
+    """The check distance is re-read from the site file, but the near-misses come from the last track: after the
+    points are marked again the check agrees with the tape, yet the letter waits for a new track."""
+    import agent, contextlib, io, tempfile
+    old = agent.run_tracker, pack.ask_plan
+    agent.run_tracker = lambda p, site: {}
+    pack.ask_plan = lambda prompt, measured, key, photo: {"fix": "f", "letter": "l", "writer": "w"}  # never the network
+    try:
+        with tempfile.TemporaryDirectory() as folder, contextlib.redirect_stdout(io.StringIO()):
+            out, site, e = agent_case(folder)
+            p = {"out": str(out), "site": str(out / "site.json"), "tape_m": 7.2, "refusals": 0}
+            letter = lambda: agent.submit_letter(p, {"notes": ""}, "key")["summary"]
+            assert "call track" in letter()  # events.json from a run outside this case: not proven
+            agent.track(p, {"people": "video", "vehicles": "video"}, "key")
+            assert agent.letter_blocker(p, agent.case_site(p), [e], "") == ""
+            moved = {**site, "image_points": [[x + 5, y] for x, y in SQUARE_IMG]}  # still reads 7.0 m
+            (out / "site.json").write_text(json.dumps(moved))
+            assert "call track" in letter() and p["refusals"] == 2
+            agent.track(p, {"people": "video", "vehicles": "video"}, "key")
+            assert agent.letter_blocker(p, agent.case_site(p), [e], "") == ""
+    finally:
+        agent.run_tracker, pack.ask_plan = old
 
 
 def test_case_agent_stops_at_its_turn_and_dollar_caps():
