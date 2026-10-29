@@ -8,6 +8,7 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 | G2 Metres | A road distance NOT used for calibration (a second lane width, or crossing-line length) comes out within ±15% of its assumed value | same | Wed 28 Oct 22:00 |
 | G3 Conflicts | Checked by eye, at least 2 of the top 3 events are real close passes, and no event involves a parked or queued vehicle | same | Thu 29 Oct 22:00 |
 | G4 Own footage | Footage filmed from height at the user's college gate runs end to end, with calibration from measured points | user's video | Sun 1 Nov 22:00 |
+| G5 Blind check | A transport or civil engineering lecturer, not told which clips the pipeline flagged, agrees with it on danger vs none with Cohen's kappa of 0.6 or more (rules below, written before any gate-pack clip is made) | the gate pack | Tue 3 Nov 22:00 |
 | G6 Speed | Against vehicles hand-timed between two lines taped 15 m apart, at least 80% of matched vehicles read within ±15% or ±2 km/h (whichever is larger), and the median error is within ±10%; at least 20 matched vehicles, or G6 is "not tested". Added Thu 29 Oct, before the taped lines are filmed; details below | user's video, with the lines taped | Sun 1 Nov 22:00 |
 
 **Scope cut if G3 fails:** report the closest approach in metres plus vehicle speed (no PET). The evidence pack and letter still ship.
@@ -214,3 +215,105 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
   same 12 of 36 (24 misses: 20 by Spark's review, 4 at a threshold) and 26 of 36 for the 15 s run; the same speed
   check on that code gives 0.52 / 1.89 km/h and 28%.
 - 58 self-checks pass.
+
+## Letter check made stricter (Thu 29 Oct)
+
+- The fifth review's fix for "SAM 3.1" counted the prompt's numbers as measured, which also let any 3.1 through. The
+  check now reads the measurements only, and the letter prompt no longer names the SAM version.
+- Also sent back now: numbers in words (two to ninety, hundred, thousand, dozen; "one" is too common to flag, and a
+  two-wheeler is a vehicle), speeds in mph, and a sentence with one near-miss's speed and another near-miss's time gap.
+- On the two cached letters (`out/dut/15`, `out/dut-15s/15`; offline, no API calls): the word check catches "The four
+  worst were all serious" in dut-15s; both letters say "SAM 3.1", and 3.1 is not in their measurements, so both
+  would now go back; neither mixes two near-misses. Against today's events.json, 3 and 6 of their numbers become
+  clip links.
+
+## One number replaces "conflicts per 100 crossings" (Thu 29 Oct)
+
+- The tile divided conflicts (person-vehicle pairs) by crossings (people), so one person passed by several vehicles
+  counted several times, and it could pass 100. `road.exposure()` now also returns who crossed, and the page's first
+  line (and the letter's first fact) counts each person once: "k of n crossings (1 in N)" within 3 s and within
+  1.5 s, with exact 95% ranges (Clopper-Pearson for the share, Garwood's Poisson range for the count).
+- Offline recomputes (cached tracks or ground truth, no API calls; SAM requests were stubbed to fail on a cache miss):
+  - SinD ground truth, 20 min: 37 of 63 crossings (1 in 1.7) within 3 s, 25 of 63 within 1.5 s. Old tile: 103.2.
+  - Dense Indian clip, crowd cache (the recompute matches the stored 83 events pair for pair and its 15 crossings;
+    Spark's stored verdicts leave 18 events): Spark rejected 10 of the 15 tracked crossers as not people (8 riders,
+    2 "not a person"), so the clip has only 5 real crossers and the ranges are wide: 5 of 5 (1 in 1) within 3 s,
+    2 of 5 (1 in 2.5) within 1.5 s; 95% ranges 47.8-100.0% and 5.3-85.3%. Old tile: 120.0 (18 events over all 15
+    crossers).
+  - Review fix: the first version kept Spark's rejected crossers in n but not in k, which printed 5 of 15 here, 3x
+    too low. `pack.real_crossers` now drops them from n by person (one with any piece still confirmed stays).
+  - Kids 15-second parts: 0 of 7, 95% range 0.0-41.0%, up to 3.7 people in a recording this long.
+- Pages built from an events.json written before this change show no headline, rather than a count that could hold
+  someone twice.
+
+## Receipt, hashes and safety pyramid (Thu 29 Oct)
+
+- **Scale table numbers** (README "Scale"), recomputed offline from the cached SAM replies, no API calls, at Meta's
+  list prices ($0.20 per 1,000 video frames billed, at least 50 a request; $2.50 per 1,000 images):
+  - kids school CCTV, 2 concepts: 8 requests, 1,088 frames billed, $0.22 for 48.4 s ($4.05 per 15 minutes);
+  - dense Indian clip, 4 concepts: 12 requests, 1,720 frames billed, $0.34 for 39.0 s ($7.94 per 15 minutes);
+  - frame by frame for 15 minutes: 13,500 images, $33.75, with the one concept "vehicle"; 31,500, $78.75, with three.
+- The share folder's `SHA256SUMS` passes the system `shasum -a 256 -c` in the self-check; `--verify` reports a changed
+  page as CHANGED and a deleted file as MISSING.
+- No cached events.json has the crosser list yet (all predate it), so the pyramid has not been drawn from a real
+  pack. The first gate pack will be the first. With SinD's 63 crossings, 0 collisions would still allow up to 5.7%.
+
+## G5 Blind check, pre-registered (Thu 29 Oct, before any gate-pack clip is made or labelled)
+
+These rules do not change after anyone labels.
+
+- **Clips** (`blind_set.py OUT_DIR SITE.json --review-decoys`, on the gate pack after G4):
+  - the near-misses Spark did not reject, as the page counts them, most dangerous first, at most 12;
+  - as many decoys: a pedestrian and a moving vehicle on the same spot 5 to 8 s apart, closest first, each
+    pedestrian one Muse Spark says is a person, so a pole is never a decoy, and one who passes no other vehicle
+    under 3 s apart inside the clip, so the rater never sees real danger the key calls none;
+  - every clip 12 s long (121 frames) from 2 s before the first of the two reached the spot (from the video's start
+    when that is sooner; earlier when 12 s would run past the video's end), the pedestrian boxed cyan and the
+    vehicle red, every tracked person's head blurred, no sound, shuffled with a fixed seed as clip01, clip02...;
+    a clip of any other length stops the run before the key is written;
+  - the key (`blind-key.json`) stays with us; the rater gets only the `blind/` folder.
+- **Rater:** one transport or civil engineering lecturer decides the gate. Classmates, if any, are reported
+  separately as non-experts.
+- **Scoring** (`score_humans.py`): the rater's serious or close is "danger", none is "none"; can't tell and unanswered
+  clips are left out and counted. Reported for each rater: agreement k of n with its Wilson 95% interval, Cohen's
+  kappa, the pipeline's near-misses called danger and the decoys called none (each with Wilson 95%), and positive
+  and negative agreement.
+- **Pass:** the lecturer's kappa is 0.6 or more (substantial, Landis & Koch 1977). Fail below it, reported the same way.
+- **Not decidable:** fewer than 6 near-misses or 6 decoys in the set, or more than a quarter of the clips can't tell
+  or unanswered. The answers are then reported as descriptive only.
+- `score_humans.py` prints this verdict itself, so the rule is applied as written.
+
+Tooling dry runs (offline, not the gate): on a copy of the cached dense Indian clip (390 frames), with the vehicle
+sampling rate its cache was made at and no `--review-decoys` (so decoys are limited to pedestrians Spark had
+already looked at), `blind_set.py` rebuilt the tracks from cache with no SAM request.
+
+- The first version wrote 12 near-misses and 8 decoys, but 6 near-miss clips, with events at 30.0-30.8 s, were cut
+  short by the video's end: 102, 102, 102, 106, 110 and 110 frames (frame counts from ffprobe). And every decoy's
+  pedestrian passed another vehicle under 3 s apart inside its clip. Both are fixed in the rules above, before
+  anyone labelled.
+- The re-run wrote 12 near-misses, all 121 frames, and 0 decoys: of 30 pairs 5 to 8 s apart, 29 had the pedestrian
+  under 3 s from another vehicle inside the clip, and the one left was a pedestrian Spark had not looked at. A set
+  from a crossing this busy would be not decidable; the gate pack needs `--review-decoys` and calm crossings too.
+- Near-misses in the video's first 2 s start with less lead (four here, at 0.2-1.7 s), and the six at 30.0-30.8 s
+  with more; the rules above allow both.
+
+## Judge bench, Spark side (Thu 29 Oct)
+
+`judge_bench.py` plants one lie at a time in two real letters and scores each letter check on them.
+
+- Bases: Glimmer's v1 letter (`<removed-run-record>`, facts rebuilt from `sample/`) and the Muse Spark letter
+  cached in `out/dut-15s/15`, written before the stricter check: the bench writes its "SAM 3.1" as "SAM" and "four"
+  as "4", after which every number passes the code check against facts rebuilt from that folder's events.json.
+- 12 kinds of lie on each base, 24 copies: the four kinds JUDGE_PROMPT names (a standard said to be met, a death
+  risk for a child, a named person blamed, a number in words) and two plain invented facts (injuries, a cause); and
+  six kinds it does not name (every school day, deaths prevented, a near-miss called a collision, children claimed,
+  km/h written as mph, two near-misses' speeds swapped). The 18 inserted sentences have no digit.
+- 8 clean controls: each base as written, and with one fact-free or true sentence added (a site visit asked for, the
+  serious count restated, "near-misses, not recorded accidents").
+- **Code check, offline, run today:** 4 of 24 lies caught (Wilson 95% 7-36%): the 2 numbers in words and the 2 mph
+  speeds. It missed every inserted sentence and both swaps, as built: those need a judge. 0 of 8 controls flagged
+  (Wilson 95% 0-32%).
+- Not run yet (paid): Muse Spark twice per letter, and Muse Glimmer once on Kaggle. Both are Muse models, so neither
+  is an independent judge of Muse letters. A reply that cannot be read is counted on its own, not as a catch.
+  Totals and their Wilson bounds count letters (one flagged if any of its readable runs flagged it), never runs:
+  two runs on one letter are not independent.

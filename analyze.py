@@ -10,6 +10,7 @@ import math
 import re
 import statistics
 import subprocess
+import time
 from pathlib import Path
 
 import crowd
@@ -19,6 +20,7 @@ import review
 import roadmap
 import road
 import sam
+import seal
 
 EVIDENCE_CLIPS = 5
 MAX_REVIEWS = 40  # Spark looks at no more pedestrians than this per run
@@ -344,10 +346,22 @@ def probe(path, entries, *extra):
                            "-of", "csv=p=0", str(path)], check=True, capture_output=True, text=True).stdout.strip()
 
 
-def write_events(out_dir, site, events, seen, cost, full, privacy=None):
+def sam_replies(out_dir):
+    """SAM replies cached in an output folder: video parts, tiles and crowd-mode images alike."""
+    return sum(1 for _ in Path(out_dir).rglob("*.sam.txt"))
+
+
+def run_record(out_dir, started, replies_before):
+    """This run, for the pack's receipt: wall-clock minutes so far, and the SAM requests it sent (0: every reply
+    came from cache, so nothing new was paid)."""
+    return {"minutes": round((time.monotonic() - started) / 60, 1), "sam_requests": sam_replies(out_dir) - replies_before}
+
+
+def write_events(out_dir, site, events, seen, cost, full, privacy=None, source_sha256=None, run=None):
     (out_dir / "events.json").write_text(json.dumps({"site": site.get("name", ""), "fps": FPS, "exposure": seen,
                                                      "cost": cost,
                                                      "sam_full_requests": full, "privacy": privacy,
+                                                     "source_sha256": source_sha256, "run": run,
                                                      "events": events}, indent=1))
 
 
@@ -520,6 +534,7 @@ def main():
     out_dir = Path(args.out or Path("out") / Path(args.video).stem)
     out_dir.mkdir(parents=True, exist_ok=True)
     check_source(args.video, out_dir, site.get("prep_filter", ""))
+    started, source, before = time.monotonic(), seal.file_sha256(args.video), sam_replies(out_dir)  # pack receipt
     clip = prepare(args.video, out_dir, site.get("prep_filter", ""))
     frame_size = tuple(int(v) for v in probe(clip, "stream=width,height").split(","))
     if site.get("frame_size") and tuple(site["frame_size"]) != frame_size:
@@ -564,7 +579,9 @@ def main():
               "in those parts were not tracked (use person_mode / vehicle_mode \"crowd\": the Crowded and Dense "
               "traffic boxes on the calibration page; or \"auto\")", flush=True)
 
-    write_events(out_dir, site, events, seen, cost(), full)  # saved before the slower, network-bound evidence step
+    # saved before the slower, network-bound evidence step
+    write_events(out_dir, site, events, seen, cost(), full, source_sha256=source,
+                 run=run_record(out_dir, started, before))
     review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size, top_down)
     everyone, privacy, searched = list(person_boxes.values()), None, []
     if events and person_concept not in crowded + list(switched) and \
@@ -572,7 +589,8 @@ def main():
         found, searched = search_heads(site, clip, out_dir, events, total, pieces, key, cap - spent)
         everyone, privacy = heads(person_boxes, found, searched)
     add_evidence(args.video, clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size, everyone)
-    write_events(out_dir, site, events, seen, cost(len(searched)), full, privacy)
+    write_events(out_dir, site, events, seen, cost(len(searched)), full, privacy, source,
+                 run_record(out_dir, started, before))
     report(seen, events)
 
 

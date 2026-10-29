@@ -528,7 +528,8 @@ def exposure(people, vehicles, fps, frames):
     """How much was watched, so a short or quiet video is never read as "safe": crossings (people, counted once
     per tracked id however many pieces it was split into), moving vehicles, minutes, and the 85th-percentile
     vehicle speed, each vehicle's speed taken while it was actually moving (the speed traffic engineers quote).
-    When someone crossed, also the gaps in traffic where they crossed that are long enough to cross in."""
+    When someone crossed, also the gaps in traffic where they crossed that are long enough to cross in, and who
+    crossed (sorted ids), so a count of people in conflicts can stay inside this one."""
     crossers = {pid.split("/")[0] for pid, feet in people.items() if crossing_cells({pid: feet}, fps)}
     vehicle_speeds = []
     for edges in vehicles.values():
@@ -537,7 +538,7 @@ def exposure(people, vehicles, fps, frames):
             vehicle_speeds.append(statistics.median(moving))
     p85 = percentile(vehicle_speeds, 0.85)
     seen = {"minutes": round(frames / fps / 60, 1), "duration_s": round(frames / fps, 1), "crossings": len(crossers), "vehicles": len(vehicle_speeds),
-            "speed_85th_kmh": round(p85 * 3.6, 1) if p85 else None}
+            "speed_85th_kmh": round(p85 * 3.6, 1) if p85 else None, "crossers": sorted(crossers)}
     cells = crossing_cells(people, fps)
     if not cells:
         return seen
