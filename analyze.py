@@ -404,11 +404,13 @@ def run_record(out_dir, started, replies_before):
 
 
 def write_events(out_dir, site, events, seen, cost, full, privacy=None, source_sha256=None, run=None, timeline=None,
-                 paths=None, walking=None):
+                 paths=None, walking=None, recording_s=None):
+    """events.json; `recording_s`, the whole recording's length, only when window_s analysed part of it."""
     (out_dir / "events.json").write_text(json.dumps({"site": site.get("name", ""), "fps": FPS, "exposure": seen,
                                                      "cost": cost,
                                                      "sam_full_requests": full, "privacy": privacy,
-                                                     "source_sha256": source_sha256, "run": run,
+                                                     "source_sha256": source_sha256,
+                                                     **({"recording_s": recording_s} if recording_s else {}), "run": run,
                                                      "timeline": timeline, "paths": paths, "walking": walking,
                                                      "events": events}, indent=1))
 
@@ -591,9 +593,10 @@ def main():
     out_dir = Path(args.out or Path("out") / Path(args.video).stem)
     out_dir.mkdir(parents=True, exist_ok=True)
     window = site.get("window_s")
-    if window and window[1] > float(probe(args.video, "format=duration")) + 1 / FPS:  # ffmpeg -t stops at the end
-        raise SystemExit(f"window_s ends at {window[1]:g} s but {args.video} is shorter: the page would claim seconds "
-                         "that were never analysed")
+    recording_s = round(float(probe(args.video, "format=duration")), 1) if window else None
+    if window and window[1] > recording_s + 1 / FPS:  # ffmpeg -t stops quietly at the end of the file
+        raise SystemExit(f"window_s ends at {window[1]:g} s but {args.video} is {recording_s:g} s long: the page would "
+                         "claim seconds that were never analysed")
     started, source, before = time.monotonic(), seal.file_sha256(args.video), sam_replies(out_dir)  # pack receipt
     check_source(args.video, out_dir, site.get("prep_filter", ""), source, window)
     clip = prepare(args.video, out_dir, site.get("prep_filter", ""), window)
@@ -651,7 +654,8 @@ def main():
 
     # saved before the slower, network-bound evidence step
     write_events(out_dir, site, events, seen, cost(), full, source_sha256=source,
-                 run=run_record(out_dir, started, before), timeline=timeline, paths=paths, walking=walk)
+                 run=run_record(out_dir, started, before), timeline=timeline, paths=paths, walking=walk,
+                 recording_s=recording_s)
     review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size, top_down)
     everyone, privacy, searched = list(person_boxes.values()), None, []
     # with no events this searches frame 0 only (one image): the street photo is still shown for the desire lines
@@ -661,7 +665,7 @@ def main():
     add_evidence(args.video, clip, out_dir, events, people, vehicles, person_boxes, vehicle_boxes, key, frame_size,
                  everyone, (window or [0.0])[0])
     write_events(out_dir, site, events, seen, cost(len(searched)), full, privacy, source,
-                 run_record(out_dir, started, before), timeline, paths, walk)
+                 run_record(out_dir, started, before), timeline, paths, walk, recording_s)
     report(seen, events, untrusted)
 
 

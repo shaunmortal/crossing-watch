@@ -2987,6 +2987,10 @@ def test_window_s_prepares_only_those_seconds_of_the_recording():
         with contextlib.redirect_stdout(printed):
             assert analyze.load_site(site)["window_s"] == [10, 25]
         assert "under 15 minutes" in printed.getvalue()  # the page will give no hourly rates
+        analyze.write_events(Path(tmp), {}, [], {"minutes": 0.3, "window_s": [10, 25]}, None, None, recording_s=40.0)
+        assert json.loads(Path(tmp, "events.json").read_text())["recording_s"] == 40.0  # the page's "of a 40 s recording"
+        analyze.write_events(Path(tmp), {}, [], {"minutes": 0.7}, None, None)
+        assert "recording_s" not in json.loads(Path(tmp, "events.json").read_text())  # no window: events.json as before
 
 
 if __name__ == "__main__":
