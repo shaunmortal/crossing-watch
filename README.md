@@ -9,12 +9,56 @@ adult death risk had they collided, and what a 20 or 30 km/h limit would have ch
 pack a principal can send to the road authority: clips, numbers, a proposed fix drawn onto the real street, and a
 ready letter. That is proof before a child is hit, instead of waiting for crash statistics.
 
-## Status
+## Judges, start here
 
-Not filed yet. The plan is to file the pack with the road authority through CPGRAMS online on Tue 3 Nov 2026, in a
-named person's name. Its reference number will be added here and in the site file's `"submitted"` key. Only "filed,
-reference X" is ever written: whether anything is approved or fixed is for the authority to say, and no resolution
-date is promised.
+**3-minute video:** GATE-TBD · **Release:** GATE-TBD · **Evidence page:** GATE-TBD · **X post:** GATE-TBD
+
+GATE-TBD: one blurred StroMotion still from Monday's run (`event1-strobe.jpg`), checked by eye.
+
+**Our crossing:** GATE-TBD (the headline from Monday's events.json). **Filed:** not yet. The plan is to file the pack
+with the road authority through CPGRAMS online on Tue 3 Nov 2026, in a named person's name. Its reference number will
+be added here and in the site file's `"submitted"` key. Only "filed, reference X" is ever written: whether anything is
+approved or fixed is for the authority to say, and no resolution date is promised.
+
+| Meta model | Its job here | Files | Ran on real data | Measured (caveats behind the link) |
+|---|---|---|---|---|
+| SAM 3.1 | tracks people and vehicles | `sam.py`, `crowd.py` | yes: DUT drone clips, news CCTV | the geometry on its tracks finds 49 of 52 DUT conflicts (crowd mode); speed error 0.16 km/h mean, 0.55 at the 95th percentile (vehicle crowd mode) ([DUT](#end-to-end-against-ground-truth-dut)) |
+| Muse Spark, reviewer | is that a person, and who | `review.py`, `blind_set.py` | yes: DUT | after its review 48 of 52 (vehicle crowd mode, no net change) and 44 of 52 (crowd mode, 5 fewer) ([DUT](#end-to-end-against-ground-truth-dut)) |
+| Muse Spark, writer and judge | picks the fix, writes the letter, checks it apart | `pack.py`, `judge_bench.py` | yes: a DUT clip's letter | as judge it flagged 24 of 24 planted lies and 1 of 8 clean letters; code alone 4 of 24; a Muse judge is not independent of Muse letters ([bench](#checking-the-checks)) |
+| Muse Spark, case agent | works the case, stops for a tape measure | `agent.py` | not yet: GATE-TBD | none: a test drives it with a scripted model |
+| Muse Image | draws the fix onto the real street | `pack.py`, `fixband.py`, `ailabel.py` | yes: a DUT frame, the news CCTV street | GATE-TBD |
+| Muse Wonder | listens for horns, brakes and shouts | `listen.py` | yes: our college clip | none: heard brakes there, not ground truth ([GATES](GATES.md#status-update-wed-28-oct-late-night)) |
+| Muse Glimmer 30B, open weights | the letter, self-hosted on Kaggle 2 x T4 | `<removed-run-record>`, `pack.py` | no: the synthetic sample | v1: 592 s, every number passed the code check; v2 checked the weights' sha256; as judge it flagged 6 of 8 clean letters ([v2](<removed-run-record>)) |
+| Muse Spark Open, open weights | the letter, on Fireworks | `pack.py`, `openweights.py` | no: the synthetic sample | one try, 55.5 s ([record](provenance/spark-open-fireworks-sample.json)) |
+
+**Checked against ground truth:** the near-miss maths on SinD's drone trajectories
+([Validation on ground-truth trajectories](#validation-on-ground-truth-trajectories)), and the whole pipeline against
+DUT's own tracked people and cars ([End to end, against ground truth (DUT)](#end-to-end-against-ground-truth-dut)).
+**Gates, pre-registered in [GATES.md](GATES.md#verdict-now):** G1 passed (news CCTV); G3 passed on DUT drone ground
+truth only; G2, G4, G5, G6 and G8 not run yet; G7 has no verdict before submission. GATE-TBD: Tuesday's verdicts.
+
+**Try it, no key and no video** (Python 3.11+ and ffmpeg):
+
+```
+python3 test_cw.py                        # self-checks, about 20 s
+python3 pack.py sample sample/site.json   # the synthetic sample (made-up tracks) -> sample/index.html
+open sample/index.html                    # macOS; elsewhere open the file in a browser
+```
+
+Without a key the page shows the measurements only; the fix and the letter need `MODEL_API_KEY` (Meta Model API) or
+`LETTER_MODEL_URL` (open weights).
+
+## Files
+
+- **Run:** `analyze.py` (video to events.json) with `sam.py`, `crowd.py`, `road.py`, `pace.py`, `review.py`,
+  `listen.py`, `render.py`, `masks.py` and `seal.py`; before filming, `calibrate.html` and `filmcheck.py`.
+- **Page and letter:** `pack.py` with `summary.py`, `roadmap.py`, `overlay.py`, `fixband.py`, `ailabel.py`,
+  `openweights.py` and `passmark.py`.
+- **Case agent:** `agent.py`.
+- **Checks:** `test_cw.py`; `validate_sind.py`, `validate_dut.py` and `validate_offline.py` (ground truth);
+  `validate_gate.py` (G6, G8); `blind_set.py` and `score_humans.py` (G5); `judge_bench.py`; `vehicle_test.py`.
+- **Video and X:** `video/split.py` (the hero shot); `guess.py` (X replies' speed guesses against the measured speed).
+- **Docs and records:** `FILMING.md`, `GATES.md`, `sites/`, `sample/`, `kaggle/`, `provenance/`, `LICENSES/`.
 
 ## How it works
 
@@ -42,7 +86,8 @@ date is promised.
 Needs Python 3.11+ and ffmpeg. No other dependencies. Put `MODEL_API_KEY=...` (Meta Model API) in `.env`.
 
 ```
-open calibrate.html                      # tape-measured rectangle, or no tape: match 4 points to a satellite view
+open calibrate.html                      # tape-measured rectangle, or no tape: match 4 points to a satellite view;
+                                         # 4 optional speed-line clicks add G6's "trap" and the agent's "check"
 python3 analyze.py VIDEO site.json       # tracks, near-misses, clips, Spark review -> out/VIDEO/events.json
 python3 pack.py out/VIDEO site.json      # letter, fix image, evidence page -> out/VIDEO/index.html
 python3 pack.py out/VIDEO site.json --notes notes.txt                                  # the principal's notes
@@ -76,10 +121,17 @@ sign with `agent.py --approve`.
   gives G7's pass mark (`passmark.py`, rule in `GATES.md`): from the headline's own counts, the most crossings with a
   vehicle within 3 s, and the most distinct such vehicles, that an after-film as long may show for a one-sided
   Fisher exact test at 5%. Page only, never in the letter; never under the pace warning or without a crosser list.
+- The page opens summary first: the minutes of video, the site and the headline, the first shown near-miss's blurred
+  clip playing beside the serious, close and crossings tiles, what the school asks for, and where the letter stands
+  (draft, approved, changed after sign-off, filed), then a bar that jumps to each section. Under the pace warning it
+  shows no clip and no ask.
 - Printed, the page keeps light colours even in dark mode, shows only the 3 worst near-misses (a letter number from
   another reads "(clip N, not printed)") and puts the letter first, on its own sheet.
 
-Filming your own crossing: [`FILMING.md`](FILMING.md) (phone locked at 1080p 30 fps, tape marks, consent notice; `python3 filmcheck.py CLIP` checks the test clip).
+Filming your own crossing: [`FILMING.md`](FILMING.md) (phone locked at 1080p 30 fps, tape marks, consent notice).
+`python3 filmcheck.py CLIP [START END]` checks a clip's size, orientation, frame rate, HDR Video and Spatial Audio,
+and whether the view held still and did not darken (from START, the window's start, to END). Muse Wonder hears only
+the first audio track, so a Spatial Audio file still gets its sound check.
 If the video is HDR anyway (HLG or PQ), `analyze.py` maps it to SDR (BT.709) as it scales the clip, else the clip
 comes out dark and washed out. That is checked only on synthetic HLG clips, where it brings the clip closer to the SDR
 original; it is untested on a real iPhone HLG file, and it may clip a bright sky.
@@ -131,9 +183,12 @@ SAM replies are cached per output folder, and so are Muse Spark's and Muse Wonde
 its crop or sound clip (person-<id>.json, event<N>-heard.json) under the SHA-256 of what was sent, and read again
 while that is unchanged. Same footage, same numbers: a re-run neither pays again nor changes the counts a signed
 letter quotes, and analyze.py prints "Spark verdicts reused: N of M". Delete those files to make Spark or Wonder look
-again, and keep the same ffmpeg between a run and its re-run. An output folder refuses a different video.
+again, and keep the same ffmpeg between a run and its re-run. An output folder knows its video by SHA-256: it refuses
+a different video, and the same file moved or renamed keeps its paid SAM replies.
 A dropped SAM request is retried after 10, 30 and 90 s (130 s in all; longer when Meta's Retry-After asks, e.g. 60 s
-on a 503). A longer dropout still ends the run, and a re-run resumes from the cache.
+on a 503); a refusal (HTTP 4xx other than 408 and 429) never is. A longer dropout still ends the run, and a re-run
+resumes from the cache. A reply is saved whole or not at all, SAM video requests go out 4 at a time, and a progress
+line prints every 25 new video and 250 new image replies.
 Videos are sent to SAM in 15-second parts that overlap by 2 s, so a person crossing a cut keeps one ID. Parts are
 short because one SAM 3.1 video request tracks at most 16 objects **in all**: once 16 IDs are taken, later arrivals
 are never picked up (none of 54 replies had more, and none gained an ID after filling). Any request that still hits
@@ -142,7 +197,8 @@ tracked in 4 overlapping tiles (SAM returns at most 16 objects per request) and 
 estimated first at Meta's list prices: a run over $10 needs `--allow-cost`, and `--budget USD` is a hard cap that
 nothing lifts. With `"person_mode": "auto"` or `"vehicle_mode": "auto"`, a concept goes to SAM video first; if a part
 fills its 16 objects before the next part takes over, that concept is detected frame by frame instead and the page
-says when it filled (on the Indian time-lapse: "person: 16 objects taken within 1.0-1.6 s in 3 of 3 parts").
+says when it filled (on the Indian time-lapse: "person: 16 objects taken within 1.0-1.6 s in 3 of 3 parts"). Before
+anything is paid, analyze.py prints the most that switch could add in SAM images.
 
 `"window_s": [S, E]` in the site file analyses only seconds S to E of the recording, picked by the window rule in
 `GATES.md` before any near-miss is seen; the SHA-256 is still of the whole original, clip time 0 is second S, and the
@@ -258,7 +314,10 @@ the road that was not used for calibration (calibrate.html writes it from the sp
 "points": [[x, y], [x, y]]}`; never kerb to kerb, which is a calibration input. The agent asks a person to
 tape it (answered in m or cm), and the letter is refused until the video and the tape agree within 15% (gate G2) and
 the near-misses were tracked with the site's current calibration points. Three refusals in a row go to a person.
-The head of the school then approves the letter or sends it back with notes. Every step goes to
+The head of the school then approves the letter or sends it back with notes; `--approve` needs `--approved-by` and
+`--school` and writes the same `signoff.json` as pack.py, so the page names who signed. The case page carries
+pack.py's receipt, the street seen from above, the Muse Image fix drawn only inside the measured band, and a `share/`
+folder with its `SHA256SUMS`. Every step goes to
 `out/VIDEO/case/agent_log.jsonl`, and the page shows "How the agent worked this case". No agent run has been made
 against the Meta API yet; a test drives it with a scripted model.
 
@@ -471,7 +530,7 @@ not the true speed-up, and a video sped up less than about 2x would pass.
 
 | Option | Cost | What it gives |
 |---|---|---|
-| A funded near-miss study (a 2020 Canadian programme) | about $5,000 per intersection | a full study |
+| A funded near-miss study (Aviva and MicroTraffic, Canada, 2020) | about C$5,000 per intersection: a city's 25% share was capped at C$12,500, so about C$50,000 per city for its 10 intersections | a full study |
 | Telraam S2 window sensor | €199 per sensor | traffic counts, no near-misses |
 | Crossing Watch, SAM only, at Meta's list prices | about $4-8 for a 15-minute dismissal (video mode); $34-79 frame by frame for dense crowds | a first screen that tells the authority where to do a full study; not a crash forecast (the Indian crash model in Related work, Ankunda et al., used 11 hours of video) |
 
@@ -588,7 +647,24 @@ affiliates), used under its SAM License (github.com/meta-models/meta-sam). The f
 check-then-retry pattern for Spark's letter, the reject-with-notes revision and the JSON-mode request field follow
 Meta's legal-agent workshop (github.com/meta-models/legal-agent-workshop, shown at a hackathon session); no code was
 copied from it. The case agent follows the shape of that workshop's loop (one tool per turn, plain text sent back, a stop for a person,
-resume from saved progress, escalation after 3 refusals); its code is our own. No
-third-party libraries; Python standard library and ffmpeg only. Test videos from YouTube were used only for local
-testing and are not included. The SinD sample (SOTIF-AVLab, non-commercial use) was used only for validation and is
-not included.
+resume from saved progress, escalation after 3 refusals); its code is our own.
+
+**What runs.** The Python code uses only the standard library. It calls ffmpeg as a command-line tool (a GPL build
+with libx264, which the clips are encoded with); ffmpeg is not bundled. `video/split.py`, for the demo's hero shot
+only, uses Chrome or any Chromium. Inside the Kaggle notebook: llama.cpp `b11976` (MIT), huggingface_hub
+(Apache-2.0) and the Muse Glimmer 30B GGUF weights (Apache-2.0, Hugging Face revision `b44f1072`). The models run
+as services, not libraries: the Meta Model API, Fireworks for Muse Spark Open, and Kaggle's 2 x T4 for Glimmer.
+
+**Datasets, none included.**
+- SinD (github.com/SOTIF-AVLab/SinD), non-commercial (a modified CC0: its LICENSE says the dataset is not permitted
+  for commercial purposes); its public sample was used only for validation. Xu Y. et al., "SIND: A Drone Dataset at
+  Signalized Intersection in China", IEEE ITSC 2022, pp. 2471-2478, doi:10.1109/ITSC55140.2022.9921959 (v1, the one
+  used; not SinD 2.0).
+- DUT (github.com/dongfang-steven-yang/vci-dataset-dut), no licence given; used only for internal testing. Yang D.
+  et al., "Top-view Trajectories: A Pedestrian Dataset of Vehicle-Crowd Interaction from Controlled Experiments and
+  Crowded Campus", IEEE Intelligent Vehicles Symposium 2019, arXiv:1902.00487.
+- Test videos from YouTube, used only for local testing. The two whose results appear here: the schoolchildren CCTV
+  clip (https://youtu.be/9YqdnG5Jxnw) and the Indian time-lapse (https://youtu.be/_l99w_CKwCU).
+
+**AI assistance.** The code and docs were written with an AI coding assistant, and the reviews named in `GATES.md`
+were AI-assisted; every model call in the product is to a Meta model.

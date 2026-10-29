@@ -17,6 +17,22 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 
 **Known limits (stated, not hidden):** a vehicle's lower box edge stands in for its footprint; up to 16 objects per SAM video request (found later: in all, not per frame); one concept per SAM request; calibration lengths on the news clip are assumed.
 
+## Verdict now
+
+The table above does not change; this one is updated as gates run. Last updated Thu 29 Oct 2026, before the
+rehearsal or the main recording was filmed.
+
+| Gate | Verdict now | Evidence |
+|---|---|---|
+| G1 Tracks | passed 28 Oct (news CCTV) | the table above; 'Status (Wed 28 Oct, evening)' below |
+| G2 Metres | not tested on the pre-registered clip (assumed lengths) | waits for our footage: the case agent's tape check and `validate_gate.py`'s line distance |
+| G3 Conflicts | not tested on its own footage; passed on DUT drone ground truth (29 Oct); phone angle pending | 'Status update (Thu 29 Oct, early)' below |
+| G4 Own footage | not run | due Sun 1 Nov |
+| G5 Blind check | not run | no rater has labelled; rules in 'G5 Blind check, pre-registered' below |
+| G6 Speed | not run | no taped lines filmed yet; rules in 'G6 pre-registration' below |
+| G7 After the fix | no verdict before submission | the mark is written here on Mon 2 Nov night; rules in 'G7 After-fix pass mark' below |
+| G8 Second operator | not run | after G6's log and Monday's run; rules in 'G8 Second operator' below |
+
 ## G6 pre-registration (written Thu 29 Oct 2026, before the taped lines are filmed)
 
 - **Lines.** Four tape marks, two on each kerb, make two lines across the road 15 m apart, centred on the crossing.
@@ -605,6 +621,31 @@ code gets our numbers from the same frame and the same tape.
 - The new crop (the cyan box drawn after upscaling, outside the person) has new bytes, so Spark is asked again on the
   next paid run; until then these are its stored verdicts on the old crops.
 
+## G6's log with a window, and the tape marks in calibrate.html (Thu 29 Oct 2026, before the rehearsal or the main recording is filmed)
+
+- With `window_s`, analyze.py tracks only seconds S to E, and `validate_gate.py` reads TRAP.csv's times on the whole
+  original but counts only the vehicles that cross both lines inside the window (commit 08b28be). So G6's "from the
+  start of that video" is read as from second S: the log starts with the first vehicle that crosses both lines at or
+  after S, and goes on in order until 30 are logged. A log started at second 0 would spend its vehicles before S.
+- `calibrate.html` writes `"trap"` from four optional speed-line clicks after the rectangle's corners (A near, B near,
+  B far, A far, and the taped distance between the lines, 15 m by default; commit 26defae), and the case agent's
+  `"check"` from A near and B near: a road distance along the near kerb that calibration does not use, as G2 asks.
+  Checked under a DOM stub only; not yet clicked through in a real browser.
+- The G6 and window rule text above is unchanged.
+
+## The README's first-screen numbers, re-checked at $0 (Thu 29 Oct 2026)
+
+On the merged build (commit 5083592), with no key in the environment and no API call:
+
+- `python3 validate_offline.py DUT_REPO out/dut-vcrowd out/dut-15s`: 48 and 44 of 52 found after Spark's review, 48
+  and 49 by the geometry (vehicle crowd mode and crowd mode); speed against the dataset's native-rate positions
+  0.16 / 0.55 km/h (mean / 95th percentile, vehicle crowd mode, 2,079 frames). The same as the entries above.
+- `judge_bench.py --out COPY` on a copy of the bench file, no judge asked: code 4 of 24 and 0 of 8, Muse Spark 24 of
+  24 and 1 of 8, 0 of 64 replies unreadable. Glimmer's column is from its Kaggle log only (`<removed-run-record>`).
+- The quick start on a `git archive` copy, which holds no `.env`: `python3 test_cw.py` passed 173 self-checks in 19 s,
+  and `python3 pack.py sample sample/site.json` wrote a measurements-only page ("2 serious, 0 close passes, fix:
+  none"), saying the letter needs `MODEL_API_KEY` or `LETTER_MODEL_URL`.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
@@ -614,3 +655,5 @@ code gets our numbers from the same frame and the same tape.
 - Thu 29 Oct 2026, after the G7 rule above was written: the page began computing G7's mark from its own k, V and n
   with `passmark.py`, by the same one-sided Fisher exact test and the same p ≤ 0.05 comparator. It shows no "after"
   result. The G7 text is unchanged.
+- Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: a "Verdict now" table added under the
+  pre-registered one, and the README's first screen links to it. No pre-registered text changed.
