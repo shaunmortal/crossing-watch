@@ -3756,7 +3756,7 @@ def test_a_judge_that_errors_or_a_writer_blip_never_loses_the_paid_letter():
         blip = False
         plan = pack.ask_plan("PROMPT", "{}", "key")
         assert plan["letter"] == good["letter"] and plan["unsupported"] == [pack.JUDGE_FAILED]
-        assert plan["tries"] == pack.LETTER_TRIES and html.escape("the reviewer says: " + pack.JUDGE_FAILED) in pack.letter_section(plan)
+        assert plan["tries"] == 1 and html.escape("the reviewer says: " + pack.JUDGE_FAILED) in pack.letter_section(plan)
         pack.JUDGE_URL = "http://127.0.0.1:8080/v1"  # the open judge answers while Spark is down
         pack.open_model_reply = lambda prompt, image, schema, judge=False: ('{"problems": ["Too long."]}', {})
         assert pack.judge_problems("letter", "{}", "key") == [pack.JUDGE_FAILED, "Too long."]
@@ -3964,6 +3964,41 @@ def test_feet_overlap_counts_frames_whose_feet_sit_on_a_vehicle_box_after_the_ri
     people = {"rider": {0: [115, 20, 145, 110]}, "walker": {0: [120, 90, 140, 215]}, "in bus": {1: [10, 10, 50, 100]}}
     vehicles = {"motorcycle#1": {0: [100, 100, 160, 200]}, "bus#2": {1: [0, 0, 400, 300]}}
     assert feet_overlap.feet_overlap(people, vehicles) == (1, 2)
+
+
+def test_a_judge_that_always_fails_costs_one_writer_call_and_a_real_objection_still_goes_back():
+    """A judge outage is no fault in the letter: the writer is paid once and that letter is kept with the point to
+    check. When one judge fails and the other objects, only the objection goes back, and a writer blip on that retry
+    keeps the paid letter."""
+    import contextlib, io
+    import urllib.error
+    good = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "Cars passed close to children."}
+    prompts = []
+    def writer(prompt, key, photo=None, known=None):
+        prompts.append(prompt)
+        if len(prompts) > 1 and blip:
+            raise urllib.error.URLError("network is unreachable")
+        return good
+    def spark_down(prompt, image, key):
+        raise urllib.error.URLError("no route to host")
+    old = pack.model_plan, pack.spark_reply, pack.open_model_reply, pack.JUDGE_URL
+    pack.model_plan, pack.spark_reply, blip = writer, spark_down, False
+    try:
+        with contextlib.redirect_stderr(io.StringIO()):
+            plan = pack.ask_plan("PROMPT", "{}", "key")
+            assert len(prompts) == 1 and plan["tries"] == 1 and plan["unsupported"] == [pack.JUDGE_FAILED]
+            pack.JUDGE_URL = "http://127.0.0.1:8080/v1"
+            pack.open_model_reply = lambda prompt, image, schema, judge=False: ('{"problems": ["Too long."]}', {})
+            prompts.clear()
+            plan = pack.ask_plan("PROMPT", "{}", "key")  # Spark down, the open judge objects every time
+            assert len(prompts) == pack.LETTER_TRIES and "Too long." in prompts[1]
+            assert pack.JUDGE_FAILED not in prompts[1] and plan["unsupported"] == [pack.JUDGE_FAILED, "Too long."]
+            prompts.clear()
+            blip = True
+            kept = pack.ask_plan("PROMPT", "{}", "key")
+            assert kept["letter"] == good["letter"] and kept["tries"] == 1 and len(prompts) == 2
+    finally:
+        pack.model_plan, pack.spark_reply, pack.open_model_reply, pack.JUDGE_URL = old
 
 
 if __name__ == "__main__":

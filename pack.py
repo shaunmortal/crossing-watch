@@ -505,7 +505,10 @@ def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES, stated=(
         problems = [] if coded or not judged else judge_problems(plan["letter"], measured, api_key)
         if not coded and not problems:
             return {**plan, "writer": WRITER, "tries": attempt + 1, **({"judged_by": judges(api_key)} if judged else {})}
-        note = retry_note(bad, crossed, problems, accused)
+        if problems and set(problems) == {JUDGE_FAILED}:  # the judge failed, not the letter: keep this one, pay no more
+            tries = attempt + 1
+            break
+        note = retry_note(bad, crossed, [p for p in problems if p != JUDGE_FAILED], accused)
     return {**plan, "writer": WRITER, "tries": tries, "unmeasured": bad, "mixed": crossed, "unsupported": problems,
             "accuses": accused}
 

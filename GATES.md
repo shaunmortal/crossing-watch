@@ -655,6 +655,9 @@ On the merged build (commit 5083592), with no key in the environment and no API 
   the rule: no number changed. Vehicle crowd mode (`out/dut-vcrowd`): 48 of 52 by the geometry and after review, 6
   false alarms, speed 0.16 / 0.55 km/h. Crowd mode (`out/dut-15s`): 49 of 52 by the geometry, 44 of 52 after review, 5
   false alarms, speed 0.15 / 0.43 km/h. The README's numbers stand.
+- **What this re-score cannot show.** DUT is top-down and its runs track no bikes, so no bike box exists there and
+  the re-score never exercises the feet condition. The rule is covered by a unit test only
+  (`test_spark_rider_call_needs_the_feet_no_lower_than_the_bike`) and is unchecked on real footage.
 
 ## Log
 
