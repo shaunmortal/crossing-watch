@@ -315,7 +315,57 @@ def test_close_passes_and_exposure_never_read_as_safe():
     assert {k: seen[k] for k in ("minutes", "crossings", "vehicles", "speed_85th_kmh")} == {
         "minutes": 1.0, "crossings": 1, "vehicles": 1, "speed_85th_kmh": 28.8}
     tiles = pack.stats([], seen)
-    assert "pedestrian crossings watched" in tiles and "85% of vehicles" in tiles and "conflicts per 100" in tiles
+    assert "pedestrian crossings watched" in tiles and "85% of vehicles" in tiles and "conflicts per 100" not in tiles
+    assert pack.headline([], seen, {})[0] == "0 of 1 crossings had a moving vehicle through the same spot within 3 s " \
+                                             "of the person; 0 of 1 within 1.5 s."
+
+
+def test_exact_ranges_match_published_values():
+    """Garwood's exact Poisson range and Clopper-Pearson's for k of n, checked against published tables."""
+    assert [round(v, 2) for v in pack.poisson_range(0)] == [0.0, 3.69]  # never "safe": 0 seen, up to 3.7 expected
+    assert [round(v, 2) for v in pack.poisson_range(9)] == [4.12, 17.08]
+    assert [round(v, 4) for v in pack.share_range(3, 10)] == [0.0667, 0.6525]
+    assert [round(v, 4) for v in pack.share_range(0, 10)] == [0.0, round(1 - 0.025 ** 0.1, 4)]
+    assert [round(v, 4) for v in pack.share_range(10, 10)] == [round(0.025 ** 0.1, 4), 1.0]
+    low, high = pack.share_range(40, 2000)  # large n: logs, not factorials
+    assert 0.0143 < low < 0.0144 and 0.0271 < high < 0.0273
+
+
+def test_headline_counts_each_person_who_crossed_once():
+    """k of n: one person in two track pieces passed by two vehicles is one, and someone exposure never counted as
+    crossing is not in k, so k never exceeds n. Without exposure's crosser list there is no headline."""
+    seen = road.exposure({"p/0": walking_across(40), "p/1": walking_across(40), "q/0": walking_across(40)}, {}, 10, 600)
+    assert seen["crossers"] == ["p", "q"] and seen["crossings"] == 2
+    hit = lambda person, pet: {"person": person, "vehicle": f"car#{pet}", "pet_s": pet, "vehicle_kmh": 30.0,
+                               "death_risk_pct": 1.5, "with_limit": {"20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}},
+                               "tier": "serious" if pet < road.PET_MAX_S else "close pass"}
+    events = [hit("c1/0", 0.4), hit("c1/1", 2.0), hit("c1/0", 1.0), hit("c2/0", 2.5), hit("pole/0", 0.1)]
+    seen = {"minutes": 1.0, "duration_s": 60.0, "crossings": 9, "crossers": [f"c{i}" for i in range(1, 10)]}
+    lines = pack.headline(events, seen, {})
+    assert lines[0] == ("2 of 9 crossings (1 in 4.5) had a moving vehicle through the same spot within 3 s of the "
+                        "person; 1 of 9 (1 in 9) within 1.5 s.")
+    assert "Clopper-Pearson" in lines[1] and "Poisson" in lines[1] and len(lines) == 2
+    measured = pack.facts({"name": "gate"}, events, seen)
+    assert next(iter(json.loads(measured))) == "headline" and lines[0] in measured and '"c1"' not in measured
+    quiet = pack.headline([], seen, {})[0]
+    assert quiet.startswith("0 of 9 crossings had") and f'<p class="lead">{quiet}</p>' in pack.page(
+        {"name": "gate", "world_points": SQUARE_ROAD}, [], seen, None, None, 10)
+    assert pack.headline(events, {"crossings": 9, "minutes": 1.0}, {}) == []  # an older events.json
+    assert "headline" not in pack.facts({"name": "gate"}, events, {"crossings": 9, "minutes": 1.0})
+
+
+def test_school_year_line_needs_both_site_keys_and_15_minutes():
+    events = [{"person": "c1/0", "vehicle": "car#1", "pet_s": 0.5, "tier": "serious"}]
+    seen = {"minutes": 20.0, "duration_s": 1200.0, "crossings": 40, "crossers": [f"c{i}" for i in range(40)]}
+    school = {"school_days": 200, "dismissal_minutes": 30}
+    year = pack.headline(events, seen, school)[-1]
+    assert year == ("If every dismissal is like this one: about 300 crossings a school year with a moving vehicle "
+                    "through the same spot within 3 s, 300 within 1.5 s (200 school days, 30-minute dismissals).")
+    assert "about 300 crossings" in pack.headline(events, seen, {**school, "school_days": 197})[-1]  # not 295.5
+    assert not any("dismissal" in line for line in pack.headline(events, seen, {"school_days": 200}))
+    short = {**seen, "minutes": 14.9, "duration_s": 894.0}
+    assert not any("dismissal" in line for line in pack.headline(events, short, school))
+    assert not any("dismissal" in line for line in pack.headline(events, seen, {**school, "school_days": "200"}))
 
 
 

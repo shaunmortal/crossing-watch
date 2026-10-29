@@ -10,6 +10,7 @@ import base64
 import html
 import http.client
 import json
+import math
 import os
 import re
 import shutil
@@ -32,6 +33,9 @@ IMAGE_MODEL = "muse-image-1.0"
 TIMEOUT_S = 300
 SHOWN_EVENTS = 5
 MIN_RATE_MINUTES = 15  # shortest video scaled to hourly rates (MUTCD Warrant 4 counts 15-minute periods)
+ALPHA = 0.05      # exact two-sided 95% ranges
+BISECTIONS = 50   # halvings to find a range's end: 1e-15 of the span, and a share never rounds up to exactly 1
+SCHOOL_YEAR = ("school_days", "dismissal_minutes")  # optional site keys: the "if every dismissal" line needs both
 LETTER_URL = os.environ.get("LETTER_MODEL_URL", "")  # an OpenAI-compatible server, e.g. llama-server with Muse
 LETTER_MODEL = os.environ.get("LETTER_MODEL", "Muse Glimmer 30B")  # Glimmer; empty: Muse Spark writes the letter
 WRITER = f"{LETTER_MODEL} (open weights, self-hosted)" if LETTER_URL else "Muse Spark"
@@ -128,8 +132,9 @@ def serious(events):
 def facts(site, events, seen):
     """The measurements a letter may quote, as JSON. Arrays (paths, spans, replays) never enter: they are not facts
     for a letter, and their many numbers would let almost any number in a letter pass the measured-number check."""
-    worst = events[:SHOWN_EVENTS]
+    worst, lines = events[:SHOWN_EVENTS], headline(events, seen, site)
     return json.dumps({
+        **({"headline": " ".join(lines)} if lines else {}),
         "site": site.get("name", ""), "observed": {k: v for k, v in seen.items() if not isinstance(v, (list, tuple, set))},
         "serious_near_misses": len(serious(events)), "close_passes": len(events) - len(serious(events)),
         "definition": f"serious: pedestrian and moving vehicle on the same spot less than {road.PET_MAX_S} s apart; "
@@ -142,11 +147,78 @@ def facts(site, events, seen):
     }, indent=1, ensure_ascii=False)  # \u escapes would add digits the number check counts as measured
 
 
+def watched_minutes(seen):
+    """Minutes of video, exact from duration_s when there (minutes is rounded to 0.1)."""
+    return seen["duration_s"] / 60 if seen.get("duration_s") else seen.get("minutes") or 0
+
+
+def falling_root(f, hi):
+    """Where f, positive near 0 and falling, crosses 0 in [0, hi] (hi when it never does)."""
+    lo = 0.0
+    for _ in range(BISECTIONS):
+        mid = (lo + hi) / 2
+        lo, hi = (mid, hi) if f(mid) > 0 else (lo, mid)
+    return (lo + hi) / 2
+
+
+def exact_range(cdf, k, hi):
+    """Exact two-sided 95% range for a count seen k times; cdf(j, x) = P(count <= j), falling as x grows."""
+    upper = falling_root(lambda x: cdf(k, x) - ALPHA / 2, hi)
+    lower = falling_root(lambda x: cdf(k - 1, x) - (1 - ALPHA / 2), hi) if k else 0.0
+    return lower, upper
+
+
+def poisson_range(k):
+    """Garwood's exact 95% range for the mean of a count seen k times: 0 gives 0 to 3.69, so 0 never reads as safe."""
+    cdf = lambda j, mu: sum(math.exp(i * math.log(mu) - mu - math.lgamma(i + 1)) for i in range(j + 1))
+    return exact_range(cdf, k, 10 * k + 10)
+
+
+def share_range(k, n):
+    """Clopper-Pearson's exact 95% range for a share seen k times in n."""
+    cdf = lambda j, p: sum(math.exp(math.lgamma(n + 1) - math.lgamma(i + 1) - math.lgamma(n - i + 1) + i * math.log(p)
+                                    + (n - i) * math.log1p(-p)) for i in range(j + 1))
+    return exact_range(cdf, k, 1.0)
+
+
+def people_hit(events, crossers):
+    """Distinct people who crossed among these events' pedestrians: one split into pieces, or passed by several
+    vehicles, counts once; one exposure never counted as crossing does not count."""
+    return len({e["person"].split("/")[0] for e in events} & crossers)
+
+
+def headline(events, seen, site):
+    """The one number, as natural frequencies (Gigerenzer & Hoffrage 1995): k of the n people who crossed had a moving
+    vehicle through their spot within CLOSE_PASS_S, and within PET_MAX_S, with exact 95% ranges. Lines; none without
+    exposure's crosser list (an older events.json), the only way to keep k inside n."""
+    if not seen.get("crossers"):
+        return []
+    crossers = set(seen["crossers"])
+    n, tiers = len(crossers), [(people_hit(events, crossers), road.CLOSE_PASS_S),
+                               (people_hit(serious(events), crossers), road.PET_MAX_S)]
+    one_in = lambda k: f" (1 in {round(n / k, 0 if n >= 10 * k else 1):g})" if k else ""
+    (k3, s3), (k15, s15) = tiers
+    shares = " and ".join(f"{100 * lo:.1f}-{100 * hi:.1f}%" for lo, hi in (share_range(k, n) for k, _ in tiers))
+    counts = " and ".join(f"{lo:.1f}-{hi:.1f}" for lo, hi in (poisson_range(k) for k, _ in tiers))
+    lines = [f"{k3} of {n} crossings{one_in(k3)} had a moving vehicle through the same spot within {s3:g} s of the "
+             f"person; {k15} of {n}{one_in(k15)} within {s15:g} s.",
+             f"Exact 95% ranges, if this recording is typical: {shares} of crossings (Clopper-Pearson); {counts} people "
+             f"in a recording this long (Poisson)."]
+    days, length = (site.get(key) for key in SCHOOL_YEAR)
+    minutes = watched_minutes(seen)
+    if all(isinstance(v, (int, float)) and v > 0 for v in (days, length)) and minutes >= MIN_RATE_MINUTES:
+        per_year = lambda k: f"{float(f'{k * length / minutes * days:.2g}'):,.0f}"  # "about": 2 significant figures
+        lines.append(f"If every dismissal is like this one: about {per_year(k3)} crossings a school year with a moving "
+                     f"vehicle through the same spot within {s3:g} s, {per_year(k15)} within {s15:g} s ({days:g} school "
+                     f"days, {length:g}-minute dismissals).")
+    return lines
+
+
 
 def engineering_lines(seen, cost):
     """The numbers road engineers already use, from the same tracks: PV^2 (IRC:103-2012) and gaps in traffic
     (UK Traffic Signs Manual ch. 6), plus what the tracking cost. Rates from a short video are scaled, and say so."""
-    minutes = seen["duration_s"] / 60 if seen.get("duration_s") else seen.get("minutes") or 0
+    minutes = watched_minutes(seen)
     if not minutes:
         return []
     lines = []
@@ -514,6 +586,7 @@ STYLE = """
 body { margin: 0 auto; max-width: 880px; padding: 24px 16px 64px; background: var(--bg); color: var(--ink);
        font: 16px/1.5 system-ui, sans-serif; }
 h1 { font-size: 1.8rem; margin: 0 0 4px; } h2 { margin-top: 40px; } .muted, .note { color: var(--muted); }
+.lead { font-size: 1.25rem; margin-bottom: 0; }
 .stats { display: flex; gap: 24px; flex-wrap: wrap; margin: 20px 0; } .stats b { display: block; font-size: 2rem; color: var(--accent); }
 .card { border-top: 1px solid var(--line); padding: 16px 0; } video, img { width: 100%; border-radius: 6px; }
 table { border-collapse: collapse; width: 100%; } td, th { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); }
@@ -530,7 +603,7 @@ cite { display: block; margin-top: 4px; font-style: normal; color: var(--muted);
 
 
 def stats(events, seen):
-    """Headline numbers. They always say how much was watched, so a quiet video never reads as "safe"."""
+    """The count tiles. They always say how much was watched, so a quiet video never reads as "safe"."""
     n_serious, crossings = len(serious(events)), seen.get("crossings") or 0
     tiles = [(n_serious, f"serious near-misses (under {road.PET_MAX_S} s)"),
              (len(events) - n_serious, f"close passes ({road.PET_MAX_S}-{road.CLOSE_PASS_S} s)"),
@@ -538,9 +611,12 @@ def stats(events, seen):
              (seen.get("minutes", "?"), "minutes of video")]
     if seen.get("speed_85th_kmh"):
         tiles.append((seen["speed_85th_kmh"], "km/h, 85% of vehicles at or below"))
-    if crossings:
-        tiles.append((round(100 * len(events) / crossings, 1), "conflicts per 100 crossings"))
     return "".join(f"<div><b>{html.escape(str(v))}</b>{html.escape(label)}</div>" for v, label in tiles)
+
+
+def lead(lines):
+    """The headline under the title, its ranges and school-year line as notes."""
+    return "".join(f'<p class="{"note" if i else "lead"}">{html.escape(line)}</p>' for i, line in enumerate(lines))
 
 
 def page(site, events, seen, plan, images, fps, cost=None, full=None):
@@ -559,7 +635,7 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None):
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Crossing Watch evidence</title>
 <style>{STYLE}{roadmap.STYLE}</style></head><body>
 <h1>Crossing Watch: near-miss evidence</h1>
-<p class="muted">{html.escape(site.get("name", ""))}</p>
+<p class="muted">{html.escape(site.get("name", ""))}</p>{lead(headline(events, seen, site))}
 <div class="stats">{stats(events, seen)}</div>{limit_note(full)}
 {engineering(seen, cost)}
 {map_section(events, site)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{legal_section(site)}
