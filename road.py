@@ -3,12 +3,17 @@ pedestrians and moving vehicles measured as post-encroachment time (PET).
 
 Map frame: metres on the road surface, set by four calibration points the user marks on the video.
 """
+import bisect
 import math
 import statistics
 
 CONFLICT_RADIUS_M = 1.0   # a vehicle edge this close to where a pedestrian stood counts as the same spot
 PET_MAX_S = 1.5           # traffic-conflict studies treat PET under ~1.5 s as a serious conflict
 CLOSE_PASS_S = 3.0        # 1.5-3 s is reported as a "close pass": never let a short video read as "safe"
+UNSEEN_S = 0.5            # SAM missed the person or vehicle this long around its moment: crowd mode inferred its position
+BEFORE_S = 2.0            # kmh_2s_before: the vehicle's speed this long before it reached the spot
+SLOWDOWN_KMH = 3.0        # person first, a vehicle less than this slower than then: "no slowdown measured" (SinD: none
+                          # of 18 person-first vehicles slowed by 3 km/h or more; our speeds agree within 0.3 km/h)
 MIN_CROSSING_M = 2.0      # a pedestrian piece that moves this far counts as one crossing (exposure)
 MOVING_MPS = 10 / 3.6     # slower than this the vehicle is parked, queued or creeping, not a serious threat
 SPEED_WINDOW_S = 1.0
@@ -22,7 +27,7 @@ BORDER_PX = 1             # a box touching the frame edge is cut off, so its low
 MIN_SPEED_STEPS = 3       # a speed needs this many frame-to-frame steps in its window; one jump is noise
 RIDER_OVERLAP = 0.6       # a "person" box this much inside a vehicle box is its rider or driver, not a pedestrian
 RIDER_FEET_PX = 3         # ...if their feet are not below the vehicle's (a pedestrian in front has lower feet)
-MIN_PIECE_S = 1.0         # a pedestrian piece shorter than this has no trustworthy path or timing
+MIN_PIECE_S = 1.0         # a pedestrian or vehicle piece shorter than this has no trustworthy path, timing or speed
 MAX_WALK_MPS = 10.0       # faster than a sprint: the track's ID has jumped to someone (or something) else
 GRID_M = 2.0              # spatial index cell; any size >= 0 gives the same answers, this one is fast
 GAP_ADULT_S = 6.0         # UK Traffic Signs Manual ch. 6, 13.5.2: an acceptable gap is 4-6 s at urban speeds...
@@ -38,6 +43,15 @@ BRAKING_MPS2 = 7.0
 # so risks are not overstated. Children are not covered by the study.
 DEATH_RISK_INTERCEPT = 6.9
 DEATH_RISK_PER_KMH = 0.090
+# Car-shaped footprints for a camera at an angle: (length, width) in metres per vehicle concept; a site's
+# "vehicle_sizes_m" (tape-measured) overrides these. Other concepts keep the lower box edge.
+VEHICLE_SIZES_M = {"car": (4.6, 1.8), "motorcycle": (1.7, 0.8), "auto rickshaw": (2.4, 1.1)}
+HEADING_S = 0.5       # direction of travel from where the vehicle was this long before and after
+MIN_HEADING_M = 0.3   # ...when it moved at least this far; otherwise the nearest frame's heading is carried
+SMOOTH_FRAMES = 2     # footprint centre: median over this many frames either side
+FIT_STEPS = 8         # Gauss-Newton steps placing a footprint under its SAM box
+FIT_STEP_M = 0.01     # finite-difference step for the fit's slopes
+FIT_DONE_M = 0.001    # the fit stops once a step moves the centre less than this
 
 
 def solve(rows, rhs):
@@ -86,6 +100,12 @@ def to_image(H, u, v):
     """Image pixel over road point (u, v), the inverse of to_ground, or None when the point is behind the camera."""
     x, y, w = solve(H, [u, v, 1.0])  # to_ground divides by 1 / w at that pixel, so w <= 0 is never in view
     return None if w <= 0 else (x / w, y / w)
+
+
+def inverse(H):
+    """H inverted once: to_ground(inverse(H), u, v) is to_image(H, u, v) without a solve per point."""
+    columns = [solve(H, [float(i == j) for i in range(3)]) for j in range(3)]
+    return [[columns[j][i] for j in range(3)] for i in range(3)]
 
 
 def zone_around(world_points, margin=ZONE_MARGIN_M):
@@ -181,7 +201,8 @@ def vehicle_edges(track, H, zone=None, frame_size=None, top_down=False):
     """frame -> road shape of the vehicle inside the zone: the segment under its lower box edge, or, when the camera
     looks straight down, the whole box (it is the footprint). Boxes cut off by the frame edge are skipped, since
     their edge is the frame's, not the vehicle's."""
-    # ponytail: lower box edge only stands in for the footprint; use mask ground contact if misses show up
+    # ponytail: at an angle the lower box edge only stands in for the footprint; vehicle_footprints replaces it for
+    # concepts with a size
     edges = {}
     for f, b in track.items():
         if frame_size and (b[0] <= BORDER_PX or b[2] >= frame_size[0] - 1 - BORDER_PX
@@ -192,6 +213,78 @@ def vehicle_edges(track, H, zone=None, frame_size=None, top_down=False):
         if all(in_zone(q, zone) for q in shape):
             edges[f] = shape
     return edges
+
+
+def rectangle(centre, heading, size):
+    """Corners, in order round it, of a (length, width) rectangle on the road turned to `heading` (radians)."""
+    c, s = math.cos(heading), math.sin(heading)
+    half_l, half_w = size[0] / 2, size[1] / 2
+    return tuple((centre[0] + dx * c - dy * s, centre[1] + dx * s + dy * c)
+                 for dx, dy in ((half_l, half_w), (half_l, -half_w), (-half_l, -half_w), (-half_l, half_w)))
+
+
+def headings(mids, fps, half_s=HEADING_S, min_m=MIN_HEADING_M):
+    """frame -> direction of travel (radians) from where the vehicle was `half_s` before and after; a frame where it
+    moved less than `min_m` in that time takes the nearest such frame's heading. Empty if it never moved that far."""
+    frames, half = sorted(mids), max(1, round(half_s * fps))
+    known = {}
+    for f in frames:
+        lo = mids[frames[bisect.bisect_left(frames, f - half)]]
+        hi = mids[frames[bisect.bisect_right(frames, f + half) - 1]]
+        if math.dist(lo, hi) >= min_m:
+            known[f] = math.atan2(hi[1] - lo[1], hi[0] - lo[0])
+    order = sorted(known)
+
+    def nearest(f):
+        i = bisect.bisect_left(order, f)
+        return min(order[max(0, i - 1):i + 1], key=lambda k: abs(k - f))
+    return {f: known[nearest(f)] for f in frames} if known else {}
+
+
+def fit_centre(H_inv, box, heading, size, start):
+    """Road point where a `size` rectangle turned to `heading` stands so that its image fits the SAM box: lowest
+    corner on the box's bottom edge, corners centred on the box's centre. Gauss-Newton on the two unknowns from
+    `start`; None if the rectangle leaves the camera's view. `H_inv` is inverse(H)."""
+    def residual(c):
+        pixels = [to_ground(H_inv, *q) for q in rectangle(c, heading, size)]
+        if None in pixels:
+            return None
+        return (max(p[1] for p in pixels) - box[3], sum(p[0] for p in pixels) / 4 - (box[0] + box[2]) / 2)
+
+    c = start
+    for _ in range(FIT_STEPS):
+        r, rx, ry = residual(c), residual((c[0] + FIT_STEP_M, c[1])), residual((c[0], c[1] + FIT_STEP_M))
+        if None in (r, rx, ry):
+            return None
+        a, b = (rx[0] - r[0]) / FIT_STEP_M, (ry[0] - r[0]) / FIT_STEP_M  # bottom pixel per metre in x, y
+        d, e = (rx[1] - r[1]) / FIT_STEP_M, (ry[1] - r[1]) / FIT_STEP_M  # centre pixel per metre in x, y
+        det = a * e - b * d
+        if abs(det) < 1e-9:
+            return None
+        dx, dy = (e * r[0] - b * r[1]) / det, (a * r[1] - d * r[0]) / det
+        c = (c[0] - dx, c[1] - dy)
+        if math.hypot(dx, dy) < FIT_DONE_M:
+            break
+    return c
+
+
+def vehicle_footprints(track, H, size, fps, zone=None, frame_size=None):
+    """frame -> road footprint of a vehicle seen at an angle: a `size` (length, width) rectangle turned to its
+    heading and placed where its image fits the SAM box (fit_centre), the centre median-smoothed over
+    +-SMOOTH_FRAMES frames. The lower box edge (vehicle_edges) lies along the near side of the vehicle's bulk, not
+    under it: in a SinD simulation of a phone at an angle it nearly doubled the serious conflicts. A track that never
+    moves far enough for a heading keeps its lower edges, so no track mixes the two shapes."""
+    edges = vehicle_edges(track, H, zone, frame_size)
+    turn = headings({f: centroid(e) for f, e in edges.items()}, fps)
+    if not turn:
+        return edges
+    H_inv = inverse(H)
+    centres = {f: c for f in edges if (c := fit_centre(H_inv, track[f], turn[f], size, centroid(edges[f])))}
+    # ponytail: the window is one-sided at a track's ends, pulling them in by up to a frame of travel; narrowing it
+    # there measured no closer to SinD's truth (validate_sind --oblique). The zone was checked on the lower edge: a
+    # footprint behind it crossing the zone's far side must not cut the track short.
+    near = lambda f: [centres[g] for g in range(f - SMOOTH_FRAMES, f + SMOOTH_FRAMES + 1) if g in centres]
+    return {f: rectangle(median_point(near(f)), turn[f], size) for f in centres}
 
 
 def segment_distance(p, a, b):
@@ -214,22 +307,25 @@ def centroid(shape):
 
 
 def speeds(edges, fps, window_s=SPEED_WINDOW_S):
-    """frame -> vehicle speed in m/s: the median step speed of the edge midpoint over about `window_s`.
-    Steps faster than MAX_PLAUSIBLE_MPS are SAM swapping the ID onto another vehicle, and are ignored."""
+    """frame -> vehicle speed in m/s: the least-squares slope of the edge midpoint against time over about
+    `window_s`. Unlike a median of frame-to-frame steps it reads true when the steps are uneven: a 24 fps video
+    resampled to 10 fps steps 2,2,3,2,3 source frames, and the median read 0.83 x the true speed. The track is cut
+    where a step is faster than MAX_PLAUSIBLE_MPS (SAM swapping the ID onto another vehicle), and a piece shorter
+    than MIN_PIECE_S gets no speed: a fragment that short is a tracking glitch, not a measured vehicle."""
     mid = {f: centroid(shape) for f, shape in edges.items()}
-    frames = sorted(mid)
-    steps, plausible = {}, set()
-    for f, g in zip(frames, frames[1:]):
-        mps = math.dist(mid[f], mid[g]) * fps / (g - f)
-        if mps <= MAX_PLAUSIBLE_MPS:
-            steps[f] = mps
-            plausible.update((f, g))
     half = max(1, round(window_s * fps / 2))
     out = {}
-    for f in plausible:  # a frame both of whose steps were teleports is on another vehicle: no speed
-        near = [steps[g] for g in range(f - half, f + half) if g in steps]
-        if len(near) >= MIN_SPEED_STEPS:
-            out[f] = statistics.median(near)
+    for piece in split_at_jumps(mid, fps, MAX_PLAUSIBLE_MPS):
+        frames = sorted(piece)
+        if len(frames) < MIN_PIECE_S * fps:
+            continue
+        for f in frames:
+            near = frames[bisect.bisect_left(frames, f - half):bisect.bisect_right(frames, f + half)]
+            if len(near) > MIN_SPEED_STEPS:
+                t = [g / fps for g in near]
+                vx = statistics.linear_regression(t, [piece[g][0] for g in near]).slope
+                vy = statistics.linear_regression(t, [piece[g][1] for g in near]).slope
+                out[f] = math.hypot(vx, vy)
     return out
 
 
@@ -295,17 +391,77 @@ def best_passes(feet, vehicles, index, speed_of, fps, bucket, radius=CONFLICT_RA
                     continue
                 if vid not in best or (frames, gap) < best[vid][0]:
                     best[vid] = ((frames, gap), fp, fv, gap, speed_of[vid][fv])
-    return {vid: event_fields(b, fps) for vid, b in best.items()}
+    return {vid: event_fields(b, fps, speed_of[vid]) for vid, b in best.items()}
 
 
-def event_fields(best, fps):
+def event_fields(best, fps, speed_mps=None):
+    """An event's numbers from its best pass; with the vehicle's speeds (frame -> m/s), also its speed BEFORE_S
+    earlier (None where it was not measured)."""
     (frames, _), fp, fv, gap, mps = best
     # Same model as the limit replay: the vehicle was speed * PET metres away; under REACTION_S (every serious
     # event) there is no time to brake, so the hit would be at full speed.
     impact_kmh = impact_mps(mps, mps * frames / fps) * 3.6
+    before = (speed_mps or {}).get(fv - round(BEFORE_S * fps))
     return {"pet_s": frames / fps, "t_person_s": fp / fps, "t_vehicle_s": fv / fps,
             "gap_m": round(gap, 2), "vehicle_kmh": round(mps * 3.6, 1), "impact_kmh": round(impact_kmh, 1),
-            "death_risk_pct": round(100 * death_risk(impact_kmh), 1), "with_limit": with_limits(mps, frames / fps)}
+            "death_risk_pct": round(100 * death_risk(impact_kmh), 1), "with_limit": with_limits(mps, frames / fps),
+            "first": first_on_spot(fp, fv), "kmh_2s_before": None if before is None else round(before * 3.6, 1)}
+
+
+def first_on_spot(t_person, t_vehicle):
+    """Who reached the conflict spot first: "person", "vehicle", or "both" at the same moment (PET 0)."""
+    return "both" if t_person == t_vehicle else "person" if t_person < t_vehicle else "vehicle"
+
+
+def first_counts(events):
+    """How many events the person, or the vehicle, reached the spot first. People first points at drivers not
+    yielding; vehicles first at people stepping into gaps."""
+    order = [first_on_spot(e["t_person_s"], e["t_vehicle_s"]) for e in events]
+    return {"person_first": order.count("person"), "vehicle_first": order.count("vehicle"),
+            "both_at_once": order.count("both")}
+
+
+def unseen_s(detected, frame, fps):
+    """Seconds SAM did not detect an object around `frame`: 0 when it did on that frame, else the gap between its
+    detections either side, across which crowd mode inferred (crowd.filled) where it was. `detected` holds the
+    frames it was detected on."""
+    before = max((f for f in detected if f <= frame), default=frame)
+    after = min((f for f in detected if f >= frame), default=frame)
+    return (after - before) / fps
+
+
+def first_note(e):
+    """The card's line on who reached the spot first. Vehicle first, the impact and risk (event_fields: the vehicle
+    speed * PET metres away) are for someone on the spot PET before it came. Person first, the vehicle's speed
+    BEFORE_S earlier: what was measured, never what the driver did."""
+    vehicle, pet, first = e["vehicle"].split("#")[0], e["pet_s"], first_on_spot(e["t_person_s"], e["t_vehicle_s"])
+    if first == "both":
+        return f"The person and the {vehicle} were on the spot at the same moment."
+    if first == "vehicle":
+        return (f"The {vehicle} passed the spot first and the person reached it {pet:.1f} s later: the impact and risk "
+                f"are for someone on the spot {pet:.1f} s before the {vehicle} came.")
+    before = e.get("kmh_2s_before")
+    slowdown = "" if before is None or before - e["vehicle_kmh"] >= SLOWDOWN_KMH else ": no slowdown measured"
+    earlier = "" if before is None else f" ({before} km/h two seconds earlier{slowdown})"
+    return f"The person was on the spot first; the {vehicle} reached it {pet:.1f} s later at {e['vehicle_kmh']} km/h{earlier}."
+
+
+def seen_note(e):
+    """The card's line on whether SAM saw both at the moment, or for how long one's position was inferred; empty
+    for an event from before this was measured."""
+    unseen = e.get("unseen_s")
+    if not unseen:
+        return ""
+    who = {"person": "the person", "vehicle": "the " + e["vehicle"].split("#")[0]}
+    gaps = [f"{unseen[k]:.1f} s ({who[k]})" for k in ("person", "vehicle") if unseen[k] >= UNSEEN_S]
+    if not gaps:
+        return "Seen at the moment."
+    return f"Not detected for about {' and '.join(gaps)}; position{'s' if len(gaps) > 1 else ''} inferred."
+
+
+def moment_note(e):
+    """first_note and seen_note, for the event card."""
+    return " ".join(n for n in (first_note(e), seen_note(e)) if n)
 
 
 def closest_pass(feet, edges, fps, radius=CONFLICT_RADIUS_M, pet_max=PET_MAX_S, min_speed=MOVING_MPS):

@@ -22,7 +22,7 @@ hit, instead of waiting for crash statistics.
 | Second look | **Muse Spark** checks each clip: is that a person, and who (child, elderly, wheelchair user...) | `review.py` |
 | Ear witness | **Muse Wonder** listens to the original audio around each near-miss for horns, screeching brakes and shouts | `listen.py` |
 | Where it happened | A bird's-eye map in road metres: each near-miss where it happened, with both paths 2 s either side | `roadmap.py` |
-| Evidence clips | ffmpeg, pedestrian boxed cyan, vehicle red, every tracked person's head blurred on every frame so clips of children can be shared | `render.py` |
+| Evidence clips | ffmpeg, pedestrian boxed cyan, vehicle red, every tracked person's head and the bottom quarter of every tracked vehicle (its number plate) blurred on every frame so clips of children can be shared; when a SAM video request for people is full, SAM image search finds the people it missed every 0.2 s of every published clip, with boxes filled in between, and the page says how many (check every public frame by eye) | `render.py`, `analyze.py` |
 | Fix and letter | **Muse Spark** (JSON mode) picks a physical fix and writes the letter from the measurements only; verified in two layers before use: code checks every number against the measurements, then **Muse Spark as a separate reviewer** (LLM as judge) lists unsupported claims (a warrant said to be met, a death risk for a child); either objection sends the letter back with the reason, and after 3 tries what remains is shown for a person to check; **Muse Image** draws the fix onto the real street | `pack.py` |
 
 ## Run
@@ -42,7 +42,10 @@ short because one SAM 3.1 video request tracks at most 16 objects **in all**: on
 are never picked up (none of 54 replies had more, and none gained an ID after filling). Any request that still hits
 the limit is counted, and the page says its counts are a minimum. For crowds, set `"person_grid": 2` in the site file: people are
 tracked in 4 overlapping tiles (SAM returns at most 16 objects per request) and joined where the tiles meet. The SAM cost is
-estimated first, and a run over $10 needs `--allow-cost`.
+estimated first at Meta's list prices: a run over $10 needs `--allow-cost`, and `--budget USD` is a hard cap that
+nothing lifts. With `"person_mode": "auto"` or `"vehicle_mode": "auto"`, a concept goes to SAM video first; if a part
+fills its 16 objects before the next part takes over, that concept is detected frame by frame instead and the page
+says when it filled (on the Indian clip: "person: 16 objects taken within 1.0-1.6 s in 3 of 3 parts").
 
 ### Open weights: Muse Glimmer writes the letter
 
@@ -76,6 +79,27 @@ tricycles, buses, trucks). It needs no Meta API.
 
 This checks the measurement layer on true positions.
 
+**A phone at an angle.** SinD is filmed from above. `python3 validate_sind.py data/sind --oblique 10,25` films the
+same 20 minutes with a simulated phone 10 m up and 25 m back (focal length 1,500 px), calibrated from four road points
+as `calibrate.html` is. Each vehicle becomes the box SAM would draw round it (1.3-3 m tall by type), and the
+conflicts found from those boxes are compared with the conflicts from SinD's true footprints on the same frames.
+Footprint sizes are SinD's median per vehicle type, as a tape-measured `vehicle_sizes_m` would give:
+
+| Vehicle shape | Conflicts | Serious | Serious missed | Serious extra | PET vs truth (mean) |
+|---|---|---|---|---|---|
+| SinD footprints (truth) | 55 | 35 | 0 | 0 | +0.00 s |
+| lower box edge (before) | 93 | 63 | 6 | 34 | -0.10 s |
+| car-shaped footprint | 57 | 37 | 3 | 5 | -0.01 s |
+| footprint, boxes off by 3 px | 58 | 38 | 2 | 5 | -0.04 s |
+| footprint, lengths 20% too long | 59 | 35 | 4 | 4 | -0.05 s |
+
+The lower box edge lies under the vehicle's near side, not its middle, and nearly doubled the serious
+conflicts. A view that is not top-down now uses a car-shaped footprint instead (`road.vehicle_footprints`):
+a rectangle of the vehicle type's size, turned to its direction of travel and moved until its image fits the SAM box
+(the lowest corner on the box's bottom edge, centred on the box), its centre median-smoothed over ±2 frames. Phone
+6 m up and 15 m back: 29 serious in truth, 42 from the lower edge, 31 from footprints; 15 m up and 20 m back: 37, 64
+and 38. This is a simulation: the box noise is independent per frame, and no real phone footage was checked.
+
 ### End to end, against ground truth (DUT)
 
 `validate_dut.py` runs the whole pipeline (SAM 3.1, metres, near-misses, Muse Spark) on 8 drone clips of a campus
@@ -87,50 +111,70 @@ one crowded frame). So **crowd mode** (`"person_mode": "crowd"`) has SAM detect 
 `crowd.py` then keeps their IDs with a small tracker: constant-velocity prediction, a match within one body size,
 and a 1 s grace period for people hidden behind others.
 
+Every DUT number here was re-scored on 29 Oct with today's code, at $0, from the cached SAM replies and Spark's
+stored verdicts: `python3 validate_offline.py DUT_REPO out/dut-15s out/dut-vcrowd` (the video rows: the 28 Oct
+folder with `--site '{"person_mode": "video", "person_grid": 1}'`, or 2 for tiles). The speed fix below moved the
+ground truth too: the dataset's own tracks now give 52 conflicts, not 36 (GATES.md, 29 Oct, shows old and new side
+by side). Found by the geometry, before Spark's review:
+
 | Clips | People per clip | Mode | True conflicts | Found | Missed (at a threshold) | False alarms (at a threshold) |
 |---|---|---|---|---|---|---|
-| 04 09 10 12 (crowded) | 24–113 | video, whole frame | 25 | 7 | 18 (2) | 0 (0) |
-| | | video, 2 x 2 tiles | 25 | 10 | 15 (3) | 11 (7) |
-| | | **crowd mode** | 25 | **21** | 4 (4) | 10 (8) |
-| 15 01 03 16 (held out) | 11–21 | video, whole frame | 11 | 7 | 4 (2) | 0 (0) |
-| | | **crowd mode** | 11 | 8 | 3 (3) | 1 (1) |
+| 04 09 10 12 (crowded) | 24–113 | video, whole frame | 37 | 9 | 28 (1) | 1 (1) |
+| | | video, 2 x 2 tiles | 37 | 19 | 18 (1) | 7 (2) |
+| | | **crowd mode** | 37 | **34** | 3 (3) | 5 (1) |
+| 15 01 03 16 (held out) | 11–21 | video, whole frame | 15 | 13 | 2 (0) | 0 (0) |
+| | | **crowd mode** | 15 | **15** | 0 (0) | 1 (1) |
 
+The video rows are the 28 Oct runs, one SAM request per clip; Spark's verdicts for them were not kept.
 The crowd tracker rule was fixed once from walking speed versus body size. The four held-out clips were not used
 to set it.
 
-- **Crowd mode over all 8 clips:** 29 of 36 conflicts found. Every miss is a threshold case, and 2 of the 11 false
-  alarms are not. Re-run with 15-second SAM parts and filled crowd boxes: still 29 of 36, all misses at a threshold,
-  and 3 of 11 false alarms not at a threshold (one event in clip 10 moved from matched to extra).
+- **Crowd mode over all 8 clips:** the geometry finds 49 of 52 conflicts, every miss a threshold case; 4 of its 6
+  false alarms are not. After Spark's review: 44 of 52 found, 3 real false alarms. Spark called 5 pedestrians in
+  true conflicts "not a person". 8 events come from track pieces Spark has not seen yet (new with today's code); they
+  stay in, as unreviewed events do on the page. If Spark rejected all of them it would be 37 of 52.
 - **Vehicles in crowd mode too** (`"vehicle_mode": "crowd"`, for dense traffic that fills SAM's 16 objects). Vehicles
   are detected on every frame (10 a second): at 5 a second a review showed motorcycles over ~36 km/h outran the
-  tracker's one-body-size match and vanished. Result: speed bias against the dataset's own velocities fell from
-  +0.9 to +0.2 km/h, and 12 of 36 conflicts are found. All 24 misses and 2 of the 3 false alarms are at a threshold:
-  DUT's cars crawl at about 10 km/h, right on the "moving" bar, so ±1 km/h decides most of them. (At 5 a second the
-  +0.9 km/h bias had pushed those cases over the bar: 35 of 36.) Every conflict clear of a threshold is found. Pedestrian pieces shorter than 1 s are dropped and Spark now calls
-  people on motorcycles and bicycles riders; neither changed any DUT result.
-- **Dense Indian intersection** (42 s, no ground truth, calibration guessed): SAM video saw on average 1.6 people and
-  6 vehicles a frame, crowd mode 14.9 people and 20 vehicles. Before the two fixes above it reported 543 serious
-  near-misses, nearly all one-frame track fragments and riders; after them, 18 events survive Spark's review (6
-  serious). Speeds there are not trustworthy (up to 88 km/h) because nothing was measured on that road.
-- **What the 2 real false alarms are** (both clip 09, checked frame by frame): one is a real person in yellow whom
-  the dataset stops tracking after 1.8 s while they keep walking along the kerb, so it may be a gap in the ground
-  truth. The other is a person standing still at the road edge for the whole clip; the dataset does not label them.
-  Dropping standing people would also drop a true conflict in clip 12, so they stay.
-- **ID fragmentation:** across the 8 clips the dataset's 301 pedestrians are followed by our tracks for 297 of them,
-  with a median of 1 track per pedestrian (at most 5).
+  tracker's one-body-size match and vanished. The geometry finds 48 of 52, all 4 misses at a threshold. After
+  Spark's review: 45 of 52 found and 4 real false alarms; Spark called 3 pedestrians in true conflicts "unclear", and
+  17 events come from pieces it has not seen (30 of 52 if it rejected them all).
+- **Spark's rider calls:** Spark called walking students "rider" or "cyclist", though DUT tracks no bikes. In vehicle
+  crowd mode that cost 17 true conflicts (28 of 52 found). So a rider call now stands only when SAM finds a
+  motorcycle, bicycle, scooter or auto rickshaw box under the person (`review.gated`); otherwise they stay a
+  pedestrian, and the card says Spark thought "rider" and gives their measured walking speed. Pedestrian pieces
+  shorter than 1 s are also dropped.
+- **Speed** against the dataset's positions at their own 23.976 fps (vehicle crowd mode, 2,079 frames): mean error
+  0.16 km/h, 95th percentile 0.55 km/h. The old median of frame-to-frame steps read a 24 fps source slow (0.83 x in
+  the self-check): 0.52 and 1.89 km/h. DUT's cars crawl at about 10 km/h, right on the "moving" bar, so this decides
+  which conflicts exist: of the frames with the car at 7–13 km/h, 7.5% still land on the wrong side of the bar (28%
+  before).
+- **Dense Indian intersection** (39 s, no ground truth, calibration guessed): SAM video saw on average 1.6 people and
+  6 vehicles a frame, crowd mode 14.9 people and 20 vehicles. Before the fixes above it reported 543 serious
+  near-misses, nearly all one-frame track fragments and riders; re-scored from its cache, 10 events survive Spark's
+  review (5 serious; 2 from pieces Spark has not seen). Speeds there are not trustworthy (up to 57 km/h) because
+  nothing was measured on that road.
+- **What the real false alarms are:** two are in clip 09 and were checked frame by frame on 28 Oct. One is a real
+  person in yellow whom the dataset stops tracking after 1.8 s while they keep walking along the kerb, so it may be a
+  gap in the ground truth. The other is a person standing still at the road edge for the whole clip; the dataset
+  does not label them. Dropping standing people would also drop a true conflict in clip 12, so they stay. The third,
+  a close pass in clip 10, is not checked yet. Vehicle crowd mode adds a fourth in clip 09: someone Spark called a
+  rider, kept by the rider gate because DUT tracks no bikes, so none can be found under anyone.
+- **ID fragmentation:** across the 8 clips the dataset's 301 pedestrians are followed by our tracks for 296 of them,
+  with a median of 1 track per pedestrian (at most 4).
 - **"At a threshold" defined:** a disagreement the other side also finds once each threshold is widened by about our
   measured error (speed ±1.5 km/h around the 10 km/h "moving" bar, gap +0.3 m, PET +0.3 s). For example, a car the
-  dataset has at 8.6 km/h and we measured at 10.1 km/h.
-- **Accuracy on matched events:** speed is usually within 1 km/h (2 km/h at worst). PET is within about 1 s.
+  dataset has at 10.1 km/h and we measured at 10.0 km/h.
+- **Accuracy on matched events** (crowd mode): speed within 1 km/h on 41 of 44 (2.0 km/h at worst); PET within 1 s
+  on 38 of 44 (2.5 s at worst).
 - **Spark review:** it judges a zoomed crop of each person's clearest frame. A full-frame snapshot had rejected real
   students who were a few pixels wide.
 - **Caveats:** this is still a small sample. The true conflicts assume a 4.6 x 1.8 m car (DUT gives only centre and
-  heading). The view is top-down, not a phone at an angle. Meta's per-image price was not found; cost estimates
-  use $0.002 per image.
+  heading). The view is top-down, not a phone at an angle. Cost estimates use Meta's list price of $2.50 per
+  1,000 SAM images.
 
-- **Engineering numbers against ground truth** (same definitions applied to the dataset's own tracks):
+- **Engineering numbers against ground truth** (crowd mode; same definitions applied to the dataset's own tracks):
   - Moving vehicles counted: right on 8 of 8 clips.
-  - Gaps of 6 s or more where people crossed: right on 7 of 8; the other has the car at 10.1 km/h, on the threshold.
+  - Gaps of 6 s or more where people crossed: right on 8 of 8.
   - Longest gap: within 0.5 s on 6 of 8.
   - Pedestrian crossings: ours run high, 374 against 280 (1.3x), because a broken track counts a person twice. PV²
     scales with this count, so the page says so.
@@ -139,18 +183,31 @@ The DUT data has no licence and was used only for internal testing; it is not in
 
 ## Limits, stated
 
-- A vehicle's lower box edge stands in for its footprint.
+- From a phone at an angle, a vehicle is a car-shaped footprint of its type's size: car 4.6 x 1.8 m, motorcycle
+  1.7 x 0.8 m, auto rickshaw 2.4 x 1.1 m, or tape-measured sizes in the site file
+  (`"vehicle_sizes_m": {"car": [3.9, 1.7]}`). Other concepts, including the single concept "vehicle", and vehicles
+  that never move far enough for a heading, keep the lower box edge (see the simulation above).
 - SAM 3.1 video tracking keeps at most 16 objects per request, so crowded sites need crowd mode, which costs more
   (one image request per 0.2 s). Dense traffic fills even a 15-second part: on our Indian intersection clip every
-  vehicle concept hit the limit within 2 s, so there vehicle counts are a minimum. People SAM did not track are also
-  not blurred.
+  vehicle concept hit the limit within 2 s, so there vehicle counts are a minimum. For people it did not track,
+  SAM image search looks again on the clips and the street photo (one image request per 0.2 s of published
+  video) and blurs those it finds; check every public frame by eye. Number plates are blurred only on vehicles
+  SAM tracked.
+- Crowd mode fills in a box across up to 1 s of missed detections, so a near-miss can sit on an inferred position
+  rather than a seen one. Each card says which: "Seen at the moment", or how long SAM did not detect the person or
+  the vehicle when that was 0.5 s or more ("position inferred"). Re-scored at $0 from the cached replies on 29 Oct,
+  before Spark's review: 12 of 22 conflicts on the dense Indian clip (a phone at an angle, crowd mode for people and
+  vehicles), against 1 of 54 (vehicle crowd mode) and 1 of 55 (crowd mode) on the top-down DUT clips. SAM video mode
+  fills nothing in, so it never flags one.
 - A person standing still on the carriageway when a car passes within 1 m is reported as a near-miss.
 - The death-risk curve is for adults (15+) hit by a car front; children are not covered by that study.
 - Distances are only as good as the measured calibration rectangle.
 - Rates per hour from a short video are scaled, not a peak-hour count; the page says so next to PV², and shows no
   PV² for videos under 15 minutes.
-- SAM video tracking at 10 frames a second costs about $0.20 per 1,000 frames per concept, so an hour with four
-  concepts is roughly $25-30. The page prints the estimate for each video.
+- SAM video tracking at 10 frames a second costs $0.20 per 1,000 frames per concept at Meta's list price, so an hour
+  with four concepts is about $33 (the 2 s overlaps between parts are billed too). Frame-by-frame detection costs
+  $2.50 per 1,000 images: about $79 for 15 minutes of people and three vehicle concepts, about $34 with the single
+  concept "vehicle". The page prints the SAM cost of each pack.
 - Box jitter alone gives a queued car an apparent speed of a few km/h. That is well under the 10 km/h "moving"
   threshold, so it does not create events, but very slow vehicles are not measured precisely.
 

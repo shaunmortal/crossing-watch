@@ -1,4 +1,5 @@
 """Self-check for road geometry, PET and SAM parsing. Run: python3 test_cw.py"""
+import html
 import json
 import math
 
@@ -147,6 +148,38 @@ def test_speed_ignores_id_switch_teleports():
     assert abs(speed[19] - 8.0) < 1e-6 and abs(speed[21] - 8.0) < 1e-6 and 20 not in speed
 
 
+def test_speed_is_true_on_a_24_fps_video_resampled_like_prepare():
+    """analyze.prepare's fps filter turns 23.976 fps into steps of 2,2,3,2,3 source frames: a median of steps read
+    0.83 x the true speed."""
+    import analyze, subprocess
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "nullsrc=s=16x16:r=24000/1001:d=4,geq=lum=N:cb=128:cr=128",
+                          "-vf", f"fps={analyze.FPS}", "-f", "rawvideo", "-pix_fmt", "yuv420p", "-"],
+                         check=True, capture_output=True).stdout
+    source = raw[::16 * 16 * 3 // 2]  # each frame's first luma byte is the number of the source frame it came from
+    edges = {k: ((8.0 * n * 1001 / 24000, 0.0), (8.0 * n * 1001 / 24000 + 2, 0.0)) for k, n in enumerate(source)}
+    speed = road.speeds(edges, analyze.FPS)
+    assert len(source) == 40 and speed.keys() == edges.keys() and all(abs(v - 8.0) < 0.2 for v in speed.values())
+
+
+def test_id_switches_and_short_fragments_give_no_vehicle_speed():
+    import analyze, crowd
+    from pathlib import Path
+    switch = {0: [[475, 234, 518, 302]], 6: [[481, 194, 511, 212]]}  # 43x68 px, then 30x18: a phantom 81 km/h
+    assert len(crowd.associate(switch, 10)) == 1 and len(crowd.associate(switch, 10, crowd.MAX_AREA_JUMP)) == 2
+    jumps, real = {}, crowd.track  # only vehicles: a person may just be partly hidden
+    crowd.track = lambda clip, frames, fps, concept, key, cache, jump: jumps.update({concept: jump}) or {}
+    try:
+        site = {"person": "person", "vehicles": ["motorcycle"], "person_mode": "crowd", "vehicle_mode": "crowd"}
+        for concept in ("person", "motorcycle"):
+            analyze.concept_tracks(site, concept, None, 20, [], Path("out"), None, None)
+    finally:
+        crowd.track = real
+    assert jumps == {"person": math.inf, "motorcycle": crowd.MAX_AREA_JUMP}
+    assert road.speeds(edges_along_x(8.0, 10, 9), 10) == {} and len(road.speeds(edges_along_x(8.0, 10, 10), 10)) == 10
+    H = road.homography(SQUARE_IMG, SQUARE_ROAD)  # cut by the right edge of a 640 px frame: not the vehicle's edge
+    assert road.vehicle_edges({0: [590, 195, 639, 232], 1: [497, 210, 568, 255]}, H, frame_size=(640, 360)).keys() == {1}
+
+
 def test_riders_are_not_pedestrians_and_one_jump_is_not_a_speed():
     rider, walker = {0: [110, 10, 130, 60]}, {0: [300, 10, 320, 60]}
     bike = {0: [100, 0, 150, 80]}
@@ -229,6 +262,168 @@ def test_pack_keeps_people_and_escapes_text():
     assert "from a pedestrian" in pack.event_card(2, base | {"review": {"is_person": True, "road_user": "unclear"}}, 10)
 
 
+def test_spark_rider_call_needs_a_bike_under_the_person():
+    from pathlib import Path
+    import analyze
+    rider = {"is_person": False, "road_user": "rider", "reason": "on a bike"}
+    person = {f: [100, 100, 110, 130] for f in range(20)}
+    bike = {5: [95, 110, 115, 135]}  # 2/3 of the person's box, on one frame
+    assert review.gated(rider, person, [bike]) == rider
+    assert review.gated(rider, person, [{5: [109, 100, 140, 130]}])["rider_unconfirmed"]  # 10% inside: no bike
+    kept = review.gated(rider, person, [], 4.0)
+    assert kept == rider | {"is_person": True, "rider_unconfirmed": True, "walk_kmh": 4.0}
+    shadow = {"is_person": False, "road_user": "not a person", "reason": "a shadow"}
+    assert review.gated(shadow, person, []) == shadow and review.gated(None, person, []) is None
+    # analyze: only rideable concepts' boxes count, and the walking speed is measured on the piece
+    original = review.review
+    review.review = lambda *a, **k: dict(rider)
+    try:
+        for vehicle, rejected in (("motorcycle#1", True), ("vehicle#1", True), ("car#1", False)):
+            events = [{"person": "7/0"}]
+            analyze.review_people(None, Path("."), events, {"7/0": {f: (0.14 * f, 0.0) for f in range(20)}},
+                                  {"7": person}, {vehicle: bike}, None, (640, 360), False)
+            assert (events[0]["review"]["is_person"] is False) == rejected
+    finally:
+        review.review = original
+    assert events[0]["review"]["walk_kmh"] == 5.0  # 1.4 m/s
+
+
+def test_unconfirmed_rider_stays_a_pedestrian_on_the_card_and_in_the_facts():
+    e = {"person": "1/0", "vehicle": "car#1", "tier": "serious", "vehicle_kmh": 30.0, "pet_s": 0.5, "t_person_s": 3.0,
+         "t_vehicle_s": 3.5, "gap_m": 0.4, "death_risk_pct": 1.5,
+         "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5}, "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}},
+         "review": {"is_person": True, "road_user": "rider", "reason": "", "rider_unconfirmed": True, "walk_kmh": 4.0}}
+    label = "pedestrian (Spark thought rider; no bike found under them; measured walking 4.0 km/h)"
+    assert pack.confirmed([e]) == [e]
+    assert html.escape("from a " + label) in pack.event_card(1, e, 10)
+    assert json.loads(pack.facts({}, [e], {"minutes": 1}))["worst"][0]["road_user"] == label
+    assert review.unconfirmed_rider({"is_person": False, "road_user": "rider"}) is None
+
+
+def test_dut_score_keeps_review_rejections_apart_from_threshold_misses():
+    """A conflict found and then rejected by Spark passed every threshold: it is missed_by_review, not 'at a threshold'."""
+    import validate_dut
+    truth = [{"person": p, "vehicle": "car#1", "tier": "serious", "pet_s": 0.5, "t_person_s": 1.0, "vehicle_kmh": 12.0}
+             for p in ("a", "b", "c")]
+    ours = lambda pid, verdict: {**truth[0], "person": pid, "vehicle": "car#x", "review": verdict}
+    events = [ours("p1/0", None), ours("p2/0", {"is_person": False, "road_user": "rider", "reason": ""})]
+    result = validate_dut.score(truth, events, {}, {}, {}, {}, {"p1/0": "a", "p2/0": "b"}, {"car#x": "car#1"})
+    assert (result["matched"], result["missed"], result["missed_by_review"], result["missed_at_threshold"]) == (1, 2, 1, 0)
+    assert result["before_review"] == {"matched": 2, "missed": 1, "extra": 0}
+    assert [m["by_review"] for m in result["missed_events"]] == [True, False]
+
+
+def test_offline_dut_check_puts_stored_verdicts_through_todays_rider_gate():
+    """validate_offline: a stored rider call with no bike under the person is overruled, one with a motorcycle under
+    them stands, "not a person" stands, an old run's "cyclist" kept as a pedestrian is re-read by today's rule, and a
+    piece Spark never saw stays unreviewed."""
+    import validate_offline
+    said = lambda ok, who: {"is_person": ok, "road_user": who, "reason": ""}
+    stored = [{"person": "a/0", "review": said(False, "rider")}, {"person": "b/0", "review": said(False, "rider")},
+              {"person": "c/0", "review": said(False, "not a person")}, {"person": "d/0", "review": said(True, "cyclist")}]
+    verdicts = validate_offline.stored_verdicts(stored)
+    assert verdicts["d/0"]["is_person"] is False
+    people = {p: {f: (0.0, 0.14 * f) for f in range(20)} for p in ("a/0", "b/0", "c/0", "d/0", "e/0")}
+    boxes = {p[0]: {f: [100.0 * i, 0, 100.0 * i + 10, 20] for f in range(20)} for i, p in enumerate(people)}
+    bike = {"motorcycle#1": {f: [95, -5, 115, 30] for f in range(20)}}  # under person b only
+    events = [{"person": p, "vehicle": "car#1"} for p in people]
+    events = validate_offline.with_verdicts(events, verdicts, boxes, bike, people)
+    assert [(e.get("review") or {}).get("is_person") for e in events] == [True, False, False, True, None]
+    assert events[0]["review"]["rider_unconfirmed"] and events[0]["review"]["walk_kmh"] == 5.0
+    assert "review" not in events[4]
+
+
+def test_offline_speed_check_reads_the_dataset_at_its_own_frame_rate():
+    """validate_offline's speed reference: a DUT car at 3 m/s reads 3 m/s on its evenly spaced 23.976 fps frames,
+    with no speed where a frame lacks neighbours; the summary counts cars near the 10 km/h bar put on the wrong side."""
+    import tempfile
+    from pathlib import Path
+    import validate_dut, validate_offline
+    with tempfile.TemporaryDirectory() as tmp:
+        folder = Path(tmp) / "data" / "trajectories_filtered"
+        folder.mkdir(parents=True)
+        rows = "".join(f"1,{s},{3.0 * (s - 1) / validate_dut.SOURCE_FPS},0\n" for s in range(1, 50))
+        (folder / "intersection_99_traj_veh_filtered.csv").write_text("id,frame,x_est,y_est\n" + rows)
+        native = validate_offline.native_speeds(Path(tmp), "99")["car#1"]
+    assert native[0] is None and native[10] is not None
+    assert all(abs(v - 3.0) < 1e-9 for v in native.values() if v is not None)
+    kmh = lambda ours, ref: (ours / 3.6, ref / 3.6)
+    summary = validate_offline.speed_summary([kmh(9.5, 10.5), kmh(12, 12), kmh(20, 21)])
+    assert summary == {"frames": 3, "mean_abs_kmh": 0.67, "p95_abs_kmh": 1.0, "near_bar_wrong_side_pct": 50.0}
+
+
+def test_rebuilt_tracks_follow_auto_modes_switch_to_frame_by_frame():
+    """validate_dut.our_tracks (validate_offline, validate_gate) rebuilds an auto-mode run as analyze.py ran it: a
+    concept whose cached video reply filled up is read from its frame-by-frame replies."""
+    import subprocess, tempfile
+    from pathlib import Path
+    import crowd, validate_dut
+    box = "<|box;x1=1;y1=1;x2=5;y2=5;w=64;h=48|>"
+    site = {"image_points": SQUARE_IMG, "world_points": SQUARE_ROAD, "person": "person", "vehicles": ["car"],
+            "vehicle_mode": "auto"}
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp)
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=64x48:rate=10:duration=2",
+                        "-pix_fmt", "yuv420p", str(out / "clip.mp4")], check=True)
+        sam.cache_path(out, "person").write_text("")
+        sam.cache_path(out, "car").write_text("<5f>" + "".join(f"{i}{box}" for i in range(sam.MAX_OBJECTS)))
+        asked, real = [], crowd.track
+        crowd.track = lambda clip, frames, fps, concept, *_: asked.append(concept) or {}
+        try:
+            validate_dut.our_tracks(site, out)
+        finally:
+            crowd.track = real
+    assert asked == ["car"]
+
+
+def test_gate_speed_trap_checks_each_logged_vehicle_against_its_one_track():
+    """validate_gate (G6): the four tape marks make two lines 15 m apart through the calibration; a logged vehicle is
+    compared with the one track on both lines at its logged moments, in either direction, and two tracks or none are
+    reported, never guessed. G6 needs 20 matched vehicles, 80% within 15% or 2 km/h and a median lean within 10%."""
+    import tempfile
+    from pathlib import Path
+    import analyze, validate_gate
+    H = road.homography([[250, 100], [350, 100], [500, 300], [100, 300]], [[0, 0], [20, 0], [20, 8], [0, 8]])
+    marks = [list(road.to_image(H, x, y)) for x, y in ((2.5, 0), (17.5, 0), (17.5, 8), (2.5, 8))]
+    lines = validate_gate.trap_lines({"trap": {"image_points": marks}}, H)
+    assert abs(validate_gate.lines_apart(*lines) - 15) < 1e-6
+    fps = analyze.FPS  # a 2 m edge driving along the road; `scale` > 1 reads distances, so speeds, that much long
+    drive = lambda kmh, y, x0, scale=1.0: {f: tuple((scale * (x0 + kmh / 3.6 * f / fps) + d, y) for d in (-1, 1))
+                                           for f in range(120)}
+    vehicles = {"car#1": drive(25, 2, 0), "motorcycle#2": drive(-30, 6, 20, 1.1),
+                "car#3": drive(20, 2, -20), "car#4": drive(20, 6, -20)}  # side by side
+    rows = validate_gate.check(vehicles, lines, 15, [(0.36, 2.52), (2.1, 0.3), (4.05, 6.75), (10.0, 11.0)])
+    assert [(r["vehicle"], r["why"]) for r in rows] == [("car#1", None), ("motorcycle#2", None),
+                                                       (None, "2 tracks on both lines"), (None, "no track on both lines")]
+    assert [round(r["trap_kmh"], 1) for r in rows[:2]] == [25.0, 30.0]
+    assert [round(r["ours_kmh"], 1) for r in rows[:2]] == [25.0, 33.0]
+    assert "NOT TESTED: 19 matched" in validate_gate.g6([(25.0, 25.0)] * 19)
+    assert validate_gate.g6([(25.0, 26.0)] * 16 + [(25.0, 35.0)] * 4).startswith("G6 PASS: 16 of 20")
+    assert validate_gate.g6([(25.0, 26.0)] * 15 + [(25.0, 35.0)] * 5).startswith("G6 FAIL: 15 of 20")
+    assert validate_gate.g6([(25.0, 27.6)] * 20).startswith("G6 FAIL: 20 of 20")  # all within 15%, all 10.4% fast
+    assert validate_gate.agrees(8.0, 9.9) and not validate_gate.agrees(8.0, 10.1)  # 2 km/h, not 15%, when slow
+
+    def refused(call):
+        try:
+            call()
+        except SystemExit as err:
+            return str(err)
+        raise AssertionError("accepted")
+    with tempfile.TemporaryDirectory() as tmp:
+        log, site = Path(tmp) / "trap.csv", Path(tmp) / "site.json"
+        log.write_text("line_a_s,line_b_s,note\n0.36,2.52,white car\n2.1,0.3,\n")
+        assert validate_gate.read_log(log) == [(0.36, 2.52), (2.1, 0.3)]
+        for bad in ("1.0,1.0", "1.0,nan", "1.0,", "-1,2"):
+            log.write_text("line_a_s,line_b_s\n" + bad + "\n")
+            assert "line 2" in refused(lambda: validate_gate.read_log(log))
+        one = {"image_points": SQUARE_IMG, "world_points": SQUARE_ROAD, "vehicles": ["car"]}
+        site.write_text(json.dumps(one | {"trap": {"image_points": marks, "distance_m": 15}}))
+        assert analyze.load_site(site)["trap"]["distance_m"] == 15
+        for trap in ({"image_points": marks[:3], "distance_m": 15}, {"image_points": marks, "distance_m": 0}, marks):
+            site.write_text(json.dumps(one | {"trap": trap}))
+            assert "trap must be" in refused(lambda: analyze.load_site(site))
+
+
 def test_page_links_find_an_event_card_and_its_moment():
     """A page link to #event-N finds card N, and data-t is when, in its clip, the near-miss begins."""
     e = {"vehicle": "car#1", "vehicle_kmh": 30.0, "pet_s": 2.5, "t_person_s": 6.0, "t_vehicle_s": 3.5, "gap_m": 0.4,
@@ -277,6 +472,60 @@ def test_sam_requests_that_hit_the_object_limit_are_counted():
         sam.cache_path(b, "car").write_text("<0f>0" + box)
         pieces = [(0, None, a), (130, None, b)]
         assert analyze.full_requests(pieces, [("car", 1)], (64, 48)) == (1, 2)
+
+def test_budget_is_a_hard_cap_on_new_sam_spending():
+    import contextlib, io, tempfile
+    from pathlib import Path
+    import analyze
+    assert analyze.spend_cap(5.0, True) == 5.0  # --allow-cost does not lift a --budget
+    assert analyze.spend_cap(None, True) == math.inf and analyze.spend_cap(None, False) == analyze.MAX_COST_USD
+    with tempfile.TemporaryDirectory() as tmp:
+        pieces = [(first, None, Path(tmp) / name) for first, name in ((0, "a"), (130, "b"), (260, "c"))]
+        for _, _, folder in pieces:
+            folder.mkdir()
+        assert analyze.billed_frames(pieces, 290) == [150, 150, 50]  # overlaps billed; a 30-frame last part bills 50
+        sam.cache_path(pieces[0][2], "car").write_text("")  # part a is cached: not paid again
+        with contextlib.redirect_stdout(io.StringIO()):
+            new, whole = analyze.check_cost(pieces, [("car", 1)], (64, 48), 290, 0.04)
+            assert (round(new, 4), round(whole, 4)) == (0.04, 0.07)  # $0.20 per 1,000 frames
+            try:
+                analyze.check_cost(pieces, [("car", 1)], (64, 48), 290, 0.039)
+                raise AssertionError("over the budget accepted")
+            except SystemExit as err:
+                assert "$0.04 is over the $0.04" in str(err) and "--budget" in str(err)
+
+
+def test_auto_mode_switches_a_concept_whose_video_requests_fill_up():
+    import tempfile
+    from pathlib import Path
+    import analyze, crowd
+    box = "<|box;x1=1;y1=1;x2=5;y2=5;w=64;h=48|>"
+    fills_at = lambda frame: "<0f>" + "".join(f"{i}{box}" for i in range(sam.MAX_OBJECTS - 1)) + f"<{frame}f>99{box}"
+    assert sam.saturation_frame(sam.parse(fills_at(16))) == 16
+    assert sam.saturation_frame(sam.parse("<0f>" + "".join(f"{i}{box}" for i in range(15)))) is None
+    site = {"person": "person", "vehicles": ["car"], "person_mode": "auto"}
+    with tempfile.TemporaryDirectory() as tmp:
+        pieces = [(first, None, Path(tmp) / name) for first, name in ((0, "a"), (130, "b"), (260, "c"))]
+        for (_, _, folder), frame in zip(pieces, (16, 135, 135)):  # b's late fill is covered by part c; c is last
+            folder.mkdir()
+            sam.cache_path(folder, "person").write_text(fills_at(frame))
+            sam.cache_path(folder, "car").write_text(fills_at(10))  # full too, but cars stay in video mode
+        switched = analyze.auto_switch(site, pieces, [("person", 1), ("car", 1)], None, (64, 48))
+        assert switched == {"person": [1.6, 13.5]}
+        jumps, real = {}, crowd.track
+        crowd.track = lambda clip, frames, fps, concept, key, cache, jump: jumps.update({concept: jump}) or {}
+        try:
+            analyze.concept_tracks(site, "person", None, 20, pieces, Path(tmp), None, (64, 48), 1, switched)
+        finally:
+            crowd.track = real
+        assert jumps == {"person": math.inf}  # detected frame by frame
+    note = analyze.switch_note("person", switched["person"], 3)
+    assert note == "person: 16 objects taken within 1.6-13.5 s in 2 of 3 parts, so frame-by-frame was used"
+    assert "within 1.0 s in 1 of 1 part," in analyze.switch_note("vehicle", [1.0], 1)
+    page = pack.limit_note([0, 4, [note]])
+    assert "at most 16 objects per request. person: 16 objects taken within 1.6-13.5 s" in page and "minimum" not in page
+    assert pack.limit_note([0, 4, []]) == "" and "minimum" in pack.limit_note([1, 4, [note]])
+
 
 def test_crowds_are_tiled_and_cut_boxes_joined():
     import analyze
@@ -345,10 +594,11 @@ def test_pv2_and_engineering_numbers_say_when_they_are_scaled():
     short = pack.engineering_lines({"minutes": 0.2, "duration_s": 15.0, "crossings": 5, "vehicles": 20}, None)
     assert "x 10^8" not in short[0] and "at least 15 minutes" in short[0]
     crowd = pack.engineering({"minutes": 10}, {"sam_usd": 7.2, "image_usd": 6.0})
-    assert "about $6.00 of it image detection, at Meta&#x27;s list prices" in crowd and "guess" not in crowd
+    assert "SAM cost for this pack: about $7.20 at Meta&#x27;s list prices (about $6.00 of it image detection)" in crowd
+    assert "guess" not in crowd
     import analyze, contextlib, io  # Meta's list price for SAM images is $2.50 per 1,000
     with contextlib.redirect_stdout(io.StringIO()):
-        assert analyze.check_cost([(0, None, None)], [], None, 100, False, images=1000, all_images=1000) == 2.5
+        assert analyze.check_cost([(0, None, None)], [], None, 100, analyze.MAX_COST_USD, 1000, 1000) == (2.5, 2.5)
     assert pack.engineering({"minutes": 0}, None) == ""
     assert "2 of 10" in pack.limit_note([2, 10]) and pack.limit_note([0, 10]) == pack.limit_note(None) == ""
 
@@ -396,6 +646,118 @@ def test_top_down_view_uses_box_centre_and_whole_box():
     assert len(road.vehicle_edges(car, H, top_down=True)[0]) == 4 and len(road.vehicle_edges(car, H)[0]) == 2
 
 
+def filmed_at_an_angle(centres, heading=0.0, size=(4.6, 1.8)):
+    """(SAM-like boxes, H) of a 1.5 m tall vehicle at `centres` ({frame: road point}) seen by a phone 10 m up and
+    25 m back, calibrated on the road as calibrate.html would be (validate_sind's simulated camera)."""
+    import validate_sind
+    project = validate_sind.camera((0.0, 0.0), 10.0, 25.0)
+    boxes = {f: validate_sind.box(project, road.rectangle(c, heading, size), 1.5) for f, c in centres.items()}
+    return boxes, validate_sind.calibration(project, (0.0, 0.0))
+
+
+def test_car_shaped_footprint_stands_under_the_box_at_an_angle():
+    drive = {f: (-8.0 + 0.8 * f, 1.0) for f in range(20)}  # 8 m/s along x at 10 fps...
+    centres = drive | {f: drive[19] for f in range(20, 40)}  # ...then 2 s standing still
+    boxes, H = filmed_at_an_angle(centres)
+    feet = road.vehicle_footprints(boxes, H, (4.6, 1.8), 10)
+    assert feet.keys() == centres.keys() and all(len(s) == 4 for s in feet.values())  # heading carried while still
+    assert all(math.dist(road.centroid(feet[f]), c) < 0.25 for f, c in centres.items() if f >= road.SMOOTH_FRAMES)
+    assert all(abs(math.dist(s[0], s[1]) - 1.8) < 1e-9 and abs(math.dist(s[1], s[2]) - 4.6) < 1e-9
+               for s in feet.values())
+    edges = road.vehicle_edges(boxes, H)  # the lower box edge is the near side, about a metre off the middle
+    assert all(math.dist(road.centroid(edges[f]), c) > 0.8 for f, c in centres.items())
+    parked = {f: boxes[39] for f in range(30)}  # never moved: no heading, so lower edges throughout
+    assert road.vehicle_footprints(parked, H, (4.6, 1.8), 10) == road.vehicle_edges(parked, H)
+
+
+def test_footprint_centre_is_median_smoothed_over_two_frames():
+    centres = {f: (-8.0 + 0.8 * f, 1.0) for f in range(20)}
+    boxes, H = filmed_at_an_angle(centres)
+    boxes[10] = [v + 12 for v in boxes[10]]  # one SAM box 12 px off
+    alone = road.fit_centre(road.inverse(H), boxes[10], 0.0, (4.6, 1.8), centres[10])
+    smoothed = road.centroid(road.vehicle_footprints(boxes, H, (4.6, 1.8), 10)[10])
+    assert math.dist(alone, centres[10]) > 0.5 and math.dist(smoothed, centres[10]) < 0.25
+
+
+def test_footprints_only_at_an_angle_and_top_down_shapes_unchanged():
+    import analyze
+    centres = {f: (-8.0 + 0.8 * f, 1.0) for f in range(20)}
+    boxes, H = filmed_at_an_angle(centres)
+    site = {"image_points": SQUARE_IMG, "world_points": SQUARE_ROAD, "zone_m": [-50, -50, 50, 50],
+            "vehicles": ["car", "bus"], "vehicle_sizes_m": {"bus": [10.0, 2.5]}}
+    tracks = {"car#1": boxes, "bus#2": boxes, "vehicle#3": boxes}
+    _, angled = analyze.road_tracks(site, H, {}, tracks, None)
+    car = road.VEHICLE_SIZES_M["car"]
+    assert angled["car#1"] == road.vehicle_footprints(boxes, H, car, analyze.FPS, site["zone_m"])
+    assert abs(math.dist(*angled["bus#2"][0][:2]) - 2.5) < 1e-9  # the site's tape-measured size
+    assert angled["vehicle#3"] == road.vehicle_edges(boxes, H, site["zone_m"])  # no size: the lower box edge
+    _, top = analyze.road_tracks({**site, "view": "top-down"}, H, {}, tracks, None)
+    assert top == {vid: road.vehicle_edges(t, H, site["zone_m"], None, True) for vid, t in tracks.items()}
+    event = {"person": "p/0", "vehicle": "car#1", "t_person_s": 1.0, "t_vehicle_s": 1.0}
+    [where] = analyze.placed([event], {"p/0": {10: (0.0, 0.0)}}, angled)
+    assert where["footprint"] == [[round(v, 1) for v in q] for q in angled["car#1"][10]]
+    import roadmap
+    assert roadmap.svg([{**where, "tier": "serious", "vehicle_kmh": 28.8, "pet_s": 0.0}],
+                       SQUARE_ROAD).count('<polygon class="foot"') == 1
+
+
+def test_sind_oblique_table_compares_vehicle_shapes_with_the_truth():
+    import validate_sind
+    person = {"7": {f: (0.0, 0.0) for f in range(40)}}  # standing in the road while a car passes 0.1 m away
+    car = {"car#1": {f: road.rectangle((-16.0 + 0.8 * f, 1.0), 0.0, (4.6, 1.8)) for f in range(40)}}
+    rows = validate_sind.oblique_rows(person, car, 10.0, 25.0)
+    table = validate_sind.oblique_table(person, rows)
+    assert len(rows) == 5 and table.count("\n") == 6
+    assert "| SinD footprints (truth) | 1 | 1 | 0 | 0 | +0.00 s |" in table
+    assert "| car-shaped footprint | 1 | 1 | 0 | 0 |" in table
+
+
+def test_who_reached_the_spot_first_and_the_vehicle_speed_two_seconds_before():
+    fps, car = 10, edges_along_x(8.0, 10, 60)  # within 1 m of x = 0 on frames 28-32, at 28.8 km/h throughout
+    waited = road.closest_pass({f: (0.0, 0.0) for f in range(15)}, car, fps)  # left the spot 1.4 s before it came
+    assert waited["first"] == "person" and waited["kmh_2s_before"] == waited["vehicle_kmh"] == 28.8
+    assert road.closest_pass({f: (0.0, 0.0) for f in range(36, 60)}, car, fps)["first"] == "vehicle"
+    bare = road.event_fields(((20, 0.5), 0, 20, 0.5, 25 / 3.6), fps)  # no speeds given: nothing from before
+    assert bare["first"] == "person" and bare["kmh_2s_before"] is None
+    e = {"person": "1/0", "vehicle": "car#1", "tier": "serious", "pet_s": 0.6, "t_person_s": 3.0, "t_vehicle_s": 3.6,
+         "gap_m": 0.4, "vehicle_kmh": 31.0, "kmh_2s_before": 32.0, "death_risk_pct": 2.0,
+         "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5}, "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
+    line = ("The person was on the spot first; the car reached it 0.6 s later at 31.0 km/h (32.0 km/h two seconds "
+            "earlier: no slowdown measured).")
+    assert road.first_note(e) == line and html.escape(line) in pack.event_card(1, e, fps)
+    assert road.first_note({**e, "kmh_2s_before": 38.0}).endswith("(38.0 km/h two seconds earlier).")
+    assert road.first_note({**e, "kmh_2s_before": None}).endswith("at 31.0 km/h.")
+    car_first = {**e, "t_person_s": 4.2}
+    assert road.first_note(car_first) == ("The car passed the spot first and the person reached it 0.6 s later: the "
+                                          "impact and risk are for someone on the spot 0.6 s before the car came.")
+    assert "same moment" in road.first_note({**e, "t_vehicle_s": 3.0})
+    assert all("did not slow" not in pack.event_card(1, x, fps) for x in (e, car_first))
+    measured = json.loads(pack.facts({}, [e, car_first, car_first], {"minutes": 1}))
+    assert (measured["person_first"], measured["vehicle_first"], measured["both_at_once"]) == (1, 2, 0)
+
+
+def test_events_inside_tracking_gaps_say_their_position_was_inferred():
+    import analyze, crowd
+    from pathlib import Path
+    detected = {0: [0, 0, 10, 30], 2: [4, 0, 14, 30], 10: [20, 0, 30, 30]}  # seen every 0.2 s, then lost for 0.8 s
+    assert [road.unseen_s(detected, f, 10) for f in (2, 1, 5)] == [0.0, 0.2, 0.8]
+    real = crowd.track  # crowd mode keeps what SAM detected apart from the boxes it fills in between
+    crowd.track = lambda clip, frames, fps, concept, key, cache, jump: {"c0": detected}
+    try:
+        site = {"person": "person", "vehicles": ["car"], "person_mode": "crowd"}
+        tracks, seen = analyze.concept_tracks(site, "person", None, 20, [], Path("out"), None, None)
+        video = analyze.concept_tracks(site, "car", None, 20, [], Path("out"), None, None)
+    finally:
+        crowd.track = real
+    assert seen == {"c0": detected} and sorted(tracks["c0"]) == list(range(11)) and video == ({}, {})
+    event = {"person": "c0/0", "vehicle": "car#1", "t_person_s": 0.5, "t_vehicle_s": 0.6}
+    [e] = analyze.with_unseen([event], seen, {"car#1": {f: [0, 0, 9, 9] for f in range(20)}})
+    assert e["unseen_s"] == {"person": 0.8, "vehicle": 0.0}
+    assert road.seen_note(e) == "Not detected for about 0.8 s (the person); position inferred."
+    assert road.seen_note({**e, "unseen_s": {"person": 0.2, "vehicle": 0.0}}) == "Seen at the moment."
+    assert road.seen_note(event) == ""  # an events.json from before this was measured
+
+
 def test_spark_crop_stays_inside_the_frame():
     assert review.crop_window([0, 0, 10, 20], (640, 360)) == (0, 0, 80)          # small box: minimum crop, clamped
     assert review.crop_window([600, 300, 640, 360], (640, 360)) == (460, 180, 180)  # 3 x 60 px, pushed inside
@@ -428,6 +790,119 @@ def test_review_three_fixes_hold():
             pass
         else:
             raise AssertionError("expected ValueError")
+
+
+def test_street_photo_blurs_people_a_full_video_reply_missed():
+    import subprocess, tempfile
+    from pathlib import Path
+    import crowd
+    box = lambda obj, x: f"{obj}<|box;x1={x};y1=5;x2={x + 10};y2=40;w=64;h=48|>"
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp)
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=64x48:rate=10:duration=1",
+                        "-pix_fmt", "yuv420p", str(out / "clip.mp4")], check=True)
+        # auto mode: the full video reply holds one person, the frame-by-frame reply it switched to holds three
+        (out / "part0").mkdir()
+        sam.cache_path(out / "part0", "person").write_text("<0f>" + box(0, 5))
+        crowd.cache_dir(out, "person").mkdir()
+        (crowd.cache_dir(out, "person") / "000000.sam.txt").write_text("<0f>" + "".join(box(i, x) for i, x in
+                                                                                       enumerate((5, 25, 45))))
+        old, blurred = render.blur_filters, []
+        render.blur_filters = lambda *args: blurred.extend(old(*args)) or blurred
+        try:
+            pack.street_photo(out / "clip.mp4", out / "street.jpg")
+        finally:
+            render.blur_filters = old
+        assert (out / "street.jpg").exists() and all(f"delogo=x={x}:" in "".join(blurred) for x in (5, 25, 45))
+
+
+def test_street_photo_blurs_plates_and_never_trusts_a_full_video_reply_alone():
+    import subprocess, tempfile
+    from pathlib import Path
+    import crowd
+    box = lambda obj, x: f"{obj}<|box;x1={x};y1=5;x2={x + 3};y2=40;w=640;h=360|>"
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp)
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=640x360:rate=10:duration=1",
+                        "-pix_fmt", "yuv420p", str(out / "clip.mp4")], check=True)
+        sam.cache_path(out, "person").write_text("<0f>" + "".join(box(i, 20 * i) for i in range(sam.MAX_OBJECTS)))
+        sam.cache_path(out, "car").write_text("<0f>0<|box;x1=400;y1=200;x2=500;y2=280;w=640;h=360|>")
+        assert raises_value_error(lambda: pack.street_photo(out / "clip.mp4", out / "street.jpg", "person", ["car"]))
+        crowd.cache_dir(out, "person").mkdir()  # analyze searched frame 0 image by image
+        (crowd.cache_dir(out, "person") / "000000.sam.txt").write_text("<0f>" + box(0, 600))
+        calls, old = [], pack.subprocess.run
+        pack.subprocess.run = lambda args, **kwargs: calls.append(args) or old(args, **kwargs)
+        try:
+            pack.street_photo(out / "clip.mp4", out / "street.jpg", "person", ["car"])
+        finally:
+            pack.subprocess.run = old
+    filters = calls[-1][calls[-1].index("-vf") + 1]
+    assert "delogo=x=400:y=260:w=100:h=20:" in filters and "delogo=x=600:" in filters  # the plate; a missed person
+
+
+def test_number_plates_are_blurred_in_the_bottom_quarter_of_each_vehicle():
+    car = {10: [100, 100, 200, 140], 11: [637, 350, 700, 400]}  # then off the frame's corner: nothing left to blur
+    assert render.plate_filters([car], 10, 11, (640, 360)) == ["delogo=x=100:y=130:w=100:h=10:enable='eq(n,0)'"]
+    calls, old = [], render.subprocess.run
+    render.subprocess.run = lambda args, **kwargs: calls.append(args)
+    try:
+        render.render("clip.mp4", {"t_person_s": 1.0, "t_vehicle_s": 1.0}, {}, {}, 10, "event1.mp4",
+                      frame_size=(640, 360), vehicles=[{5: [100, 100, 200, 140]}])
+    finally:
+        render.subprocess.run = old
+    assert "delogo=x=100:y=130:w=100:h=10:enable='eq(n,5)'" in calls[0][calls[0].index("-vf") + 1]
+
+
+def test_heads_a_full_video_request_missed_are_searched_on_every_published_frame():
+    import contextlib, io, tempfile
+    from pathlib import Path
+    import analyze, crowd
+    site = {"person": "person", "vehicles": ["car"]}
+    events = [{"t_person_s": 3.0, "t_vehicle_s": 3.5, "review": {"is_person": False}},  # rejected: no clip
+              {"t_person_s": 3.0, "t_vehicle_s": 3.5}]
+    shown = analyze.shown_frames(events, 100)
+    assert shown == {0, *range(10, 56)}  # the one clip, 1-5.5 s, and frame 0 (the street photo)
+    asked, real = [], crowd.track
+    crowd.track = lambda clip, frames, fps, concept, key, cache: asked.extend(frames) or {"c0": {0: [0, 0, 9, 30]}}
+    try:
+        with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stdout(io.StringIO()):
+            pieces = [(0, None, Path(tmp))]
+            try:
+                analyze.search_heads(site, None, Path(tmp), events, 100, pieces, None, 0.05)
+                raise AssertionError("over the budget accepted")
+            except SystemExit as err:
+                assert "$0.06 is over the $0.05" in str(err)  # 25 images at $0.0025
+            found, searched = analyze.search_heads(site, None, Path(tmp), events, 100, pieces, None, 1.0)
+    finally:
+        crowd.track = real
+    assert asked == searched == [0, *range(10, 57, 2)]  # 25 frames: 10 fps clip, 5 fps samples, one past each end
+    tracked = {"a": {0: [0, 0, 10, 30]}, "far": {90: [0, 0, 10, 30]}}  # "far" is on no searched frame
+    missed = {"c1": {12: [50, 0, 60, 30]}, "c2": {0: [100, 0, 110, 30]}, "c3": {0: [200, 0, 210, 30]}}
+    everyone, counts = analyze.heads(tracked, found | missed, searched)  # c0 sits on a; frame 0 has 2 it missed
+    assert counts == {"heads_tracked": 1, "heads_found": 2} and len(everyone) == 6
+    note = pack.privacy_note(counts)
+    assert "up to 1 heads a frame blurred from tracks + up to 2 found by SAM image search" in note
+    assert pack.privacy_note(None) == ""
+
+
+def test_found_heads_cover_the_last_published_frame_and_frames_next_to_a_lone_sample():
+    import contextlib, io, tempfile
+    from pathlib import Path
+    import analyze, crowd
+    site = {"person": "person", "vehicles": ["car"]}
+    events = [{"t_person_s": 13.0, "t_vehicle_s": 13.5}]  # its clip runs to the end of a 150-frame clip
+    shown = analyze.shown_frames(events, 150)
+    assert max(shown) == 149  # an odd frame: samples are 0, 2, ..., 148
+    real = crowd.track  # the search sees one person on every sample, a new short track each time (it flickers)
+    crowd.track = lambda clip, frames, fps, concept, key, cache: {f"c{f}": {f: [0, 0, 9, 30]} for f in frames}
+    try:
+        with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stdout(io.StringIO()):
+            found, searched = analyze.search_heads(site, None, Path(tmp), events, 150, [(0, None, Path(tmp))], None, 1.0)
+    finally:
+        crowd.track = real
+    boxed = {f for t in found.values() for f in t}
+    assert shown <= boxed and max(boxed) == 149  # every published frame has a box, none past the clip
+    assert analyze.heads({}, found, searched)[1] == {"heads_tracked": 0, "heads_found": 1}  # counts on samples only
 
 
 def test_crowd_tracker_keeps_ids_through_a_short_gap_and_apart_from_neighbours():
@@ -617,6 +1092,24 @@ def test_site_concepts_must_not_share_a_cache_name():
             raise AssertionError("duplicate concepts accepted")
         except SystemExit as err:
             assert "same cache name" in str(err)
+        one = {"image_points": SQUARE_IMG, "world_points": SQUARE_ROAD, "vehicles": ["vehicle"]}
+        path.write_text(json.dumps(one | {"person_mode": "auto", "vehicle_mode": "auto"}))
+        assert analyze.load_site(path)["vehicles"] == ["vehicle"]
+        path.write_text(json.dumps(one | {"vehicle_mode": "fast"}))
+        try:
+            analyze.load_site(path)
+            raise AssertionError("unknown mode accepted")
+        except SystemExit as err:
+            assert "vehicle_mode" in str(err) and '"auto"' in str(err)
+        path.write_text(json.dumps(one | {"vehicle_sizes_m": {"vehicle": [4.2, 1.7]}}))
+        assert analyze.load_site(path)["vehicle_sizes_m"] == {"vehicle": [4.2, 1.7]}
+        for sizes in ({"car": [4.2, 1.7]}, {"vehicle": [1.7, 4.2]}, {"vehicle": [4.2]}, {"vehicle": [4.2, 0]}):
+            path.write_text(json.dumps(one | {"vehicle_sizes_m": sizes}))  # not a site concept, width first, ...
+            try:
+                analyze.load_site(path)
+                raise AssertionError(f"bad vehicle_sizes_m accepted: {sizes}")
+            except SystemExit as err:
+                assert "vehicle_sizes_m" in str(err)
 
 
 def test_number_check_reads_grouped_numbers_and_non_english_facts():
@@ -629,6 +1122,7 @@ def test_number_check_reads_grouped_numbers_and_non_english_facts():
 def test_paths_and_other_arrays_never_reach_the_letter_facts():
     """Every number in the facts counts as measured, so arrays of coordinates would let a letter's numbers through."""
     e = {"person": "1/0", "vehicle": "car#1", "tier": "serious", "pet_s": 0.5, "vehicle_kmh": 30.0, "death_risk_pct": 1.5,
+         "t_person_s": 2.0, "t_vehicle_s": 2.5,
          "with_limit": {"20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}, "where": [41.7, 63.2],
          "path_person": [[57.9, 88.4]], "path_vehicle": [[77.3, 12.6]], "replay": [[71.1, 72.2]], "spans": [[13.7, 19.3]]}
     seen = {"minutes": 0.3, "crossings": 4, "spans": [[23.9, 31.7]], "replay": (44.4, 55.5)}

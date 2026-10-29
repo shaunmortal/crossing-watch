@@ -8,10 +8,44 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 | G2 Metres | A road distance NOT used for calibration (a second lane width, or crossing-line length) comes out within ±15% of its assumed value | same | Wed 28 Oct 22:00 |
 | G3 Conflicts | Checked by eye, at least 2 of the top 3 events are real close passes, and no event involves a parked or queued vehicle | same | Thu 29 Oct 22:00 |
 | G4 Own footage | Footage filmed from height at the user's college gate runs end to end, with calibration from measured points | user's video | Sun 1 Nov 22:00 |
+| G6 Speed | Against vehicles hand-timed between two lines taped 15 m apart, at least 80% of matched vehicles read within ±15% or ±2 km/h (whichever is larger), and the median error is within ±10%; at least 20 matched vehicles, or G6 is "not tested". Added Thu 29 Oct, before the taped lines are filmed; details below | user's video, with the lines taped | Sun 1 Nov 22:00 |
 
 **Scope cut if G3 fails:** report the closest approach in metres plus vehicle speed (no PET). The evidence pack and letter still ship.
 
 **Known limits (stated, not hidden):** a vehicle's lower box edge stands in for its footprint; up to 16 objects per SAM video request (found later: in all, not per frame); one concept per SAM request; calibration lengths on the news clip are assumed.
+
+## G6 pre-registration (written Thu 29 Oct 2026, before the taped lines are filmed)
+
+- **Lines.** Four tape marks, two on each kerb, make two lines across the road 15 m apart, centred on the crossing.
+  They are separate from the calibration rectangle (never its corners, or the check is not independent). Everything
+  is done from the footpath, and there are no staged rides. The marks are clicked in the calibration frame and saved
+  in the site file as `"trap"` (see the first lines of `validate_gate.py`).
+- **Truth.** For each vehicle, the moments its front wheel touches line A and line B, read frame by frame on the exact
+  video file given to analyze.py (the 30 fps original, never the 10 fps clip.mp4). Trap speed is the taped distance
+  divided by the time between them.
+- **Which vehicles.** From the start of that video, every vehicle of any kind that crosses both lines, in order, until
+  30 are logged (or all of them, if fewer cross). A vehicle is skipped only when its front wheel is hidden at either
+  line or it stops between the lines, and each skip is noted with why. The log is made without looking at the
+  pipeline's speeds.
+- **Ours.** `python3 validate_gate.py SITE.json OUT_DIR TRAP.csv` rebuilds the run's tracks from its cached SAM replies
+  at $0. It matches each logged vehicle to the one track within 1.5 m of line A and of line B at the logged moments,
+  and takes that track's median measured speed between them. A vehicle with no such track, with two or more, or with
+  fewer than 3 measured speeds is listed with the reason and left out of the error figures.
+- **Pass:** at least 20 matched vehicles; at least 80% of them within ±15% or ±2 km/h of their trap speed, whichever is
+  larger; and the median signed error within ±10%. **Fail:** fewer than 80% within the band, or a median error beyond
+  ±10%. **Not tested:** fewer than 20 matched vehicles. A failed or untested G6 is never reported as passed.
+- **If G6 fails or is not tested,** the README, the video and the X post give the trap's measured error (or say that
+  no own-camera speed check was possible) as the speed accuracy on our camera, not the DUT or SinD numbers.
+- **Why these bands.** In a synthetic rooftop-camera simulation (re-run offline on Thu 29 Oct), hand timing a 15 m
+  trap on a 30 fps original is good to 0.67-1.14 km/h at 25 km/h (95th percentile, half to one frame of picking
+  error); calibration from an 8 m rectangle adds 2.0-5.4% (95th percentile, 1-2 px clicks, two camera positions); and
+  up to 4 px of box jitter adds under 0.5 km/h (95th percentile) to today's speed estimator. The band leaves room for
+  all three; the ±10% bound on the median catches a scale error that the band alone would let through. The simulation
+  leaves out SAM's box drift on a real camera at an angle, so G6 can fail.
+- **Side check.** The script also prints how far apart the calibration puts the two lines. That is a road distance not
+  used for calibration, so it can also serve G2.
+- These conditions and the constants in `validate_gate.py` (`BAND_PCT`, `BAND_KMH`, `PASS_SHARE`, `MAX_LEAN_PCT`,
+  `MIN_VEHICLES`, `MATCH_M`, `MIN_SPEEDS`) do not change after the trap footage arrives.
 
 ## Status (Wed 28 Oct, evening, written by the agent)
 
@@ -123,10 +157,60 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
   cost called a Meta price; child and non-car events showed the adult car-front risk without a caveat; pedestrian
   count includes pavement walkers when no carriageway is marked (stated).
 - DUT re-run after both changes (`validate_dut.py ... --mode crowd --out out/dut-15s`): 29 of 36 found, 3 real false alarms (was 2).
+  *Corrected 29 Oct: stale. Clip 15's events.json was rewritten after this validation.json; scored as stored, the run gives 26 of 36.*
 - Vehicle crowd mode: DUT 35 of 36 (4 real false alarms); dense Indian clip coverage 6 -> 20 vehicles a frame. Found and
   fixed on the way: one-frame pedestrian fragments (543 -> 83 events) and riders accepted as pedestrians by Spark
   (83 -> 18 after review). Speed on that clip is untestable (guessed calibration); G2 on real footage still pending.
 - Fifth review (2 reviewers, findings checked): crowd-mode vehicles over ~36 km/h were lost at 5 samples a second (now
   10); synonym concepts shared one cache (now refused); letter check missed non-English facts and comma numbers, and
-  flagged "SAM 3.1" from the prompt (fixed). DUT with vehicles at 10 a second: 12 of 36, every miss at the 10 km/h
-  bar, speed bias +0.2 km/h; all non-threshold conflicts found, 1 real false alarm.
+  flagged "SAM 3.1" from the prompt (fixed). DUT with vehicles at 10 a second: 12 of 36, speed bias +0.2 km/h, 1 real
+  false alarm. *Corrected 29 Oct: the misses were not at the 10 km/h bar. 20 of the 24 were Spark's review (17 of them
+  "rider" or "cyclist" calls on walking students) and 4 were at a threshold.*
+
+## Status update (Thu 29 Oct): DUT re-scored after the speed fix and the rider gate
+
+- **Truth pass.** Every DUT number in the README was recomputed once, at $0, with the code as it now stands, from
+  the cached SAM replies and Spark's stored verdicts: `python3 validate_offline.py DUT_REPO out/dut-15s
+  out/dut-vcrowd` (it writes nothing; a cache miss stops it). The two lines above marked *Corrected 29 Oct* were
+  wrong, and so was the README's "neither changed any DUT result": Spark's rider calls had cost 17 conflicts.
+- **Why the numbers moved:**
+  1. **Speed fix (a9ef24b).** DUT's source runs at 23.976 fps. Resampled to 10 fps it steps 2,2,3,2,3 source
+     frames, and the old median of steps read 0.83 x the true speed: our tracks and the dataset's own tracks (resampled
+     the same way for scoring) were both read slow. With a least-squares slope, cars at about 10 km/h now count as
+     moving, so the truth set grows from 36 to 52 conflicts (24 to 34 serious). This is the "moving" bar being read
+     right, not better detection. The same commit's phantom-speed guard leaves the Indian clip with no event above
+     57 km/h (88 before).
+  2. **Rider gate (b54d1ab).** Spark called walking students "rider" or "cyclist". DUT tracks no bikes, so no bike box
+     is ever under them and every such call is now overruled.
+  3. **New events.** Today's code finds conflicts in track pieces Spark never saw: 8 events in crowd mode, 17 in
+     vehicle crowd mode. They stay in, as unreviewed events do on the page. The low end of each range below assumes
+     Spark would reject all of them; a Spark re-run settles it (SAM is cached).
+- **Old and new side by side.** Old = as published before today. Crowd mode = people in crowd mode, cars by SAM video
+  in 15 s parts.
+
+| Number | Old | New (29 Oct) |
+|---|---|---|
+| True conflicts in the dataset's own tracks | 36 (24 serious) | 52 (34 serious) |
+| Crowd mode, found after Spark's review | 29 of 36 | 44 of 52 (37 to 44) |
+| ... crowded / held-out clips | 21 of 25 / 8 of 11 | 29 of 37 / 15 of 15 |
+| ... with 15 s parts | "29 of 36" (stale: 26 as stored) | the same run: 44 of 52 |
+| Crowd mode, found by the geometry alone | not published | 49 of 52, every miss at a threshold |
+| Crowd mode, real false alarms | 2 (3 with 15 s parts) | 3 |
+| Vehicle crowd mode, found after review | 12 of 36 | 45 of 52 (30 to 45; 28 without the rider gate) |
+| Vehicle crowd mode, misses | 24, "every miss at the 10 km/h bar" (in fact 20 by Spark's review, 4 at a threshold) | 7: 4 at a threshold, 3 that Spark called "unclear" |
+| Vehicle crowd mode, real false alarms | 1 | 4 |
+| Whole frame / 2 x 2 tiles | 14 / 19 of 36, after review | 22 / 34 of 52, by the geometry (their verdicts were not kept) |
+| Speed against the dataset's native-rate positions, vehicle crowd mode (mean / 95th percentile error) | 0.52 / 1.89 km/h | 0.16 / 0.55 km/h |
+| Frames with the car at 7-13 km/h put on the wrong side of the 10 km/h bar | 28% | 7.5% |
+| Matched events, speed | usually within 1 km/h, 2 at worst | 41 of 44 within 1 km/h, 2.0 at worst |
+| Matched events, PET | within about 1 s | 38 of 44 within 1 s, 2.5 s at worst |
+| Gaps of 6 s or more where people crossed | right on 7 of 8 clips | right on 8 of 8 |
+| Dataset pedestrians followed by our tracks | 297 of 301, at most 5 tracks each | 296 of 301, at most 4 |
+| Indian crowd clip (no ground truth), after review | 18 events (6 serious), up to 88 km/h | 10 events (5 serious, 2 not yet reviewed), up to 57 km/h |
+
+- Unchanged: moving vehicles counted right on 8 of 8 clips, longest gap within 0.5 s on 6 of 8, pedestrian crossings
+  374 against the dataset's 280.
+- How the old column was checked: the stored events re-scored with the code from before the speed fix give the
+  same 12 of 36 (24 misses: 20 by Spark's review, 4 at a threshold) and 26 of 36 for the 15 s run; the same speed
+  check on that code gives 0.52 / 1.89 km/h and 28%.
+- 58 self-checks pass.

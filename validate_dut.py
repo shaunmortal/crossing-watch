@@ -110,41 +110,69 @@ def boundary_flags(missed, extra, people, vehicles, our_people, our_vehicles, pe
     return missed_b, extra_b
 
 
+def score(truth, events, people, vehicles, our_people, our_vehicles, person_ids, vehicle_ids):
+    """Our events against the truth, before Spark's review (raw) and after it (pack.confirmed). A conflict found and
+    then rejected by the review is missed_by_review: it passed every threshold, so only raw misses are checked for
+    being at a threshold."""
+    raw_pairs, raw_missed, raw_extra = match(truth, events, person_ids, vehicle_ids)
+    pairs, missed, extra = match(truth, pack.confirmed(events), person_ids, vehicle_ids)
+    raw_b, extra_b = boundary_flags(raw_missed, extra, people, vehicles, our_people, our_vehicles, person_ids, vehicle_ids)
+    at_threshold = {id(t): b for t, b in zip(raw_missed, raw_b)}
+    missed_b = [at_threshold.get(id(t)) for t in missed]  # None: found, then removed by the review
+    fields = lambda e: {k: e[k] for k in ("tier", "pet_s", "t_person_s", "vehicle_kmh")}
+    return {"matched": len(pairs), "missed": len(missed), "extra": len(extra),
+            "missed_by_review": missed_b.count(None), "missed_at_threshold": sum(raw_b), "extra_at_threshold": sum(extra_b),
+            "before_review": {"matched": len(raw_pairs), "missed": len(raw_missed), "extra": len(raw_extra)},
+            "pet_abs_error_s": [round(abs(t["pet_s"] - f["pet_s"]), 1) for t, f in pairs],
+            "speed_error_kmh": [round(f["vehicle_kmh"] - t["vehicle_kmh"], 1) for t, f in pairs],
+            "missed_events": [{**fields(e), "at_threshold": bool(b), "by_review": b is None} for e, b in zip(missed, missed_b)],
+            "extra_events": [{**fields(e), "at_threshold": b} for e, b in zip(extra, extra_b)]}
+
+
+def our_tracks(site, clip_out):
+    """(person boxes, vehicle boxes, pedestrian pieces, vehicle shapes, frame count) of a run, rebuilt from its
+    cached SAM replies the way analyze.py builds them, auto mode's switch to frame-by-frame included."""
+    clip_file = clip_out / "clip.mp4"
+    total = analyze.frame_count(clip_file)
+    frame_size = tuple(int(v) for v in analyze.probe(clip_file, "stream=width,height").split(","))
+    pieces = analyze.parts(clip_file, clip_out, total)  # all cached by the run
+    switched = analyze.auto_switch(site, pieces, analyze.video_plan(site), None, frame_size)
+    tracks_of = lambda concept, g=1: analyze.concept_tracks(site, concept, clip_file, total, pieces, clip_out, None,
+                                                            frame_size, g, switched)
+    person_boxes = tracks_of(site.get("person", "person"), site.get("person_grid", 1))[0]
+    vehicle_boxes = {f"{c}#{k}": t for c in site["vehicles"] for k, t in tracks_of(c)[0].items()}
+    H = road.homography(site["image_points"], site["world_points"])
+    return person_boxes, vehicle_boxes, *analyze.road_tracks(site, H, person_boxes, vehicle_boxes, frame_size), total
+
+
+def compare(repo, clip, events, exposure, our_people, our_vehicles, total):
+    """One clip's events (as analyze.py writes them) and road tracks against the dataset's own tracks."""
+    people, vehicles = ground_truth(repo, clip)
+    truth = road.conflicts(people, vehicles, analyze.FPS)
+    person_ids = identities(our_people, people, PERSON_ID_DIST_M)
+    vehicle_ids = identities(our_vehicles, vehicles, VEHICLE_ID_DIST_M)
+    followers = {}  # dataset pedestrian -> our SAM tracks that follow them (pieces of one track count once)
+    for oid, tid in person_ids.items():
+        followers.setdefault(tid, set()).add(oid.split("/")[0])
+    found = pack.confirmed(events)
+    return {"clip": clip, "truth": {"pedestrians": len(people), "conflicts": len(truth),
+                                    "serious": sum(e["tier"] == "serious" for e in truth),
+                                    "exposure": road.exposure(people, vehicles, analyze.FPS, total)},
+            "pipeline": {"exposure": exposure, "conflicts": len(found),
+                         "serious": sum(e["tier"] == "serious" for e in found)},
+            "tracks_per_pedestrian": sorted(len(s) for s in followers.values()),
+            **score(truth, events, people, vehicles, our_people, our_vehicles, person_ids, vehicle_ids)}
+
+
 def check_clip(repo, videos, clip, out, grid=1, mode="video", vehicle_mode="video"):
     video = videos / f"intersection_{clip}_roi.mp4"
     clip_out = out / clip
     subprocess.run(["python3", "analyze.py", str(video), str(site_for(repo, video, clip, out, grid, mode, vehicle_mode)), "--out", str(clip_out)],
                    check=True)
     data = json.loads((clip_out / "events.json").read_text())
-    found = pack.confirmed(data["events"])
-    people, vehicles = ground_truth(repo, clip)
-    truth = road.conflicts(people, vehicles, analyze.FPS)
     site = json.loads((out / f"site-{clip}.json").read_text())
-    frame_size = tuple(int(v) for v in analyze.probe(clip_out / "clip.mp4", "stream=width,height").split(","))
-    clip_file = clip_out / "clip.mp4"
-    pieces = analyze.parts(clip_file, clip_out, analyze.frame_count(clip_file))  # all cached by the run above
-    tracks_of = lambda concept, g=1: analyze.concept_tracks(site, concept, clip_file, analyze.frame_count(clip_file),
-                                                            pieces, clip_out, None, frame_size, g)
-    our_people, our_vehicles = analyze.road_tracks(
-        site, road.homography(site["image_points"], site["world_points"]),
-        tracks_of("person", site.get("person_grid", 1)), {f"car#{k}": t for k, t in tracks_of("car").items()}, frame_size)
-    person_ids = identities(our_people, people, PERSON_ID_DIST_M)
-    vehicle_ids = identities(our_vehicles, vehicles, VEHICLE_ID_DIST_M)
-    pairs, missed, extra = match(truth, found, person_ids, vehicle_ids)
-    missed_b, extra_b = boundary_flags(missed, extra, people, vehicles, our_people, our_vehicles, person_ids, vehicle_ids)
-    return {"clip": clip, "truth": {"pedestrians": len(people), "conflicts": len(truth),
-                                    "serious": sum(e["tier"] == "serious" for e in truth),
-                                    "exposure": road.exposure(people, vehicles, analyze.FPS, analyze.frame_count(clip_file))},
-            "pipeline": {"exposure": data.get("exposure"), "conflicts": len(found),
-                         "serious": sum(e["tier"] == "serious" for e in found)},
-            "matched": len(pairs), "missed": len(missed), "extra": len(extra),
-            "missed_at_threshold": sum(missed_b), "extra_at_threshold": sum(extra_b),
-            "pet_abs_error_s": [round(abs(t["pet_s"] - f["pet_s"]), 1) for t, f in pairs],
-            "speed_error_kmh": [round(f["vehicle_kmh"] - t["vehicle_kmh"], 1) for t, f in pairs],
-            "missed_events": [{**{k: e[k] for k in ("tier", "pet_s", "t_person_s", "vehicle_kmh")}, "at_threshold": b}
-                              for e, b in zip(missed, missed_b)],
-            "extra_events": [{**{k: e[k] for k in ("tier", "pet_s", "t_person_s", "vehicle_kmh")}, "at_threshold": b}
-                             for e, b in zip(extra, extra_b)]}
+    *_, our_people, our_vehicles, total = our_tracks(site, clip_out)
+    return compare(repo, clip, data["events"], data.get("exposure"), our_people, our_vehicles, total)
 
 
 def main():

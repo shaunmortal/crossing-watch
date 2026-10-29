@@ -19,6 +19,8 @@ MATCH_IOU = 0.3      # a detection continues a track when it overlaps the predic
 MATCH_SIZES = 1.0    # ...or when its centre is within one box size (the larger side) of the predicted centre:
                      # between samples a walker moves less than their own body width
 MAX_GAP_S = 1.0      # a track hidden for up to this long picks up its ID again
+MAX_AREA_JUMP = 2.5  # vehicles: a box this many times larger or smaller than the track's last is another vehicle
+                     # (a motorcycle went 43x68 to 30x18 px: a phantom 81 km/h); people may just be partly hidden
 
 
 def detect(clip, frames, concept, api_key, cache_dir, clip_fps):
@@ -88,9 +90,12 @@ def predicted(track, last_frame, frame):
     return [box[0] + dx, box[1] + dy, box[2] + dx, box[3] + dy]
 
 
-def closeness(expected, box):
+def closeness(expected, box, max_area_jump=math.inf):
     """How well a detection continues a track, given where the track was expected: from IoU, or failing that
-    from centre distance in box sizes; None when it is too far to be the same person."""
+    from centre distance in box sizes; None when it is too far, or too different in size, to be the same object."""
+    jump = (box[2] - box[0]) * (box[3] - box[1]) / ((expected[2] - expected[0]) * (expected[3] - expected[1]))
+    if max(jump, 1 / jump) > max_area_jump:
+        return None
     overlap = iou(expected, box)
     if overlap >= MATCH_IOU:
         return 1 + overlap
@@ -99,9 +104,10 @@ def closeness(expected, box):
     return 1 - shift / MATCH_SIZES if shift <= MATCH_SIZES else None
 
 
-def associate(detections, clip_fps):
+def associate(detections, clip_fps, max_area_jump=math.inf):
     """{track id: {frame: box}} from {frame: [box, ...]}: each frame's boxes join the best-matching live track
-    (greedy, best match first); a track unseen for MAX_GAP_S ends; unmatched boxes start new tracks."""
+    (greedy, best match first; never one whose box is over `max_area_jump` times larger or smaller); a track unseen
+    for MAX_GAP_S ends; unmatched boxes start new tracks."""
     tracks, last = {}, {}  # id -> {frame: box}; id -> last frame seen
     max_gap = round(MAX_GAP_S * clip_fps)
     for frame in sorted(detections):
@@ -109,7 +115,7 @@ def associate(detections, clip_fps):
         live = [tid for tid, seen in last.items() if frame - seen <= max_gap]
         expected = {tid: predicted(tracks[tid], last[tid], frame) for tid in live}
         pairs = sorted(((score, tid, i) for tid in live for i, box in enumerate(boxes)
-                        if (score := closeness(expected[tid], box)) is not None), reverse=True)
+                        if (score := closeness(expected[tid], box, max_area_jump)) is not None), reverse=True)
         used_t, used_b = set(), set()
         for _, tid, i in pairs:
             if tid in used_t or i in used_b:
@@ -146,8 +152,8 @@ def sample_frames(total_frames, clip_fps, sample_fps):
     return range(0, total_frames, max(1, round(clip_fps / sample_fps)))
 
 
-def track(clip, frames, clip_fps, concept, api_key, cache_dir):
-    """Tracks of one concept in a crowded clip: SAM image detection on `frames` (see sample_frames), IDs from
-    `associate`, boxes filled in between samples."""
-    tracks = associate(detect(clip, frames, concept, api_key, cache_dir, clip_fps), clip_fps)
-    return {tid: filled(t) for tid, t in tracks.items()}
+def track(clip, frames, clip_fps, concept, api_key, cache_dir, max_area_jump=math.inf):
+    """Tracks of one concept in a crowded clip, as detected: SAM image detection on `frames` (see sample_frames), IDs
+    from `associate` (see its `max_area_jump`). `filled` adds the boxes in between; keeping these apart says which
+    positions were seen and which inferred."""
+    return associate(detect(clip, frames, concept, api_key, cache_dir, clip_fps), clip_fps, max_area_jump)

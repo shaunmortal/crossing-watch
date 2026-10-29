@@ -2,13 +2,18 @@
 pedestrians and mixed traffic in metres). Our PET is compared with the textbook conflict-zone PET (Allen et al.
 1978: time from the first road user leaving the conflict spot to the second arriving), computed independently.
 
+With --oblique HEIGHT,BACK it instead films the same trajectories with a simulated phone HEIGHT m up and BACK m
+behind the crossing, turns each vehicle into the box SAM would see, and compares the conflicts found from the lower
+box edge and from car-shaped footprints (road.vehicle_footprints) with those from SinD's true footprints.
+
 Data (non-commercial; not in this repo): https://github.com/SOTIF-AVLab/SinD, Data/Tianjin/8_2_1/
-Run: python3 validate_sind.py data/sind
+Run: python3 validate_sind.py data/sind [--oblique 10,25]
 """
 import argparse
 import csv
 import json
 import math
+import random
 import statistics
 import time
 from pathlib import Path
@@ -18,6 +23,12 @@ import road
 FPS = 10
 ZONE_M = road.CONFLICT_RADIUS_M  # conflict spot radius, the same 1 m both methods use
 WINDOW_S = 10                    # textbook PET looks at the vehicle this long either side of the event
+FOCAL_PX = 1500.0                # simulated phone camera: focal length in pixels
+MIN_DEPTH_M = 0.5                # ...which sees nothing closer than this
+CALIBRATION_M = 5.0              # simulated calibration: four road points this far either way of the crossing
+BOX_NOISE_PX = 3.0               # robustness rows: SAM box edges off by this much (standard deviation)...
+SIZE_ERROR = 1.2                 # ...or every footprint length this many times too long
+HEIGHT_M = {"car": 1.5, "bus": 3.0, "truck": 3.0, "motorcycle": 1.3, "bicycle": 1.3, "tricycle": 1.6}  # box tops
 
 
 def load(folder):
@@ -77,7 +88,7 @@ def compare(people, vehicles, events):
 
 
 def speed_error(vehicles, true_speed):
-    """Our speed (median of position steps) against SinD's own velocity, km/h: (mean, 95th percentile)."""
+    """Our speed (least-squares slope of positions) against SinD's own velocity, km/h: (mean, 95th percentile)."""
     errors = sorted(abs(v - true_speed[vid][f]) * 3.6 for vid, shapes in vehicles.items()
                     for f, v in road.speeds(shapes, FPS).items())
     return statistics.mean(errors), errors[int(0.95 * len(errors))]
@@ -98,11 +109,101 @@ def summarise(people, vehicles, events, rows, seconds, speed):
                                 for k in sorted({v.split("#")[0] for v in vehicles})}}
 
 
+def camera(centre, height, back, focal=FOCAL_PX):
+    """project(x, y, z) -> image pixel, or None out of view, for a phone `height` m up and `back` m behind road point
+    `centre` (towards -y), looking at it; image y grows downwards."""
+    n = math.hypot(height, back)
+    fwd, down = (back / n, -height / n), (-height / n, -back / n)  # (y, z) parts; the image x axis is world x
+
+    def project(x, y, z):
+        d = (x - centre[0], y - centre[1] + back, z - height)
+        depth = d[1] * fwd[0] + d[2] * fwd[1]
+        if depth <= MIN_DEPTH_M:
+            return None
+        return focal * d[0] / depth, focal * (d[1] * down[0] + d[2] * down[1]) / depth
+    return project
+
+
+def box(project, corners, height):
+    """The box [x1, y1, x2, y2] SAM would draw round a vehicle `height` m tall standing on `corners`, or None."""
+    pixels = [project(x, y, z) for x, y in corners for z in (0.0, height)]
+    if None in pixels:
+        return None
+    us, vs = [p[0] for p in pixels], [p[1] for p in pixels]
+    return [min(us), min(vs), max(us), max(vs)]
+
+
+def calibration(project, centre):
+    """road.homography from four road points round `centre` and their pixels, as calibrate.html marks them."""
+    world = [[centre[0] + dx * CALIBRATION_M, centre[1] + dy * CALIBRATION_M]
+             for dx, dy in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    return road.homography([list(project(x, y, 0.0)) for x, y in world], world)
+
+
+def class_sizes(vehicles):
+    """{type: (median length, median width)} of SinD's own footprints: a tape-measured "vehicle_sizes_m"."""
+    dims = {}
+    for vid, shapes in vehicles.items():
+        a, b, _, d = next(iter(shapes.values()))  # load() lists the corners round the vehicle, front first
+        dims.setdefault(vid.split("#")[0], []).append((math.dist(a, d), math.dist(a, b)))
+    return {kind: (statistics.median(l for l, _ in d), statistics.median(w for _, w in d)) for kind, d in dims.items()}
+
+
+def oblique_rows(people, vehicles, height, back):
+    """[(method, vehicle shapes)]: SinD's footprints on the frames the simulated phone sees, the lower box edge, the
+    car-shaped footprint, and the footprint again with noisy boxes or lengths SIZE_ERROR times too long."""
+    centre = road.median_point([p for t in people.values() for p in t.values()])
+    project = camera(centre, height, back)
+    H = calibration(project, centre)
+    boxes = {vid: {f: b for f, s in shapes.items() if (b := box(project, s, HEIGHT_M[vid.split("#")[0]]))}
+             for vid, shapes in vehicles.items()}
+    rng = random.Random(1)
+    noisy = {vid: {f: [v + rng.gauss(0, BOX_NOISE_PX) for v in b] for f, b in t.items()} for vid, t in boxes.items()}
+    sizes = class_sizes(vehicles)
+    long = {kind: (length * SIZE_ERROR, width) for kind, (length, width) in sizes.items()}
+    fitted = lambda tracks, size: {vid: road.vehicle_footprints(t, H, size[vid.split("#")[0]], FPS)
+                                   for vid, t in tracks.items()}
+    return [("SinD footprints (truth)", {vid: {f: vehicles[vid][f] for f in t} for vid, t in boxes.items()}),
+            ("lower box edge (before)", {vid: road.vehicle_edges(t, H) for vid, t in boxes.items()}),
+            ("car-shaped footprint", fitted(boxes, sizes)),
+            (f"footprint, boxes off by {BOX_NOISE_PX:g} px", fitted(noisy, sizes)),
+            (f"footprint, lengths {SIZE_ERROR - 1:.0%} too long", fitted(boxes, long))]
+
+
+def oblique_table(people, rows):
+    """Markdown table: each method's conflicts against those from the true footprints (the first row)."""
+    found = [(name, {(e["person"], e["vehicle"]): e for e in road.conflicts(people, shapes, FPS)})
+             for name, shapes in rows]
+    truth = found[0][1]
+    serious = lambda events: {k for k, e in events.items() if e["tier"] == "serious"}
+    lines = ["| Vehicle shape | Conflicts | Serious | Serious missed | Serious extra | PET vs truth (mean) |",
+             "|---|---|---|---|---|---|"]
+    for name, events in found:
+        diffs = [events[k]["pet_s"] - truth[k]["pet_s"] for k in events.keys() & truth.keys()]
+        pet = f"{statistics.mean(diffs):+.2f} s" if diffs else "-"
+        lines.append(f"| {name} | {len(events)} | {len(serious(events))} | {len(serious(truth) - serious(events))} | "
+                     f"{len(serious(events) - serious(truth))} | {pet} |")
+    return "\n".join(lines)
+
+
+def camera_place(text):
+    height, back = (float(v) for v in text.split(","))
+    if not (height > 0 and back > 0):
+        raise ValueError
+    return height, back
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("folder", type=Path)
+    parser.add_argument("--oblique", type=camera_place, metavar="HEIGHT,BACK",
+                        help="simulate a phone HEIGHT m up and BACK m back and compare vehicle shapes (prints only)")
     args = parser.parse_args()
     people, vehicles, true_speed = load(args.folder)
+    if args.oblique:
+        print(f"phone {args.oblique[0]:g} m up, {args.oblique[1]:g} m back:")
+        print(oblique_table(people, oblique_rows(people, vehicles, *args.oblique)))
+        return
     started = time.time()
     events = road.conflicts(people, vehicles, FPS)
     seconds = time.time() - started

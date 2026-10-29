@@ -27,7 +27,8 @@ def svg(events, area, shown=5):
     placed = [e for e in events if e.get("where")]
     if not placed:
         return ""
-    points = [p for e in placed for p in [e["where"], *e.get("path_person", []), *e.get("path_vehicle", [])]] + list(area)
+    points = [p for e in placed for p in [e["where"], *e.get("path_person", []), *e.get("path_vehicle", []),
+                                          *e.get("footprint", [])]] + list(area)
     x0, y0, x1, y1 = bounds(points)
     scale = WIDTH_PX / (x1 - x0)
     height = max(1, round((y1 - y0) * scale))
@@ -42,6 +43,8 @@ def svg(events, area, shown=5):
         for key, cls in (("path_vehicle", "veh"), ("path_person", "ped")):
             if len(e.get(key, [])) > 1:
                 marks.append(f'<polyline class="{cls}" points="{" ".join(at(p) for p in e[key])}"/>')
+        if e.get("footprint"):  # the vehicle's footprint (or lower box edge) at its moment
+            marks.append(f'<polygon class="foot" points="{" ".join(at(p) for p in e["footprint"])}"/>')
     for i, e in enumerate(placed):  # dots on top of every path
         serious = e.get("tier", "serious") == "serious"
         label = html.escape(f'{e.get("tier", "serious")}: {e["vehicle"].split("#")[0]} at {e["vehicle_kmh"]} km/h, '
@@ -64,6 +67,7 @@ STYLE = """
 .map .area { fill: none; stroke: var(--muted); stroke-dasharray: 6 4; }
 .map .ped { fill: none; stroke: #2f7de1; stroke-width: 2.5; }
 .map .veh { fill: none; stroke: var(--accent); stroke-width: 2.5; opacity: 0.6; }
+.map .foot { fill: var(--accent); fill-opacity: 0.2; stroke: var(--accent); stroke-width: 1.5; }
 .map .hit { fill: var(--accent); } .map .near { fill: none; stroke: #d98a00; stroke-width: 2.5; }
 .map text { fill: var(--ink); font: 12px system-ui, sans-serif; } .map .bar { stroke: var(--ink); stroke-width: 2; }
 """

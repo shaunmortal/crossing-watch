@@ -10,6 +10,7 @@ import re
 import subprocess
 import urllib.request
 
+import road
 import sam
 
 MODEL = "muse-spark-1.3"
@@ -19,6 +20,10 @@ MIN_CROP_PX = 80
 CROP_OUT_PX = 384   # upscaled so a small person is visible
 ROAD_USERS = {"child", "adult", "elderly", "wheelchair user", "rider", "cyclist", "not a person", "unclear"}
 NOT_PEDESTRIANS = {"not a person", "rider", "cyclist"}  # riders are vehicles here, as bicycles are in SinD
+RIDER_VERDICTS = {"rider", "cyclist"}
+RIDEABLE = {"motorcycle", "bicycle", "scooter", "auto rickshaw",  # vehicle concepts a person can ride on or in;
+            "vehicle"}  # the single concept "vehicle" covers two-wheelers too, so its boxes count
+RIDER_GATE_SHARE = 0.3  # a rider call stands only if the person's box is this much inside a rideable box
 VIEWS = {False: "a traffic camera looking down at a street crossing at an angle",
          True: "a drone looking straight down on a street crossing; people look like small heads and shoulders from above"}
 PROMPT = ('Zoomed crop from {view}. Is the thing in the thin CYAN box a pedestrian on foot? Someone riding or sitting '
@@ -42,6 +47,27 @@ def read_verdict(text):
     is_person = data["cyan_is_a_pedestrian"] and data["road_user"] not in NOT_PEDESTRIANS  # contradictions: no
     return {"is_person": is_person, "road_user": data["road_user"],
             "reason": str(data.get("reason", ""))[:200]}
+
+
+def gated(verdict, person_boxes, rideables, walk_kmh=None):
+    """Spark's verdict, except that "rider" or "cyclist" rejects the person only when SAM found a rideable vehicle
+    under them: their box RIDER_GATE_SHARE or more inside its box on the same frame. Otherwise they stay a
+    pedestrian, marked rider_unconfirmed (on the DUT drone test Spark called walking students riders). "not a
+    person" always stands: a shadow moves at walking pace too."""
+    if not verdict or verdict["is_person"] or verdict["road_user"] not in RIDER_VERDICTS:
+        return verdict
+    share = max((road.inside_share(b, w[f]) for w in rideables for f, b in person_boxes.items() if f in w), default=0.0)
+    if share >= RIDER_GATE_SHARE:
+        return verdict
+    return {**verdict, "is_person": True, "rider_unconfirmed": True, "walk_kmh": walk_kmh}
+
+
+def unconfirmed_rider(verdict):
+    """How a page names someone Spark called a rider with no bike under them, or None for any other verdict."""
+    if not (verdict or {}).get("rider_unconfirmed"):
+        return None
+    walk = "" if verdict.get("walk_kmh") is None else f"; measured walking {verdict['walk_kmh']} km/h"
+    return f"pedestrian (Spark thought {verdict['road_user']}; no bike found under them{walk})"
 
 
 def crop_window(box, frame_size):
