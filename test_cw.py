@@ -3593,6 +3593,61 @@ def test_page_names_spark_removals_unsure_people_the_25_kmh_count_and_the_camera
     assert pack.camera_note(None) == "" and "camera" not in pack.receipt_line({"run": run, "events": []}, None, None)
 
 
+def test_indian_legal_box_quotes_the_driving_regulations_word_for_word_without_the_count():
+    """reg. 16(5) as the Gazette prints it, with its PDF page and the fixed sign-only sentence; reg. 39(1) only with a
+    marked crossing; the Gazette cited as itself; never the 25 km/h count, the site's name or a broken rule."""
+    site = {"name": "LNCT gate", "country": "IN", "city": "Bhopal", "world_points": SQUARE_ROAD}
+    box = pack.legal_section(site)
+    assert ("No driver shall drive at a speed exceeding twenty-five kilometre per hour or such lower speed as may be "
+            "specified on the road signage while passing by a construction site or a school or a hospital, wherever "
+            "indicated by signage, or on roads without footpaths and soft shoulders where pedestrians use a part of "
+            "the carriageway to walk.") in box
+    assert f'{pack.gazette.PDF}#page=10">Regulation 16(5), PDF page 10' in box
+    assert "This rule applies where signs show it; we do not say any driver broke it." in box
+    assert "India's limit past a school or hospital where signs show it" in box
+    assert "Gazette of India Extraordinary No. 525, 23 June 2017, G.S.R. 634(E)" in box
+    assert "39(1)" not in box and "39(1)" not in pack.legal_section({**site, "zebra_m": []})
+    zebra = pack.legal_section({**site, "zebra_m": [[0, 0], [4, 0], [4, 8], [0, 8]]})
+    assert f'{pack.gazette.PDF}#page=15">Regulation 39(1), PDF page 15' in zebra
+    assert ("While approaching an uncontrolled pedestrian crossing, the driver shall slowdown, stop and give way to "
+            "pedestrians, users of invalid carriages and wheelchairs.") in zebra
+    assert pack.legal_section({"country": "GB", "zebra_m": [[0, 0], [4, 0], [4, 8]]}) == ""
+    seen = {"minutes": 20.0, "crossings": 100, "vehicles": 5, "over_25_kmh": 2}
+    page = pack.page(site, [], seen, None, None, 10)
+    law = page.split('<section id="law">')[1].split("</section>")[0]
+    assert "2 of 5 moving vehicles passed faster than 25 km/h" in page and "moving vehicles" not in law
+    assert "LNCT" not in law and "illegal" not in law and "No driver shall" not in pack.facts(site, [], seen)
+    stopped = pack.engineering_lines({**seen, "vehicles": 0, "over_25_kmh": 0}, None, site)
+    assert not [line for line in stopped if "faster than 25 km/h" in line]  # never "0 of 0 moving vehicles"
+
+
+def test_a_letter_saying_a_driver_broke_a_rule_goes_back_and_is_flagged_if_kept():
+    """Code, at no cost, sends back a letter or fix reason that says someone broke a law or rule; a video cannot
+    show a limit applied. "broken" (a broken footpath) is no accusation."""
+    assert pack.accusing("Cars passed at 30 km/h. That is illegal here.\nDrivers violated the limit.") == [
+        "That is illegal here.", "Drivers violated the limit."]
+    assert pack.accusing("The footpath is broken. Drivers braked late. Unlawfully fast; a breach.") == [
+        "Unlawfully fast; a breach."]
+    good = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "Cars passed close to people."}
+    bad = {**good, "letter": "Drivers broke the 25 km/h limit."}
+    replies, prompts, judged = [bad, good], [], []
+    old = pack.model_plan, pack.judge_problems
+    pack.model_plan = lambda prompt, key, photo=None, known=None: (prompts.append(prompt), replies.pop(0))[1]
+    pack.judge_problems = lambda letter, measured, key: judged.append(letter) or []
+    try:
+        plan = pack.ask_plan("PROMPT", '{"limit_kmh": 25}', "key")
+        assert plan["letter"] == good["letter"] and plan["tries"] == 2 and judged == [good["letter"]]
+        assert "says someone broke a rule" in prompts[1] and bad["letter"] in prompts[1]
+        replies[:] = [{**good, "why": "It is illegal to speed here."}] * pack.LETTER_TRIES
+        stubborn = pack.ask_plan("PROMPT", '{"limit_kmh": 25}', "key")
+    finally:
+        pack.model_plan, pack.judge_problems = old
+    assert stubborn["accuses"] == ["It is illegal to speed here."] and stubborn["tries"] == pack.LETTER_TRIES
+    section = pack.letter_section(stubborn)
+    assert "says someone broke a rule, which a video cannot show: It is illegal to speed here." in section
+    assert 'id="letter-check" hidden' in section
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):
