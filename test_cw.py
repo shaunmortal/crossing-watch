@@ -3812,6 +3812,40 @@ def test_kaggle_notebook_v3_judges_the_public_bench_twice_and_saves_the_letter()
     assert text.count(team) == 2  # the first cell and <removed-run-record>'s "team"
 
 
+def test_writers_table_prices_each_letter_from_its_run_record_and_marks_what_it_cannot_check():
+    """writers_table.py on fixture records: Kaggle costs $0, Fireworks and the Meta API are tokens x the quoted price
+    (cached prompt at the cached price), an unpriced model is NOT CHECKED, and kaggle/open-weights.md holds the table
+    as the committed records produce it now."""
+    import tempfile
+    from pathlib import Path
+    import writers_table
+    kaggle = {"nvidia_smi": "| 0 Tesla T4 |\n| 1 Tesla T4 |", "pack_py_s": 313, "model": {"repo": "meta-models/x"},
+              "letter": {"writer": "Muse Glimmer 30B (open weights, self-hosted)", "tries": 2, "judged_by": None,
+                         "unmeasured": [], "unsupported": [], "usage": {"prompt_tokens": 962, "completion_tokens": 2263}}}
+    fireworks = {"model": "accounts/fireworks/models/muse-spark-open", "host": "api.fireworks.ai", "wall_s": 55.5,
+                 "tries": 1, "usage": {"prompt_tokens": 1000, "completion_tokens": 2000, "prompt_tokens_details": {
+                     "cached_tokens": 600}, "completion_tokens_details": {"reasoning_tokens": 1500}}}
+    meta = {"model": "muse-spark-1.3", "host": "api.meta.ai", "wall_s": 20, "tries": 3, "judged_by": None,
+            "unmeasured": ["40"], "usage": {"input_tokens": 1000000, "output_tokens": 1000000,
+                                            "output_tokens_details": {"reasoning_tokens": 7}}}
+    unknown = {"model": "some-model", "host": "example.com", "tries": 3, "usage": {"prompt_tokens": 1, "completion_tokens": 1}}
+    with tempfile.TemporaryDirectory() as tmp:
+        paths = []
+        for i, record in enumerate((kaggle, fireworks, meta, unknown)):
+            paths.append(Path(tmp) / f"{i}.json")
+            paths[-1].write_text(json.dumps(record))
+        lines = writers_table.table(paths)
+    assert lines[2] == ("| Muse Glimmer 30B | yes | Kaggle, 2 x Tesla T4, self-hosted | 313 | 962 (not reported) | 2,263 "
+                        "| not reported | 2 | passed | none ran | $0 (free Kaggle GPU quota) |")
+    assert lines[3] == ("| Muse Spark Open | yes | Fireworks (serverless) | 55.5 | 1,000 (600) | 2,000 | 1,500 | 1 "
+                        "| passed (kept before the last try) | NOT RECORDED | $0.0091 |")  # (400x1.25 + 600x0.15 + 2000x4.25) / 1M
+    assert lines[4] == ("| Muse Spark | no | Meta API | 20 | 1,000,000 (not reported) | 1,000,000 | 7 | 3 | failed: 1 left "
+                        "| none ran | $5.5000 |")
+    assert lines[5].endswith("| 3 | NOT RECORDED | NOT RECORDED | NOT CHECKED |") and "example.com" in lines[5]
+    assert all(line.count("|") == lines[0].count("|") for line in lines[1:6])
+    doc = Path(__file__).with_name("kaggle").joinpath("open-weights.md").read_text()
+    assert "\n".join(writers_table.table(writers_table.RECORDS)) in doc
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):
