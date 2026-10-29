@@ -530,7 +530,7 @@ not the true speed-up, and a video sped up less than about 2x would pass.
 
 | Option | Cost | What it gives |
 |---|---|---|
-| A funded near-miss study (a 2020 Canadian programme) | about $5,000 per intersection | a full study |
+| A funded near-miss study (Aviva and MicroTraffic, Canada, 2020) | about C$5,000 per intersection: a city's 25% share was capped at C$12,500, so about C$50,000 per city for its 10 intersections | a full study |
 | Telraam S2 window sensor | €199 per sensor | traffic counts, no near-misses |
 | Crossing Watch, SAM only, at Meta's list prices | about $4-8 for a 15-minute dismissal (video mode); $34-79 frame by frame for dense crowds | a first screen that tells the authority where to do a full study; not a crash forecast (the Indian crash model in Related work, Ankunda et al., used 11 hours of video) |
 
@@ -647,7 +647,24 @@ affiliates), used under its SAM License (github.com/meta-models/meta-sam). The f
 check-then-retry pattern for Spark's letter, the reject-with-notes revision and the JSON-mode request field follow
 Meta's legal-agent workshop (github.com/meta-models/legal-agent-workshop, shown at a hackathon session); no code was
 copied from it. The case agent follows the shape of that workshop's loop (one tool per turn, plain text sent back, a stop for a person,
-resume from saved progress, escalation after 3 refusals); its code is our own. No
-third-party libraries; Python standard library and ffmpeg only. Test videos from YouTube were used only for local
-testing and are not included. The SinD sample (SOTIF-AVLab, non-commercial use) was used only for validation and is
-not included.
+resume from saved progress, escalation after 3 refusals); its code is our own.
+
+**What runs.** The Python code uses only the standard library. It calls ffmpeg as a command-line tool (a GPL build
+with libx264, which the clips are encoded with); ffmpeg is not bundled. `video/split.py`, for the demo's hero shot
+only, uses Chrome or any Chromium. Inside the Kaggle notebook: llama.cpp `b11976` (MIT), huggingface_hub
+(Apache-2.0) and the Muse Glimmer 30B GGUF weights (Apache-2.0, Hugging Face revision `b44f1072`). The models run
+as services, not libraries: the Meta Model API, Fireworks for Muse Spark Open, and Kaggle's 2 x T4 for Glimmer.
+
+**Datasets, none included.**
+- SinD (github.com/SOTIF-AVLab/SinD), non-commercial (a modified CC0: its LICENSE says the dataset is not permitted
+  for commercial purposes); its public sample was used only for validation. Xu Y. et al., "SIND: A Drone Dataset at
+  Signalized Intersection in China", IEEE ITSC 2022, pp. 2471-2478, doi:10.1109/ITSC55140.2022.9921959 (v1, the one
+  used; not SinD 2.0).
+- DUT (github.com/dongfang-steven-yang/vci-dataset-dut), no licence given; used only for internal testing. Yang D.
+  et al., "Top-view Trajectories: A Pedestrian Dataset of Vehicle-Crowd Interaction from Controlled Experiments and
+  Crowded Campus", IEEE Intelligent Vehicles Symposium 2019, arXiv:1902.00487.
+- Test videos from YouTube, used only for local testing. The two whose results appear here: the schoolchildren CCTV
+  clip (https://youtu.be/9YqdnG5Jxnw) and the Indian time-lapse (https://youtu.be/_l99w_CKwCU).
+
+**AI assistance.** The code and docs were written with an AI coding assistant, and the reviews named in `GATES.md`
+were AI-assisted; every model call in the product is to a Meta model.
