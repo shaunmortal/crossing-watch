@@ -148,7 +148,8 @@ moved or the picture darkened. Then by eye: the view matches the 1x lens (no fis
   blurred, to the letter's writer: Muse Spark through Meta's API, or the server in `LETTER_MODEL_URL` (e.g. Fireworks,
   not Meta). The measurements and the letter go to its judges (Muse Spark, and the server in `JUDGE_MODEL_URL`), and
   the blurred frame to Muse Image through Meta's API. Only `out/VIDEO/share/` is published: blurred clips and
-  pictures.
+  pictures. Every Meta API call uses a Standard-mode model id, never a `-contributor` one: in Standard mode, Meta's
+  pricing page says, "your content is not used to train Meta models" (README, Standard mode only).
 - The unblurred files stay in `out/VIDEO/`: `clip.mp4` (and the parts cut from it), the `person-*.jpg` crops Spark
   saw and the `event*.wav` sound. When the study ends (the letter filed, the hackathon judged), delete them in each
   video's folder (Monday's and the rehearsal's), with the raw videos, the test clip, the calibration frame and any

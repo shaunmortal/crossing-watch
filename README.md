@@ -84,6 +84,12 @@ anything is published, the unblurred video goes to SAM, crops of people to Muse 
 through Meta's API; the unblurred files stay in `out/VIDEO/` on the machine that ran it until deleted (`FILMING.md`
 gives the command).
 
+**Standard mode only.** Meta's Model API pricing page (https://dev.meta.ai/docs/pricing-rate-limits.md, fetched 29 Oct 2026) says: "Contributor mode
+offers discounted pricing or more usage in exchange for permission to use your content to train future Meta models"
+and "In Standard mode, you pay standard prices and your content is not used to train Meta models." Crossing Watch
+calls only Standard-mode model ids, never a `-contributor` one, because what it sends is unblurred video and crops of
+people on the street, and street sound.
+
 **Tamper-evident.** `analyze.py` records the SHA-256 of the original video (`source_sha256` in events.json) and the
 page prints it. `share/` gets a standard `SHA256SUMS` for every file in it, the page included, so anyone can check a
 copy with `shasum -a 256 -c SHA256SUMS`, or `python3 pack.py --verify FOLDER`: MATCH, CHANGED or MISSING per file,
@@ -210,8 +216,9 @@ LETTER_MODEL_URL=https://api.fireworks.ai/inference/v1 LETTER_MODEL=accounts/fir
 
 `agent.py` is optional; analyze.py and pack.py never call it. Muse Spark works the case through five tools (track,
 review, measure, request_measurement, submit_letter), one tool per turn, with at most 25 turns per start and a $1
-cap on its own turns. That cap is an estimate at Muse Spark Open's Fireworks list price ($1.25 / $4.25 per million
-input / output tokens); the Meta API price of muse-spark-1.3 is NOT CHECKED. Tracking is outside the cap: SAM, Spark's
+cap on its own turns. That cap is an estimate at the Meta API Standard list price for muse-spark-1.3 ($1.25 / $4.25
+per 1M input / output tokens, $0.15 cached input; list price fetched 29 Oct 2026 from
+https://dev.meta.ai/docs/pricing-rate-limits.md). Tracking is outside the cap: SAM, Spark's
 pedestrian reviews and the sound check in analyze.py are billed apart, and analyze.py still refuses a SAM estimate
 over $10 without `--allow-cost`. Its one tracking decision: when SAM video hits its 16-object limit, it tracks that
 concept again in crowd mode, which bills SAM per image. The site file marks a distance that was not used for
