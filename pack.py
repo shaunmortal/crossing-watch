@@ -67,6 +67,39 @@ Reply with JSON only:
   "letter": "<a short formal letter in {language} from the head of the school to the road authority: what was measured,
              the worst near-misses, the requested fix, and an offer to share the video. Use [School name] and [Date]
              as placeholders.>"}}"""
+# Muse Image only: IRC 103-2022 as the Supreme Court quotes it (order para 21 and its footnote 1). Never in
+# LETTER_PROMPT, where 4, 10 and 20 would count as measured numbers.
+RAISED_SPEC = ("Draw the crossing raised to the level of the footpath and 4 m wide, with a speed hump 10-20 m before it "
+               "on each approach.")
+RAISED = re.compile(r"raised|\btable", re.I)  # fixes RAISED_SPEC fits: raised zebra, tabletop crossing, speed table
+ORDER_PDF = "https://www.livelaw.in/pdf_upload/2037620122025-10-07-624635.pdf"  # the signed order, 41 pages
+ORDER = ("Supreme Court of India, S. Rajaseekaran v. Union of India, Writ Petition (Civil) No. 295 of 2012, "
+         "reportable order of 7 October 2025, 2025 INSC 1189")
+# (paragraph, PDF page, the Court's words verbatim): written by code, so no model ever writes a paragraph number
+SCHOOL_ZONES = ("35.5", 33, "In school zones and other vulnerable corridors, authorities shall systematically identify "
+                "high-risk stretches using accident data, and implement context-specific measures such as raised "
+                "crossings, zebra markings, traffic calming features, and deployment of trained crossing guards.")
+SURVEY = ("35.6", 34, "We, therefore, direct the road owning agencies in the 50 cities mentioned in Annexure 46 of the "
+          "Report on Road Accidents, 2023 and the NHAI to draw up an action plan and start phase-wise survey to assess "
+          "the requirement of additional pedestrian crossing facilities.")
+GRIEVANCE = ("35.11", 37, "State Governments/Municipal Authorities/NHAI are directed to create an online grievance "
+             "redressal mechanism regarding footpaths which would include complaints of encroachments on footpaths, "
+             "maintenance of footpaths and also suggestions for pedestrian crossing.")
+LEGAL_NOTE = ("Paragraph 35.5 asks authorities to identify high-risk stretches using accident data. The near-misses "
+              "measured here are not accidents: they are offered as further evidence about this crossing, alongside "
+              "that data. Where the road authority has set up the online mechanism of paragraph 35.11, this pack can "
+              "be filed there as a suggestion for a pedestrian crossing.")
+# the 50 million-plus cities of Annexure 46 in MoRTH's Road Accidents in India 2023 (paragraph 35.6 binds them), and
+# common other names. Exact names only: a misspelt city loses paragraph 35.6, it never gains it
+ANNEXURE_46 = {
+    "agra", "ahmedabad", "allahabad", "prayagraj", "amritsar", "asansol durgapur", "asansol", "durgapur", "aurangabad",
+    "bengaluru", "bhopal", "chandigarh", "coimbatore", "chennai", "delhi", "dhanbad", "faridabad", "ghaziabad",
+    "gwalior", "hyderabad", "indore", "jabalpur", "jaipur", "jamshedpur", "jodhpur", "kannur", "kanpur", "kozhikode",
+    "kochi", "kolkata", "kollam", "kota", "lucknow", "ludhiana", "madurai", "malappuram", "meerut", "mumbai", "nagpur",
+    "nashik", "patna", "pune", "raipur", "rajkot", "srinagar", "surat", "thiruvananthapuram", "thrissur",
+    "tiruchirappalli", "vadodara", "varanasi", "vijayawada", "visakhapatnam",
+    "bangalore", "bombay", "calcutta", "madras", "cochin", "calicut", "trivandrum", "trichy", "baroda", "vizag",
+    "new delhi"}
 
 
 def confirmed(events):
@@ -116,9 +149,10 @@ def engineering_lines(seen, cost):
                      f"{round(seen['crossings'] * 60 / minutes)} pedestrians and {round(seen['vehicles'] * 60 / minutes)} "
                      f"moving vehicles an hour ({source}; pedestrians are people who walked 2 m or more on the marked carriageway, or "
                      f"anywhere in view if none is marked, and broken tracks can count one twice: 1.3x the true count "
-                     f"in our drone test). IRC:103-2012 (6.7.4.1.2): a controlled crossing may be "
+                     f"in our drone test). IRC:103-2012 cl. 6.7.4.1.2: a controlled crossing may be "
                      f"warranted above {road.PV2_UNDIVIDED / 1e8:g} x 10^8 on an undivided road, "
-                     f"{road.PV2_DIVIDED / 1e8:g} x 10^8 on a divided road.")
+                     f"{road.PV2_DIVIDED / 1e8:g} x 10^8 on a divided road (the Union has told the Supreme Court "
+                     f"that a Second Revision, IRC 103-2022, exists).")
     if "gaps_6s" in seen:
         lines.append(f"{seen.get('gap_6s_share_pct', '?')}% of the time was inside gaps of {road.GAP_ADULT_S:g} s or "
                      f"more with no moving vehicle where people crossed: {seen['gaps_6s']} "
@@ -330,6 +364,27 @@ def fix_section(plan, images):
 <figcaption>AI-drawn proposal by Muse Image, not a photo</figcaption></figure></div></section>"""
 
 
+def fix_instruction(plan):
+    """Muse Image's instruction: the model's, plus the IRC size when the fix is a raised crossing."""
+    return plan["image_prompt"] + (" " + RAISED_SPEC if RAISED.search(plan["fix"]) else "")
+
+
+def legal_section(site):
+    """For a site in India ("country": "IN"), why the authority can act: the Supreme Court's own sentences, each
+    linked to its page of the order. Paragraph 35.6 only when the site's "city" is in Annexure 46."""
+    if str(site.get("country", "")).upper() != "IN":
+        return ""
+    city = str(site.get("city", "")).strip()
+    listed = city.casefold() in ANNEXURE_46
+    quotes = "".join(f'<blockquote>“{html.escape(text)}”<cite><a href="{ORDER_PDF}#page={page}">Paragraph {para}, '
+                     f"page {page}</a></cite></blockquote>"
+                     for para, page, text in [SCHOOL_ZONES] + ([SURVEY] if listed else []) + [GRIEVANCE])
+    annexure = (f'<p class="note">{html.escape(city)} is one of the 50 million-plus cities in Annexure 46 of MoRTH\'s '
+                "Road Accidents in India 2023.</p>" if listed else "")
+    return (f'<section><h2>Why the authority can act</h2>{quotes}{annexure}<p class="note">{html.escape(LEGAL_NOTE)}</p>'
+            f'<p class="note">Source: {html.escape(ORDER)} (<a href="{ORDER_PDF}">PDF</a>).</p></section>')
+
+
 def letter_section(plan):
     if not plan:
         return ""
@@ -364,6 +419,8 @@ table { border-collapse: collapse; width: 100%; } td, th { text-align: left; pad
 figure { margin: 0; position: relative; } .letter { border-left: 3px solid var(--line); padding-left: 16px; }
 .ai-label { position: absolute; left: 8px; top: 8px; padding: 2px 8px; border-radius: 4px; background: #000c; color: #fff;
             font-size: 0.8rem; } .disclosure { border: 1px dashed var(--muted); padding: 8px 12px; }
+blockquote { margin: 16px 0; padding-left: 16px; border-left: 3px solid var(--accent); }
+cite { display: block; margin-top: 4px; font-style: normal; color: var(--muted); } a { color: inherit; }
 """
 
 
@@ -400,7 +457,7 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None):
 <p class="muted">{html.escape(site.get("name", ""))}</p>
 <div class="stats">{stats(events, seen)}</div>{limit_note(full)}
 {engineering(seen, cost)}
-{map_section(events, site)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{letter_section(plan)}
+{map_section(events, site)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{legal_section(site)}{letter_section(plan)}
 <section><h2>How this was measured</h2><p class="note">{html.escape(method)}</p></section></body></html>"""
 
 
@@ -456,7 +513,7 @@ def main():
             plan = ask_plan(prompt, measured, key, photo)
             (out_dir / "plan.json").write_text(json.dumps(plan, indent=1, ensure_ascii=False))  # the paid-for letter
             if photo and key:  # Muse Image draws the fix; without a key there is no street image on the page
-                images = (photo.name, draw_fix(photo, plan["image_prompt"], key, out_dir / "street-fixed.webp").name)
+                images = (photo.name, draw_fix(photo, fix_instruction(plan), key, out_dir / "street-fixed.webp").name)
         except (SystemExit, OSError, ValueError, KeyError, IndexError, TypeError, AttributeError,
                 http.client.HTTPException, subprocess.CalledProcessError) as err:
             print(f"letter or fix image failed, page will show the measurements only: {err}", file=sys.stderr)

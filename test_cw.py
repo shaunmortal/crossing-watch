@@ -704,6 +704,33 @@ def test_paths_and_other_arrays_never_reach_the_letter_facts():
     assert '"crossings": 4' in text and '"vehicle_kmh": 30.0' in text
 
 
+def test_indian_sites_quote_the_supreme_court_order_in_code_never_in_the_letter():
+    """2025 INSC 1189 is an order, para 35.5 says "using accident data", and Annexure 46 is MoRTH's, not the Court's."""
+    box = pack.legal_section({"country": "in"})
+    assert "Why the authority can act" in box and "reportable order of 7 October 2025, 2025 INSC 1189" in box
+    assert "high-risk stretches using accident data" in box and "also suggestions for pedestrian crossing" in box
+    assert f'{pack.ORDER_PDF}#page=33">Paragraph 35.5' in box and "not accidents" in box and "judgment" not in box
+    assert "35.6" not in box and "Annexure 46" not in box  # no city given: paragraph 35.6 may not bind it
+    pune = pack.legal_section({"country": "IN", "city": "Pune"})
+    assert "Paragraph 35.6, page 34" in pune and "Pune is one of the 50 million-plus cities in Annexure 46 of MoRTH" in pune
+    assert "35.6" not in pack.legal_section({"country": "IN", "city": "Gurugram"})
+    assert pack.legal_section({"name": "gate"}) == pack.legal_section({"country": "GB"}) == ""
+    assert box in pack.page({"country": "IN", "world_points": SQUARE_ROAD}, [], {"minutes": 1}, None, None, 10)
+    measured = pack.facts({"name": "gate", "country": "IN"}, [], {"minutes": 1})
+    assert pack.unmeasured("under paragraph 35.5 of 2025 INSC 1189", measured) == ["35.5", "1189", "2025"]
+
+
+def test_raised_crossing_size_goes_to_muse_image_only():
+    """The IRC size of a raised crossing is drawn, never offered to the letter as numbers it could quote."""
+    plan = {"fix": "Raised zebra crossing", "image_prompt": "Add the crossing."}
+    assert pack.fix_instruction(plan) == "Add the crossing. " + pack.RAISED_SPEC and "4 m wide" in pack.RAISED_SPEC
+    assert pack.fix_instruction({**plan, "fix": "20 km/h zone with suitable signs"}) == "Add the crossing."
+    assert pack.fix_instruction({**plan, "fix": "a suitable speed table"}).endswith(pack.RAISED_SPEC)
+    assert "4 m" not in pack.LETTER_PROMPT and "hump" not in pack.LETTER_PROMPT
+    pv2 = pack.engineering_lines({"minutes": 30, "crossings": 100, "vehicles": 500}, None)[0]
+    assert "IRC:103-2012 cl. 6.7.4.1.2" in pv2 and "Second Revision, IRC 103-2022" in pv2
+
+
 def test_filmcheck_flags_settings_that_break_speeds_or_metres():
     import filmcheck
     phone = [{"codec_type": "video", "width": 1920, "height": 1080, "r_frame_rate": "30/1", "avg_frame_rate": "30/1"},
