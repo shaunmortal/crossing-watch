@@ -360,7 +360,7 @@ python3 agent.py VIDEO site.json --approve --approved-by "A. Rao, Principal" --s
 
 With `AGENT_MODEL_URL` set (and optionally `AGENT_MODEL`, default `accounts/fireworks/models/muse-spark-open`), the
 turns go to an open-weights model instead, through OpenAI-style tool calling (`openagent.py`): the same five tools,
-one per turn, the same caps, with the $1 priced at the Fireworks price `writers_table.py` quotes. The key is
+one per turn (`tool_choice` "required", or "auto" from a server that rejects it, logged per turn), the same caps, with the $1 priced at the Fireworks price `writers_table.py` quotes. The key is
 `AGENT_MODEL_KEY`, else `FIREWORKS_API_KEY` on Fireworks' API only; the Meta key never goes there and is needed only
 for what Muse Spark does inside the tools (the letter, unless `LETTER_MODEL_URL` is set). Every turn's model, usage and
 wall seconds go to `agent_log.jsonl`, the page names the model ("Muse Spark Open (open weights, on Fireworks)"), and a

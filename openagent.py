@@ -3,6 +3,7 @@ on Fireworks. AGENT_MODEL_URL names the server (unset: agent.py talks to Muse Sp
 AGENT_MODEL its API model id, AGENT_MODEL_KEY its key (on Fireworks' API, FIREWORKS_API_KEY when none is set: a key
 never goes to another server). The same tools, one per turn; the dollar cap at the price writers_table.py quotes."""
 import json
+import urllib.error
 
 import openweights
 import sam
@@ -38,18 +39,31 @@ def chat_tools(tools):
 
 
 def step(instructions, messages, tools):
-    """One turn: (the first tool call as {"call_id", "name", "arguments"} or None, the usage). The reply's
-    reasoning_content is not replayed, as Spark's reasoning items are not. A reply without a message is a ValueError,
-    an HTTP error an OSError: the case pauses."""
+    """One turn: (the first tool call as {"call_id", "name", "arguments"} or None, the usage, the tool_choice the
+    server answered). The reply's reasoning_content is not replayed, as Spark's reasoning items are not. A reply
+    without a message is a ValueError, an HTTP error an OSError: the case pauses."""
     body = {"model": MODEL, "messages": [{"role": "system", "content": instructions}, *messages],
-            "tools": chat_tools(tools), "tool_choice": "auto", "parallel_tool_calls": False}
-    reply = openweights.post(URL, openweights.server_key(URL, KEY), body)
+            "tools": chat_tools(tools), "parallel_tool_calls": False}
+    reply, choice = ask(body)
     try:
         message = reply["choices"][0]["message"]
         calls = message.get("tool_calls") or []
     except (KeyError, IndexError, TypeError, AttributeError):
         raise ValueError(f"the model's reply holds no message: {str(reply)[:200]}") from None
-    return first_call(calls, len(messages)), reply.get("usage") or {}
+    return first_call(calls, len(messages)), reply.get("usage") or {}, choice
+
+
+def ask(body):
+    """The reply and its tool_choice: "required", so every turn calls a tool (Fireworks: "Model must call at least one
+    tool", https://docs.fireworks.ai/guides/function-calling), or "auto" from a server that rejects that with HTTP 400."""
+    # ponytail: "required" is tried every turn (a 400 bills no tokens); keep the fallback per case if 400s get slow
+    key = openweights.server_key(URL, KEY)
+    try:
+        return openweights.post(URL, key, {**body, "tool_choice": "required"}), "required"
+    except urllib.error.HTTPError as err:
+        if err.code != openweights.REJECTED:
+            raise
+    return openweights.post(URL, key, {**body, "tool_choice": "auto"}), "auto"
 
 
 def first_call(calls, n):

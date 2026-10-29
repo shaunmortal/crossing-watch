@@ -312,15 +312,15 @@ def rates():
 
 
 def model_turn(p, key):
-    """One turn: (the tool call or None, the usage), from Muse Spark on the Meta API or, with AGENT_MODEL_URL, from
-    openagent (Chat Completions; the Meta key never goes there)."""
+    """One turn: (the tool call or None, the usage, the tool_choice sent or None), from Muse Spark on the Meta API or,
+    with AGENT_MODEL_URL, from openagent (Chat Completions; the Meta key never goes there)."""
     if openagent.URL:
         return openagent.step(INSTRUCTIONS, p["messages"], TOOLS)
     body = {"model": review.MODEL, "instructions": INSTRUCTIONS, "input": p["messages"], "tools": TOOLS,
             "parallel_tool_calls": False, "store": False, "reasoning": {"effort": "low"}}
     reply = spark_turn(body, key)
     call = next((o for o in reply.get("output") or [] if o.get("type") == "function_call"), None)
-    return call, reply.get("usage") or {}
+    return call, reply.get("usage") or {}, None
 
 
 def replay(call, result):
@@ -361,7 +361,7 @@ def drive(p, key):
             return p["status"]
         started = time.monotonic()
         try:
-            call, usage = model_turn(p, key)
+            call, usage, tool_choice = model_turn(p, key)
         except (OSError, ValueError, http.client.HTTPException) as err:  # URLError and JSONDecodeError included
             p["status"] = "paused"
             save(p, {"summary": f"Paused: the model call failed ({str(err)[:200]})."})
@@ -380,7 +380,8 @@ def drive(p, key):
         p["status"] = result.get("status", "running")
         save(p, {"turn": p["turn"], "tool": call and call.get("name"), "summary": result["summary"],
                  "status": p["status"], "model": model_label(), "input_tokens": used_in, "output_tokens": used_out,
-                 "usage": usage, "wall_s": wall_s, "usd": round(p["usd"], 4)})
+                 "usage": usage, "wall_s": wall_s, "usd": round(p["usd"], 4),
+                 **({"tool_choice": tool_choice} if tool_choice else {})})
         if p["status"] == "needs_review":
             write_page(p)
         if p["status"] != "running":

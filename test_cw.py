@@ -4171,7 +4171,7 @@ def test_case_agent_on_open_weights_works_the_case_to_the_tape_measure():
     bodies = [body for _, body, _ in seen]
     assert replies == [] and all(path == "/v1/chat/completions" for path, _, _ in seen) and len(bodies) == 6
     assert all(b["model"] == "accounts/fireworks/models/muse-spark-open" and b["parallel_tool_calls"] is False
-               and b["tool_choice"] == "auto" and b["messages"][0] == {"role": "system", "content": agent.INSTRUCTIONS}
+               and b["tool_choice"] == "required" and b["messages"][0] == {"role": "system", "content": agent.INSTRUCTIONS}
                for b in bodies)
     assert [t["function"]["name"] for t in bodies[0]["tools"]] == [t["name"] for t in agent.TOOLS]
     assert bodies[0]["tools"][0]["function"]["parameters"]["required"] == ["people", "vehicles"]
@@ -4388,6 +4388,25 @@ def test_muse_spark_letter_records_its_wall_time_and_tokens_like_an_open_weights
     assert "spark-key-1" not in json.dumps(record)
     row = writers_table.row({**record, "host": writers_table.META_HOST})  # $ (800x1.25 + 200x0.15 + 500x4.25) / 1M
     assert f"| Meta API | {plan['wall_s']} | 1,000 (200) | 500 | 300 | 1 | passed | {pack.JUDGE} | $0.0032 |" in row
+
+
+def test_case_agent_on_open_weights_asks_for_a_tool_every_turn_and_falls_back_to_auto_on_400():
+    """openagent sends tool_choice "required" (Fireworks documents it); a server that rejects it with HTTP 400 is asked
+    again with "auto", and each turn's log says which one was answered. Another error still pauses the case."""
+    import agent, contextlib, io, tempfile
+    replies = [chat_reply("measure"), 400, chat_reply("measure"), 500]
+    server, seen = fake_open_model(replies)
+    old = open_agent(server)
+    try:
+        with tempfile.TemporaryDirectory() as folder, contextlib.redirect_stdout(io.StringIO()):
+            out, _, _ = agent_case(folder)
+            assert agent.work(out / "video.mp4", out / "site.json", out, "meta-key") == "paused"
+            log = [json.loads(line) for line in (out / "case" / agent.LOG).read_text().splitlines()]
+    finally:
+        restore_agent(old, server)
+    assert [body["tool_choice"] for _, body, _ in seen] == ["required", "required", "auto", "required"]
+    assert [s.get("tool_choice") for s in log] == ["required", "auto", None]
+    assert "HTTP Error 500" in log[-1]["summary"] and replies == []
 
 if __name__ == "__main__":
     for name, check in list(globals().items()):
