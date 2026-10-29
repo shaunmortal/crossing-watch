@@ -178,12 +178,13 @@ moved or the picture darkened. Then by eye: the view matches the 1x lens (no fis
   cost about $X", then, on a first run, stops before any request. It does not include auto mode's worst case: a
   site with `"person_mode"` or `"vehicle_mode"` set to `"auto"` can switch to frame-by-frame after the video
   requests are paid. Pick the modes and the budget from the estimate.
+- A dropped SAM request is retried after 10, 30 and 90 s (130 s in all; longer when Meta's Retry-After asks, e.g.
+  60 s on a 503). A longer dropout still ends the run, and a re-run resumes from the cache.
 
 **The paid run (screen-recorded once; a retake costs money).**
 
-- Record `analyze.py`, not the agent. The agent calls `analyze.py` without `--budget`, so its $10 default cap would
-  stop it on camera: 15 minutes of people and the four default vehicles in video mode is about $10.40. On mains
-  power, with N from the free estimate:
+- Record `analyze.py`, not the agent. The agent tracks only from the SAM replies `analyze.py` cached (it runs it
+  with `--budget 0`), so it cannot make the paid run. On mains power, with N from the free estimate:
 
   ```
   date; time caffeinate -dims python3 analyze.py CLIP.MOV SITE.json --budget N; date

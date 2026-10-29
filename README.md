@@ -55,7 +55,9 @@ python3 test_cw.py                       # self-checks
 **Signed and filed.** `pack.py` keeps the fix and letter in `out/VIDEO/plan.json` with the sha256 of the prompt they
 came from. A re-run from the same measurements, language and letter model reuses it, and the Muse Image picture of the
 same fix: no new Spark or Muse Image call. Other measurements ask for a new letter; to ask again anyway, delete
-`plan.json`.
+`plan.json`. A letter that has been signed is replaced only with `pack.py OUT SITE --new-letter`, and the signed one
+is kept as `plan-<sha8>.json`. `pack.py` also stops in an `agent.py` case folder (`case/progress.json`) and says to
+sign with `agent.py --approve`.
 
 - `--notes FILE` sends the principal's notes back with the letter: "change only the sentences the notes ask for". The
   revised letter goes through both checks again (the legal-agent workshop's "Reject with notes"). The notes reach
@@ -72,7 +74,7 @@ same fix: no new Spark or Muse Image call. Other measurements ask for a new lett
   counts, pre-intervention conflicts, analysis), without the trained observers step 3 normally needs, with a
   severity that is not the toolkit's observer scales; step 9 is the same film again after the fix.
 - Printed, the page keeps light colours even in dark mode, shows only the 3 worst near-misses (a letter number from
-  another reads "(clip N, not printed)") and puts the letter on its own sheet.
+  another reads "(clip N, not printed)") and puts the letter first, on its own sheet.
 
 Filming your own crossing: [`FILMING.md`](FILMING.md) (phone locked at 1080p 30 fps, tape marks, consent notice; `python3 filmcheck.py CLIP` checks the test clip).
 
@@ -115,6 +117,8 @@ re-checked in the browser against the same measurements, and a number that is no
 speed in mph gets a red underline.
 
 SAM replies are cached per output folder, so re-running costs nothing. An output folder refuses a different video.
+A dropped SAM request is retried after 10, 30 and 90 s (130 s in all; longer when Meta's Retry-After asks, e.g. 60 s
+on a 503). A longer dropout still ends the run, and a re-run resumes from the cache.
 Videos are sent to SAM in 15-second parts that overlap by 2 s, so a person crossing a cut keeps one ID. Parts are
 short because one SAM 3.1 video request tracks at most 16 objects **in all**: once 16 IDs are taken, later arrivals
 are never picked up (none of 54 replies had more, and none gained an ID after filling). Any request that still hits
@@ -126,8 +130,10 @@ fills its 16 objects before the next part takes over, that concept is detected f
 says when it filled (on the Indian time-lapse: "person: 16 objects taken within 1.0-1.6 s in 3 of 3 parts").
 
 `"window_s": [S, E]` in the site file analyses only seconds S to E of the recording, picked by the window rule in
-`GATES.md` before any near-miss is seen; the SHA-256 is still of the whole original, and the page's times count from
-second S. A window under 15 minutes gets no hourly rates, PV² or school-year line.
+`GATES.md` before any near-miss is seen; the SHA-256 is still of the whole original, clip time 0 is second S, and the
+page's times count from second S. A window under 15 minutes gets no hourly rates, PV² or school-year line, and
+`analyze.py` warns about it. A window that ends past the end of the video is refused, and changing the window needs a
+new `--out` folder.
 
 ### Open weights: Muse Glimmer writes the letter
 
@@ -143,7 +149,7 @@ timings. Two runs have a record, both on the synthetic sample, which has no pers
 - [`<removed-run-record>`](<removed-run-record>), with llama-server's default sampling and the template's
   default "high" reasoning: Glimmer's part took 592 s; it proposed a raised zebra crossing and wrote a letter whose
   every number passed the code check. The letter was correct but stiff.
-- [`<removed-run-record>`](<removed-run-record>), 29 Oct, the notebook as it is now at commit 3ed3c6e: both
+- [`<removed-run-record>`](<removed-run-record>), 29 Oct, the notebook at commit 3ed3c6e: both
   sha256 checks passed and pack.py took 313 s. Glimmer needed two tries (the log does not say why the first went
   back); the letter kept, 2,263 tokens at 13.6 tokens a second, proposes a raised zebra crossing with entry deflection
   and passed the code check. No judge read it: the run had no Meta key. The same run then judged the planted-lies
@@ -222,11 +228,14 @@ LETTER_MODEL_URL=https://api.fireworks.ai/inference/v1 LETTER_MODEL=accounts/fir
 review, measure, request_measurement, submit_letter), one tool per turn, with at most 25 turns per start and a $1
 cap on its own turns. That cap is an estimate at the Meta API Standard list price for muse-spark-1.3 ($1.25 / $4.25
 per 1M input / output tokens, $0.15 cached input; list price fetched 29 Oct 2026 from
-https://dev.meta.ai/docs/pricing-rate-limits.md). Tracking is outside the cap: SAM, Spark's
-pedestrian reviews and the sound check in analyze.py are billed apart, and analyze.py still refuses a SAM estimate
-over $10 without `--allow-cost`. Its one tracking decision: when SAM video hits its 16-object limit, it tracks that
-concept again in crowd mode, which bills SAM per image. The site file marks a distance that was not used for
-calibration, `"check": {"what": "kerb to kerb at the zebra", "points": [[x, y], [x, y]]}`. The agent asks a person to
+https://dev.meta.ai/docs/pricing-rate-limits.md). Tracking is outside the cap. The agent runs analyze.py with
+`--budget 0`, so it tracks only from the SAM replies an earlier analyze.py run cached: a SAM request not in the cache
+stops the tool instead of paying. Spark's pedestrian reviews and the sound check in analyze.py are billed apart. Its
+one tracking decision: when SAM video hits its 16-object limit, it tracks that concept again in crowd mode, which
+needs SAM image replies, so from the cache only when an earlier run made them. The site file marks a distance along
+the road that was not used for calibration (calibrate.html writes it from the speed-line clicks),
+`"check": {"what": "line A to line B along the near kerb (the A near and B near speed-line tape marks)",
+"points": [[x, y], [x, y]]}`; never kerb to kerb, which is a calibration input. The agent asks a person to
 tape it (answered in m or cm), and the letter is refused until the video and the tape agree within 15% (gate G2) and
 the near-misses were tracked with the site's current calibration points. Three refusals in a row go to a person.
 The head of the school then approves the letter or sends it back with notes. Every step goes to
@@ -236,7 +245,7 @@ against the Meta API yet; a test drives it with a scripted model.
 ```
 python3 agent.py VIDEO site.json                      # runs until it needs a person
 python3 agent.py VIDEO site.json --answer R1 "7.2 m"  # the taped length; the agent continues
-python3 agent.py VIDEO site.json --approve            # or --reject --notes "..."
+python3 agent.py VIDEO site.json --approve --approved-by "A. Rao, Principal" --school "..."  # or --reject --notes "..."
 ```
 
 ## Checking the checks
