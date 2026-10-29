@@ -17,13 +17,19 @@ FRAME = re.compile(r"<(\d+)f>")
 BOX = re.compile(r"(\d+)<\|box;x1=([\d.]+);y1=([\d.]+);x2=([\d.]+);y2=([\d.]+)")
 
 
-def load_api_key():
-    key = os.environ.get("MODEL_API_KEY", "")
-    if not key and ENV_FILE.exists():
+def env_value(name):
+    """`name` from the environment, else from .env, else ""."""
+    value = os.environ.get(name, "")
+    if not value and ENV_FILE.exists():
         for line in ENV_FILE.read_text().splitlines():
-            name, _, value = line.partition("=")
-            if name.strip() == "MODEL_API_KEY":
-                key = value.strip()
+            key, _, found = line.partition("=")
+            if key.strip() == name:
+                value = found.strip()
+    return value
+
+
+def load_api_key():
+    key = env_value("MODEL_API_KEY")
     if not key:
         raise SystemExit(f"MODEL_API_KEY is missing: set it in the environment or in {ENV_FILE}")
     return key
