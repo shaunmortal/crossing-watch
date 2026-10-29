@@ -69,7 +69,8 @@ def solve(rows, rhs):
     for col in range(n):
         pivot = max(range(col, n), key=lambda r: abs(m[r][col]))
         if abs(m[pivot][col]) < 1e-12:
-            raise ValueError("calibration points must not lie on one line")
+            raise ValueError("calibration points give no usable homography (three on one line, or the horizon runs "
+                             "through the frame's corner): click them again")
         m[col], m[pivot] = m[pivot], m[col]
         for r in range(n):
             if r != col:

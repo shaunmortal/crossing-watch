@@ -53,8 +53,10 @@ NOTES_HIDDEN = "The head of the school sent the letter back with notes (kept in 
 NUDGE = "Plain text is not accepted. Call exactly one tool."
 INSTRUCTIONS = """You work one near-miss case for a school. A phone filmed the crossing outside it; the head of the
 school will send the road authority a letter built only from what the video measured. Your tools:
-- track: run the tracker. Start with people and vehicles in "video" mode. SAM video tracks at most 16 objects per
-  request, so a concept whose requests hit that limit missed later arrivals: track again with it in "crowd" mode.
+- track: run the tracker on the SAM replies a paid run cached; it never pays. Start with the modes the case names:
+  other modes are usually not cached, and track then fails with their cost. SAM video tracks at most 16 objects per
+  request, so a concept whose requests hit that limit missed later arrivals: track again with it in "crowd" mode
+  ("auto" mode does that switch itself).
 - review: what Muse Spark said about each tracked pedestrian (is it a person, a child, a rider).
 - measure: the measurements a letter may use, and the video's reading of the site's check distance.
 - request_measurement: ask a person to tape-measure the check distance. The case pauses until they answer.
@@ -68,7 +70,7 @@ def function(name, description, **properties):
         "type": "object", "properties": properties, "required": list(properties), "additionalProperties": False}}
 
 
-MODE = {"type": "string", "enum": ["video", "crowd"]}
+MODE = {"type": "string", "enum": list(analyze.MODES)}
 TOOLS = [function("track", "Track people and vehicles with SAM 3.1 and measure near-misses.", people=MODE, vehicles=MODE),
          function("review", "Muse Spark's verdict on each tracked pedestrian in a near-miss."),
          function("measure", "The measurements a letter may quote, and the video's reading of the check distance."),
@@ -111,7 +113,16 @@ def check_distance(site):
             isinstance(pt, list) and len(pt) == 2 and all(isinstance(v, (int, float)) for v in pt) for pt in points)):
         raise ValueError('site "check" must be {"what": "<the distance>", "points": [[x, y], [x, y]]} in clip pixels')
     H = road.homography(site["image_points"], site["world_points"])
-    return math.dist(road.to_ground(H, *points[0]), road.to_ground(H, *points[1]))
+    ends = [road.to_ground(H, *pt) for pt in points]
+    if None in ends:
+        raise ValueError('site "check" points must lie on the road, below the horizon')
+    return math.dist(*ends)
+
+
+def named_modes(p):
+    """The tracking modes the site file names: analyze.py's paid run used them, so SAM's replies for them are cached."""
+    site = analyze.load_site(p["site"])
+    return f'people "{site.get("person_mode", "video")}" and vehicles "{site.get("vehicle_mode", "video")}"'
 
 
 def run_tracker(p, site):
@@ -129,16 +140,19 @@ def run_tracker(p, site):
     frame_size = tuple(int(v) for v in analyze.probe(clip, "stream=width,height").split(","))
     pieces = analyze.parts(clip, out_dir, analyze.frame_count(clip))
     plan = [(site.get("person", "person"), site.get("person_grid", 1))] + [(c, 1) for c in site["vehicles"]]
-    return {c: list(analyze.full_requests(pieces, [(c, g)], frame_size)) for c, g in plan
-            if c not in analyze.crowd_concepts(site)}
+    switching = analyze.crowd_concepts(site) + analyze.crowd_concepts(site, "auto")  # auto switched the full ones
+    return {c: list(analyze.full_requests(pieces, [(c, g)], frame_size)) for c, g in plan if c not in switching}
 
 
 def track(p, args, key):
     modes = {"person_mode": args.get("people"), "vehicle_mode": args.get("vehicles")}
-    if not set(modes.values()) <= {"video", "crowd"}:
-        return {"summary": "Refused: people and vehicles must each be \"video\" or \"crowd\"."}
+    if not set(modes.values()) <= set(analyze.MODES):
+        return {"summary": "Refused: people and vehicles must each be \"video\", \"crowd\" or \"auto\"."}
     site = {**case_site(p), **modes}
-    full = run_tracker(p, site)
+    try:
+        full = run_tracker(p, site)
+    except ValueError as err:  # mostly a cost: --budget 0 met replies the paid run never asked for
+        raise ValueError(f"the site file names {named_modes(p)}, the modes whose SAM replies are cached. {err}")
     p["modes"], p["tracked_with"] = modes, calibration(site)
     data, events, _ = case_data(p)
     hit = [f"{c} in {n} of {total}" for c, (n, total) in full.items() if n]
@@ -434,7 +448,8 @@ def person_step(p, key, answer=None, approve=None, notes=None):
         raise SystemExit({"needs_review": "the letter waits for --approve or --reject --notes \"...\"",
                           "over_budget": f"this case reached the ${MAX_USD:.2f} cap"}[status])
     return ("You have more turns. Continue." if p["turn"] else
-            f"Work the case for the crossing \"{case_site(p).get('name', '')}\" and file the letter.")
+            f"Work the case for the crossing \"{case_site(p).get('name', '')}\" and file the letter. The case names "
+            f"{named_modes(p)} for tracking.")
 
 
 def work(video, site, out_dir, key, answer=None, approve=None, notes=None):
