@@ -36,10 +36,16 @@ def blur_filters(person_tracks, first, last, frame_size):
     return out
 
 
+def window(event, fps):
+    """(first, last) clip frames of an event's evidence clip: PAD_S before the first of the pedestrian and the
+    vehicle reached the spot to PAD_S after the second did, so a close pass still shows the vehicle arriving."""
+    times = event["t_person_s"], event["t_vehicle_s"]
+    return max(0, round(min(times) * fps) - round(PAD_S * fps)), round(max(times) * fps) + round(PAD_S * fps)
+
+
 def render(clip, event, person_track, vehicle_track, fps, out_path, everyone=(), frame_size=None):
     """Write the evidence clip for one event, heads of `everyone` blurred; returns out_path."""
-    centre = round(min(event["t_person_s"], event["t_vehicle_s"]) * fps)
-    first, last = max(0, centre - round(PAD_S * fps)), centre + round(PAD_S * fps)
+    first, last = window(event, fps)
     blurs = blur_filters(everyone, first, last, frame_size) if frame_size else []
     filters = ",".join(blurs + box_filters([(person_track, "cyan"), (vehicle_track, "red")], first, last)) or "null"
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{first / fps:.3f}", "-i", str(clip),

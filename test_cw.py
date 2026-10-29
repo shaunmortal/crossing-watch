@@ -182,6 +182,19 @@ def test_heads_are_blurred_inside_the_frame():
     assert blurs == ["delogo=x=1:y=1:w=19:h=29:enable='eq(n,0)'"]
 
 
+def test_evidence_clip_runs_until_the_vehicle_arrives():
+    late_car = {"t_person_s": 3.0, "t_vehicle_s": 5.5}  # a close pass: the car reached her spot 2.5 s after her
+    assert render.window(late_car, 10) == (10, 75)  # 2 s before she was there to 2 s after the car was
+    assert render.window({"t_person_s": 0.5, "t_vehicle_s": 0.2}, 10) == (0, 25)  # never before the video starts
+    calls, old = [], render.subprocess.run
+    render.subprocess.run = lambda args, **kwargs: calls.append(args)
+    try:
+        render.render("clip.mp4", late_car, {}, {}, 10, "event1.mp4")
+    finally:
+        render.subprocess.run = old
+    assert calls[0][calls[0].index("-ss") + 1] == "1.000" and calls[0][calls[0].index("-frames:v") + 1] == "66"
+
+
 def test_spark_verdicts_are_validated():
     ok = review.read_verdict('Sure: {"cyan_is_a_pedestrian": false, "road_user": "not a person", "reason": "a pole"}')
     assert ok == {"is_person": False, "road_user": "not a person", "reason": "a pole"}
