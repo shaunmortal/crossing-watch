@@ -2636,6 +2636,51 @@ def test_guesses_keep_5_to_150_kmh_and_the_chart_draws_the_measured_speed_in_red
             sys.argv = old
 
 
+
+def walkers(count, mps, seconds=10, fps=10):
+    """`count` pedestrian pieces, as analyze.road_tracks makes them, each walking straight across at `mps`."""
+    return {f"{i}/0": {f: (mps * f / fps, 3.0 * i) for f in range(seconds * fps)} for i in range(count)}
+
+
+def test_people_walking_too_fast_or_slow_flag_the_video_and_no_letter_is_asked_for():
+    """A time-lapse (or a scale too large) makes people walk too fast: events.json says so, the page shows the warning
+    instead of the headline and near-miss counts, and pack asks no model for a letter, nor the case agent."""
+    import agent, analyze, pace, tempfile
+    fast, slow = pace.walking(walkers(pace.MIN_PIECES, 3.0), 10), pace.walking(walkers(pace.MIN_PIECES, 0.3), 10)
+    assert fast == {"median_mps": 3.0, "pieces": pace.MIN_PIECES, "flag": "fast"} and slow["flag"] == "slow"
+    assert "about 2.3 times normal walking" in pace.warning(fast) and "slowed down" in pace.warning(slow)
+    with tempfile.TemporaryDirectory() as folder:
+        out = pack_folder(folder)
+        data = json.loads((out / "events.json").read_text())
+        analyze.write_events(out, {}, data["events"], data["exposure"], None, None, walking=fast)
+        assert run_pack(out, ask=lambda prompt: 1 / 0, key="key") == [] and not (out / "plan.json").exists()
+        page = (out / "index.html").read_text()
+        assert "this video looks sped up or the calibration is off" in page and "No letter was asked for." in page
+        assert "serious near-misses" not in page and "Worst moments" not in page and "pedestrian crossings" in page
+        assert "walk at 3.0 m/s" in agent.letter_blocker({}, {}, data["events"], "", fast)
+
+
+def test_people_walking_normally_leave_the_numbers_and_the_page_unchanged():
+    import pace, tempfile
+    walk = pace.walking(walkers(pace.MIN_PIECES, 1.3), 10)
+    assert walk == {"median_mps": 1.3, "pieces": pace.MIN_PIECES, "flag": None} and pace.warning(walk) == ""
+    with tempfile.TemporaryDirectory() as folder:
+        events = json.loads((pack_folder(folder) / "events.json").read_text())["events"]
+    seen = {"minutes": 0.5, "crossings": 3, "vehicles": 2, "speed_85th_kmh": 30.0, "crossers": ["1", "2", "3"]}
+    site = {"world_points": SQUARE_ROAD}
+    page = pack.page(site, events, seen, None, None, 10, walking=walk)
+    assert page == pack.page(site, events, seen, None, None, 10) and "Worst moments" in page and "1 of 3" in page
+
+
+def test_too_few_walking_pieces_are_not_judged():
+    """Fewer than pace.MIN_PIECES people crossed (the Indian time-lapse in SAM video mode kept none): their pace is
+    reported, never judged."""
+    import pace
+    assert pace.walking(walkers(pace.MIN_PIECES - 1, 3.0), 10) == {"median_mps": 3.0, "pieces": pace.MIN_PIECES - 1,
+                                                                   "flag": None}
+    standing = {"1/0": {f: (0.0, 0.0) for f in range(100)}}  # a piece that never crossed is not a walker
+    assert pace.walking(standing, 10) == {"median_mps": None, "pieces": 0, "flag": None}
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):

@@ -15,6 +15,7 @@ from pathlib import Path
 
 import crowd
 import listen
+import pace
 import render
 import review
 import roadmap
@@ -363,12 +364,12 @@ def run_record(out_dir, started, replies_before):
 
 
 def write_events(out_dir, site, events, seen, cost, full, privacy=None, source_sha256=None, run=None, timeline=None,
-                 paths=None):
+                 paths=None, walking=None):
     (out_dir / "events.json").write_text(json.dumps({"site": site.get("name", ""), "fps": FPS, "exposure": seen,
                                                      "cost": cost,
                                                      "sam_full_requests": full, "privacy": privacy,
                                                      "source_sha256": source_sha256, "run": run,
-                                                     "timeline": timeline, "paths": paths,
+                                                     "timeline": timeline, "paths": paths, "walking": walking,
                                                      "events": events}, indent=1))
 
 
@@ -587,6 +588,9 @@ def main():
     seen = road.exposure(people, vehicles, FPS, total)
     timeline = road.timeline(people, vehicles, FPS, total)  # the gap barcode's spans, kept out of `seen`
     paths = road.crossing_paths(people, vehicles, FPS)  # the desire lines, kept out of `seen` too
+    walk = pace.walking(people, FPS)  # people are the clock: a time-lapse or a wrong scale shows in their pace
+    if walk["flag"]:
+        print(f"warning: {pace.warning(walk)}", flush=True)
     full = (*full_requests(pieces, [(c, g) for c, g in plan if c not in switched], frame_size), notes)
     if full[0]:
         print(f"warning: {full[0]} of {full[1]} SAM requests hit the {sam.MAX_OBJECTS}-object limit; later arrivals "
@@ -595,7 +599,7 @@ def main():
 
     # saved before the slower, network-bound evidence step
     write_events(out_dir, site, events, seen, cost(), full, source_sha256=source,
-                 run=run_record(out_dir, started, before), timeline=timeline, paths=paths)
+                 run=run_record(out_dir, started, before), timeline=timeline, paths=paths, walking=walk)
     review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size, top_down)
     everyone, privacy, searched = list(person_boxes.values()), None, []
     # with no events this searches frame 0 only (one image): the street photo is still shown for the desire lines
@@ -605,7 +609,7 @@ def main():
     add_evidence(args.video, clip, out_dir, events, people, vehicles, person_boxes, vehicle_boxes, key, frame_size,
                  everyone)
     write_events(out_dir, site, events, seen, cost(len(searched)), full, privacy, source,
-                 run_record(out_dir, started, before), timeline, paths)
+                 run_record(out_dir, started, before), timeline, paths, walk)
     report(seen, events)
 
 

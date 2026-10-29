@@ -23,6 +23,7 @@ import urllib.request
 from pathlib import Path
 
 import analyze
+import pace
 import pack
 import review
 import road
@@ -175,10 +176,13 @@ def off_share(video_m, tape):
     return abs(video_m - tape) / tape
 
 
-def letter_blocker(p, site, events, notes):
+def letter_blocker(p, site, events, notes, walking=None):
     """Why the letter may not be written yet, or "": it needs near-misses tracked in this case with the site's
-    current calibration points, and a taped check distance that agrees with the video."""
+    current calibration points, a taped check distance that agrees with the video, and people walking at a walking
+    pace (events.json's "walking", pace.warning)."""
     video_m, tape = check_distance(site), p.get("tape_m")
+    if warning := pace.warning(walking):
+        return warning.rstrip(".")
     if not events:
         return "no near-misses were measured, so there is nothing to report"
     if video_m is None:
@@ -197,8 +201,8 @@ def letter_blocker(p, site, events, notes):
 
 def submit_letter(p, args, key):
     site, notes = case_site(p), str(args.get("notes") or "")
-    _, events, seen = case_data(p)
-    reason = letter_blocker(p, site, events, notes)
+    data, events, seen = case_data(p)
+    reason = letter_blocker(p, site, events, notes, data.get("walking"))
     if reason:
         p["refusals"] += 1
         if p["refusals"] < MAX_REFUSALS:
@@ -327,7 +331,8 @@ def write_page(p, images=None):
     site, (data, events, seen) = case_site(p), case_data(p)
     page = pack.page(site, events, seen, p["letter"], images, data["fps"], data.get("cost"),
                      data.get("sam_full_requests"), data.get("privacy"), source_sha256=data.get("source_sha256"),
-                     timeline=data.get("timeline"), paths=data.get("paths") or {}, case=case_section(p["out"]))
+                     timeline=data.get("timeline"), paths=data.get("paths") or {}, case=case_section(p["out"]),
+                     walking=data.get("walking"))
     (Path(p["out"]) / "index.html").write_text(page)
 
 

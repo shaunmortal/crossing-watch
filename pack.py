@@ -31,6 +31,7 @@ import ailabel
 import crowd
 import fixband
 import overlay
+import pace
 import render
 import review
 import roadmap
@@ -913,15 +914,16 @@ cite { display: block; margin-top: 4px; font-style: normal; color: var(--muted);
     + ' { content: " (clip " attr(data-clip) ", not printed)"; } }\n')
 
 
-def stats(events, seen):
-    """The count tiles. They always say how much was watched, so a quiet video never reads as "safe"."""
+def stats(events, seen, measured=True):
+    """The count tiles. They always say how much was watched, so a quiet video never reads as "safe". Not `measured`
+    (pace.warning), only that: its near-miss counts and speeds are not measurements."""
     n_serious, crossings = len(serious(events)), seen.get("crossings") or 0
-    tiles = [(n_serious, f"serious near-misses (under {road.PET_MAX_S} s)"),
-             (len(events) - n_serious, f"close passes ({road.PET_MAX_S}-{road.CLOSE_PASS_S} s)"),
-             (crossings, "pedestrian crossings watched"), (seen.get("vehicles", "?"), "moving vehicles"),
-             (seen.get("minutes", "?"), "minutes of video")]
-    if seen.get("speed_85th_kmh"):
-        tiles.append((seen["speed_85th_kmh"], "km/h, 85% of vehicles at or below"))
+    watched = [(crossings, "pedestrian crossings watched"), (seen.get("vehicles", "?"), "moving vehicles"),
+               (seen.get("minutes", "?"), "minutes of video")]
+    near = [(n_serious, f"serious near-misses (under {road.PET_MAX_S} s)"),
+            (len(events) - n_serious, f"close passes ({road.PET_MAX_S}-{road.CLOSE_PASS_S} s)")]
+    speed = [(seen["speed_85th_kmh"], "km/h, 85% of vehicles at or below")] if seen.get("speed_85th_kmh") else []
+    tiles = [*near, *watched, *speed] if measured else watched
     return "".join(f"<div><b>{html.escape(str(v))}</b>{html.escape(label)}</div>" for v, label in tiles)
 
 
@@ -930,8 +932,19 @@ def lead(lines):
     return "".join(f'<p class="{"note" if i else "lead"}">{html.escape(line)}</p>' for i, line in enumerate(lines))
 
 
+def banner(walking):
+    """The warning that replaces the headline when people walk too fast or too slow here (pace.warning), else ""."""
+    warning = pace.warning(walking)
+    return (f'<p class="lead note bad" role="alert"><b>Not measurements.</b> {html.escape(warning)} No letter was '
+            "asked for.</p>" if warning else "")
+
+
 def page(site, events, seen, plan, images, fps, cost=None, full=None, privacy=None, signoff=None, receipt="",
-         source_sha256=None, timeline=None, ground=None, paths=None, case=""):
+         source_sha256=None, timeline=None, ground=None, paths=None, case="", walking=None):
+    warning = banner(walking)  # then the headline, pyramid, engineering numbers and gap barcode are left out
+    measured = "" if warning else (f"{pyramid(events, seen)}\n{engineering(seen, cost)}"
+                                   f"{roadmap.gap_strip(timeline, events, SHOWN_EVENTS, full)}")
+    moments = "Tracked moments, not measurements (see the warning above)" if warning else "Worst moments"
     cards = "\n".join(event_card(i + 1, e, fps, overlay.strip(e, site, events[:SHOWN_EVENTS]))
                       for i, e in enumerate(events[:SHOWN_EVENTS])) or (
         f"<p>No conflicts under {road.CLOSE_PASS_S} s in these {html.escape(str(seen.get('minutes', '?')))} minutes. "
@@ -948,10 +961,9 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None, privacy=No
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Crossing Watch evidence</title>
 <style>{STYLE}{roadmap.STYLE}{overlay.STYLE}</style></head><body>
 <h1>Crossing Watch: near-miss evidence</h1>
-<p class="muted">{html.escape(site.get("name", ""))}</p>{filed_line(site)}{lead(headline(events, seen, site))}
-<div class="stats">{stats(events, seen)}</div>{limit_note(full)}{privacy_note(privacy)}{pyramid(events, seen)}
-{engineering(seen, cost)}{roadmap.gap_strip(timeline, events, SHOWN_EVENTS, full)}
-{map_section(events, site, ground, paths)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{fixband.figure(images)}{legal_section(site)}
+<p class="muted">{html.escape(site.get("name", ""))}</p>{filed_line(site)}{warning or lead(headline(events, seen, site))}
+<div class="stats">{stats(events, seen, not warning)}</div>{limit_note(full)}{privacy_note(privacy)}{measured}
+{map_section(events, site, ground, paths)}<section><h2>{moments}</h2>{cards}</section>{fix_section(plan, images)}{fixband.figure(images)}{legal_section(site)}
 {letter_section(plan, events[:SHOWN_EVENTS], facts(site, events, seen, paths), signoff)}{case}
 {tct_section()}<section><h2>How this was measured</h2><p class="note">{html.escape(method)}</p>
 {f'<p class="note">{html.escape(receipt)}</p>' if receipt else ""}{hash_line(source_sha256, site)}</section>{overlay.SCRIPT}</body></html>"""
@@ -1096,12 +1108,15 @@ def main():
     paths = data.get("paths") or {}  # desire lines: with them a 0-event clip still gets its photo, fix and letter
     measured = facts(site, events, seen, paths)
     prompt = LETTER_PROMPT.format(facts=measured, language=site.get("letter_language", "English"))
-    saved = saved_plan(out_dir, prompt)
+    untrusted = pace.warning(data.get("walking"))  # no letter (no paid call) from speeds and gaps that are not measured
+    saved = None if untrusted else saved_plan(out_dir, prompt)
+    if untrusted:
+        print(f"no letter or fix picture: {untrusted}", file=sys.stderr)
     if (notes or all(signer)) and not saved:
         sys.exit("pack.py: --notes and --approved-by work on plan.json's letter from these same measurements, and "
                  "there is none: run pack.py without them first, and have that letter read")
     plan, images, ground = saved, None, None  # saved stays if a revision fails
-    if events or paths:
+    if (events or paths) and not untrusted:
         try:
             photo = street_photo(out_dir / "clip.mp4", out_dir / "street.jpg", site.get("person", "person"),
                                  site.get("vehicles", []))
@@ -1129,7 +1144,7 @@ def main():
     page_html = page(site, events, seen, plan, images, data["fps"], data.get("cost"), data.get("sam_full_requests"),
                      data.get("privacy"), signoff=signoff, receipt=receipt_line(data, plan, images),
                      source_sha256=data.get("source_sha256"), timeline=data.get("timeline"), ground=ground,
-                     paths=paths)
+                     paths=paths, walking=data.get("walking"))
     (out_dir / "index.html").write_text(page_html)
     seal.write_sums(share(out_dir, page_html))  # the only folder to publish, and its hashes
     print(f"wrote {out_dir / 'index.html'}: {len(serious(events))} serious, {len(events) - len(serious(events))} close "
