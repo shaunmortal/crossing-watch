@@ -2,18 +2,19 @@
 
 Near-miss evidence for a dangerous crossing, from one phone video.
 
-Put a phone somewhere high (a first-floor window, a wall) looking at the crossing outside a school, record the
-pick-up rush, and Crossing Watch finds every moment a moving vehicle and a pedestrian were on the same spot less
-than 1.5 seconds apart. It measures the vehicle's speed, the adult death risk had they collided, and what a
-20 or 30 km/h limit would have changed. The output is an evidence pack a principal can send to the road authority:
-clips, numbers, a proposed fix drawn onto the real street, and a ready letter. That is proof before a child is
-hit, instead of waiting for crash statistics.
+Put a phone somewhere high (a first-floor window, a wall, or a 2.5-3 m stand on the footpath) looking at the
+crossing outside a school or college, record the pick-up rush, and Crossing Watch finds every moment a moving
+vehicle and a pedestrian were on the same spot less than 1.5 seconds apart. It measures the vehicle's speed, the
+adult death risk had they collided, and what a 20 or 30 km/h limit would have changed. The output is an evidence
+pack a principal can send to the road authority: clips, numbers, a proposed fix drawn onto the real street, and a
+ready letter. That is proof before a child is hit, instead of waiting for crash statistics.
 
 ## Status
 
-Not filed yet. The pack goes to the road authority by hand on Mon 2 or Tue 3 Nov 2026, in a named person's name.
-Its reference number will be added here and in the site file's `"submitted"` key. Only "filed, reference X" is ever
-written: whether anything is approved or fixed is for the authority to say, and no resolution date is promised.
+Not filed yet. The plan is to file the pack with the road authority through CPGRAMS online on Tue 3 Nov 2026, in a
+named person's name. Its reference number will be added here and in the site file's `"submitted"` key. Only "filed,
+reference X" is ever written: whether anything is approved or fixed is for the authority to say, and no resolution
+date is promised.
 
 ## How it works
 
