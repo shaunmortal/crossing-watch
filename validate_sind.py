@@ -77,7 +77,7 @@ def compare(people, vehicles, events):
 
 
 def speed_error(vehicles, true_speed):
-    """Our speed (median of position steps) against SinD's own velocity, km/h: (mean, 95th percentile)."""
+    """Our speed (least-squares slope of positions) against SinD's own velocity, km/h: (mean, 95th percentile)."""
     errors = sorted(abs(v - true_speed[vid][f]) * 3.6 for vid, shapes in vehicles.items()
                     for f, v in road.speeds(shapes, FPS).items())
     return statistics.mean(errors), errors[int(0.95 * len(errors))]

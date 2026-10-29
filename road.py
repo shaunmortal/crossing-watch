@@ -3,6 +3,7 @@ pedestrians and moving vehicles measured as post-encroachment time (PET).
 
 Map frame: metres on the road surface, set by four calibration points the user marks on the video.
 """
+import bisect
 import math
 import statistics
 
@@ -22,7 +23,7 @@ BORDER_PX = 1             # a box touching the frame edge is cut off, so its low
 MIN_SPEED_STEPS = 3       # a speed needs this many frame-to-frame steps in its window; one jump is noise
 RIDER_OVERLAP = 0.6       # a "person" box this much inside a vehicle box is its rider or driver, not a pedestrian
 RIDER_FEET_PX = 3         # ...if their feet are not below the vehicle's (a pedestrian in front has lower feet)
-MIN_PIECE_S = 1.0         # a pedestrian piece shorter than this has no trustworthy path or timing
+MIN_PIECE_S = 1.0         # a pedestrian or vehicle piece shorter than this has no trustworthy path, timing or speed
 MAX_WALK_MPS = 10.0       # faster than a sprint: the track's ID has jumped to someone (or something) else
 GRID_M = 2.0              # spatial index cell; any size >= 0 gives the same answers, this one is fast
 GAP_ADULT_S = 6.0         # UK Traffic Signs Manual ch. 6, 13.5.2: an acceptable gap is 4-6 s at urban speeds...
@@ -214,22 +215,25 @@ def centroid(shape):
 
 
 def speeds(edges, fps, window_s=SPEED_WINDOW_S):
-    """frame -> vehicle speed in m/s: the median step speed of the edge midpoint over about `window_s`.
-    Steps faster than MAX_PLAUSIBLE_MPS are SAM swapping the ID onto another vehicle, and are ignored."""
+    """frame -> vehicle speed in m/s: the least-squares slope of the edge midpoint against time over about
+    `window_s`. Unlike a median of frame-to-frame steps it reads true when the steps are uneven: a 24 fps video
+    resampled to 10 fps steps 2,2,3,2,3 source frames, and the median read 0.83 x the true speed. The track is cut
+    where a step is faster than MAX_PLAUSIBLE_MPS (SAM swapping the ID onto another vehicle), and a piece shorter
+    than MIN_PIECE_S gets no speed: a fragment that short is a tracking glitch, not a measured vehicle."""
     mid = {f: centroid(shape) for f, shape in edges.items()}
-    frames = sorted(mid)
-    steps, plausible = {}, set()
-    for f, g in zip(frames, frames[1:]):
-        mps = math.dist(mid[f], mid[g]) * fps / (g - f)
-        if mps <= MAX_PLAUSIBLE_MPS:
-            steps[f] = mps
-            plausible.update((f, g))
     half = max(1, round(window_s * fps / 2))
     out = {}
-    for f in plausible:  # a frame both of whose steps were teleports is on another vehicle: no speed
-        near = [steps[g] for g in range(f - half, f + half) if g in steps]
-        if len(near) >= MIN_SPEED_STEPS:
-            out[f] = statistics.median(near)
+    for piece in split_at_jumps(mid, fps, MAX_PLAUSIBLE_MPS):
+        frames = sorted(piece)
+        if len(frames) < MIN_PIECE_S * fps:
+            continue
+        for f in frames:
+            near = frames[bisect.bisect_left(frames, f - half):bisect.bisect_right(frames, f + half)]
+            if len(near) > MIN_SPEED_STEPS:
+                t = [g / fps for g in near]
+                vx = statistics.linear_regression(t, [piece[g][0] for g in near]).slope
+                vy = statistics.linear_regression(t, [piece[g][1] for g in near]).slope
+                out[f] = math.hypot(vx, vy)
     return out
 
 

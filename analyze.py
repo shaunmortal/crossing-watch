@@ -6,6 +6,7 @@ Writes DIR/events.json and prints the most dangerous moments first.
 """
 import argparse
 import json
+import math
 import re
 import statistics
 import subprocess
@@ -248,7 +249,8 @@ def crowd_frames(site, concept, total):
 def concept_tracks(site, concept, clip, total, pieces, out_dir, key, frame_size, grid=1):
     """One concept's tracks in whole-clip frames and pixels, by crowd mode or SAM video as the site asks."""
     if concept in crowd_concepts(site):
-        return crowd.track(clip, crowd_frames(site, concept, total), FPS, concept, key, crowd.cache_dir(out_dir, concept))
+        jump = crowd.MAX_AREA_JUMP if concept in site["vehicles"] else math.inf
+        return crowd.track(clip, crowd_frames(site, concept, total), FPS, concept, key, crowd.cache_dir(out_dir, concept), jump)
     return track_all(pieces, concept, key, frame_size, grid)
 
 

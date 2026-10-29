@@ -147,6 +147,38 @@ def test_speed_ignores_id_switch_teleports():
     assert abs(speed[19] - 8.0) < 1e-6 and abs(speed[21] - 8.0) < 1e-6 and 20 not in speed
 
 
+def test_speed_is_true_on_a_24_fps_video_resampled_like_prepare():
+    """analyze.prepare's fps filter turns 23.976 fps into steps of 2,2,3,2,3 source frames: a median of steps read
+    0.83 x the true speed."""
+    import analyze, subprocess
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "nullsrc=s=16x16:r=24000/1001:d=4,geq=lum=N:cb=128:cr=128",
+                          "-vf", f"fps={analyze.FPS}", "-f", "rawvideo", "-pix_fmt", "yuv420p", "-"],
+                         check=True, capture_output=True).stdout
+    source = raw[::16 * 16 * 3 // 2]  # each frame's first luma byte is the number of the source frame it came from
+    edges = {k: ((8.0 * n * 1001 / 24000, 0.0), (8.0 * n * 1001 / 24000 + 2, 0.0)) for k, n in enumerate(source)}
+    speed = road.speeds(edges, analyze.FPS)
+    assert len(source) == 40 and speed.keys() == edges.keys() and all(abs(v - 8.0) < 0.2 for v in speed.values())
+
+
+def test_id_switches_and_short_fragments_give_no_vehicle_speed():
+    import analyze, crowd
+    from pathlib import Path
+    switch = {0: [[475, 234, 518, 302]], 6: [[481, 194, 511, 212]]}  # 43x68 px, then 30x18: a phantom 81 km/h
+    assert len(crowd.associate(switch, 10)) == 1 and len(crowd.associate(switch, 10, crowd.MAX_AREA_JUMP)) == 2
+    jumps, real = {}, crowd.track  # only vehicles: a person may just be partly hidden
+    crowd.track = lambda clip, frames, fps, concept, key, cache, jump: jumps.update({concept: jump}) or {}
+    try:
+        site = {"person": "person", "vehicles": ["motorcycle"], "person_mode": "crowd", "vehicle_mode": "crowd"}
+        for concept in ("person", "motorcycle"):
+            analyze.concept_tracks(site, concept, None, 20, [], Path("out"), None, None)
+    finally:
+        crowd.track = real
+    assert jumps == {"person": math.inf, "motorcycle": crowd.MAX_AREA_JUMP}
+    assert road.speeds(edges_along_x(8.0, 10, 9), 10) == {} and len(road.speeds(edges_along_x(8.0, 10, 10), 10)) == 10
+    H = road.homography(SQUARE_IMG, SQUARE_ROAD)  # cut by the right edge of a 640 px frame: not the vehicle's edge
+    assert road.vehicle_edges({0: [590, 195, 639, 232], 1: [497, 210, 568, 255]}, H, frame_size=(640, 360)).keys() == {1}
+
+
 def test_riders_are_not_pedestrians_and_one_jump_is_not_a_speed():
     rider, walker = {0: [110, 10, 130, 60]}, {0: [300, 10, 320, 60]}
     bike = {0: [100, 0, 150, 80]}
