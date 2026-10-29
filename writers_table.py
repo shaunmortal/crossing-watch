@@ -4,8 +4,8 @@ reads the records and the prices below, never an API.
 
 Run: python3 writers_table.py [RECORD.json ...]
 Default records: <removed-run-record> (the Kaggle notebook's) and provenance/spark-open-fireworks-sample.json
-(pack.py's letter-provenance.json). A Muse Spark run on the Meta API is read the same way once it has a record with
-"model", "host" ("api.meta.ai") and the Responses API "usage".
+(pack.py's letter-provenance.json). A Muse Spark run on the Meta API is read the same way: pack.py's record of it has
+"model", "host" ("api.meta.ai"), the Responses API "usage" and the reply's "wall_s".
 """
 import json
 import sys

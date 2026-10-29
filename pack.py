@@ -22,6 +22,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import unicodedata
 import urllib.request
 import uuid
@@ -69,7 +70,7 @@ def writer_label(url, model=LETTER_MODEL):
 
 WRITER = writer_label(LETTER_URL)
 LETTER_HOST = sam.env_value("LETTER_MODEL_HOST")  # where it ran, e.g. "Kaggle 2 x T4" (the notebook reads nvidia-smi)
-PROVENANCE = "letter-provenance.json"  # beside plan.json: what an open-weights server ran, measured; never a key
+PROVENANCE = "letter-provenance.json"  # beside plan.json: what the letter's model ran, measured; never a key
 RUN_KEYS = ("request_id", "usage", "wall_s", "timings", "response_format")  # openweights.reply's record
 CHECK_KEYS = ("unmeasured", "mixed", "unsupported")  # what ask_plan's checks left on a letter kept after the last try
 JUDGE = "Muse Spark (a separate reviewer)"
@@ -581,8 +582,7 @@ def model_plan(prompt, api_key, photo=None, known=None):
     open-weights server can write digits only as numbers in `known` (default: the prompt)."""
     image = "data:image/jpeg;base64," + base64.b64encode(photo.read_bytes()).decode() if photo else None
     schema = plan_schema(known or prompt) if NUMBER_LOCK else PLAN_SCHEMA
-    text, server = (open_model_reply(prompt, image, schema) if LETTER_URL
-                    else (spark_reply(prompt, image, api_key), {}))
+    text, server = open_model_reply(prompt, image, schema) if LETTER_URL else spark_run(prompt, image, api_key)
     match = re.search(r"\{.*\}", text, re.S)
     plan = json.loads(match[0], strict=False) if match else {}  # a letter may hold raw newlines
     if not isinstance(plan, dict) or not all(isinstance(plan.get(k), str) and plan[k].strip() for k in PLAN_KEYS):
@@ -603,6 +603,13 @@ def unreadable(plan):
 
 
 def spark_reply(prompt, image, api_key):
+    """Muse Spark's reply text (what a judge reads)."""
+    return spark_run(prompt, image, api_key)[0]
+
+
+def spark_run(prompt, image, api_key):
+    """Muse Spark's reply on the Meta API: the text, and its run record as openweights.reply gives one (the Responses
+    API usage and id, the wall seconds measured here), kept in plan.json and PROVENANCE."""
     if not api_key:
         raise ValueError("no MODEL_API_KEY for Muse Spark (or set LETTER_MODEL_URL for an open-weights model)")
     content = [{"type": "input_text", "text": prompt}] + ([{"type": "input_image", "image_url": image}] if image else [])
@@ -610,10 +617,13 @@ def spark_reply(prompt, image, api_key):
                        "input": [{"role": "user", "content": content}]}).encode()
     req = urllib.request.Request(sam.API_URL, data=body, headers={
         "Authorization": f"Bearer {api_key}", "Content-Type": "application/json"})
+    started = time.monotonic()
     with urllib.request.urlopen(req, timeout=TIMEOUT_S) as response:
         reply = json.load(response)
-    return "".join(c.get("text", "") for o in reply.get("output", []) if o.get("type") == "message"
+    text = "".join(c.get("text", "") for o in reply.get("output", []) if o.get("type") == "message"
                    for c in o.get("content", []))
+    return text, {"usage": reply.get("usage"), "request_id": reply.get("id"),
+                  "wall_s": round(time.monotonic() - started, 1), "response_format": "json_object"}
 
 
 def open_model_reply(prompt, image, schema, judge=False):
@@ -1280,14 +1290,16 @@ def new_plan(out_dir, prompt, measured, key, photo, revise=None, notes=""):
 def write_plan(out_dir, plan):
     """plan.json, the paid-for letter, after copying the letter it held to plan-<first 8 of its sha256>.json, so no
     paid-for or signed letter is ever lost (signoff.json's letter_sha256 names its file); pack and the case agent both
-    write through here. Beside it, when an open-weights server wrote it, PROVENANCE: the model id, host, request id,
-    usage, wall seconds, the checks (letter_checks) and the letter's sha256 (never the key)."""
+    write through here. Beside it, when the reply's run was measured (an open-weights server or Muse Spark), PROVENANCE:
+    the model id, host, request id, usage, wall seconds, the checks (letter_checks) and the letter's sha256 (never the
+    key)."""
     path, old = out_dir / "plan.json", read_json(out_dir / "plan.json")
     if isinstance(old, dict) and isinstance(old.get("letter"), str):
         shutil.copyfile(path, out_dir / PLAN_BACKUP.format(sha8=sha256(old["letter"])[:8]))
     path.write_text(json.dumps(plan, indent=1, ensure_ascii=False))
-    if LETTER_URL and "wall_s" in plan:
-        record = {"model": LETTER_MODEL, "host": openweights.host(LETTER_URL), **{k: plan.get(k) for k in RUN_KEYS},
+    if "wall_s" in plan:
+        model, url = (LETTER_MODEL, LETTER_URL) if LETTER_URL else (review.MODEL, sam.API_URL)
+        record = {"model": model, "host": openweights.host(url), **{k: plan.get(k) for k in RUN_KEYS},
                   "tries": plan.get("tries"), **letter_checks(plan), "letter_sha256": sha256(plan["letter"])}
         (out_dir / PROVENANCE).write_text(json.dumps(record, indent=1))
 

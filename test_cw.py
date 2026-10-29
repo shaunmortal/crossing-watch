@@ -4355,6 +4355,40 @@ def test_writers_table_says_passed_for_a_letter_kept_on_its_first_try():
     assert writers_table.number_check({}, pack.LETTER_TRIES) == writers_table.number_check({}, None) == "NOT RECORDED"
     assert writers_table.number_check({"unmeasured": ["40"], "mixed": []}, 1) == "failed: 1 left"
 
+
+def test_muse_spark_letter_records_its_wall_time_and_tokens_like_an_open_weights_one():
+    """Without LETTER_MODEL_URL, Muse Spark's Responses API usage and the measured wall seconds go into plan.json and
+    letter-provenance.json, so writers_table shows Spark's time, tokens and cost too. A fake Meta API, no network."""
+    import contextlib, io, sam, tempfile
+    from pathlib import Path
+    import writers_table
+    good = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "PET 0.4 s."}
+    usage = {"input_tokens": 1000, "output_tokens": 500, "input_tokens_details": {"cached_tokens": 200},
+             "output_tokens_details": {"reasoning_tokens": 300}}
+    said = lambda text: [{"type": "reasoning", "summary": []},
+                         {"type": "message", "content": [{"type": "output_text", "text": text}]}]
+    server, seen = fake_open_model([{"id": "resp-1", "usage": usage, "output": said(json.dumps(good))},
+                                    {"id": "resp-2", "usage": {"input_tokens": 1}, "output": said('{"problems": []}')}])
+    names = "LETTER_URL", "JUDGE_URL"
+    old = [getattr(pack, n) for n in names] + [sam.API_URL]
+    pack.LETTER_URL = pack.JUDGE_URL = ""
+    sam.API_URL = f"http://127.0.0.1:{server.server_port}/v1/responses"
+    try:
+        with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stderr(io.StringIO()):
+            plan = pack.new_plan(Path(tmp), "PROMPT", '{"pet_s": 0.4}', "spark-key-1", None)
+            record = json.loads((Path(tmp) / pack.PROVENANCE).read_text())
+    finally:
+        pack.LETTER_URL, pack.JUDGE_URL, sam.API_URL = old
+        server.shutdown()
+        server.server_close()
+    assert len(seen) == 2 and plan["usage"] == usage and isinstance(plan["wall_s"], float)  # the letter's, not the judge's
+    assert record == {"model": "muse-spark-1.3", "host": "127.0.0.1", "request_id": "resp-1", "usage": usage,
+                      "wall_s": plan["wall_s"], "timings": None, "response_format": "json_object", "tries": 1,
+                      "judged_by": pack.JUDGE, "letter_sha256": pack.sha256(good["letter"])}
+    assert "spark-key-1" not in json.dumps(record)
+    row = writers_table.row({**record, "host": writers_table.META_HOST})  # $ (800x1.25 + 200x0.15 + 500x4.25) / 1M
+    assert f"| Meta API | {plan['wall_s']} | 1,000 (200) | 500 | 300 | 1 | passed | {pack.JUDGE} | $0.0032 |" in row
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):
