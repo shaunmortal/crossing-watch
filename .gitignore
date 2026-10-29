@@ -18,14 +18,16 @@ sample/signoff.json
 sample/letter-provenance.json
 replies.txt
 guess.svg
-# the phone's originals (both cases, for case-sensitive clones), sound, the test clip's frames, the filmer's notes,
-# raters' answers (they hold names) and a replaced letter. Not TRAP.csv: hand-logged line times are G6 evidence.
+# the phone's originals (both cases, for case-sensitive clones), sound, the raw calibration and test-clip frames,
+# the filmer's notes, raters' answers (they hold names) and a replaced letter. Not TRAP.csv: hand-logged line times
+# are G6 evidence.
 *.mov
 *.MOV
 *.m4v
 *.webm
 *.wav
 *.m4a
+/frame.jpg
 /first.png
 /last.png
 notes.txt

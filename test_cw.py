@@ -1534,8 +1534,8 @@ def test_docs_folder_lets_in_only_blurred_evidence_clips():
             assert not ignored(name), name
         for name in ("docs/clip.mp4", "docs/gate/clip.mp4", "docs/gate/part0/clip.mp4", "docs/gate/person-c1-0.jpg",
                      "docs/gate/blind/clip01.mp4", "docs/gate/blind/index.html", "docs/gate/blind-key.json",
-                     "out/gate/event1.mp4", ".env", "CLIP.MOV", "TEST.MOV", "first.png", "last.png", "notes.txt",
-                     "answers-a.json", "docs/gate/event1.wav", "docs/gate/raw.mov", ".env.local",
+                     "out/gate/event1.mp4", ".env", "CLIP.MOV", "TEST.MOV", "first.png", "last.png", "frame.jpg",
+                     "notes.txt", "answers-a.json", "docs/gate/event1.wav", "docs/gate/raw.mov", ".env.local",
                      "sample/plan-1a2b3c4d.json", "docs/gate/person-c1.json"):
             assert ignored(name), name
 
