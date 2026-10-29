@@ -2,18 +2,19 @@
 
 Near-miss evidence for a dangerous crossing, from one phone video.
 
-Put a phone somewhere high (a first-floor window, a wall) looking at the crossing outside a school, record the
-pick-up rush, and Crossing Watch finds every moment a moving vehicle and a pedestrian were on the same spot less
-than 1.5 seconds apart. It measures the vehicle's speed, the adult death risk had they collided, and what a
-20 or 30 km/h limit would have changed. The output is an evidence pack a principal can send to the road authority:
-clips, numbers, a proposed fix drawn onto the real street, and a ready letter. That is proof before a child is
-hit, instead of waiting for crash statistics.
+Put a phone somewhere high (a first-floor window, a wall, or a 2.5-3 m stand on the footpath) looking at the
+crossing outside a school or college, record the pick-up rush, and Crossing Watch finds every moment a moving
+vehicle and a pedestrian were on the same spot less than 1.5 seconds apart. It measures the vehicle's speed, the
+adult death risk had they collided, and what a 20 or 30 km/h limit would have changed. The output is an evidence
+pack a principal can send to the road authority: clips, numbers, a proposed fix drawn onto the real street, and a
+ready letter. That is proof before a child is hit, instead of waiting for crash statistics.
 
 ## Status
 
-Not filed yet. The pack goes to the road authority by hand on Mon 2 or Tue 3 Nov 2026, in a named person's name.
-Its reference number will be added here and in the site file's `"submitted"` key. Only "filed, reference X" is ever
-written: whether anything is approved or fixed is for the authority to say, and no resolution date is promised.
+Not filed yet. The plan is to file the pack with the road authority through CPGRAMS online on Tue 3 Nov 2026, in a
+named person's name. Its reference number will be added here and in the site file's `"submitted"` key. Only "filed,
+reference X" is ever written: whether anything is approved or fixed is for the authority to say, and no resolution
+date is promised.
 
 ## How it works
 
@@ -22,7 +23,7 @@ written: whether anything is approved or fixed is for the authority to say, and 
 | Track every pedestrian and vehicle through the video | **SAM 3.1** (one concept per request: person, car, motorcycle, auto rickshaw...); in crowds, SAM image detection 5 times a second plus our tracker | `sam.py`, `crowd.py` |
 | Pixels to metres on the road | 4-point homography from a rectangle marked on the road | `road.py`, `calibrate.html` |
 | Clean the tracks | Drop riders inside vehicle boxes, split tracks where the ID jumps, ignore static objects, cut-off boxes and teleport speeds | `road.py` |
-| Near-miss | Post-encroachment time (PET) under 1.5 s, within 1 m, vehicle over 10 km/h | `road.py` |
+| Near-miss | Post-encroachment time (PET) under 1.5 s, within 1 m, vehicle over 10 km/h (why 1.5 s: Sources) | `road.py` |
 | Severity | Adult death risk at that speed, Rosén & Sander (2009); replay under 30 and 20 km/h limits | `road.py` |
 | Numbers road engineers use | Pedestrians and vehicles an hour, PV² (IRC:103-2012), 85th-percentile speed, and gaps in traffic of 6 s and 12 s where people actually crossed (UK Traffic Signs Manual ch. 6) | `road.py`, `pack.py` |
 | Second look | **Muse Spark** checks each clip: is that a person, and who (child, elderly, wheelchair user...) | `review.py` |
@@ -83,6 +84,12 @@ anything is published, the unblurred video goes to SAM, crops of people to Muse 
 through Meta's API; the unblurred files stay in `out/VIDEO/` on the machine that ran it until deleted (`FILMING.md`
 gives the command).
 
+**Standard mode only.** Meta's Model API pricing page (https://dev.meta.ai/docs/pricing-rate-limits.md, fetched 29 Oct 2026) says: "Contributor mode
+offers discounted pricing or more usage in exchange for permission to use your content to train future Meta models"
+and "In Standard mode, you pay standard prices and your content is not used to train Meta models." Crossing Watch
+calls only Standard-mode model ids, never a `-contributor` one, because what it sends is unblurred video and crops of
+people on the street, and street sound.
+
 **Tamper-evident.** `analyze.py` records the SHA-256 of the original video (`source_sha256` in events.json) and the
 page prints it. `share/` gets a standard `SHA256SUMS` for every file in it, the page included, so anyone can check a
 copy with `shasum -a 256 -c SHA256SUMS`, or `python3 pack.py --verify FOLDER`: MATCH, CHANGED or MISSING per file,
@@ -118,21 +125,33 @@ nothing lifts. With `"person_mode": "auto"` or `"vehicle_mode": "auto"`, a conce
 fills its 16 objects before the next part takes over, that concept is detected frame by frame instead and the page
 says when it filled (on the Indian time-lapse: "person: 16 objects taken within 1.0-1.6 s in 3 of 3 parts").
 
+`"window_s": [S, E]` in the site file analyses only seconds S to E of the recording, picked by the window rule in
+`GATES.md` before any near-miss is seen; the SHA-256 is still of the whole original, and the page's times count from
+second S. A window under 15 minutes gets no hourly rates, PV² or school-year line.
+
 ### Open weights: Muse Glimmer writes the letter
 
 Set `LETTER_MODEL_URL` to any OpenAI-compatible server and the fix and letter come from that model instead of Muse
 Spark, with the same number check. `<removed-run-record>` runs Meta's official 4-bit **Muse Glimmer 30B**
 (`meta-models/Muse-Glimmer-30B-GGUF`, Apache 2.0) with llama.cpp on Kaggle's free 2 x T4 and writes the evidence
-page; when the pack has a blurred street photo, Glimmer is shown it too. One run has a record so far,
-[`<removed-run-record>`](<removed-run-record>): on the synthetic sample, which has no person tracks and so no
-photo, Glimmer's part took 592 s; it proposed a raised zebra crossing and wrote a letter whose every number passed the
-code check. No Glimmer run has been sent a street photo yet. The letter was correct but stiff, so Muse Spark stays the
-default writer. Version 1 ran with llama-server's default sampling and the template's default "high" reasoning. The
-notebook now pins llama.cpp `b11976` and the Hugging Face revision, checks both files against their published sha256,
-runs one 32,768-token slot with medium reasoning and the model card's sampling, stops with a clear error if Glimmer
-runs out of context, and writes `<removed-run-record>` (llama.cpp build, GPUs, timings, the letter's sha256, the git
-commit and pack.py's sha256). The page then says "Muse Glimmer 30B wrote this in N s on Kaggle 2 x T4", with N from
-the server's own timings. The Kaggle notebook was run by the author.
+page; when the pack has a blurred street photo, Glimmer is shown it too. The notebook pins llama.cpp `b11976` and
+the Hugging Face revision, checks both files against their published sha256 before use, runs one 32,768-token slot
+with medium reasoning and the model card's sampling, stops with a clear error if Glimmer runs out of context, and
+writes `<removed-run-record>` (llama.cpp build, GPUs, timings, the letter's sha256, the git commit and pack.py's
+sha256). The page then says "Muse Glimmer 30B wrote this in N s on Kaggle 2 x T4", with N from the server's own
+timings. Two runs have a record, both on the synthetic sample, which has no person tracks and so no photo:
+- [`<removed-run-record>`](<removed-run-record>), with llama-server's default sampling and the template's
+  default "high" reasoning: Glimmer's part took 592 s; it proposed a raised zebra crossing and wrote a letter whose
+  every number passed the code check. The letter was correct but stiff.
+- [`<removed-run-record>`](<removed-run-record>), 29 Oct, the notebook as it is now at commit 3ed3c6e: both
+  sha256 checks passed and pack.py took 313 s. Glimmer needed two tries (the log does not say why the first went
+  back); the letter kept, 2,263 tokens at 13.6 tokens a second, proposes a raised zebra crossing with entry deflection
+  and passed the code check. No judge read it: the run had no Meta key. The same run then judged the planted-lies
+  bench (below): every lie flagged, but also 6 of 8 clean letters. The output files, `<removed-run-record>`
+  among them, are not downloaded yet; the record is copied from the run's log.
+
+No Glimmer run has been sent a street photo yet, and Muse Spark stays the default writer.
+The Kaggle notebook was run by the author.
 The open-weights model is sent a JSON schema that gives the plan's shape only. A number lock is opt-in:
 `LETTER_MODEL_NUMBER_LOCK=1` also holds every string to a pattern that allows digits only as the measured numbers.
 On Fireworks (29 Oct) that pattern trapped Muse Spark Open in "a0a0a0…" in every field. The text held no unmeasured
@@ -142,7 +161,8 @@ check and the reviewer still run after that, and the run record counts the model
 `LETTER_MODEL_KEY` adds a Bearer token for a server that needs one, and the letter says "self-hosted" only when the
 server runs on the same machine.
 `JUDGE_MODEL_URL` makes the open-weights model a judge too: it reviews the letter beside Muse Spark, or alone without a
-Meta key, and the page names only the judges that ran. No Glimmer judge run has been made yet.
+Meta key, and the page names only the judges that ran. As a judge on the planted-lies bench, Glimmer objected to
+6 of 8 clean letters (below).
 `sample/` is a synthetic example (made-up tracks, no video) for trying the letter step anywhere.
 
 ```
@@ -200,8 +220,9 @@ LETTER_MODEL_URL=https://api.fireworks.ai/inference/v1 LETTER_MODEL=accounts/fir
 
 `agent.py` is optional; analyze.py and pack.py never call it. Muse Spark works the case through five tools (track,
 review, measure, request_measurement, submit_letter), one tool per turn, with at most 25 turns per start and a $1
-cap on its own turns. That cap is an estimate at Muse Spark Open's Fireworks list price ($1.25 / $4.25 per million
-input / output tokens); the Meta API price of muse-spark-1.3 is NOT CHECKED. Tracking is outside the cap: SAM, Spark's
+cap on its own turns. That cap is an estimate at the Meta API Standard list price for muse-spark-1.3 ($1.25 / $4.25
+per 1M input / output tokens, $0.15 cached input; list price fetched 29 Oct 2026 from
+https://dev.meta.ai/docs/pricing-rate-limits.md). Tracking is outside the cap: SAM, Spark's
 pedestrian reviews and the sound check in analyze.py are billed apart, and analyze.py still refuses a SAM estimate
 over $10 without `--allow-cost`. Its one tracking decision: when SAM video hits its 16-object limit, it tracks that
 concept again in crowd mode, which bills SAM per image. The site file marks a distance that was not used for
@@ -224,10 +245,21 @@ python3 agent.py VIDEO site.json --approve            # or --reject --notes "...
 a Muse Spark letter from our cache, and scores each letter check on them: 24 copies with 12 kinds of lie, half of
 them kinds the judge's prompt does not name (a near-miss called a collision, "every school day", two near-misses'
 speeds swapped...), and 8 clean controls. The 18 added sentences have no digit, and the 2 swaps use only measured
-numbers. Run offline today, the code check caught 4 of 24 (the numbers in words and the speeds in mph; Wilson 95%
-7-36%) and flagged 0 of 8 controls (0-32%): the rest is the judge's job. Muse Spark and Muse Glimmer as judges are
-not run yet; both are Muse models, so neither is an independent judge of Muse letters. A judge reply that cannot be
-read is counted on its own, never as a catch. Details in [`GATES.md`](GATES.md).
+numbers. Results on 29 Oct (Wilson 95% ranges; the full table is in [`GATES.md`](GATES.md)):
+
+| Letter check | Letters with a planted lie flagged | Clean letters flagged |
+|---|---|---|
+| Code alone, offline | 4 of 24 (7-36%): the numbers in words and the speeds in mph | 0 of 8 (0-32%) |
+| Muse Spark as judge, two runs a letter | 24 of 24 (86-100%) | 1 of 8 (2-47%) |
+| Muse Glimmer 30B as judge, one run a letter on Kaggle | 24 of 24 (86-100%) | 6 of 8 (41-93%) |
+
+Muse Spark flagged every planted lie, the six kinds its prompt never names too, and objected to one clean letter of
+eight. Glimmer also flagged every lie but objected to six clean letters of eight: as a judge it objects to nearly
+everything, so its 24 of 24 shows little, and Muse Spark stays the default judge. "Flagged" means the judge listed a
+problem; whether it named the planted one is not checked. Both are Muse models, so neither is an independent judge of
+Muse letters, and 8 controls are few. No reply was unreadable (0 of 64 from Spark, 0 of 32 from Glimmer); one that
+cannot be read is counted on its own, never as a catch. Glimmer's figures are from the Kaggle log
+([`<removed-run-record>`](<removed-run-record>)); its output files are not downloaded yet.
 
 ```
 python3 judge_bench.py --out out/judge-bench.json             # build the letters, score the code check
@@ -261,7 +293,7 @@ tricycles, buses, trucks). It needs no Meta API. Re-scored on 29 Oct after the s
 - **Speed:** ours, from positions, against SinD's own velocity: mean error 0.24 km/h, 95th percentile 0.91 km/h.
 - **PET:** 66 conflicts under 3 s (42 serious). An independent textbook PET over a conflict area (Allen et al.
   1978) agrees within 0.5 s on 53 of 66 and gives the same tier on 57. In every disagreement the area method gives
-  the lower PET, because its conflict area is broader, so ours errs on the side of not overstating.
+  the lower PET, because its conflict area is broader, so on SinD ours errs on the side of not overstating.
 - **Pairs only the textbook flagged** as serious: 9, the same 9 pairs as before the speed fix, and each was checked.
   2 were stopped cars beside a person; we exclude vehicles under 10 km/h on purpose. 4 never came within 3 m at the
   same moment, an artefact of the broad area. 3 were cycles under 10 km/h passing 1.2–1.6 m away, at our thresholds'
@@ -357,9 +389,10 @@ to set it.
   rider, kept by the rider gate because DUT tracks no bikes, so none can be found under anyone.
 - **ID fragmentation:** across the 8 clips the dataset's 301 pedestrians are followed by our tracks for 296 of them,
   with a median of 1 track per pedestrian (at most 4).
-- **"At a threshold" defined:** a disagreement the other side also finds once each threshold is widened by about our
-  measured error (speed ±1.5 km/h around the 10 km/h "moving" bar, gap +0.3 m, PET +0.3 s). For example, a car the
-  dataset has at 10.1 km/h and we measured at 10.0 km/h.
+- **"At a threshold" defined:** a disagreement the other side also finds once each threshold is widened by
+  validate_dut's at-a-threshold bands (speed ±1.5 km/h around the 10 km/h "moving" bar, gap +0.3 m, PET +0.3 s). PET
+  +0.3 s is about our median matched PET error (0.2-0.25 s), not its spread: the 90th percentile is 1.0-1.1 s. For
+  example, a car the dataset has at 10.1 km/h and we measured at 10.0 km/h.
 - **Accuracy on matched events** (crowd mode): speed within 1 km/h on 41 of 44 (2.0 km/h at worst); PET within 1 s
   on 38 of 44 (2.5 s at worst).
 - **Spark review:** it judges a zoomed crop of each person's clearest frame. A full-frame snapshot had rejected real
@@ -408,7 +441,7 @@ not the true speed-up, and a video sped up less than about 2x would pass.
 |---|---|---|
 | A funded near-miss study (a 2020 Canadian programme) | about $5,000 per intersection | a full study |
 | Telraam S2 window sensor | €199 per sensor | traffic counts, no near-misses |
-| Crossing Watch, SAM only, at Meta's list prices | about $4-8 for a 15-minute dismissal (video mode); $34-79 frame by frame for dense crowds | a first screen that tells the authority where to do a full study |
+| Crossing Watch, SAM only, at Meta's list prices | about $4-8 for a 15-minute dismissal (video mode); $34-79 frame by frame for dense crowds | a first screen that tells the authority where to do a full study; not a crash forecast (the Indian crash model in Related work, Ankunda et al., used 11 hours of video) |
 
 The video-mode range is counted from the cached SAM replies of our two real-street test clips and scaled to 15
 minutes, at $0.20 per 1,000 frames billed (at least 50 a request, the 2 s overlaps included): a school crossing on
@@ -457,8 +490,42 @@ python3 vehicle_test.py out/indian-crowd --spend   # 60 cached crowd frames, abo
 - Box jitter alone gives a queued car an apparent speed of a few km/h. That is well under the 10 km/h "moving"
   threshold, so it does not create events, but very slow vehicles are not measured precisely.
 
+## Related work
+
+Measuring near-misses from video is not new, in India either. Each line says only what its source says:
+
+- Ismail, Sayed, Saunier & Lim (2009) analysed pedestrian-vehicle conflicts automatically from video, over 2 days at
+  one Vancouver intersection.
+- Katoch, Ghosh & Chandra (2025) used a drone and computer vision for PET and time-to-collision at a school in an
+  Indian city (the abstract names neither the city nor the hours).
+- Manisha et al. (2025) estimated PET from video at 30 school zones in Thiruvananthapuram, counted the traffic by
+  hand, and fitted a crash-frequency model.
+- Ankunda, Ali & Mohanty (2024), the closest to this: 11 hours of AI-processed video at one midblock crossing in
+  India, with block-maxima and peak-over-threshold crash models; crash risk rose with the 5-minute count of PET
+  under 1.5 s.
+- What is different here: one phone at a window or on a stand; SAM 3.1 asked for "auto rickshaw" and "motorcycle"
+  by name, with no training (no accuracy claim on Indian vehicles: that test has not run); checked end to end
+  against a drone dataset's tracks (DUT, top-down); and a number-checked letter for the school to file. One dismissal is a first
+  screen, not a crash forecast.
+
 ## Sources
 
+- **Why 1.5 s.** Indian studies flag PET under 2 s (per pedestrian or per site) as high risk; an Indian AI-video
+  study uses PET under 1.5 s (Ankunda et al. 2024). The Mumbai 2 s is set on each pedestrian's mean PET and the
+  Kerala one per site, so neither is the unit of our per-event PET, and no IRC or MoRTH PET standard is claimed.
+- Ankunda A, Ali Y, Mohanty M (2024). *Accident Analysis & Prevention* 203:107633. doi:10.1016/j.aap.2024.107633
+  (abstract only, https://trid.trb.org/View/2382202; full text NOT CHECKED)
+- Marisamynathan S, Vedagiri P (2020). Pedestrian safety evaluation of signalized intersections using surrogate
+  safety measures. *Transport* 35(1):48-56. doi:10.3846/transport.2020.12157 (Mumbai, 1,398 pedestrians: PET
+  categories on each pedestrian's mean PET, "highly dangerous" under 2 s; crossing speed 1.27 m/s at the 50th
+  percentile, 1.08 m/s at the 15th)
+- Manisha R, Anusha SP, Panachakel JT, Bivina GR (2025). Modeling of pedestrian safety in school zones based on
+  behavioural risk. *Proceedings of the Eastern Asia Society for Transportation Studies* 15.
+  https://easts.info/on-line/proceedings/vol.15/pdf/J_PP3924.pdf (PET below 2 s per site, which it takes from Allen
+  et al. 1978, its ref. 13; 65 of Thiruvananthapuram's 341 KRSA black spots are in school zones)
+- Ismail K, Sayed T, Saunier N, Lim C (2009). *Transportation Research Record* 2140:44-54. doi:10.3141/2140-05
+- Katoch B, Ghosh I, Chandra S (2025). *Lecture Notes in Civil Engineering* 655:283-297.
+  doi:10.1007/978-981-96-8118-1_19 (abstract: https://trid.trb.org/View/2671911)
 - Rosén E, Sander U (2009). Pedestrian fatality risk as a function of car impact speed. *Accident Analysis & Prevention* 41(3):536–542. doi:10.1016/j.aap.2009.02.002
 - Allen BL, Shin BT, Cooper PJ (1978). Analysis of traffic conflicts and collisions. *Transportation Research Record* 667:67–74. (post-encroachment time)
 - Indian Roads Congress, IRC:103-2012, Guidelines for Pedestrian Facilities, clause 6.7.4.1.2 (PV²). The Union told
@@ -482,10 +549,11 @@ python3 vehicle_test.py out/indian-crowd --spend   # 60 cached crowd frames, abo
 
 All code in this repository was written during the hackathon, except the mask decoder in `masks.py`: a Python port
 of the one_bit decoder in Meta's meta-sam-parser (`_mask_codec.py`, Copyright (c) Meta Platforms, Inc. and
-affiliates), used under its SAM License (github.com/meta-models/meta-sam). The check-then-retry pattern for Spark's
-letter, the reject-with-notes revision and the JSON-mode request field follow Meta's legal-agent workshop
-(github.com/meta-models/legal-agent-workshop, shown at a hackathon session); no code was copied from it. The
-case agent follows the shape of that workshop's loop (one tool per turn, plain text sent back, a stop for a person,
+affiliates), used under its SAM License (github.com/meta-models/meta-sam). The full SAM License is in
+`LICENSES/SAM-License.txt`; `masks.py` is under it, and everything else is under MIT (`LICENSE`). The
+check-then-retry pattern for Spark's letter, the reject-with-notes revision and the JSON-mode request field follow
+Meta's legal-agent workshop (github.com/meta-models/legal-agent-workshop, shown at a hackathon session); no code was
+copied from it. The case agent follows the shape of that workshop's loop (one tool per turn, plain text sent back, a stop for a person,
 resume from saved progress, escalation after 3 refusals); its code is our own. No
 third-party libraries; Python standard library and ffmpeg only. Test videos from YouTube were used only for local
 testing and are not included. The SinD sample (SOTIF-AVLab, non-commercial use) was used only for validation and is

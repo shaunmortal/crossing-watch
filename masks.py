@@ -1,6 +1,6 @@
-# The one_bit decoder below is ported from meta-sam-parser's _mask_codec.py:
+# Ported from meta-models/meta-sam python/src/meta_sam_parser/_mask_codec.py
 # Copyright (c) Meta Platforms, Inc. and affiliates. All Rights Reserved.
-# Used under the SAM License: https://github.com/meta-models/meta-sam
+# This file is under the SAM License (LICENSES/SAM-License.txt), not MIT.
 """SAM 3.1's masks: the one_bit mask SAM sends after each box (sam.request asks for it), decoded into the pixels it
 covers and found again for a tracked box. For drawing only: every measurement stays on boxes.
 

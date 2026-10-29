@@ -1,10 +1,12 @@
 .env
+.env.*
 out/
 __pycache__/
 *.mp4
 # docs/ (GitHub Pages) may hold only the blurred evidence clips and hero shots, never clip.mp4 or blind clips
 !docs/**/event[0-9]*.mp4
 docs/**/person-*.jpg
+docs/**/person-*.json
 docs/**/blind*
 test-videos/
 data/
@@ -16,3 +18,18 @@ sample/signoff.json
 sample/letter-provenance.json
 replies.txt
 guess.svg
+# the phone's originals (both cases, for case-sensitive clones), sound, the raw calibration and test-clip frames,
+# the filmer's notes, raters' answers (they hold names) and a replaced letter. Not TRAP.csv: hand-logged line times
+# are G6 evidence.
+*.mov
+*.MOV
+*.m4v
+*.webm
+*.wav
+*.m4a
+/frame.jpg
+/first.png
+/last.png
+notes.txt
+answers-*.json
+plan-*.json
