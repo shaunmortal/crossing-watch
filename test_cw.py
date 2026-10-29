@@ -339,7 +339,7 @@ def test_evidence_clips_save_one_road_position_per_clip_frame_for_the_hero_split
             subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=10:duration=8",
                             "-pix_fmt", "yuv420p", str(clip)], check=True)
             analyze.add_evidence(clip, clip, Path(tmp), [e], {"p/0": feet}, {"car#1": shapes}, {"p": boxes},
-                                 {"car#1": {}}, None, (320, 180))
+                                 {"car#1": {}}, None, (320, 180), [boxes])
             frames = analyze.frame_count(Path(tmp) / e["clip"])
     finally:
         analyze.listen.listen = old
@@ -1306,7 +1306,7 @@ def pack_folder(folder):
                                                                          "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
     out = Path(folder)
     (out / "events.json").write_text(json.dumps({"fps": 10, "exposure": {"minutes": 0.3}, "events": [e]}))
-    (out / "site.json").write_text(json.dumps({"name": "gate", "world_points": SQUARE_ROAD}))
+    (out / "site.json").write_text(json.dumps({"name": "gate", "image_points": SQUARE_IMG, "world_points": SQUARE_ROAD}))
     return out
 
 
@@ -1314,17 +1314,17 @@ def run_pack(out, *flags, ask=None, key=None, draw=None):
     """pack.main() on `out` with no network: `ask(prompt)` stands in for the letter model, `draw` for Muse Image (and
     with it a street photo). Returns each (prompt, stated notes) the letter step was asked with."""
     import contextlib, io, sys
-    calls, old = [], (sys.argv, pack.optional_key, pack.street_photo, pack.ask_plan, pack.draw_fix)
+    calls, old = [], (sys.argv, pack.optional_key, pack.street_photo, pack.ask_plan, pack.draw_fix, pack.photo_people)
     sys.argv = ["pack.py", str(out), str(out / "site.json"), *flags]
     pack.optional_key = lambda: key
     pack.street_photo = (lambda clip, path, *args: (path.write_bytes(b"jpeg"), path)[1]) if draw else lambda *args: None
     pack.ask_plan = lambda prompt, measured, key, photo, stated=(): (calls.append((prompt, stated)), ask(prompt))[1]
-    pack.draw_fix = draw or pack.draw_fix
+    pack.draw_fix, pack.photo_people = draw or pack.draw_fix, lambda *args: []
     try:
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
             pack.main()
     finally:
-        sys.argv, pack.optional_key, pack.street_photo, pack.ask_plan, pack.draw_fix = old
+        sys.argv, pack.optional_key, pack.street_photo, pack.ask_plan, pack.draw_fix, pack.photo_people = old
     return calls
 
 
@@ -1713,7 +1713,7 @@ def test_gap_barcode_colours_every_gap_and_links_the_near_misses():
     page = pack.page({"world_points": SQUARE_ROAD}, [], {"minutes": 1}, None, None, 10, timeline=timeline)
     assert "Gaps in traffic" in page
     with tempfile.TemporaryDirectory() as folder:  # analyze keeps the spans apart from the facts' exposure
-        analyze.write_events(Path(folder), {}, [], {"minutes": 1}, None, None, timeline)
+        analyze.write_events(Path(folder), {}, [], {"minutes": 1}, None, None, timeline=timeline)
         assert json.loads((Path(folder) / "events.json").read_text())["timeline"] == timeline
 
 
@@ -1972,7 +1972,7 @@ def test_desire_lines_are_crossings_not_pavement_walks():
     axis = road.road_axis({"car#1": tilt(1), "car#2": tilt(-1)}, fps)  # headings 1 and 179 degrees: the road is x
     assert abs(axis[1]) < 1e-9 and abs(abs(axis[0]) - 1) < 1e-9
     with tempfile.TemporaryDirectory() as folder:  # analyze keeps the paths apart from the facts' exposure
-        analyze.write_events(Path(folder), {}, [], {"minutes": 1}, None, None, None, DESIRE)
+        analyze.write_events(Path(folder), {}, [], {"minutes": 1}, None, None, paths=DESIRE)
         assert json.loads((Path(folder) / "events.json").read_text())["paths"] == DESIRE
 
 
@@ -2008,7 +2008,7 @@ def test_a_clip_without_near_misses_still_gets_its_letter_from_the_desire_lines(
         old = sys.argv, pack.optional_key, pack.street_photo, pack.ask_plan
         sys.argv = ["pack.py", folder, str(out / "site.json")]
         pack.optional_key, pack.street_photo = lambda: None, lambda *args: None  # no key, no network, no photo
-        pack.ask_plan = lambda prompt, measured, key, photo: asked.append(measured) or plan
+        pack.ask_plan = lambda prompt, measured, key, photo, stated=(): asked.append(measured) or plan
         try:
             for paths in ({}, DESIRE):
                 (out / "events.json").write_text(json.dumps({"fps": 10, "exposure": {"minutes": 0.3}, "events": [],

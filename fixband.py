@@ -260,7 +260,7 @@ def main():
         raise SystemExit("--band needs four road points x,y in metres, going round, all in front of the camera")
     events_file = out_dir / "events.json"
     events = pack.confirmed(json.loads(events_file.read_text())["events"]) if events_file.exists() else []
-    people = pack.photo_people(out_dir / "clip.mp4", site.get("person", "person"), site.get("person_mode") == "crowd")
+    people = pack.photo_people(out_dir / "clip.mp4", site.get("person", "person"))
     key = sam.load_api_key()
     dest.mkdir(parents=True, exist_ok=True)
     images, score = draw_in_band(out_dir / "street.jpg", args.fix, quad_m, quad, events, H, [t[0] for t in people if 0 in t],
