@@ -431,6 +431,7 @@ def main():
             measured = facts(site, events, seen)
             prompt = LETTER_PROMPT.format(facts=measured, language=site.get("letter_language", "English"))
             plan = ask_plan(prompt, measured, key, photo)
+            (out_dir / "plan.json").write_text(json.dumps(plan, indent=1, ensure_ascii=False))  # the paid-for letter
             if photo and key:  # Muse Image draws the fix; without a key there is no street image on the page
                 images = (photo.name, draw_fix(photo, plan["image_prompt"], key, out_dir / "street-fixed.jpg").name)
         except (SystemExit, OSError, ValueError, KeyError, IndexError, TypeError, AttributeError,

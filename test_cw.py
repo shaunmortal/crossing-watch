@@ -496,6 +496,28 @@ def test_a_second_model_judges_the_letter_and_its_objections_go_back():
     assert pack.read_problems('{"problems": ["a", 3, ""]}') == ["a"] and pack.read_problems("nonsense") is None
 
 
+def test_pack_saves_the_letter_plan_next_to_the_page():
+    import sys, tempfile
+    from pathlib import Path
+    e = {"person": "1/0", "vehicle": "car#1", "tier": "serious", "pet_s": 0.5, "vehicle_kmh": 30.0, "death_risk_pct": 1.5,
+         "t_person_s": 3.0, "t_vehicle_s": 3.5, "gap_m": 0.4, "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5},
+                                                                         "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
+    plan = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "PET 0.5 s, स्कूल.", "writer": "Muse Spark"}
+    with tempfile.TemporaryDirectory() as folder:
+        out = Path(folder)
+        (out / "events.json").write_text(json.dumps({"fps": 10, "exposure": {"minutes": 0.3}, "events": [e]}))
+        (out / "site.json").write_text(json.dumps({"name": "gate", "world_points": SQUARE_ROAD}))
+        old = sys.argv, pack.optional_key, pack.street_photo, pack.ask_plan
+        sys.argv = ["pack.py", folder, str(out / "site.json")]
+        pack.optional_key, pack.street_photo = lambda: None, lambda *args: None  # no key, no network, no photo
+        pack.ask_plan = lambda prompt, measured, key, photo: plan
+        try:
+            pack.main()
+        finally:
+            sys.argv, pack.optional_key, pack.street_photo, pack.ask_plan = old
+        assert json.loads((out / "plan.json").read_text()) == plan and "speed table" in (out / "index.html").read_text()
+
+
 def test_crowd_mode_can_cover_people_vehicles_or_both():
     import analyze
     site = {"person": "person", "vehicles": ["car", "motorcycle"]}
