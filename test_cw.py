@@ -893,8 +893,34 @@ def test_case_agent_stops_for_a_tape_measure_and_files_the_letter_only_when_it_a
     assert "How the agent worked this case" in page and "Video 7.0 m, tape 7.2 m, 3% off: proven" in page
     assert "Person: R2 answered: 7.2 m" in page and "approved" in page
     assert "off" in agent.letter_blocker({"tape_m": 9.0}, site, [e], "")  # 22% off: mark the calibration again
-    assert "numbers" in agent.letter_blocker({"tape_m": 7.2}, site, [e], "say 3 times")
-    assert agent.tape_metres("720 cm") == 7.2
+    assert "numbers" in agent.letter_blocker({"tape_m": 7.2, "tracked_with": agent.calibration(site)}, site, [e], "3")
+    assert agent.tape_metres("720 cm") == agent.tape_metres(" 7.2M ") == 7.2
+    assert all(raises_system_exit(lambda t=t: agent.tape_metres(t))
+               for t in ("7 ft", "24 feet", "7,2 m", "1,200 cm", "2 m 20 cm", "720", "7.2 mm"))  # never read as metres
+
+
+def test_case_agent_refuses_a_letter_tracked_before_the_calibration_points_were_marked_again():
+    """The check distance is re-read from the site file, but the near-misses come from the last track: after the
+    points are marked again the check agrees with the tape, yet the letter waits for a new track."""
+    import agent, contextlib, io, tempfile
+    old = agent.run_tracker, pack.ask_plan
+    agent.run_tracker = lambda p, site: {}
+    pack.ask_plan = lambda prompt, measured, key, photo: {"fix": "f", "letter": "l", "writer": "w"}  # never the network
+    try:
+        with tempfile.TemporaryDirectory() as folder, contextlib.redirect_stdout(io.StringIO()):
+            out, site, e = agent_case(folder)
+            p = {"out": str(out), "site": str(out / "site.json"), "tape_m": 7.2, "refusals": 0}
+            letter = lambda: agent.submit_letter(p, {"notes": ""}, "key")["summary"]
+            assert "call track" in letter()  # events.json from a run outside this case: not proven
+            agent.track(p, {"people": "video", "vehicles": "video"}, "key")
+            assert agent.letter_blocker(p, agent.case_site(p), [e], "") == ""
+            moved = {**site, "image_points": [[x + 5, y] for x, y in SQUARE_IMG]}  # still reads 7.0 m
+            (out / "site.json").write_text(json.dumps(moved))
+            assert "call track" in letter() and p["refusals"] == 2
+            agent.track(p, {"people": "video", "vehicles": "video"}, "key")
+            assert agent.letter_blocker(p, agent.case_site(p), [e], "") == ""
+    finally:
+        agent.run_tracker, pack.ask_plan = old
 
 
 def test_case_agent_stops_at_its_turn_and_dollar_caps():

@@ -76,13 +76,17 @@ LETTER_MODEL_URL=http://127.0.0.1:8080/v1 python3 pack.py out/VIDEO site.json
 
 `agent.py` is optional; analyze.py and pack.py never call it. Muse Spark works the case through five tools (track,
 review, measure, request_measurement, submit_letter), one tool per turn, with at most 25 turns per start and a $1
-cap on its own turns. Its one tracking decision: when SAM video hits its 16-object limit, it tracks that concept again
-in crowd mode. The site file marks a distance that was not used for calibration, `"check": {"what": "kerb to kerb at
-the zebra", "points": [[x, y], [x, y]]}`. The agent asks a person to tape it, and the letter is refused until the
-video and the tape agree within 15% (gate G2). Three refusals in a row go to a person. The head of the school then
-approves the letter or sends it back with notes. Every step goes to `out/VIDEO/case/agent_log.jsonl`, and the page
-shows "How the agent worked this case". No agent run has been made against the Meta API yet; a test drives it with
-a scripted model.
+cap on its own turns. That cap is an estimate at Muse Spark Open's Fireworks list price ($1.25 / $4.25 per million
+input / output tokens); the Meta API price of muse-spark-1.3 is NOT CHECKED. Tracking is outside the cap: SAM, Spark's
+pedestrian reviews and the sound check in analyze.py are billed apart, and analyze.py still refuses a SAM estimate
+over $10 without `--allow-cost`. Its one tracking decision: when SAM video hits its 16-object limit, it tracks that
+concept again in crowd mode, which bills SAM per image. The site file marks a distance that was not used for
+calibration, `"check": {"what": "kerb to kerb at the zebra", "points": [[x, y], [x, y]]}`. The agent asks a person to
+tape it (answered in m or cm), and the letter is refused until the video and the tape agree within 15% (gate G2) and
+the near-misses were tracked with the site's current calibration points. Three refusals in a row go to a person.
+The head of the school then approves the letter or sends it back with notes. Every step goes to
+`out/VIDEO/case/agent_log.jsonl`, and the page shows "How the agent worked this case". No agent run has been made
+against the Meta API yet; a test drives it with a scripted model.
 
 ```
 python3 agent.py VIDEO site.json                      # runs until it needs a person

@@ -29,11 +29,13 @@ import road
 import sam
 
 MAX_TURNS = 25           # model turns per start or resume (the workshop's turn limit); then the case pauses
-MAX_USD = 1.00           # Muse Spark spend on agent turns per case; the letter's own calls in pack.ask_plan are apart
-USD_PER_M_IN, USD_PER_M_OUT = 1.25, 4.25  # Spark's rate per 1M input / output tokens: Muse Spark Open's list price
+MAX_USD = 1.00           # estimated Spark spend on agent turns per case; tracking and pack.ask_plan's calls are apart
+# an estimate per 1M input / output tokens: Muse Spark Open's Fireworks list price (muse-spark-1.3's Meta API price
+# is not checked)
+USD_PER_M_IN, USD_PER_M_OUT = 1.25, 4.25
 MAX_REFUSALS = 3         # submit_letter refused this often in a row: a person is asked (the workshop's memo_refused)
 CHECK_TOLERANCE = 0.15   # GATES.md G2: a distance not used for calibration agrees with the tape within 15%
-TAPE = re.compile(r"([0-9]+(?:\.[0-9]+)?)\s*(cm)?", re.I)  # "7.2 m", "7.2" or "720 cm"
+TAPE = re.compile(r"\s*([0-9]+(?:\.[0-9]+)?)\s*(m|cm)\s*", re.I)  # the whole answer: "7.2 m", "7.2m" or "720 cm"
 LOG = "agent_log.jsonl"
 NUDGE = "Plain text is not accepted. Call exactly one tool."
 INSTRUCTIONS = """You work one near-miss case for a school. A phone filmed the crossing outside it; the head of the
@@ -80,6 +82,11 @@ def case_data(p):
     return data, pack.confirmed(data["events"]), seen
 
 
+def calibration(site):
+    """The site's calibration points as one string, to tell whether they were marked again since the last track."""
+    return json.dumps([site["image_points"], site["world_points"]])
+
+
 def check_distance(site):
     """The video's reading, in metres, of the site's check distance; None when the site marks none."""
     check = site.get("check")
@@ -115,8 +122,9 @@ def track(p, args, key):
     modes = {"person_mode": args.get("people"), "vehicle_mode": args.get("vehicles")}
     if not set(modes.values()) <= {"video", "crowd"}:
         return {"summary": "Refused: people and vehicles must each be \"video\" or \"crowd\"."}
-    full = run_tracker(p, {**case_site(p), **modes})
-    p["modes"] = modes
+    site = {**case_site(p), **modes}
+    full = run_tracker(p, site)
+    p["modes"], p["tracked_with"] = modes, calibration(site)
     data, events, _ = case_data(p)
     hit = [f"{c} in {n} of {total}" for c, (n, total) in full.items() if n]
     summary = (f"Tracked people in {modes['person_mode']} mode and vehicles in {modes['vehicle_mode']} mode: "
@@ -167,8 +175,8 @@ def off_share(video_m, tape):
 
 
 def letter_blocker(p, site, events, notes):
-    """Why the letter may not be written yet, or "": it needs near-misses and a taped check distance that agrees
-    with the video."""
+    """Why the letter may not be written yet, or "": it needs near-misses tracked in this case with the site's
+    current calibration points, and a taped check distance that agrees with the video."""
     video_m, tape = check_distance(site), p.get("tape_m")
     if not events:
         return "no near-misses were measured, so there is nothing to report"
@@ -179,6 +187,8 @@ def letter_blocker(p, site, events, notes):
     if off_share(video_m, tape) > CHECK_TOLERANCE:
         return (f"video {video_m:.1f} m, tape {tape:g} m: {off_share(video_m, tape):.0%} off, more than "
                 f"{CHECK_TOLERANCE:.0%}, so the calibration points must be marked again")
+    if p.get("tracked_with") != calibration(site):
+        return "the near-misses were not tracked with the site's current calibration points: call track again"
     if re.search(r"\d", notes):
         return "notes may not hold numbers: a letter's numbers come only from the measurements"
     return ""
@@ -261,7 +271,7 @@ def drive(p, key):
     for _ in range(MAX_TURNS):
         if p["usd"] >= MAX_USD:
             p["status"] = "over_budget"
-            save(p, {"summary": f"Stopped: agent turns cost ${p['usd']:.2f}, the cap is ${MAX_USD:.2f}."})
+            save(p, {"summary": f"Stopped: agent turns cost about ${p['usd']:.2f}, the cap is ${MAX_USD:.2f}."})
             return p["status"]
         body = {"model": review.MODEL, "instructions": INSTRUCTIONS, "input": p["messages"], "tools": TOOLS,
                 "parallel_tool_calls": False, "store": False, "reasoning": {"effort": "low"}}
@@ -306,8 +316,10 @@ def case_section(out_dir):
     items = "".join(f"<li>{'Person: ' if s.get('person') else ''}{html.escape(s['summary'])}</li>" for s in steps)
     turns, usd = sum("turn" in s for s in steps), max([s.get("usd", 0) for s in steps] or [0])
     return (f'<section><h2>How the agent worked this case</h2><ol>{items}</ol><p class="note">Muse Spark chose one '
-            f"tool per turn: {turns} turns, about ${usd:.2f} at ${USD_PER_M_IN:g} / ${USD_PER_M_OUT:g} per million "
-            "input / output tokens. Steps marked Person were a person's answers.</p></section>")
+            f"tool per turn: {turns} turns, about ${usd:.2f}, estimated at Muse Spark Open's Fireworks list price of "
+            f"${USD_PER_M_IN:g} / ${USD_PER_M_OUT:g} per million input / output tokens; the Meta API price of "
+            f"{review.MODEL} was not checked. Tracking (SAM, Spark's pedestrian reviews, the sound check) is billed "
+            "apart and is not in this figure. Steps marked Person were a person's answers.</p></section>")
 
 
 def write_page(p, images=None):
@@ -332,10 +344,11 @@ def sign_off(p, key):
 
 
 def tape_metres(text):
-    match = TAPE.search(text)
-    metres = float(match[1]) / (100 if match and match[2] else 1) if match else 0
+    """The taped length in metres. Only "N m" or "N cm" is read, so "7 ft", "7,2 m" or a bare "720" is refused."""
+    match = TAPE.fullmatch(text)
+    metres = float(match[1]) / (100 if match[2].lower() == "cm" else 1) if match else 0
     if metres <= 0:
-        raise SystemExit(f"answer with the taped length, e.g. \"7.2 m\", not {text!r}")
+        raise SystemExit(f"answer with the taped length in m or cm, e.g. \"7.2 m\", not {text!r}")
     return metres
 
 
