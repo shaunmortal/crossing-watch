@@ -30,6 +30,7 @@ from pathlib import Path
 
 import ailabel
 import crowd
+import filmcheck
 import fixband
 import openweights
 import overlay
@@ -96,6 +97,7 @@ SENTENCE = re.compile(r"(?<=[.!?])\s+|\n")
 SHOWN_FILE = re.compile(r'\b(?:src|poster)="([^"#?]+)')  # a file the page shows (clip, poster, picture), no #t=...
 UNSHAREABLE = re.compile(r"clip\.mp4|person-.*\.jpg")  # the unblurred video and the unblurred crops Spark saw
 PLAN_KEYS = ("fix", "why", "image_prompt", "letter")
+UNSURE = "pedestrian (Spark unsure; kept)"  # review.gated kept someone Spark called "unclear" (review_unclear)
 PLAN_SCHEMA = {"type": "object", "properties": {k: {"type": "string"} for k in PLAN_KEYS}, "required": list(PLAN_KEYS),
                "additionalProperties": False}  # the plan's shape only, for an open-weights server
 NUMBER_LOCK = os.environ.get("LETTER_MODEL_NUMBER_LOCK", "") == "1"  # opt-in: on Fireworks (29 Oct) the number
@@ -217,7 +219,7 @@ def facts(site, events, seen, paths=None):
                    "road_user": review.unconfirmed_rider(e.get("review"))
                    or (e.get("review") or {}).get("road_user", "not reviewed")} for e in worst],
         "risk_source": "Rosén & Sander 2009, adults 15+, car fronts",
-        "engineering": engineering_lines(seen, None),
+        "engineering": engineering_lines(seen, None, site),
         **({"desire_lines": " ".join(desire)} if desire else {}),
     }, indent=1, ensure_ascii=False)  # \u escapes would add digits the number check counts as measured
 
@@ -295,9 +297,11 @@ def headline(events, seen, site):
 
 
 
-def engineering_lines(seen, cost):
+def engineering_lines(seen, cost, site=None):
     """The numbers road engineers already use, from the same tracks: PV^2 (IRC:103-2012) and gaps in traffic
-    (UK Traffic Signs Manual ch. 6), plus what the tracking cost. Rates from a short video are scaled, and say so."""
+    (UK Traffic Signs Manual ch. 6), plus what the tracking cost. Rates from a short video are scaled, and say so.
+    For a site in India, the moving vehicles over India's school-zone speed, also when none was (older events.json
+    files have no over_25_kmh, so their facts stay the same)."""
     minutes = watched_minutes(seen)
     if not minutes:
         return []
@@ -324,6 +328,10 @@ def engineering_lines(seen, cost):
                      f"more, longest {seen['longest_gap_s']} s (the first and last are cut short by the video). "
                      f"UK Traffic Signs Manual ch. 6 (13.5.2): 4-6 s is an "
                      f"acceptable gap at urban speeds; other groups, such as children, may need 10-12 s or longer.")
+    if site and in_india(site) and "over_25_kmh" in seen:
+        lines.append(f"{seen['over_25_kmh']} of {seen.get('vehicles', '?')} moving vehicles passed faster than "
+                     f"{road.IN_SCHOOL_KMH} km/h, the speed India's Motor Vehicles (Driving) Regulations 2017 "
+                     "(reg. 16(5)) set past schools and hospitals where signed.")
     if cost and cost.get("sam_usd") is not None:
         images = f" (about ${cost['image_usd']:.2f} of it image detection)" if cost.get("image_usd") else ""
         lines.append(f"SAM cost for this pack: about ${cost['sam_usd']:.2f} at Meta's list prices{images}, so about "
@@ -331,8 +339,8 @@ def engineering_lines(seen, cost):
     return lines
 
 
-def engineering(seen, cost):
-    lines = engineering_lines(seen, cost)
+def engineering(seen, cost, site=None):
+    lines = engineering_lines(seen, cost, site)
     if not lines:
         return ""
     items = "".join(f"<li>{html.escape(line)}</li>" for line in lines)
@@ -649,7 +657,8 @@ def article(word):
 def passed(e):
     """Who the vehicle passed, by Spark's review: the road user and, escaped, "a ..." / "an ..."."""
     verdict = e.get("review") or {}
-    road_user = verdict.get("road_user", "pedestrian (not reviewed by Spark)")
+    road_user = (UNSURE if verdict.get("review_unclear") else
+                 verdict.get("road_user", "pedestrian (not reviewed by Spark)"))
     road_user = review.unconfirmed_rider(verdict) or ("pedestrian" if road_user == "unclear" else road_user)
     return road_user, html.escape(article(road_user))
 
@@ -827,20 +836,58 @@ def pyramid(events, seen):
 def receipt_line(data, plan, images):
     """What made this pack, said by code: the analysis run's wall-clock minutes and the SAM requests it sent (none:
     every reply came from cache), the people Muse Spark looked at, the moments Muse Wonder listened to, the letter's
-    tries and the Muse Image picture. Counts only: dollars are for SAM alone, in the cost line."""
+    tries and the Muse Image picture, and the camera check (camera_note). Counts only: dollars are for SAM alone, in
+    the cost line."""
     run, events = data.get("run") or {}, data.get("events", [])
     sent = run.get("sam_requests")
     parts = ([f"the analysis ran {run['minutes']:g} minutes and " + (
         f"sent {sent} new SAM request{'' if sent == 1 else 's'}" if sent else
         "took every SAM reply from cache, so it paid nothing new")] if run else [])
     looked, heard = len({e["person"] for e in events if e.get("review")}), sum(e.get("heard") is not None for e in events)
-    parts += [f"Muse Spark looked at {looked} {'person' if looked == 1 else 'people'}"] if looked else []
+    reused = run.get("spark_reused") or 0  # same footage, same numbers: verdicts read from an earlier run's replies
+    again = (f" ({reused} of {run.get('spark_reviewed', '?')} verdicts reused from an earlier run: same crops, same "
+             "replies)" if reused else "")
+    parts += [f"Muse Spark looked at {looked} {'person' if looked == 1 else 'people'}{again}"] if looked else []
     parts += [f"Muse Wonder listened around {heard} near-miss{'' if heard == 1 else 'es'}"] if heard else []
     if plan and plan.get("tries"):
         parts.append(f"{plan.get('writer') or 'the model'} wrote the letter in {plan['tries']} "
                      f"tr{'y' if plan['tries'] == 1 else 'ies'}")
     parts += ["Muse Image drew 1 picture"] if images else []
+    start_s = ((data.get("exposure") or {}).get("window_s") or [0])[0]
+    parts += [camera] if (camera := camera_note(data.get("camera"), start_s)) else []
     return f"Receipt: {'; '.join(parts)}. Dollar costs on this page are for SAM only." if parts else ""
+
+
+def camera_note(camera, start_s=0):
+    """events.json's "camera" (filmcheck.steadiness on the analysed clip) for the receipt, with its clip seconds moved
+    to the recording's time (`start_s`: window_s's start); "" without one. A move says positions after it are off,
+    never that speeds or PETs are wrong; a check that stopped on a dark frame says so, not that the camera held."""
+    if not camera:
+        return ""
+    at = lambda key: filmcheck.clock(camera[key] + start_s)
+    width, notes = filmcheck.STEADY_WIDTH, []
+    if camera.get("moved"):
+        notes.append(f"the camera moved {max(map(abs, camera['dx_dy']))} px (of {width}) at {at('at_s')} into the "
+                     "recording, so positions after that are off")
+    elif camera.get("at_s") is not None:
+        notes.append(f"the largest camera shift was {camera['max_shift_px']} px (of {width}), at {at('at_s')}")
+    if "darker_pct" in camera:
+        notes.append(f"the picture was {camera['darker_pct']}% darker by {at('dark_at_s')}, where the camera check "
+                     "stopped")
+    return "; ".join(notes)
+
+
+def removed_note(events):
+    """The tracks Muse Spark's review removed, the same ones confirmed() and real_crossers() leave out: each track,
+    what Spark called it and its reason as review.public_reason shows it (never a crop); "" when none was."""
+    removed = {}
+    for e in events:
+        if (e.get("review") or {}).get("is_person") is False:
+            removed.setdefault(e["person"], e["review"])
+    said = [f"track {pid}, {v['road_user']}" + (f' ("{why}")' if (why := review.public_reason(v.get("reason"))) else "")
+            for pid, v in removed.items()]
+    return (f"Removed by Muse Spark: {len(said)} track{'' if len(said) == 1 else 's'} ({'; '.join(said)}). Spark can "
+            "be wrong." if said else "")
 
 
 def window_line(window, recording_s=None):
@@ -1074,11 +1121,12 @@ def top(site, events, seen, plan, images, signoff, full, warning, lines):
 
 
 def page(site, events, seen, plan, images, fps, cost=None, full=None, privacy=None, signoff=None, receipt="",
-         source_sha256=None, timeline=None, ground=None, paths=None, case="", walking=None, recording_s=None):
+         source_sha256=None, timeline=None, ground=None, paths=None, case="", walking=None, recording_s=None,
+         removed=""):
     warning = banner(walking, site)  # then the headline, pyramid, engineering numbers, barcode and card numbers go
     lines = [] if warning else headline(events, seen, site)  # its ranges and school-year line go under the pyramid
     ranges = "".join(f'<p class="note">{html.escape(line)}</p>' for line in lines[1:])
-    measured = "" if warning else (f"{pyramid(events, seen)}{ranges}\n{engineering(seen, cost)}"
+    measured = "" if warning else (f"{pyramid(events, seen)}{ranges}\n{engineering(seen, cost, site)}"
                                    f"{roadmap.gap_strip(timeline, events, SHOWN_EVENTS, full)}")
     moments = "Tracked moments, not measurements (see the warning above)" if warning else "Worst moments"
     cards = "\n".join(tracked_card(i + 1, e) if warning else
@@ -1097,7 +1145,7 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None, privacy=No
 {map_section(events, site, ground, paths, not warning)}<section id="clips"><h2>{moments}</h2>{cards}</section>{fix_section(plan, images)}{fixband.figure(images)}{legal_section(site)}
 {letter_section(plan, events[:SHOWN_EVENTS], facts(site, events, seen, paths), signoff)}{case}
 {tct_section("" if warning else passmark.after_mark(events, seen))}<section id="method"><h2>How this was measured</h2><p class="note">{html.escape(method)}</p>{privacy_note(privacy)}
-{f'<p class="note">{html.escape(receipt)}</p>' if receipt else ""}{hash_line(source_sha256, site, seen.get("window_s"), recording_s)}</section>"""
+{f'<p class="note">{html.escape(receipt)}</p>' if receipt else ""}{f'<p class="note">{html.escape(removed)}</p>' if removed else ""}{hash_line(source_sha256, site, seen.get("window_s"), recording_s)}</section>"""
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Crossing Watch evidence</title>
 <style>{STYLE}{summary.STYLE}{roadmap.STYLE}{overlay.STYLE}</style></head><body>
@@ -1316,7 +1364,8 @@ def main():
     page_html = page(site, events, seen, plan, images, data["fps"], data.get("cost"), data.get("sam_full_requests"),
                      data.get("privacy"), signoff=signoff, receipt=receipt_line(data, plan, images),
                      source_sha256=data.get("source_sha256"), timeline=data.get("timeline"), ground=ground,
-                     paths=paths, walking=data.get("walking"), recording_s=data.get("recording_s"))
+                     paths=paths, walking=data.get("walking"), recording_s=data.get("recording_s"),
+                     removed=removed_note(data["events"]))
     (out_dir / "index.html").write_text(page_html)
     seal.write_sums(share(out_dir, page_html))  # the only folder to publish, and its hashes
     counts = ("not measurements, see the page's warning" if untrusted else

@@ -3555,6 +3555,44 @@ def test_a_window_page_says_which_minutes_were_analysed_and_caps_the_school_year
     assert pack.headline(events, seen, {**school, "dismissal_minutes": 10})[-1].endswith("10-minute dismissals).")
 
 
+def test_page_names_spark_removals_unsure_people_the_25_kmh_count_and_the_camera_check():
+    """A track Spark's review removed is named in a page note (its reason cut, never one with a digit, no crop path);
+    someone Spark was unsure of is "pedestrian (Spark unsure; kept)"; an Indian site's engineering numbers count the
+    vehicles over 25 km/h, 0 included, and an older events.json keeps the same facts; the receipt says how many Spark
+    verdicts were reused and what the camera check found, in the recording's time."""
+    unsure = review.gated({"is_person": False, "road_user": "unclear", "reason": "too small"}, {}, [])
+    assert pack.passed({"review": unsure})[0] == "pedestrian (Spark unsure; kept)"
+    assert pack.passed({"review": {"is_person": True, "road_user": "unclear"}})[0] == "pedestrian"
+    pole = {"is_person": False, "road_user": "not a person", "reason": "a pole"}
+    events = [{"person": "c1/0", "review": pole}, {"person": "c1/0", "review": pole},
+              {"person": "c2/0", "review": {"is_person": False, "road_user": "rider", "reason": "plate MP04 AB"}},
+              {"person": "c3/0", "review": unsure}, {"person": "c4/0"}]
+    note = pack.removed_note(events)
+    assert note == ('Removed by Muse Spark: 2 tracks (track c1/0, not a person ("a pole"); track c2/0, rider). '
+                    "Spark can be wrong.")
+    assert pack.removed_note(events[3:]) == ""
+    page = pack.page({"name": "gate", "world_points": SQUARE_ROAD}, [], {"minutes": 15.0}, None, None, 10, removed=note)
+    assert html.escape(note) in page and "MP04" not in page and "person-" not in page
+    seen = {"minutes": 20.0, "crossings": 100, "vehicles": 5, "over_25_kmh": 0}
+    india = pack.engineering_lines(seen, None, {"country": "IN"})
+    assert india[-1] == ("0 of 5 moving vehicles passed faster than 25 km/h, the speed India's Motor Vehicles "
+                         "(Driving) Regulations 2017 (reg. 16(5)) set past schools and hospitals where signed.")
+    assert pack.engineering_lines(seen, None, {"country": "GB"}) == india[:-1]
+    older = {k: v for k, v in seen.items() if k != "over_25_kmh"}
+    assert pack.engineering_lines(older, None, {"country": "IN"}) == india[:-1]
+    run = {"minutes": 1.0, "sam_requests": 0, "spark_reviewed": 4, "spark_reused": 3}
+    looked = [{"person": f"c{i}/0", "review": {"is_person": True, "road_user": "adult"}} for i in range(4)]
+    moved = {"max_shift_px": 9, "at_s": 120.0, "moved": True, "dx_dy": [-7, 2]}
+    line = pack.receipt_line({"run": run, "events": looked, "camera": moved, "exposure": {"window_s": [130, 1030]}},
+                             None, None)
+    assert "Muse Spark looked at 4 people (3 of 4 verdicts reused from an earlier run: same crops, same replies)" in line
+    assert "the camera moved 7 px (of 640) at 4:10 into the recording, so positions after that are off" in line
+    dark = {"max_shift_px": 2, "at_s": 60.0, "moved": False, "dx_dy": [2, 0], "darker_pct": 45, "dark_at_s": 300.0}
+    assert pack.camera_note(dark) == ("the largest camera shift was 2 px (of 640), at 1:00; the picture was 45% "
+                                      "darker by 5:00, where the camera check stopped")
+    assert pack.camera_note(None) == "" and "camera" not in pack.receipt_line({"run": run, "events": []}, None, None)
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):
