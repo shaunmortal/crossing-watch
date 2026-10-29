@@ -8,7 +8,10 @@ import math
 import statistics
 
 CONFLICT_RADIUS_M = 1.0   # a vehicle edge this close to where a pedestrian stood counts as the same spot
-PET_MAX_S = 1.5           # traffic-conflict studies treat PET under ~1.5 s as a serious conflict
+# 1.5 s: Ankunda, Ali & Mohanty 2024 (AAP 203:107633), 11 h of AI-processed video at an Indian midblock crossing,
+# found crash risk rises with the 5-min count of PET < 1.5 s; Mumbai (Marisamynathan & Vedagiri 2020, mean PET per
+# pedestrian) and Thiruvananthapuram school zones (Manisha et al. 2025, PET per site) flag under 2 s as high risk.
+PET_MAX_S = 1.5           # under this a serious conflict
 CLOSE_PASS_S = 3.0        # 1.5-3 s is reported as a "close pass": never let a short video read as "safe"
 UNSEEN_S = 0.5            # SAM missed the person or vehicle this long around its moment: crowd mode inferred its position
 BEFORE_S = 2.0            # kmh_2s_before: the vehicle's speed this long before it reached the spot

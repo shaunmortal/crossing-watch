@@ -1,7 +1,7 @@
 """Paid test, about $0.15: does SAM's single concept "vehicle" find what "car", "motorcycle" and "auto rickshaw" find?
 Frames that crowd mode already sent with those three concepts go to SAM once more as images with the concept
 "vehicle", and each frame's "vehicle" boxes are matched against the three concepts' cached boxes. Adopt "vehicle" at
-ADOPT_RECALL or better: it cuts vehicle image requests 3x (README "Cost"). Until a run says so, it is not adopted.
+ADOPT_RECALL or better: it cuts vehicle image requests 3x (README "Scale"). Until a run says so, it is not adopted.
 
   python3 vehicle_test.py out/indian-crowd            # prints what it would cost; sends nothing
   python3 vehicle_test.py out/indian-crowd --spend    # sends the uncached images (at most $0.20)

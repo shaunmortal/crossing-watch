@@ -7,6 +7,7 @@ import statistics
 import road
 
 NORMAL_MPS = 1.3  # normal walking, 1.2-1.5 m/s; DUT's and SinD's own pedestrian tracks give medians of 1.22 and 1.13
+# Mumbai crosswalks, 1,398 pedestrians: 50th percentile 1.27 m/s, 15th percentile 1.08 m/s (Marisamynathan & Vedagiri 2020)
 FAST_MPS = 2.4    # median above this: sped up, or the scale too large (real videos 1.05-1.66; the Indian time-lapse 2.71)
 SLOW_MPS = 0.5    # median below this: slowed down, or the scale too small (real videos 0.80 at the lowest)
 MIN_PIECES = 10   # fewer walking pieces than this are not judged (the fewest on a real video we measured: 11)
