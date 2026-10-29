@@ -101,6 +101,9 @@ revision and sha256 checks, `-c 32768`, medium reasoning, the card's sampling), 
 `judge-bench-public.json` (every letter, both raw replies, the vote) next to `<removed-run-record>`. Glimmer's
 2-vote numbers are not measured yet: they come from that run.
 
+The case agent (`agent.py`) can also take its turns on Muse Spark Open on Fireworks (`AGENT_MODEL_URL`, see the
+README's case agent section); no such run has been made yet.
+
 ## Runs still to come
 
 1. **Kaggle Version 3, the clean bench** (free GPU, no paid call; Kaggle step). Zip one commit:

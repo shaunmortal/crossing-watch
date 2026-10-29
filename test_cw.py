@@ -4115,6 +4115,167 @@ def test_writers_table_prices_each_letter_from_its_run_record_and_marks_what_it_
     doc = Path(__file__).with_name("kaggle").joinpath("open-weights.md").read_text()
     assert "\n".join(writers_table.table(writers_table.RECORDS)) in doc
 
+
+def chat_reply(name=None, arguments="{}", tokens=(2000, 100)):
+    """A Chat Completions reply, as Fireworks sends one: a tool call (or plain text with reasoning_content) and usage."""
+    message = {"role": "assistant", "content": None if name else "I will track first.", "reasoning_content": "Think."}
+    if name:
+        message["tool_calls"] = [{"id": f"tc-{name}", "type": "function",
+                                  "function": {"name": name, "arguments": arguments}}]
+    return {"id": "chatcmpl-1", "choices": [{"message": message, "finish_reason": "tool_calls" if name else "stop"}],
+            "usage": {"prompt_tokens": tokens[0], "completion_tokens": tokens[1],
+                      "completion_tokens_details": {"reasoning_tokens": 40}}}
+
+
+def open_agent(server, model="accounts/fireworks/models/muse-spark-open", key=""):
+    """Points openagent at the fake server; returns the old settings for restore_agent."""
+    import openagent
+    old = openagent.URL, openagent.MODEL, openagent.KEY
+    openagent.URL, openagent.MODEL, openagent.KEY = f"http://127.0.0.1:{server.server_port}/v1", model, key
+    return old
+
+
+def restore_agent(old, server):
+    import openagent
+    openagent.URL, openagent.MODEL, openagent.KEY = old
+    server.shutdown()
+    server.server_close()
+
+
+def test_case_agent_on_open_weights_works_the_case_to_the_tape_measure():
+    """AGENT_MODEL_URL: the turns go to an OpenAI-compatible server (a local fake of Fireworks): an HTTP error pauses
+    the case, plain text with reasoning_content is sent back, a malformed call is reported and recovered from, and
+    the case stops for a tape measure; every turn's model, usage and wall time are logged, and the page names the
+    model. The case cannot then resume on Muse Spark."""
+    import agent, contextlib, io, openagent, tempfile
+    replies = [500, chat_reply(), chat_reply("track", '{"people": "video"'),
+               chat_reply("track", '{"people": "video", "vehicles": "video"}'), chat_reply("measure"),
+               chat_reply("request_measurement")]
+    server, seen = fake_open_model(replies)
+    old, old_tracker = open_agent(server), agent.run_tracker
+    agent.run_tracker = lambda p, site: {"person": [0, 1]}
+    try:
+        with tempfile.TemporaryDirectory() as folder, contextlib.redirect_stdout(io.StringIO()):
+            out, _, _ = agent_case(folder)
+            run = lambda: agent.work(out / "video.mp4", out / "site.json", out, "meta-key")
+            assert run() == "paused" and run() == "needs_input"
+            progress = json.loads((out / "case" / "progress.json").read_text())
+            log = [json.loads(line) for line in (out / "case" / agent.LOG).read_text().splitlines()]
+            section = agent.case_section(out)
+            label = openagent.label()
+            openagent.URL = ""
+            switched = stopped(run)
+    finally:
+        agent.run_tracker = old_tracker
+        restore_agent(old, server)
+    bodies = [body for _, body, _ in seen]
+    assert replies == [] and all(path == "/v1/chat/completions" for path, _, _ in seen) and len(bodies) == 6
+    assert all(b["model"] == "accounts/fireworks/models/muse-spark-open" and b["parallel_tool_calls"] is False
+               and b["tool_choice"] == "auto" and b["messages"][0] == {"role": "system", "content": agent.INSTRUCTIONS}
+               for b in bodies)
+    assert [t["function"]["name"] for t in bodies[0]["tools"]] == [t["name"] for t in agent.TOOLS]
+    assert bodies[0]["tools"][0]["function"]["parameters"]["required"] == ["people", "vehicles"]
+    assert bodies[2]["messages"][-1] == {"role": "user", "content": agent.NUDGE}  # plain text: told to call a tool
+    assert not any("reasoning_content" in m for b in bodies for m in b["messages"])
+    bad, told = bodies[3]["messages"][-2:]
+    assert bad["tool_calls"][0]["function"]["arguments"] == "{}" and told["tool_call_id"] == bad["tool_calls"][0]["id"]
+    assert "track failed" in json.loads(told["content"])["summary"]
+    assert '"people": "video", "vehicles": "video"' in bodies[4]["messages"][-2]["tool_calls"][0]["function"]["arguments"]
+    turns = [s for s in log if "turn" in s]
+    assert progress["status"] == "needs_input" and progress["requests"][0]["kind"] == "measurement"
+    assert progress["agent_model"] == label == "Muse Spark Open (open weights, self-hosted)" and len(turns) == 5
+    assert all(s["model"] == label and s["usage"]["prompt_tokens"] == 2000 and isinstance(s["wall_s"], float)
+               for s in turns)
+    assert "Paused: the model call failed (HTTP Error 500" in log[0]["summary"]
+    assert abs(progress["usd"] - 5 * (2000 * 1.25 + 100 * 4.25) / 1e6) < 1e-9
+    assert f"{label} chose one tool per turn: 5 turns" in section and "list price for accounts/fireworks/models" in section
+    assert "is a case Muse Spark Open (open weights, self-hosted) worked, not Muse Spark" in switched
+    assert openweights_label_on_fireworks() == "Muse Spark Open (open weights, on Fireworks)"
+
+
+def openweights_label_on_fireworks():
+    import openweights
+    return openweights.label("https://api.fireworks.ai/inference/v1", "accounts/fireworks/models/muse-spark-open")
+
+
+def test_case_agent_on_open_weights_keeps_its_turn_and_dollar_caps_at_the_fireworks_price():
+    """The $1 cap prices the open model's turns at writers_table's quoted Fireworks price; the turn cap pauses; a
+    model with no quoted price stops before any turn."""
+    import agent, contextlib, io, openagent, tempfile
+    server, seen = fake_open_model([chat_reply(), chat_reply(), chat_reply(tokens=(10000, 1000))])
+    old, caps = open_agent(server), (agent.MAX_TURNS, agent.MAX_USD)
+    try:
+        with tempfile.TemporaryDirectory() as folder, contextlib.redirect_stdout(io.StringIO()):
+            out, _, _ = agent_case(folder)
+            run = lambda: agent.work(out / "video.mp4", out / "site.json", out, "key")
+            agent.MAX_TURNS = 2
+            assert run() == "paused" and len(seen) == 2
+            agent.MAX_USD = 0.01  # two turns cost $0.0059, the third $0.0168 more
+            assert run() == "over_budget" and len(seen) == 3 and raises_system_exit(run)
+        with tempfile.TemporaryDirectory() as folder, contextlib.redirect_stdout(io.StringIO()):
+            out, _, _ = agent_case(folder)
+            openagent.MODEL = "some-unpriced-model"
+            unpriced = stopped(lambda: agent.work(out / "video.mp4", out / "site.json", out, "key"))
+    finally:
+        agent.MAX_TURNS, agent.MAX_USD = caps
+        restore_agent(old, server)
+    assert "quotes no price for some-unpriced-model" in unpriced and len(seen) == 3
+
+
+def test_case_agent_on_open_weights_sends_no_key_to_another_host():
+    """FIREWORKS_API_KEY goes only to Fireworks' API, the Meta key never to the open model's server; a key set with
+    AGENT_MODEL_KEY goes to that server."""
+    import agent, contextlib, io, openagent, openweights, os, tempfile
+    server, seen = fake_open_model([chat_reply(), chat_reply()])
+    old, old_env = open_agent(server), os.environ.get("FIREWORKS_API_KEY")
+    os.environ["FIREWORKS_API_KEY"] = "fw-test-secret"
+    try:
+        with tempfile.TemporaryDirectory() as folder, contextlib.redirect_stdout(io.StringIO()):
+            out, _, _ = agent_case(folder)
+            agent.MAX_TURNS, caps = 1, agent.MAX_TURNS
+            try:
+                agent.work(out / "video.mp4", out / "site.json", out, "meta-secret")
+                openagent.KEY = "agent-secret"
+                agent.work(out / "video.mp4", out / "site.json", out, "meta-secret")
+            finally:
+                agent.MAX_TURNS = caps
+        to_fireworks = openweights.server_key("https://api.fireworks.ai/inference/v1", "")
+    finally:
+        os.environ.pop("FIREWORKS_API_KEY")
+        if old_env is not None:
+            os.environ["FIREWORKS_API_KEY"] = old_env
+        restore_agent(old, server)
+    sent = [json.dumps(body) + json.dumps(headers) for _, body, headers in seen]
+    assert len(sent) == 2 and not any("fw-test-secret" in s or "meta-secret" in s for s in sent)
+    assert "Authorization" not in seen[0][2] and seen[1][2]["Authorization"] == "Bearer agent-secret"
+    assert to_fireworks == "fw-test-secret"
+
+
+def test_case_agent_without_agent_model_url_talks_to_muse_spark_as_before():
+    """The default path: the Responses API body as before, the log and page name Muse Spark at its Meta API price,
+    and a case saved before AGENT_MODEL_URL existed resumes on Spark."""
+    import agent, contextlib, io, openagent, tempfile
+    bodies, old = [], (agent.spark_turn, agent.MAX_TURNS, openagent.URL)
+    agent.spark_turn, agent.MAX_TURNS, openagent.URL = scripted_spark([None, None], bodies), 1, ""
+    try:
+        with tempfile.TemporaryDirectory() as folder, contextlib.redirect_stdout(io.StringIO()):
+            out, _, _ = agent_case(folder)
+            run = lambda: agent.work(out / "video.mp4", out / "site.json", out, "key")
+            assert run() == "paused"
+            saved = out / "case" / "progress.json"
+            progress = json.loads(saved.read_text())
+            saved.write_text(json.dumps({k: v for k, v in progress.items() if k != "agent_model"}))
+            assert run() == "paused" and len(bodies) == 2
+            log = [json.loads(line) for line in (out / "case" / agent.LOG).read_text().splitlines()]
+            section = agent.case_section(out)
+    finally:
+        agent.spark_turn, agent.MAX_TURNS, openagent.URL = old
+    assert set(bodies[0]) == {"model", "instructions", "input", "tools", "parallel_tool_calls", "store", "reasoning"}
+    assert bodies[0]["model"] == "muse-spark-1.3" and bodies[0]["tools"] == agent.TOOLS
+    assert progress["agent_model"] == "Muse Spark" and all(s["model"] == "Muse Spark" for s in log if "turn" in s)
+    assert log[0]["input_tokens"] == 2000 and log[0]["usage"] == {"input_tokens": 2000, "output_tokens": 100}
+    assert f"Muse Spark chose one tool per turn: 2 turns, about $0.01, estimated at the {agent.PRICE}" in section
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):
