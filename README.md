@@ -23,7 +23,7 @@ date is promised.
 | Track every pedestrian and vehicle through the video | **SAM 3.1** (one concept per request: person, car, motorcycle, auto rickshaw...); in crowds, SAM image detection 5 times a second plus our tracker | `sam.py`, `crowd.py` |
 | Pixels to metres on the road | 4-point homography from a rectangle marked on the road | `road.py`, `calibrate.html` |
 | Clean the tracks | Drop riders inside vehicle boxes, split tracks where the ID jumps, ignore static objects, cut-off boxes and teleport speeds | `road.py` |
-| Near-miss | Post-encroachment time (PET) under 1.5 s, within 1 m, vehicle over 10 km/h | `road.py` |
+| Near-miss | Post-encroachment time (PET) under 1.5 s, within 1 m, vehicle over 10 km/h (why 1.5 s: Sources) | `road.py` |
 | Severity | Adult death risk at that speed, Rosén & Sander (2009); replay under 30 and 20 km/h limits | `road.py` |
 | Numbers road engineers use | Pedestrians and vehicles an hour, PV² (IRC:103-2012), 85th-percentile speed, and gaps in traffic of 6 s and 12 s where people actually crossed (UK Traffic Signs Manual ch. 6) | `road.py`, `pack.py` |
 | Second look | **Muse Spark** checks each clip: is that a person, and who (child, elderly, wheelchair user...) | `review.py` |
@@ -441,7 +441,7 @@ not the true speed-up, and a video sped up less than about 2x would pass.
 |---|---|---|
 | A funded near-miss study (a 2020 Canadian programme) | about $5,000 per intersection | a full study |
 | Telraam S2 window sensor | €199 per sensor | traffic counts, no near-misses |
-| Crossing Watch, SAM only, at Meta's list prices | about $4-8 for a 15-minute dismissal (video mode); $34-79 frame by frame for dense crowds | a first screen that tells the authority where to do a full study |
+| Crossing Watch, SAM only, at Meta's list prices | about $4-8 for a 15-minute dismissal (video mode); $34-79 frame by frame for dense crowds | a first screen that tells the authority where to do a full study; not a crash forecast (the Indian crash model in Related work, Ankunda et al., used 11 hours of video) |
 
 The video-mode range is counted from the cached SAM replies of our two real-street test clips and scaled to 15
 minutes, at $0.20 per 1,000 frames billed (at least 50 a request, the 2 s overlaps included): a school crossing on
@@ -490,8 +490,42 @@ python3 vehicle_test.py out/indian-crowd --spend   # 60 cached crowd frames, abo
 - Box jitter alone gives a queued car an apparent speed of a few km/h. That is well under the 10 km/h "moving"
   threshold, so it does not create events, but very slow vehicles are not measured precisely.
 
+## Related work
+
+Measuring near-misses from video is not new, in India either. Each line says only what its source says:
+
+- Ismail, Sayed, Saunier & Lim (2009) analysed pedestrian-vehicle conflicts automatically from video, over 2 days at
+  one Vancouver intersection.
+- Katoch, Ghosh & Chandra (2025) used a drone and computer vision for PET and time-to-collision at a school in an
+  Indian city (the abstract names neither the city nor the hours).
+- Manisha et al. (2025) estimated PET from video at 30 school zones in Thiruvananthapuram, counted the traffic by
+  hand, and fitted a crash-frequency model.
+- Ankunda, Ali & Mohanty (2024), the closest to this: 11 hours of AI-processed video at one midblock crossing in
+  India, with block-maxima and peak-over-threshold crash models; crash risk rose with the 5-minute count of PET
+  under 1.5 s.
+- What is different here: one phone at a window or on a stand; SAM 3.1 asked for "auto rickshaw" and "motorcycle"
+  by name, with no training (no accuracy claim on Indian vehicles: that test has not run); checked end to end
+  against a drone dataset's tracks (DUT, top-down); and a number-checked letter for the school to file. One dismissal is a first
+  screen, not a crash forecast.
+
 ## Sources
 
+- **Why 1.5 s.** Indian studies flag PET under 2 s (per pedestrian or per site) as high risk; an Indian AI-video
+  study uses PET under 1.5 s (Ankunda et al. 2024). The Mumbai 2 s is set on each pedestrian's mean PET and the
+  Kerala one per site, so neither is the unit of our per-event PET, and no IRC or MoRTH PET standard is claimed.
+- Ankunda A, Ali Y, Mohanty M (2024). *Accident Analysis & Prevention* 203:107633. doi:10.1016/j.aap.2024.107633
+  (abstract only, https://trid.trb.org/View/2382202; full text NOT CHECKED)
+- Marisamynathan S, Vedagiri P (2020). Pedestrian safety evaluation of signalized intersections using surrogate
+  safety measures. *Transport* 35(1):48-56. doi:10.3846/transport.2020.12157 (Mumbai, 1,398 pedestrians: PET
+  categories on each pedestrian's mean PET, "highly dangerous" under 2 s; crossing speed 1.27 m/s at the 50th
+  percentile, 1.08 m/s at the 15th)
+- Manisha R, Anusha SP, Panachakel JT, Bivina GR (2025). Modeling of pedestrian safety in school zones based on
+  behavioural risk. *Proceedings of the Eastern Asia Society for Transportation Studies* 15.
+  https://easts.info/on-line/proceedings/vol.15/pdf/J_PP3924.pdf (PET below 2 s per site, which it takes from Allen
+  et al. 1978, its ref. 13; 65 of Thiruvananthapuram's 341 KRSA black spots are in school zones)
+- Ismail K, Sayed T, Saunier N, Lim C (2009). *Transportation Research Record* 2140:44-54. doi:10.3141/2140-05
+- Katoch B, Ghosh I, Chandra S (2025). *Lecture Notes in Civil Engineering* 655:283-297.
+  doi:10.1007/978-981-96-8118-1_19 (abstract: https://trid.trb.org/View/2671911)
 - Rosén E, Sander U (2009). Pedestrian fatality risk as a function of car impact speed. *Accident Analysis & Prevention* 41(3):536–542. doi:10.1016/j.aap.2009.02.002
 - Allen BL, Shin BT, Cooper PJ (1978). Analysis of traffic conflicts and collisions. *Transportation Research Record* 667:67–74. (post-encroachment time)
 - Indian Roads Congress, IRC:103-2012, Guidelines for Pedestrian Facilities, clause 6.7.4.1.2 (PV²). The Union told
