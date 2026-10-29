@@ -274,6 +274,35 @@ def test_gap_clock_says_who_came_first_and_freezes_on_the_tier():
     assert page.count("<script>") == 1 and "requestAnimationFrame" in page and page.index("<script>") > page.index("event-1")
 
 
+def test_stopping_strip_runs_past_the_spot_only_on_the_worst_fast_person_first_card():
+    assert round(overlay.stopping_m(38), 2) == 23.79 and round(overlay.stopping_m(20), 1) == 10.5
+    site = {"image_points": SQUARE_IMG, "world_points": SQUARE_ROAD}  # 20 px a metre; zone -10..20 m
+    e = {"person": "1/0", "vehicle": "car#1", "tier": "serious", "pet_s": 1.2, "t_person_s": 3.0, "t_vehicle_s": 4.2,
+         "vehicle_kmh": 38.0, "gap_m": 0.4, "death_risk_pct": 1.5, "clip": "event1.mp4", "where": [8.0, 5.0],
+         "path_vehicle": [[x, 5.0] for x in range(-8, 14)],
+         "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5}, "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
+    drawn = overlay.strip(e, site, [e])
+    assert "needed 23.8 m to stop, had 12.7 m" in drawn and "stopped in 10.5 m, short of the spot" in drawn
+    assert "Not new evidence" in drawn and all(f'class="{c}"' in drawn for c in ("red", "green", "ring"))
+    stop, H, zone = overlay.stopping(e), road.homography(SQUARE_IMG, SQUARE_ROAD), road.zone_around(SQUARE_ROAD)
+    red = overlay.strip_pixels(stop, stop["needed_m"], overlay.STRIP_WIDTH_M, zone, H)  # from 12.7 m back to 23.8 m on
+    assert math.dist(red[0], (100 + 20 * (8 - 38 / 3.6 * 1.2), 182)) < 1e-6 and abs(red[1][0] - 482.4) < 2
+    fast = overlay.stopping(e | {"vehicle_kmh": 60.0})  # 20 m back and 44.8 m long: cut to the zone, -10 to 20 m
+    assert [round(p[0]) for p in overlay.strip_pixels(fast, fast["needed_m"], 1.8, zone, H)] == [-100, 500, 500, -100]
+    vehicle_first = e | {"t_vehicle_s": 1.8}
+    assert overlay.strip(vehicle_first, site, [vehicle_first]) == ""
+    for no in ({"vehicle_kmh": 24.9, "pet_s": 2.0, "t_vehicle_s": 5.0},  # slow, though 13.8 m away
+               {"pet_s": 0.9, "t_vehicle_s": 3.9},  # 9.5 m away: under 10.5 m, the go/no-go fails
+               {"path_vehicle": [[x, 5.0] for x in range(-8, 2)] + [[2.0, y] for y in range(6, 16)]}):  # turns 90 degrees
+        assert overlay.strip(e | no, site, [e | no]) == "", no
+    second = e | {"person": "2/0"}
+    assert overlay.strip(second, site, [e, second]) == "" and overlay.strip(e, site, [vehicle_first, e]) == drawn
+    page = pack.page(site, [vehicle_first, e, second], {"minutes": 0.3}, None, None, 10)
+    assert page.count('<svg class="strip"') == 1 and page.index('<svg class="strip"') > page.index('id="event-2"')
+    assert '<div class="clip"><video' in page and "viewBox" in page
+    assert '<svg class="strip"' not in pack.page(site, [e | {"clip": None}], {"minutes": 0.3}, None, None, 10)
+
+
 def test_long_videos_are_tracked_in_overlapping_parts_and_ids_joined():
     import subprocess, tempfile
     from pathlib import Path
