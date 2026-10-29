@@ -1,4 +1,5 @@
 """Self-check for road geometry, PET and SAM parsing. Run: python3 test_cw.py"""
+import html
 import json
 import math
 
@@ -259,6 +260,57 @@ def test_pack_keeps_people_and_escapes_text():
     card = pack.event_card(1, child, 10)
     assert "&lt;script&gt;" in card and "<script>" not in card and "from a child" in card
     assert "from a pedestrian" in pack.event_card(2, base | {"review": {"is_person": True, "road_user": "unclear"}}, 10)
+
+
+def test_spark_rider_call_needs_a_bike_under_the_person():
+    from pathlib import Path
+    import analyze
+    rider = {"is_person": False, "road_user": "rider", "reason": "on a bike"}
+    person = {f: [100, 100, 110, 130] for f in range(20)}
+    bike = {5: [95, 110, 115, 135]}  # 2/3 of the person's box, on one frame
+    assert review.gated(rider, person, [bike]) == rider
+    assert review.gated(rider, person, [{5: [109, 100, 140, 130]}])["rider_unconfirmed"]  # 10% inside: no bike
+    kept = review.gated(rider, person, [], 4.0)
+    assert kept == rider | {"is_person": True, "rider_unconfirmed": True, "walk_kmh": 4.0}
+    shadow = {"is_person": False, "road_user": "not a person", "reason": "a shadow"}
+    assert review.gated(shadow, person, []) == shadow and review.gated(None, person, []) is None
+    # analyze: only rideable concepts' boxes count, and the walking speed is measured on the piece
+    original = review.review
+    review.review = lambda *a, **k: dict(rider)
+    try:
+        for vehicle, rejected in (("motorcycle#1", True), ("car#1", False)):
+            events = [{"person": "7/0"}]
+            analyze.review_people(None, Path("."), events, {"7/0": {f: (0.14 * f, 0.0) for f in range(20)}},
+                                  {"7": person}, {vehicle: bike}, None, (640, 360), False)
+            assert (events[0]["review"]["is_person"] is False) == rejected
+    finally:
+        review.review = original
+    assert events[0]["review"]["walk_kmh"] == 5.0  # 1.4 m/s
+
+
+def test_unconfirmed_rider_stays_a_pedestrian_on_the_card_and_in_the_facts():
+    e = {"person": "1/0", "vehicle": "car#1", "tier": "serious", "vehicle_kmh": 30.0, "pet_s": 0.5, "t_person_s": 3.0,
+         "t_vehicle_s": 3.5, "gap_m": 0.4, "death_risk_pct": 1.5,
+         "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5}, "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}},
+         "review": {"is_person": True, "road_user": "rider", "reason": "", "rider_unconfirmed": True, "walk_kmh": 4.0}}
+    label = "pedestrian (Spark thought rider; no bike found under them; measured walking 4.0 km/h)"
+    assert pack.confirmed([e]) == [e]
+    assert html.escape("from a " + label) in pack.event_card(1, e, 10)
+    assert json.loads(pack.facts({}, [e], {"minutes": 1}))["worst"][0]["road_user"] == label
+    assert review.unconfirmed_rider({"is_person": False, "road_user": "rider"}) is None
+
+
+def test_dut_score_keeps_review_rejections_apart_from_threshold_misses():
+    """A conflict found and then rejected by Spark passed every threshold: it is missed_by_review, not 'at a threshold'."""
+    import validate_dut
+    truth = [{"person": p, "vehicle": "car#1", "tier": "serious", "pet_s": 0.5, "t_person_s": 1.0, "vehicle_kmh": 12.0}
+             for p in ("a", "b", "c")]
+    ours = lambda pid, verdict: {**truth[0], "person": pid, "vehicle": "car#x", "review": verdict}
+    events = [ours("p1/0", None), ours("p2/0", {"is_person": False, "road_user": "rider", "reason": ""})]
+    result = validate_dut.score(truth, events, {}, {}, {}, {}, {"p1/0": "a", "p2/0": "b"}, {"car#x": "car#1"})
+    assert (result["matched"], result["missed"], result["missed_by_review"], result["missed_at_threshold"]) == (1, 2, 1, 0)
+    assert result["before_review"] == {"matched": 2, "missed": 1, "extra": 0}
+    assert [m["by_review"] for m in result["missed_events"]] == [True, False]
 
 
 def test_page_links_find_an_event_card_and_its_moment():

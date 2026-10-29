@@ -86,7 +86,8 @@ def facts(site, events, seen):
                       f"close pass: {road.PET_MAX_S}-{road.CLOSE_PASS_S} s",
         "worst": [{"tier": e.get("tier", "serious"), "pet_s": e["pet_s"], "vehicle": e["vehicle"].split("#")[0], "vehicle_kmh": e["vehicle_kmh"],
                    "adult_death_risk_if_hit_pct": e["death_risk_pct"], "at_20_kmh_limit": e["with_limit"]["20"],
-                   "road_user": (e.get("review") or {}).get("road_user", "not reviewed")} for e in worst],
+                   "road_user": review.unconfirmed_rider(e.get("review"))
+                   or (e.get("review") or {}).get("road_user", "not reviewed")} for e in worst],
         "risk_source": "Rosén & Sander 2009, adults 15+, car fronts",
         "engineering": engineering_lines(seen, None),
     }, indent=1, ensure_ascii=False)  # \u escapes would add digits the number check counts as measured
@@ -274,7 +275,7 @@ def event_card(i, e, fps):
     """Card #i, linkable as #event-i; data-t is the second of its clip when the first of the two reached the spot."""
     verdict, at30, at20 = e.get("review") or {}, e["with_limit"]["30"], e["with_limit"]["20"]
     road_user = verdict.get("road_user", "pedestrian (not reviewed by Spark)")
-    road_user = "pedestrian" if road_user == "unclear" else road_user
+    road_user = review.unconfirmed_rider(verdict) or ("pedestrian" if road_user == "unclear" else road_user)
     who = html.escape(("an " if road_user[0] in "aeiou" else "a ") + road_user)
     video = f'<video src="{html.escape(e["clip"])}" controls muted loop playsinline></video>' if e.get("clip") else ""
     moment_s = min(e["t_person_s"], e["t_vehicle_s"]) - render.window(e, fps)[0] / fps

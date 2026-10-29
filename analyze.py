@@ -300,19 +300,29 @@ def piece_boxes(person_boxes, people, pid):
     return {f: boxes[f] for f in people[pid] if f in boxes}
 
 
-def review_people(clip, out_dir, events, people, person_boxes, key, frame_size, top_down):
+def walking_kmh(feet):
+    """A pedestrian piece's median speed in km/h, or None when it is too short to measure."""
+    mps = list(road.speeds({f: (p,) for f, p in feet.items()}, FPS).values())
+    return round(statistics.median(mps) * 3.6, 1) if mps else None
+
+
+def review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size, top_down):
     """Spark looks once at each pedestrian piece involved in a conflict (most dangerous first, at most
-    MAX_REVIEWS), and its verdict is attached to all that piece's events."""
+    MAX_REVIEWS), and its verdict is attached to all that piece's events. A rider call stands only with a
+    rideable vehicle's box under the person (review.gated)."""
+    rideables = [t for name, t in vehicle_boxes.items() if name.split("#")[0].lower() in review.RIDEABLE]
     verdicts = {}
     for e in events:
         pid = e["person"]
         if pid not in verdicts and len(verdicts) < MAX_REVIEWS:
+            boxes = piece_boxes(person_boxes, people, pid)
             try:
-                verdicts[pid] = review.review(clip, piece_boxes(person_boxes, people, pid), frame_size,
-                                              out_dir / f"person-{pid.replace('/', '-')}.jpg", key, top_down)
+                verdict = review.review(clip, boxes, frame_size, out_dir / f"person-{pid.replace('/', '-')}.jpg",
+                                        key, top_down)
             except (subprocess.CalledProcessError, OSError) as err:
                 print(f"review of {pid} failed: {err}", flush=True)
-                verdicts[pid] = None
+                verdict = None
+            verdicts[pid] = review.gated(verdict, boxes, rideables, walking_kmh(people[pid]))
         e["review"] = verdicts.get(pid)
 
 
@@ -339,7 +349,8 @@ def report(seen, events):
         verdict, at20 = e.get("review") or {}, e["with_limit"]["20"]
         print(f"  [{e['tier']}] person {e['person']} / {e['vehicle']}: PET {e['pet_s']:.1f} s, {e['gap_m']} m, {e['vehicle_kmh']} km/h "
               f"(adult death risk if hit {e['death_risk_pct']}%; at a 20 km/h limit {at20['impact_kmh']} km/h, "
-              f"{at20['death_risk_pct']}%), at {e['t_person_s']:.1f} s  [Spark: {verdict.get('road_user', 'not reviewed')}]")
+              f"{at20['death_risk_pct']}%), at {e['t_person_s']:.1f} s  "
+              f"[Spark: {review.unconfirmed_rider(verdict) or verdict.get('road_user', 'not reviewed')}]")
 
 
 def main():
@@ -389,7 +400,7 @@ def main():
               "traffic boxes on the calibration page)", flush=True)
 
     write_events(out_dir, site, events, seen, cost, full)  # saved before the slower, network-bound evidence step
-    review_people(clip, out_dir, events, people, person_boxes, key, frame_size, top_down)
+    review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size, top_down)
     add_evidence(args.video, clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size)
     write_events(out_dir, site, events, seen, cost, full)
     report(seen, events)
