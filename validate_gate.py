@@ -143,6 +143,7 @@ def main():
     if "trap" not in site:
         raise SystemExit(f"{args.site} has no \"trap\": see this script's first lines")
     sam.request = crowd.request = analyze.encode = validate_offline.offline  # $0: never call SAM or re-encode
+    sam.RETRY_WAITS_S = ()  # a reply missing from the cache fails at once, not after the retries' waits
     lines = trap_lines(site, road.homography(site["image_points"], site["world_points"]))
     *_, vehicles, _ = validate_dut.our_tracks(site, args.out)
     distance_m = site["trap"]["distance_m"]

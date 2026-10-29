@@ -2860,6 +2860,49 @@ def test_too_few_walking_pieces_are_not_judged():
     standing = {"1/0": {f: (0.0, 0.0) for f in range(100)}}  # a piece that never crossed is not a walker
     assert pace.walking(standing, 10) == {"median_mps": None, "pieces": 0, "flag": None}
 
+
+def test_a_dropped_request_is_sent_again_and_a_refusal_is_not():
+    """sam.fetch: a wifi drop or a 503 is sent again (after the server's Retry-After when longer), a 401 never; a
+    reply is written whole under its name, and a cached one is never sent again."""
+    import tempfile, time, urllib.error
+    from pathlib import Path
+    waits, real_sleep, real_waits = [], time.sleep, sam.RETRY_WAITS_S
+    time.sleep, sam.RETRY_WAITS_S = waits.append, (10, 30, 90)
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            calls = []
+
+            def flaky():
+                calls.append(1)
+                if len(calls) == 1:
+                    raise urllib.error.URLError("wifi dropped")
+                if len(calls) == 2:
+                    raise RuntimeError("SAM busy") from urllib.error.HTTPError("u", 503, "busy", {"Retry-After": "60"}, None)
+                return "<0f>"
+            assert sam.fetch(Path(tmp, "person.sam.txt"), flaky, "test") == "<0f>" and len(calls) == 3
+            assert waits == [10, 60] and not list(Path(tmp).glob("*.part"))
+            assert sam.fetch(Path(tmp, "person.sam.txt"), lambda: 1 / 0, "test") == "<0f>"  # cached: never sent again
+
+            def refused():
+                calls.append(1)
+                raise RuntimeError("SAM request failed: 401") from urllib.error.HTTPError("u", 401, "no", {}, None)
+            calls.clear()
+            try:
+                sam.fetch(Path(tmp, "car.sam.txt"), refused, "test")
+                raise AssertionError("a 401 was not raised")
+            except RuntimeError:
+                assert len(calls) == 1 and not Path(tmp, "car.sam.txt").exists()
+            def down():
+                raise urllib.error.URLError("down")
+            try:
+                sam.fetch(Path(tmp, "bus.sam.txt"), down, "test")
+                raise AssertionError("a long dropout did not end the run")
+            except urllib.error.URLError:
+                assert waits[-3:] == [10, 30, 90] and not Path(tmp, "bus.sam.txt").exists()
+    finally:
+        time.sleep, sam.RETRY_WAITS_S = real_sleep, real_waits
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):

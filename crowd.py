@@ -7,7 +7,6 @@ import json
 import math
 import subprocess
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
 
 import sam
 
@@ -28,16 +27,14 @@ def detect(clip, frames, concept, api_key, cache_dir, clip_fps):
     cache_dir.mkdir(parents=True, exist_ok=True)
 
     def one(frame):
-        cache = cache_dir / f"{frame:06d}.sam.txt"
-        if not cache.exists():
-            jpeg = subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{frame / clip_fps:.3f}", "-i", str(clip),
-                                   "-frames:v", "1", "-f", "image2", "-c:v", "mjpeg", "-q:v", "3", "-"],
-                                  check=True, capture_output=True).stdout
-            cache.write_text(request(jpeg, concept, api_key))
-        return frame, [box for track in sam.parse(cache.read_text()).values() for box in track.values()]
+        jpeg = lambda: subprocess.run(["ffmpeg", "-v", "error", "-ss", f"{frame / clip_fps:.3f}", "-i", str(clip),
+                                       "-frames:v", "1", "-f", "image2", "-c:v", "mjpeg", "-q:v", "3", "-"],
+                                      check=True, capture_output=True).stdout
+        text = sam.fetch(cache_dir / f"{frame:06d}.sam.txt", lambda: request(jpeg(), concept, api_key),
+                         f"SAM {concept} on frame {frame}", "image")
+        return frame, [box for track in sam.parse(text).values() for box in track.values()]
 
-    with ThreadPoolExecutor(WORKERS) as pool:
-        return dict(pool.map(one, frames))
+    return dict(sam.each(one, frames, WORKERS))
 
 
 def request(jpeg, concept, api_key):
