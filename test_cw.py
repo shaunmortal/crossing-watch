@@ -608,6 +608,30 @@ def test_review_three_fixes_hold():
             raise AssertionError("expected ValueError")
 
 
+def test_street_photo_blurs_people_a_full_video_reply_missed():
+    import subprocess, tempfile
+    from pathlib import Path
+    import crowd
+    box = lambda obj, x: f"{obj}<|box;x1={x};y1=5;x2={x + 10};y2=40;w=64;h=48|>"
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp)
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=64x48:rate=10:duration=1",
+                        "-pix_fmt", "yuv420p", str(out / "clip.mp4")], check=True)
+        # auto mode: the full video reply holds one person, the frame-by-frame reply it switched to holds three
+        (out / "part0").mkdir()
+        sam.cache_path(out / "part0", "person").write_text("<0f>" + box(0, 5))
+        crowd.cache_dir(out, "person").mkdir()
+        (crowd.cache_dir(out, "person") / "000000.sam.txt").write_text("<0f>" + "".join(box(i, x) for i, x in
+                                                                                       enumerate((5, 25, 45))))
+        old, blurred = render.blur_filters, []
+        render.blur_filters = lambda *args: blurred.extend(old(*args)) or blurred
+        try:
+            pack.street_photo(out / "clip.mp4", out / "street.jpg")
+        finally:
+            render.blur_filters = old
+        assert (out / "street.jpg").exists() and all(f"delogo=x={x}:" in "".join(blurred) for x in (5, 25, 45))
+
+
 def test_crowd_tracker_keeps_ids_through_a_short_gap_and_apart_from_neighbours():
     import crowd
     walker = lambda x0: {f: [x0 + 2 * f, 100, x0 + 2 * f + 20, 160] for f in range(0, 40, 2)}

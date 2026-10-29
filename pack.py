@@ -257,16 +257,17 @@ def draw_fix(photo, instruction, api_key, out_path):
     return out_path
 
 
-def street_photo(clip, out_path, person_concept="person", crowd_mode=False):
-    """First frame of the clip with every head blurred (it is shown on the page and sent to Muse Image). Uses the
-    same SAM cache analyze wrote (crowd mode's first image, or part0/ for long videos); without it there is no
-    photo rather than unblurred faces."""
+def street_photo(clip, out_path, person_concept="person"):
+    """First frame of the clip with every head blurred (it is shown on the page and sent to Muse Image). Blurs the
+    people in every SAM reply analyze wrote for that frame: the frame-by-frame one (crowd mode, or auto mode after
+    it switched; a full video reply misses people) and the video one (part0/ for long videos). Without either there
+    is no photo rather than unblurred faces."""
     folder = clip.parent / "part0" if (clip.parent / "part0").is_dir() else clip.parent
-    people_file = (crowd.cache_dir(clip.parent, person_concept) / f"{0:06d}.sam.txt" if crowd_mode
-                   else sam.cache_path(folder, person_concept))
-    if not people_file.exists():
-        raise ValueError(f"no person tracks at {people_file}; not showing an unblurred street photo")
-    people = sam.parse(people_file.read_text()).values()
+    replies = [f for f in (crowd.cache_dir(clip.parent, person_concept) / f"{0:06d}.sam.txt",
+                           sam.cache_path(folder, person_concept)) if f.exists()]
+    if not replies:
+        raise ValueError(f"no person tracks for {clip}; not showing an unblurred street photo")
+    people = [track for f in replies for track in sam.parse(f.read_text()).values()]
     size = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
                            "-of", "csv=p=0", str(clip)], check=True, capture_output=True, text=True).stdout.strip()
     filters = ",".join(render.blur_filters(people, 0, 0, tuple(int(v) for v in size.split(",")))) or "null"
@@ -425,8 +426,7 @@ def main():
     plan, images = None, None
     if events:
         try:
-            photo = street_photo(out_dir / "clip.mp4", out_dir / "street.jpg", site.get("person", "person"),
-                                 site.get("person_mode") == "crowd")
+            photo = street_photo(out_dir / "clip.mp4", out_dir / "street.jpg", site.get("person", "person"))
         except (ValueError, OSError, subprocess.CalledProcessError) as err:
             print(f"no street photo: {err}", file=sys.stderr)
             photo = None

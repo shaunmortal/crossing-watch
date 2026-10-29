@@ -148,8 +148,8 @@ to set it.
 - **Spark review:** it judges a zoomed crop of each person's clearest frame. A full-frame snapshot had rejected real
   students who were a few pixels wide.
 - **Caveats:** this is still a small sample. The true conflicts assume a 4.6 x 1.8 m car (DUT gives only centre and
-  heading). The view is top-down, not a phone at an angle. Meta's per-image price was not found; cost estimates
-  use $0.002 per image.
+  heading). The view is top-down, not a phone at an angle. Cost estimates use Meta's list price of $2.50 per
+  1,000 SAM images.
 
 - **Engineering numbers against ground truth** (crowd mode; same definitions applied to the dataset's own tracks):
   - Moving vehicles counted: right on 8 of 8 clips.
