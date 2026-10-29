@@ -497,7 +497,7 @@ def test_a_second_model_judges_the_letter_and_its_objections_go_back():
 
 
 def test_pack_saves_the_letter_plan_next_to_the_page():
-    import sys, tempfile
+    import contextlib, io, sys, tempfile
     from pathlib import Path
     e = {"person": "1/0", "vehicle": "car#1", "tier": "serious", "pet_s": 0.5, "vehicle_kmh": 30.0, "death_risk_pct": 1.5,
          "t_person_s": 3.0, "t_vehicle_s": 3.5, "gap_m": 0.4, "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5},
@@ -512,7 +512,8 @@ def test_pack_saves_the_letter_plan_next_to_the_page():
         pack.optional_key, pack.street_photo = lambda: None, lambda *args: None  # no key, no network, no photo
         pack.ask_plan = lambda prompt, measured, key, photo: plan
         try:
-            pack.main()
+            with contextlib.redirect_stdout(io.StringIO()):
+                pack.main()
         finally:
             sys.argv, pack.optional_key, pack.street_photo, pack.ask_plan = old
         assert json.loads((out / "plan.json").read_text()) == plan and "speed table" in (out / "index.html").read_text()
