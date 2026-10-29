@@ -2086,12 +2086,11 @@ def test_glimmer_notebook_is_pinned_hash_checked_and_records_its_run():
                 "run.stderr.count('open model reply:')", "'tries': tries",  # pack.open_model_reply logs each try
                 "os.path.exists(f'{CW}/judge_bench.py')", "'JUDGE_MODEL_URL': 'http://127.0.0.1:8080/v1'",
                 "k != 'MODEL_API_KEY'", "<removed-run-record>", "'--out', BENCH_JSON, '--glimmer', '1'",  # the Glimmer-only judge pass, skipped without a bench
-                "glob.glob('/kaggle/input/**/judge-bench.json', recursive=True)",  # both bases: out/ is not in the zip
-                "shutil.copyfile(attached[0], BENCH_JSON)", "f'bench: {BENCH_FROM}"):
+                "f'bench: {BENCH_FROM}"):
         assert pin in text, pin
     assert re.search(r"assert sha256\(path\) == SHA256\[name\]", text)
     assert "run by the author" in text  # who ran it, as README says
-    assert "BENCH_JSON = '/tmp/judge-bench.json'" in text  # an attached bench never becomes a saved, public output
+    assert "/kaggle/input/**/judge-bench.json" not in text  # v3: the public sample/ bench only, never an attached one
     assert "billion" not in Path(__file__).with_name("README.md").read_text()  # the product name, not a parameter count
 
 
@@ -3754,6 +3753,63 @@ def test_judge_bench_public_is_built_only_from_sample_letters_with_each_source_r
     assert all(i["code"] == [bool(judge_bench.code_flags(i["letter"], i["measured"]))] for i in published)
     record = json.loads(judge_bench.SPARK_OPEN_RECORD.read_text())
     assert record["model"].endswith("muse-spark-open") and record["letter_sha256"].startswith("a721a428")
+
+
+
+def test_open_judge_with_two_votes_counts_a_problem_only_when_both_replies_list_one():
+    """JUDGE_VOTES=2: the JUDGE_MODEL_URL judge (a fake llama-server here) is asked twice per letter, in pack.py and in
+    judge_bench.py's Glimmer column; one flag of two is no problem, an unreadable reply is still never a pass, and the
+    bench keeps both raw replies with the vote. Muse Spark is still asked once."""
+    import contextlib, io, judge_bench
+    as_reply = lambda content: {"choices": [{"message": {"content": content}, "finish_reason": "stop"}]}
+    flag, clean = '{"problems": ["Says a warrant is met."]}', '{"problems": []}'
+    server, seen = fake_open_model([as_reply(r) for r in (flag, flag, flag, clean, flag, "no JSON here",
+                                                         flag, clean, flag, flag)])
+    sparks, old = [], (pack.JUDGE_URL, pack.LETTER_URL, pack.JUDGE_VOTES, pack.spark_reply)
+    pack.JUDGE_URL, pack.LETTER_URL, pack.JUDGE_VOTES = f"http://127.0.0.1:{server.server_port}/v1", "", 2
+    pack.spark_reply = lambda prompt, image, key: sparks.append(prompt) or clean
+    item = {"id": "x", "kind": "k", "named": True, "planted": True, "letter": "L", "measured": "{}"}
+    try:
+        with contextlib.redirect_stderr(io.StringIO()):
+            both, split, unread = (pack.judge_problems("letter", "{}", None) for _ in range(3))
+            ask = judge_bench.asker("glimmer")
+            one_of_two = judge_bench.judged(item, "glimmer", ask, 1, pack.JUDGE_VOTES)
+            two_of_two = judge_bench.judged(item, "glimmer", ask, 1, pack.JUDGE_VOTES)
+            pack.JUDGE_URL = ""
+            spark_only = pack.judge_problems("letter", "{}", "key")
+            spark_run = judge_bench.judged(item, "spark", lambda prompt: flag, 1)
+    finally:
+        pack.JUDGE_URL, pack.LETTER_URL, pack.JUDGE_VOTES, pack.spark_reply = old
+        server.shutdown()
+        server.server_close()
+    assert both == ["Says a warrant is met."] and split == [] and unread == ["The reviewer's reply could not be read."]
+    assert len(seen) == 10 and all(body["response_format"]["type"] == "json_schema" for _, body, _ in seen)
+    assert one_of_two["glimmer"] == [False] and one_of_two["glimmer_votes"] == [{"replies": [flag, clean], "vote": False}]
+    assert two_of_two["glimmer"] == [True] and two_of_two["glimmer_votes"][0]["vote"] is True
+    assert spark_only == [] and len(sparks) == 1  # Spark: one call, as before
+    assert spark_run["spark"] == [True] and "spark_votes" not in spark_run
+    assert pack.vote([["a"], ["b"]]) == ["a"] and pack.vote([["a"], []]) == [] and pack.vote([["a"], None]) is None
+    assert pack.vote([[]]) == [] and pack.vote([["a"]]) == ["a"]  # one vote: what the one reply said
+    text = "\n".join(judge_bench.table([one_of_two, two_of_two]))
+    assert "Muse Glimmer: 2 of 2 runs asked 2 times, a problem counted only when every reply listed one" in text
+    assert "Muse Spark:" not in text
+
+
+
+def test_kaggle_notebook_v3_judges_the_public_bench_twice_and_saves_the_letter():
+    """Version 3 of the Glimmer notebook: valid JSON, the bench from the repo's public sample/ file with JUDGE_VOTES=2
+    for Glimmer, the letter and plan.json saved as outputs, and who ran it in the agreed words."""
+    from pathlib import Path
+    raw = Path(__file__).with_name("kaggle").joinpath("<removed-run-record>").read_text()
+    notebook = json.loads(raw)
+    text = "\n".join("".join(c["source"]) for c in notebook["cells"])
+    for pin in ("'notebook': '<removed-run-record>, version 3'", "BENCH_FROM = f'{CW}/kaggle/judge-bench-public.json'",
+                "JUDGE_VOTES = '2'", "'JUDGE_VOTES': JUDGE_VOTES", "shutil.copyfile(BENCH_FROM, BENCH_JSON)",
+                "shutil.copyfile(f'{OUT}/plan.json', '/kaggle/working/plan.json')", "/kaggle/working/glimmer-letter.txt",
+                "OUT = f'{CW}/sample'", "-DCMAKE_CUDA_ARCHITECTURES=75"):
+        assert pin in text, pin
+    team = "The Kaggle notebook was run by the author."
+    assert text.count(team) == 2  # the first cell and <removed-run-record>'s "team"
 
 
 if __name__ == "__main__":

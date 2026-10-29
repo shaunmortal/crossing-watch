@@ -8,7 +8,9 @@ Run: python3 judge_bench.py --out FILE [--spark N] [--glimmer N]
 --public builds the bench only from letters written from the synthetic sample/, safe to publish.
 FILE keeps the letters and every verdict: when it exists the bench reads its letters from it (so a Kaggle run needs
 only FILE), re-scores the code check and asks each judge only for the runs it still lacks. --glimmer needs
-LETTER_MODEL_URL (an OpenAI-compatible server, as in <removed-run-record>).
+LETTER_MODEL_URL (an OpenAI-compatible server, as in <removed-run-record>). With JUDGE_VOTES=2 each Glimmer
+run asks it twice and flags only when both replies list a problem (pack.vote); FILE keeps both raw replies and the vote
+under "glimmer_votes". Muse Spark is always asked once.
 """
 import argparse
 import html
@@ -183,19 +185,23 @@ def code_flags(letter, measured):
     return pack.unmeasured(letter, measured) + pack.mixed(letter, json.loads(measured).get("worst", []))
 
 
-def judged(item, column, ask, runs):
+def judged(item, column, ask, runs, votes=1):
     """`item` with up to `runs` verdicts in `column`: True when the judge listed a problem, False when none, None
-    when its reply could not be read. A failed call stops there, for the next run to ask again."""
-    verdicts = list(item.get(column, []))
+    when its reply could not be read. Each run asks `votes` times and is pack.vote's verdict; with more than one, every
+    run's raw replies and vote are kept in `column`_votes. A failed call stops there (its run's other replies too),
+    for the next run to ask again."""
+    verdicts, held = list(item.get(column, [])), list(item.get(f"{column}_votes", []))
+    prompt = pack.JUDGE_PROMPT.format(facts=item["measured"], letter=item["letter"])
     while len(verdicts) < runs:
         try:
-            reply = ask(pack.JUDGE_PROMPT.format(facts=item["measured"], letter=item["letter"]))
+            replies = [ask(prompt) for _ in range(votes)]
         except (OSError, ValueError, KeyError, IndexError, http.client.HTTPException) as err:
             print(f"{item['id']}: {column} call failed, asked again next run: {err}", file=sys.stderr)
             break
-        problems = pack.read_problems(reply)
+        problems = pack.vote([pack.read_problems(reply) for reply in replies])
         verdicts.append(None if problems is None else bool(problems))
-    return {**item, column: verdicts}
+        held += [{"replies": replies, "vote": verdicts[-1]}] if votes > 1 else []
+    return {**item, column: verdicts, **({f"{column}_votes": held} if held else {})}
 
 
 def tally(items, column):
@@ -243,9 +249,21 @@ def table(items):
              row("**Clean controls: false alarms**", "", [i for i in items if not i["planted"]], letters, True)]
     unread = "; ".join(f"{name} {tally(items, c)[2]} of {sum(len(i.get(c, [])) for i in items)} replies"
                        for c, name in JUDGES)
+    voted = [votes_line(items, c, name) for c, name in JUDGES]
     return head + rows + ["", "In the rows per kind a checker's cell counts runs; every other cell counts letters, one "
                           "flagged if any of its readable runs flagged it, as runs on one letter are not independent.",
-                          f"Unreadable judge replies (in no cell above): {unread}."]
+                          f"Unreadable judge replies (in no cell above): {unread}."] + [v for v in voted if v]
+
+
+def votes_line(items, column, name):
+    """How many of this judge's runs were votes of several replies, or "" when none was."""
+    held = [v for item in items for v in item.get(f"{column}_votes", [])]
+    if not held:
+        return ""
+    asks = sorted({len(v["replies"]) for v in held})
+    return (f"{name}: {len(held)} of {sum(len(i.get(column, [])) for i in items)} runs asked "
+            f"{' or '.join(map(str, asks))} times, a problem counted only when every reply listed one; a run with an "
+            "unreadable reply is unreadable.")
 
 
 def asker(column):
@@ -281,7 +299,7 @@ def main():
             continue
         ask = asker(column)
         for k, item in enumerate(bench):
-            bench[k] = judged(item, column, ask, runs)
+            bench[k] = judged(item, column, ask, runs, pack.JUDGE_VOTES if column == "glimmer" else 1)
             out.write_text(json.dumps(bench, indent=1, ensure_ascii=False))  # every paid reply kept at once
     print("\n".join(table(bench)))
 
