@@ -34,6 +34,7 @@ import fixband
 import openweights
 import overlay
 import pace
+import passmark
 import render
 import review
 import roadmap
@@ -281,12 +282,15 @@ def headline(events, seen, site):
     days, length = (site.get(key) for key in SCHOOL_YEAR)
     minutes = watched_minutes(seen)
     if all(isinstance(v, (int, float)) and v > 0 for v in (days, length)) and minutes >= MIN_RATE_MINUTES:
+        capped = seen.get("window_s") and length > minutes  # a window_s on the rush is never scaled to the dismissal
+        length, dismissals = ((minutes, f"the {round(minutes, 1):g} analysed minutes of each dismissal") if capped
+                              else (length, f"{length:g}-minute dismissals"))
         scaled = lambda count: f"{float(f'{count * length / minutes * days:.2g}'):,.0f}"  # 2 significant figures
         # 0 seen is never 0 a year: Poisson's upper bound, scaled the same way
         per_year = lambda k: f"about {scaled(k)}" if k else f"up to {scaled(poisson_range(0)[1])}"
         lines.append(f"If every dismissal is like this one: {per_year(k3)} crossings a school year with a moving "
                      f"vehicle through the same spot within {s3:g} s, {per_year(k15)} within {s15:g} s ({days:g} school "
-                     f"days, {length:g}-minute dismissals).")
+                     f"days, {dismissals}).")
     return lines
 
 
@@ -345,6 +349,19 @@ def limit_note(full):
         return switched
     return switched + (f'<p class="note">In {full[0]} of {full[1]} tracking requests SAM reached its {sam.MAX_OBJECTS}-object '
                        "limit, so some people or vehicles were not tracked: counts and near-misses here are a minimum.</p>")
+
+
+def tracked_by(full):
+    """The method's opening: SAM 3.1's tracks and Muse Spark's check only when `full`, analyze.py's SAM request counts
+    (events.json's sam_full_requests), says SAM made them; sample/'s made-up tracks have none. Never "every" person:
+    a full video request leaves some untracked (limit_note)."""
+    if not full:
+        return ("No SAM tracking run is recorded for these tracks (events.json counts no SAM requests), so neither "
+                "SAM 3.1 nor Muse Spark made or checked them. ")
+    return (f"SAM 3.1 tracked the pedestrians and vehicles it found, at most {sam.MAX_OBJECTS} objects per video "
+            "request (a note under the counts says when a request was full). Four points on the road turned pixels "
+            "into metres. Muse Spark looked at the person in each near-miss, most dangerous first, and removed tracks "
+            "that were not people; a card says when it did not look. ")
 
 
 def privacy_note(privacy):
@@ -771,14 +788,17 @@ def filed_line(site):
     return f'<p class="filed">Filed with {to} on {channel}, {date}: reference {reference}.</p>'
 
 
-def tct_section():
-    """Where this pack sits in the school-zone Traffic Conflict Technique toolkit, and the step left after the fix."""
+def tct_section(mark=""):
+    """Where this pack sits in the school-zone Traffic Conflict Technique toolkit, and the step left after the fix:
+    `mark`, G7's pass mark (passmark.after_mark), in its own paragraph when there is one."""
+    step9 = (f"Step 9 comes after the fix is in place.</p><p>{html.escape(mark)}" if mark else
+             "Step 9 comes after the fix is in place: film the same dismissal from the same spot for as long, run "
+             "this pack again and compare.")
     return ('<section><h2>Where this fits in a conflict study</h2><p class="note">This pack covers steps 5-7 (baseline '
             f'counts, pre-intervention conflicts, analysis) of the CDC/FIA school-zone <a href="{TCT_TOOLKIT}">Traffic '
             "Conflict Technique toolkit</a>, without the trained observers step 3 normally needs. Severity here is "
             "post-encroachment time and the measured speed, not the toolkit's observer severity scales, so the two do "
-            "not compare one to one. Step 9 comes after the fix is in place: film the same dismissal from the same spot "
-            "for as long, run this pack again and compare.</p></section>")
+            f"not compare one to one. {step9}</p></section>")
 
 
 def pyramid(events, seen):
@@ -823,10 +843,23 @@ def receipt_line(data, plan, images):
     return f"Receipt: {'; '.join(parts)}. Dollar costs on this page are for SAM only." if parts else ""
 
 
-def hash_line(source_sha256, site):
+def window_line(window, recording_s=None):
+    """Which minutes of the recording were analysed (window_s, kept in events.json's exposure) and that the page's
+    times count from its start; "" without one."""
+    if not window:
+        return ""
+    start, end = (f"{round(s / 60, 1):g}" for s in window)
+    whole = f"this {round(recording_s / 60, 1):g}-minute recording" if recording_s else "the recording"
+    return (f"Only minutes {start}-{end} of {whole} were analysed (seconds {window[0]:g}-{window[1]:g}); times on this "
+            f"page count from second {window[0]:g}. ")
+
+
+def hash_line(source_sha256, site, window=None, recording_s=None):
     """Where the hashes are that show a changed file: the original video's (from analyze.py) and SHA256SUMS in the
-    shared folder; for a site in India, the evidence-law form that asks for them, which the school fills and signs."""
+    shared folder; for a site in India, the evidence-law form that asks for them, which the school fills and signs.
+    The original is hashed whole, so window_line says which part of it was analysed."""
     video = (f"The original video's SHA-256 is <code>{html.escape(source_sha256)}</code>. " if source_sha256 else "")
+    video += html.escape(window_line(window, recording_s))
     law = (" In India, Part A of the certificate for electronic evidence in the Schedule to the Bharatiya Sakshya "
            "Adhiniyam, 2023 (section 63(4)) asks for these hash values: the school fills and signs it."
            if in_india(site) else "")
@@ -1041,7 +1074,7 @@ def top(site, events, seen, plan, images, signoff, full, warning, lines):
 
 
 def page(site, events, seen, plan, images, fps, cost=None, full=None, privacy=None, signoff=None, receipt="",
-         source_sha256=None, timeline=None, ground=None, paths=None, case="", walking=None):
+         source_sha256=None, timeline=None, ground=None, paths=None, case="", walking=None, recording_s=None):
     warning = banner(walking, site)  # then the headline, pyramid, engineering numbers, barcode and card numbers go
     lines = [] if warning else headline(events, seen, site)  # its ranges and school-year line go under the pyramid
     ranges = "".join(f'<p class="note">{html.escape(line)}</p>' for line in lines[1:])
@@ -1053,19 +1086,18 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None, privacy=No
                       for i, e in enumerate(events[:SHOWN_EVENTS])) or (
         f"<p>No conflicts under {road.CLOSE_PASS_S} s in these {html.escape(summary.minutes(seen))} minutes. "
         "A short recording can miss rare events: record more school-run periods before drawing any conclusion.</p>")
-    method = (f"SAM 3.1 tracked every pedestrian and vehicle. Four points on the road turned pixels into metres. "
-              f"A near-miss is a pedestrian and a moving vehicle on the same spot (within {road.CONFLICT_RADIUS_M} m) "
-              f"less than {road.PET_MAX_S} s apart (post-encroachment time); {road.PET_MAX_S}-{road.CLOSE_PASS_S} s is "
-              f"reported as a close pass. Muse Spark checked each clip and removed "
-              f"tracks that were not people. Death risk: Rosén & Sander (2009), Accident Analysis & Prevention "
+    method = (f"{tracked_by(full)}A near-miss is a pedestrian and a moving vehicle on the same spot (within "
+              f"{road.CONFLICT_RADIUS_M} m) less than {road.PET_MAX_S} s apart (post-encroachment time); "
+              f"{road.PET_MAX_S}-{road.CLOSE_PASS_S} s is reported as a close pass. "
+              f"Death risk: Rosén & Sander (2009), Accident Analysis & Prevention "
               f"41(3):536-542, for adults hit by a car front; children are not covered by that study. Speed-limit rows "
               f"replay the same moment with the vehicle no faster than the limit, a {road.REACTION_S} s reaction and "
               f"{road.BRAKING_MPS2} m/s² braking. {site.get('calibration_note', '')}")
     body = f"""{measured}
 {map_section(events, site, ground, paths, not warning)}<section id="clips"><h2>{moments}</h2>{cards}</section>{fix_section(plan, images)}{fixband.figure(images)}{legal_section(site)}
 {letter_section(plan, events[:SHOWN_EVENTS], facts(site, events, seen, paths), signoff)}{case}
-{tct_section()}<section id="method"><h2>How this was measured</h2><p class="note">{html.escape(method)}</p>{privacy_note(privacy)}
-{f'<p class="note">{html.escape(receipt)}</p>' if receipt else ""}{hash_line(source_sha256, site)}</section>"""
+{tct_section("" if warning else passmark.after_mark(events, seen))}<section id="method"><h2>How this was measured</h2><p class="note">{html.escape(method)}</p>{privacy_note(privacy)}
+{f'<p class="note">{html.escape(receipt)}</p>' if receipt else ""}{hash_line(source_sha256, site, seen.get("window_s"), recording_s)}</section>"""
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Crossing Watch evidence</title>
 <style>{STYLE}{summary.STYLE}{roadmap.STYLE}{overlay.STYLE}</style></head><body>
@@ -1284,7 +1316,7 @@ def main():
     page_html = page(site, events, seen, plan, images, data["fps"], data.get("cost"), data.get("sam_full_requests"),
                      data.get("privacy"), signoff=signoff, receipt=receipt_line(data, plan, images),
                      source_sha256=data.get("source_sha256"), timeline=data.get("timeline"), ground=ground,
-                     paths=paths, walking=data.get("walking"))
+                     paths=paths, walking=data.get("walking"), recording_s=data.get("recording_s"))
     (out_dir / "index.html").write_text(page_html)
     seal.write_sums(share(out_dir, page_html))  # the only folder to publish, and its hashes
     counts = ("not measurements, see the page's warning" if untrusted else
