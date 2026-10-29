@@ -2375,6 +2375,88 @@ def test_filmcheck_reads_a_real_ffprobe_reply():
         assert filmcheck.problems(filmcheck.probe(upright))[0].startswith("shown 1080x1920")
 
 
+def test_filmcheck_flags_hdr_and_spatial_audio():
+    """iPhone HDR Video (HLG) and Spatial Audio, which ffprobe 9 names apple_apac, each give one thing to change."""
+    import filmcheck
+    phone = [{"codec_type": "video", "width": 1920, "height": 1080, "r_frame_rate": "30/1", "avg_frame_rate": "30/1",
+              "color_transfer": "bt709"}, {"codec_type": "audio", "codec_name": "aac", "codec_tag_string": "mp4a"}]
+    assert filmcheck.problems(phone) == []
+    for transfer in ("arib-std-b67", "smpte2084"):
+        assert filmcheck.problems([{**phone[0], "color_transfer": transfer}, phone[1]])[0].startswith("recorded in HDR")
+    for apac in ({"codec_name": "apple_apac", "codec_tag_string": "apac"}, {"codec_name": "apac"},
+                 {"codec_tag_string": "apac"}):
+        found = filmcheck.problems([*phone, {"codec_type": "audio", **apac}])  # the stereo track is there too
+        assert len(found) == 1 and "Spatial Audio" in found[0], apac
+
+
+def view(dx=0, dy=0, height=200):
+    """A 640 px wide grey frame cut from one fixed random street (8 px blobs and fine grain, smooth as a real view is
+    at a quarter size), its content moved by (dx, dy) px."""
+    import random
+    rng, width = random.Random(3), 640 + 80
+    blobs = [[rng.randrange(192) for _ in range(width // 8)] for _ in range((height + 80) // 8)]
+    street = bytes(blobs[y // 8][x // 8] + rng.randrange(64) for y in range(height + 80) for x in range(width))
+    return b"".join(street[(y + 40 - dy) * width + 40 - dx:(y + 40 - dy) * width + 680 - dx] for y in range(height))
+
+
+def test_filmcheck_shift_reads_small_and_large_moves_past_traffic():
+    import filmcheck
+    ref = view()
+    for move in ((3, -2), (18, -10), (-30, 7)):  # 18 and -10 fall between quarter-size pixels
+        img = bytearray(view(*move))
+        img[80 * 640:120 * 640] = bytes(40 * 640)  # a dark bus across a fifth of the frame
+        assert filmcheck.shift(ref, bytes(img)) == move, move
+
+
+def test_filmcheck_summary_needs_two_samples_in_a_row():
+    import filmcheck
+    assert filmcheck.summary([]) == {"max_shift_px": 0, "at_s": None, "moved": False, "dx_dy": None}
+    one_sway = [(60, 0, 1), (120, 9, 0), (180, 1, -2), (240, 2, 0)]  # a bus or a gust: back at the next sample
+    assert filmcheck.summary(one_sway) == {"max_shift_px": 9, "at_s": 120, "moved": False, "dx_dy": [9, 0]}
+    sagged = [(60, 1, 0), (120, 0, 6), (180, 1, 7), (240, 0, 8)]
+    assert filmcheck.summary(sagged) == {"max_shift_px": 8, "at_s": 120, "moved": True, "dx_dy": [0, 6]}
+    assert not filmcheck.summary([(60, 0, 5), (120, 5, 5)])["moved"]  # 5 px is not over the line
+    lines = filmcheck.camera_lines(filmcheck.summary(sagged))
+    assert lines[1] == "" and "re-shoot, or set window_s to end before the move" in lines[0][0] and "2:00" in lines[0][0]
+    found, note = filmcheck.camera_lines(filmcheck.summary(one_sway))
+    assert found == [] and note.startswith("camera: largest shift 9 px (of 640) at 2:00")
+
+
+def test_filmcheck_steadiness_samples_each_minute_skips_the_end_and_stops_when_dark():
+    import filmcheck
+    asked, real = [], (filmcheck.gray, filmcheck.shift)
+    filmcheck.gray, filmcheck.shift = lambda clip, t: asked.append(t) or b"frame", lambda ref, img: (0, 0)
+    try:
+        assert not filmcheck.steadiness("clip", 1.0, 901.0)["moved"]
+        assert asked == [1.0, *(1.0 + 60 * k for k in range(1, 15)), 900.0]  # every minute and the last second
+        asked.clear()
+        filmcheck.steadiness("clip", 1.0, 10.0)
+        assert asked == [1.0, 3.25, 5.5, 7.75, 9.0]  # a 10 s test clip still gets two samples in a row
+        frames = {1.0: view(), 61.0: view(0, 7), 121.0: view(0, 7), 181.0: b"",
+                  241.0: bytes(v // 3 for v in view(0, 7))}  # sagged; one frame missing; then dusk
+        filmcheck.gray, filmcheck.shift = lambda clip, t: frames[t], real[1]
+        held = filmcheck.steadiness("clip", 1.0, 302.0)
+    finally:
+        filmcheck.gray, filmcheck.shift = real
+    assert held == {"max_shift_px": 7, "at_s": 61.0, "moved": True, "dx_dy": [0, 7], "darker_pct": 67,
+                    "dark_at_s": 241.0}
+    found, _ = filmcheck.camera_lines(held)
+    assert len(found) == 2 and found[1].startswith("the picture is 67% darker by 4:01")
+
+
+def test_filmcheck_finds_a_knocked_phone_in_a_real_clip():
+    """One end-to-end clip: the view slides 6 px left at 5 s and stays there."""
+    import filmcheck, subprocess, tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as tmp:
+        clip = Path(tmp) / "knocked.mp4"
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=656x360:rate=5:d=12", "-vf",
+                        "crop=640:360:x='if(gte(t,5),8,2)':y=0", "-c:v", "libx264", "-preset", "ultrafast", str(clip)],
+                       check=True)
+        held = filmcheck.steadiness(clip, 1.0, 12.0, every=8)
+    assert held["moved"] and held["dx_dy"] == [-6, 0] and 5 <= held["at_s"] <= 8, held
+
+
 DESIRE = {"a": [[[0.3, -3.7], [0.3, 3.9]]], "b": [[[1.1, -3.7], [1.1, 3.9]]], "c": [[[1.7, 3.9], [1.7, -3.7]]],
           "d": [[[9.4, -3.7], [9.4, 3.9]]]}  # four people across a road along x; a, b and c within 2 m
 
