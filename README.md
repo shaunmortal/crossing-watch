@@ -22,7 +22,7 @@ hit, instead of waiting for crash statistics.
 | Second look | **Muse Spark** checks each clip: is that a person, and who (child, elderly, wheelchair user...) | `review.py` |
 | Ear witness | **Muse Wonder** listens to the original audio around each near-miss for horns, screeching brakes and shouts | `listen.py` |
 | Where it happened | A bird's-eye map in road metres: each near-miss where it happened, with both paths 2 s either side | `roadmap.py` |
-| Evidence clips | ffmpeg, pedestrian boxed cyan, vehicle red, every tracked person's head blurred on every frame so clips of children can be shared | `render.py` |
+| Evidence clips | ffmpeg, pedestrian boxed cyan, vehicle red, every tracked person's head and the bottom quarter of every tracked vehicle (its number plate) blurred on every frame so clips of children can be shared; when a SAM video request for people is full, SAM image search finds the people it missed on every published frame, and the page says how many | `render.py`, `analyze.py` |
 | Fix and letter | **Muse Spark** (JSON mode) picks a physical fix and writes the letter from the measurements only; verified in two layers before use: code checks every number against the measurements, then **Muse Spark as a separate reviewer** (LLM as judge) lists unsupported claims (a warrant said to be met, a death risk for a child); either objection sends the letter back with the reason, and after 3 tries what remains is shown for a person to check; **Muse Image** draws the fix onto the real street | `pack.py` |
 
 ## Run
@@ -165,8 +165,10 @@ The DUT data has no licence and was used only for internal testing; it is not in
 - A vehicle's lower box edge stands in for its footprint.
 - SAM 3.1 video tracking keeps at most 16 objects per request, so crowded sites need crowd mode, which costs more
   (one image request per 0.2 s). Dense traffic fills even a 15-second part: on our Indian intersection clip every
-  vehicle concept hit the limit within 2 s, so there vehicle counts are a minimum. People SAM did not track are also
-  not blurred.
+  vehicle concept hit the limit within 2 s, so there vehicle counts are a minimum. For people it did not track,
+  SAM image search looks again on the clips and the street photo (one image request per 0.2 s of published
+  video) and blurs those it finds; check every public frame by eye. Number plates are blurred only on vehicles
+  SAM tracked.
 - A person standing still on the carriageway when a car passes within 1 m is reported as a near-miss.
 - The death-risk curve is for adults (15+) hit by a car front; children are not covered by that study.
 - Distances are only as good as the measured calibration rectangle.

@@ -321,10 +321,10 @@ def probe(path, entries, *extra):
                            "-of", "csv=p=0", str(path)], check=True, capture_output=True, text=True).stdout.strip()
 
 
-def write_events(out_dir, site, events, seen, cost, full):
+def write_events(out_dir, site, events, seen, cost, full, privacy=None):
     (out_dir / "events.json").write_text(json.dumps({"site": site.get("name", ""), "fps": FPS, "exposure": seen,
                                                      "cost": cost,
-                                                     "sam_full_requests": full,
+                                                     "sam_full_requests": full, "privacy": privacy,
                                                      "events": events}, indent=1))
 
 
@@ -388,15 +388,56 @@ def review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, ke
         e["review"] = verdicts.get(pid)
 
 
-def add_evidence(video, clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size):
-    """Evidence clip and sound check for the top events Spark did not reject; one failure costs that event's
-    evidence, not the run. Only the frames of the track piece that made the event are boxed."""
-    kept = [e for e in events if (e.get("review") or {}).get("is_person", True)]
-    for i, e in enumerate(kept[:EVIDENCE_CLIPS]):
+def evidence_events(events):
+    """The top EVIDENCE_CLIPS events Spark did not reject: the ones that get an evidence clip."""
+    return [e for e in events if (e.get("review") or {}).get("is_person", True)][:EVIDENCE_CLIPS]
+
+
+def shown_frames(events, total):
+    """The clip frames that are published: every evidence clip's frames, and frame 0 (pack's street photo)."""
+    windows = [render.window(e, FPS) for e in evidence_events(events)]
+    return {0, *(f for first, last in windows for f in range(first, min(last, total - 1) + 1))}
+
+
+def search_heads(site, clip, out_dir, events, total, pieces, key, budget):
+    """When a SAM video request for people was full, people who came later have no track, so no blur. SAM image
+    search looks for them, as crowd mode would, on the person frames within one sample of a shown frame (so the boxes
+    filled in between samples cover each one), within `budget` dollars (check_cost). Returns (their tracks, the
+    frames searched)."""
+    person = site.get("person", "person")
+    sampled, shown = crowd_frames(site, person, total), shown_frames(events, total)
+    frames = [f for f in sampled if not shown.isdisjoint(range(f - sampled.step + 1, f + sampled.step))]
+    cache = crowd.cache_dir(out_dir, person)
+    print(f"a SAM video request for {person} was full: SAM image search on {len(frames)} published frames for "
+          "the people it missed", flush=True)
+    check_cost(pieces, [], None, total, budget, sum(not (cache / f"{f:06d}.sam.txt").exists() for f in frames),
+               len(frames))
+    return crowd.track(clip, frames, FPS, person, key, cache), frames
+
+
+def heads(person_boxes, found, frames):
+    """(person tracks whose heads are blurred: the tracked and the found, the page's counts). Counts are for the
+    busiest searched frame, since the tracker splits people seen only every 0.2 s into many short tracks: the most
+    people with a track on one frame, and the most found on one frame who sit on no tracked box (LINK_SHARE)."""
+    on = lambda tracks, f: [t[f] for t in tracks if f in t]
+    def missed(f):
+        tracked = on(person_boxes.values(), f)
+        return sum(all(road.inside_share(*sorted((b, o), key=box_area)) < LINK_SHARE for o in tracked)
+                   for b in on(found.values(), f))
+    counts = {"heads_tracked": max(len(on(person_boxes.values(), f)) for f in frames),
+              "heads_found": max(map(missed, frames))}
+    return [*person_boxes.values(), *found.values()], counts
+
+
+def add_evidence(video, clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size, everyone):
+    """Evidence clip and sound check for evidence_events; one failure costs that event's evidence, not the run. Only
+    the frames of the track piece that made the event are boxed; the heads of `everyone` and every number plate are
+    blurred."""
+    for i, e in enumerate(evidence_events(events)):
         pair = piece_boxes(person_boxes, people, e["person"]), vehicle_boxes[e["vehicle"]]
         try:
-            e["clip"] = render.render(clip, e, *pair, FPS, out_dir / f"event{i + 1}.mp4",
-                                      everyone=list(person_boxes.values()), frame_size=frame_size).name
+            e["clip"] = render.render(clip, e, *pair, FPS, out_dir / f"event{i + 1}.mp4", everyone=everyone,
+                                      frame_size=frame_size, vehicles=list(vehicle_boxes.values())).name
             e["heard"] = listen.listen(video, e, out_dir / f"event{i + 1}.wav", key)
         except (subprocess.CalledProcessError, OSError) as err:
             print(f"evidence for event {i + 1} failed: {err}", flush=True)
@@ -452,10 +493,12 @@ def main():
     notes = [switch_note(c, seconds, len(pieces)) for c, seconds in switched.items()]
     if switched:
         print("auto mode: " + "; ".join(notes), flush=True)
-        sam_usd += check_cost(pieces, [], frame_size, total, cap - spent,
-                              *image_requests(site, list(switched), total, out_dir))[1]
-    cost = {"sam_usd": round(sam_usd, 2),
-            "image_usd": round(image_requests(site, crowded + list(switched), total, out_dir)[1] * SAM_USD_PER_IMAGE, 2)}
+        more, whole = check_cost(pieces, [], frame_size, total, cap - spent,
+                                 *image_requests(site, list(switched), total, out_dir))
+        spent, sam_usd = spent + more, sam_usd + whole
+    image_usd = image_requests(site, crowded + list(switched), total, out_dir)[1] * SAM_USD_PER_IMAGE
+    cost = lambda searched=0: {"sam_usd": round(sam_usd + searched * SAM_USD_PER_IMAGE, 2),
+                               "image_usd": round(image_usd + searched * SAM_USD_PER_IMAGE, 2)}
 
     tracks_of = lambda concept, g=1: concept_tracks(site, concept, clip, total, pieces, out_dir, key, frame_size, g,
                                                     switched)
@@ -471,10 +514,15 @@ def main():
               "in those parts were not tracked (use person_mode / vehicle_mode \"crowd\": the Crowded and Dense "
               "traffic boxes on the calibration page; or \"auto\")", flush=True)
 
-    write_events(out_dir, site, events, seen, cost, full)  # saved before the slower, network-bound evidence step
+    write_events(out_dir, site, events, seen, cost(), full)  # saved before the slower, network-bound evidence step
     review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size, top_down)
-    add_evidence(args.video, clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size)
-    write_events(out_dir, site, events, seen, cost, full)
+    everyone, privacy, searched = list(person_boxes.values()), None, []
+    if events and person_concept not in crowded + list(switched) and \
+            full_requests(pieces, [(person_concept, grid)], frame_size)[0]:
+        found, searched = search_heads(site, clip, out_dir, events, total, pieces, key, cap - spent)
+        everyone, privacy = heads(person_boxes, found, searched)
+    add_evidence(args.video, clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size, everyone)
+    write_events(out_dir, site, events, seen, cost(len(searched)), full, privacy)
     report(seen, events)
 
 

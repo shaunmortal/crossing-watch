@@ -6,6 +6,7 @@ import subprocess
 PAD_S = 2.0
 HEAD_SHARE = 0.3   # the top 30% of a person box holds the head
 MIN_BLUR_PX = 3    # heads smaller than this are unrecognisable anyway, and delogo needs room
+PLATE_SHARE = 0.25  # the bottom 25% of a vehicle box holds its number plate
 
 
 def box_filters(tracks, first, last):
@@ -36,6 +37,23 @@ def blur_filters(person_tracks, first, last, frame_size):
     return out
 
 
+def plate_filters(vehicle_tracks, first, last, frame_size):
+    """One delogo per number plate per frame, over the bottom PLATE_SHARE of each vehicle box, clamped as in
+    blur_filters."""
+    width, height = frame_size
+    out = []
+    for track in vehicle_tracks:
+        for f in range(first, last + 1):
+            b = track.get(f)
+            if not b:
+                continue
+            x1, y1 = max(1, round(b[0])), max(1, round(b[3] - PLATE_SHARE * (b[3] - b[1])))
+            x2, y2 = min(width - 2, round(b[2])), min(height - 2, round(b[3]))
+            if x2 - x1 >= MIN_BLUR_PX and y2 - y1 >= MIN_BLUR_PX:
+                out.append(f"delogo=x={x1}:y={y1}:w={x2 - x1}:h={y2 - y1}:enable='eq(n,{f - first})'")
+    return out
+
+
 def window(event, fps):
     """(first, last) clip frames of an event's evidence clip: PAD_S before the first of the pedestrian and the
     vehicle reached the spot to PAD_S after the second did, so a close pass still shows the vehicle arriving."""
@@ -43,10 +61,12 @@ def window(event, fps):
     return max(0, round(min(times) * fps) - round(PAD_S * fps)), round(max(times) * fps) + round(PAD_S * fps)
 
 
-def render(clip, event, person_track, vehicle_track, fps, out_path, everyone=(), frame_size=None):
-    """Write the evidence clip for one event, heads of `everyone` blurred; returns out_path."""
+def render(clip, event, person_track, vehicle_track, fps, out_path, everyone=(), frame_size=None, vehicles=()):
+    """Write the evidence clip for one event, heads of `everyone` and number plates of `vehicles` blurred; returns
+    out_path."""
     first, last = window(event, fps)
-    blurs = blur_filters(everyone, first, last, frame_size) if frame_size else []
+    blurs = blur_filters(everyone, first, last, frame_size) + plate_filters(vehicles, first, last, frame_size) \
+        if frame_size else []
     filters = ",".join(blurs + box_filters([(person_track, "cyan"), (vehicle_track, "red")], first, last)) or "null"
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{first / fps:.3f}", "-i", str(clip),
                     "-frames:v", str(last - first + 1), "-vf", filters, "-an", "-c:v", "libx264",

@@ -632,6 +632,75 @@ def test_street_photo_blurs_people_a_full_video_reply_missed():
         assert (out / "street.jpg").exists() and all(f"delogo=x={x}:" in "".join(blurred) for x in (5, 25, 45))
 
 
+def test_street_photo_blurs_plates_and_never_trusts_a_full_video_reply_alone():
+    import subprocess, tempfile
+    from pathlib import Path
+    import crowd
+    box = lambda obj, x: f"{obj}<|box;x1={x};y1=5;x2={x + 3};y2=40;w=640;h=360|>"
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp)
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=640x360:rate=10:duration=1",
+                        "-pix_fmt", "yuv420p", str(out / "clip.mp4")], check=True)
+        sam.cache_path(out, "person").write_text("<0f>" + "".join(box(i, 20 * i) for i in range(sam.MAX_OBJECTS)))
+        sam.cache_path(out, "car").write_text("<0f>0<|box;x1=400;y1=200;x2=500;y2=280;w=640;h=360|>")
+        assert raises_value_error(lambda: pack.street_photo(out / "clip.mp4", out / "street.jpg", "person", ["car"]))
+        crowd.cache_dir(out, "person").mkdir()  # analyze searched frame 0 image by image
+        (crowd.cache_dir(out, "person") / "000000.sam.txt").write_text("<0f>" + box(0, 600))
+        calls, old = [], pack.subprocess.run
+        pack.subprocess.run = lambda args, **kwargs: calls.append(args) or old(args, **kwargs)
+        try:
+            pack.street_photo(out / "clip.mp4", out / "street.jpg", "person", ["car"])
+        finally:
+            pack.subprocess.run = old
+    filters = calls[-1][calls[-1].index("-vf") + 1]
+    assert "delogo=x=400:y=260:w=100:h=20:" in filters and "delogo=x=600:" in filters  # the plate; a missed person
+
+
+def test_number_plates_are_blurred_in_the_bottom_quarter_of_each_vehicle():
+    car = {10: [100, 100, 200, 140], 11: [637, 350, 700, 400]}  # then off the frame's corner: nothing left to blur
+    assert render.plate_filters([car], 10, 11, (640, 360)) == ["delogo=x=100:y=130:w=100:h=10:enable='eq(n,0)'"]
+    calls, old = [], render.subprocess.run
+    render.subprocess.run = lambda args, **kwargs: calls.append(args)
+    try:
+        render.render("clip.mp4", {"t_person_s": 1.0, "t_vehicle_s": 1.0}, {}, {}, 10, "event1.mp4",
+                      frame_size=(640, 360), vehicles=[{5: [100, 100, 200, 140]}])
+    finally:
+        render.subprocess.run = old
+    assert "delogo=x=100:y=130:w=100:h=10:enable='eq(n,5)'" in calls[0][calls[0].index("-vf") + 1]
+
+
+def test_heads_a_full_video_request_missed_are_searched_on_every_published_frame():
+    import contextlib, io, tempfile
+    from pathlib import Path
+    import analyze, crowd
+    site = {"person": "person", "vehicles": ["car"]}
+    events = [{"t_person_s": 3.0, "t_vehicle_s": 3.5, "review": {"is_person": False}},  # rejected: no clip
+              {"t_person_s": 3.0, "t_vehicle_s": 3.5}]
+    shown = analyze.shown_frames(events, 100)
+    assert shown == {0, *range(10, 56)}  # the one clip, 1-5.5 s, and frame 0 (the street photo)
+    asked, real = [], crowd.track
+    crowd.track = lambda clip, frames, fps, concept, key, cache: asked.extend(frames) or {"c0": {0: [0, 0, 9, 30]}}
+    try:
+        with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stdout(io.StringIO()):
+            pieces = [(0, None, Path(tmp))]
+            try:
+                analyze.search_heads(site, None, Path(tmp), events, 100, pieces, None, 0.05)
+                raise AssertionError("over the budget accepted")
+            except SystemExit as err:
+                assert "$0.06 is over the $0.05" in str(err)  # 25 images at $0.0025
+            found, searched = analyze.search_heads(site, None, Path(tmp), events, 100, pieces, None, 1.0)
+    finally:
+        crowd.track = real
+    assert asked == searched == [0, *range(10, 57, 2)]  # 25 frames: 10 fps clip, 5 fps samples, one past each end
+    tracked = {"a": {0: [0, 0, 10, 30]}, "far": {90: [0, 0, 10, 30]}}  # "far" is on no searched frame
+    missed = {"c1": {12: [50, 0, 60, 30]}, "c2": {0: [100, 0, 110, 30]}, "c3": {0: [200, 0, 210, 30]}}
+    everyone, counts = analyze.heads(tracked, found | missed, searched)  # c0 sits on a; frame 0 has 2 it missed
+    assert counts == {"heads_tracked": 1, "heads_found": 2} and len(everyone) == 6
+    note = pack.privacy_note(counts)
+    assert "up to 1 heads a frame blurred from tracks + up to 2 found by SAM image search" in note
+    assert pack.privacy_note(None) == ""
+
+
 def test_crowd_tracker_keeps_ids_through_a_short_gap_and_apart_from_neighbours():
     import crowd
     walker = lambda x0: {f: [x0 + 2 * f, 100, x0 + 2 * f + 20, 160] for f in range(0, 40, 2)}
