@@ -3,6 +3,7 @@ import json
 import math
 
 import listen
+import overlay
 import pack
 import render
 import review
@@ -255,6 +256,22 @@ def test_page_links_find_an_event_card_and_its_moment():
     assert '<article class="card" id="event-3" data-t="2.00">' in pack.event_card(3, e, 10)  # clip starts at 1.5 s
     assert 'data-t="1.00"' in pack.event_card(1, e | {"t_vehicle_s": 1.0}, 10)  # clip starts at 0, not -1 s
 
+
+def test_gap_clock_says_who_came_first_and_freezes_on_the_tier():
+    e = {"person": "1/0", "vehicle": "motorcycle#c28", "tier": "serious", "pet_s": 0.8, "t_person_s": 3.0,
+         "t_vehicle_s": 3.8, "vehicle_kmh": 30.0, "gap_m": 0.4, "death_risk_pct": 1.5, "clip": "event1.mp4",
+         "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5}, "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
+    assert overlay.clock_text(e) == "The motorcycle reached the pedestrian's spot 0.8 s after they left it."
+    assert overlay.clock_text(e | {"t_vehicle_s": 2.4, "pet_s": 0.6000000000000001}) == (
+        "The pedestrian stepped where the motorcycle was 0.6 s earlier.")
+    assert overlay.clock_text(e | {"t_vehicle_s": 3.0, "pet_s": 0.0}) == (
+        "The pedestrian and the motorcycle were on the same spot at once.")
+    clock = overlay.clip("<video></video>", e | {"tier": "close pass", "pet_s": 2.0})
+    assert 'data-pet="2.0" data-word="close pass, 1.5-3.0 s">2.0 s, close pass, 1.5-3.0 s</span>' in clock  # no JS: final gap
+    assert overlay.clip("", e) == '<p class="gap">The motorcycle reached the pedestrian&#x27;s spot 0.8 s after they left it.</p>'
+    page = pack.page({"world_points": SQUARE_ROAD}, [e], {"minutes": 0.3}, None, None, 10)
+    assert '<div class="clip"><video src="event1.mp4"' in page and 'data-word="serious near-miss, under 1.5 s"' in page
+    assert page.count("<script>") == 1 and "requestAnimationFrame" in page and page.index("<script>") > page.index("event-1")
 
 
 def test_long_videos_are_tracked_in_overlapping_parts_and_ids_joined():

@@ -18,6 +18,7 @@ import uuid
 from pathlib import Path
 
 import crowd
+import overlay
 import render
 import review
 import roadmap
@@ -278,7 +279,7 @@ def event_card(i, e, fps):
     who = html.escape(("an " if road_user[0] in "aeiou" else "a ") + road_user)
     video = f'<video src="{html.escape(e["clip"])}" controls muted loop playsinline></video>' if e.get("clip") else ""
     moment_s = min(e["t_person_s"], e["t_vehicle_s"]) - render.window(e, fps)[0] / fps
-    return f"""<article class="card" id="event-{i}" data-t="{moment_s:.2f}">{video}
+    return f"""<article class="card" id="event-{i}" data-t="{moment_s:.2f}">{overlay.clip(video, e)}
 <h3>#{i} &middot; {html.escape(e.get("tier", "serious"))} &middot; {html.escape(e["vehicle"].split("#")[0])} at {e["vehicle_kmh"]} km/h, {e["pet_s"]:.1f} s from {who}</h3>
 <table><tr><th></th><th>Impact speed if hit</th><th>Adult death risk</th></tr>
 <tr><td>As driven</td><td>{e.get("impact_kmh", e["vehicle_kmh"])} km/h</td><td>{e["death_risk_pct"]}%</td></tr>
@@ -384,13 +385,13 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None):
               f"{road.BRAKING_MPS2} m/s² braking. {site.get('calibration_note', '')}")
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Crossing Watch evidence</title>
-<style>{STYLE}{roadmap.STYLE}</style></head><body>
+<style>{STYLE}{roadmap.STYLE}{overlay.STYLE}</style></head><body>
 <h1>Crossing Watch: near-miss evidence</h1>
 <p class="muted">{html.escape(site.get("name", ""))}</p>
 <div class="stats">{stats(events, seen)}</div>{limit_note(full)}
 {engineering(seen, cost)}
 {map_section(events, site)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{letter_section(plan)}
-<section><h2>How this was measured</h2><p class="note">{html.escape(method)}</p></section></body></html>"""
+<section><h2>How this was measured</h2><p class="note">{html.escape(method)}</p></section>{overlay.SCRIPT}</body></html>"""
 
 
 def clip_minutes(clip, fps):
