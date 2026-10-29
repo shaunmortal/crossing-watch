@@ -64,6 +64,8 @@ followed by a non-digit; llama-server turns it into a grammar that still lets Gl
 used it yet, the code check and the reviewer still run after it, and the run record counts Glimmer's tries.
 `LETTER_MODEL_KEY` adds a Bearer token for a server that needs one, and the letter says "self-hosted" only when the
 server runs on the same machine.
+`JUDGE_MODEL_URL` makes the open-weights model a judge too: it reviews the letter beside Muse Spark, or alone without a
+Meta key, and the page names only the judges that ran. No Glimmer judge run has been made yet.
 `sample/` is a synthetic example (made-up tracks, no video) for trying the letter step anywhere.
 
 ```

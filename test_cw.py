@@ -740,7 +740,9 @@ def test_glimmer_notebook_is_pinned_hash_checked_and_records_its_run():
                 "f48b452316f9b213758e8659444029b961a24a07f99a1abb2a9f88b06f7c00c6", "'-np', '1'", "(32768, 16384)",
                 "'reasoning_strength': 'medium'", "'--temp', '1.0', '--top-p', '0.95', '--top-k', '64'",
                 "LETTER_MODEL_HOST", "<removed-run-record>", "build_info", "GIT_SHA", "pack_py_sha256",
-                "run.stderr.count('open model reply:')", "'tries': tries"):  # pack.open_model_reply logs each try
+                "run.stderr.count('open model reply:')", "'tries': tries",  # pack.open_model_reply logs each try
+                "os.path.exists(f'{CW}/judge_bench.py')", "'JUDGE_MODEL_URL': 'http://127.0.0.1:8080/v1'",
+                "k != 'MODEL_API_KEY'", "<removed-run-record>"):  # the Glimmer-only judge pass, skipped without a bench
         assert pin in text, pin
     assert re.search(r"assert sha256\(path\) == SHA256\[name\]", text)
     assert "shaunmortal" in text
