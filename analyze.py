@@ -76,6 +76,12 @@ def load_site(path):
                          "metres, length first, e.g. {\"car\": [3.9, 1.7]}")
     if not PREP_FILTER.match(site.get("prep_filter", "") or "crop"):
         raise SystemExit(f"{path}: prep_filter may only use crop, scale, transpose, hflip or vflip")
+    trap = site.get("trap")
+    if trap is not None and not (isinstance(trap, dict) and numeric_points(trap.get("image_points"), 4)
+                                 and isinstance(trap.get("distance_m"), (int, float)) and trap["distance_m"] > 0):
+        raise SystemExit(f"{path}: trap must be {{\"image_points\": four tape marks clicked going round (line A near "
+                         "kerb, line B near kerb, line B far kerb, line A far kerb), \"distance_m\": taped metres from "
+                         "line A to line B}; see validate_gate.py")
     return site
 
 
@@ -301,6 +307,13 @@ def crowd_concepts(site, mode="crowd"):
             + (list(site["vehicles"]) if site.get("vehicle_mode") == mode else []))
 
 
+def video_plan(site):
+    """[(concept, grid)] tracked by SAM video requests: people (in person_grid tiles) and each vehicle concept, except
+    those in crowd mode."""
+    concepts = [(site.get("person", "person"), site.get("person_grid", 1))] + [(c, 1) for c in site["vehicles"]]
+    return [(c, g) for c, g in concepts if c not in crowd_concepts(site)]
+
+
 def crowd_frames(site, concept, total):
     """The clip frames crowd mode sends as images for `concept`: people at crowd.CROWD_FPS, vehicles faster."""
     rate = crowd.CROWD_FPS if concept == site.get("person", "person") else crowd.VEHICLE_FPS
@@ -520,11 +533,10 @@ def main():
     total = frame_count(clip)
     pieces = parts(clip, out_dir, total)
     person_concept, grid = site.get("person", "person"), site.get("person_grid", 1)
-    crowded = crowd_concepts(site)
-    video_plan = [(c, g) for c, g in [(person_concept, grid)] + [(c, 1) for c in site["vehicles"]] if c not in crowded]
+    crowded, plan = crowd_concepts(site), video_plan(site)
     cap = spend_cap(args.budget, args.allow_cost)
-    spent, sam_usd = check_cost(pieces, video_plan, frame_size, total, cap, *image_requests(site, crowded, total, out_dir))
-    switched = auto_switch(site, pieces, video_plan, key, frame_size)
+    spent, sam_usd = check_cost(pieces, plan, frame_size, total, cap, *image_requests(site, crowded, total, out_dir))
+    switched = auto_switch(site, pieces, plan, key, frame_size)
     notes = [switch_note(c, seconds, len(pieces)) for c, seconds in switched.items()]
     if switched:
         print("auto mode: " + "; ".join(notes), flush=True)
@@ -546,7 +558,7 @@ def main():
     events = with_unseen(placed(road.conflicts(people, vehicles, FPS), people, vehicles), person_detected,
                          vehicle_detected)
     seen = road.exposure(people, vehicles, FPS, total)
-    full = (*full_requests(pieces, [(c, g) for c, g in video_plan if c not in switched], frame_size), notes)
+    full = (*full_requests(pieces, [(c, g) for c, g in plan if c not in switched], frame_size), notes)
     if full[0]:
         print(f"warning: {full[0]} of {full[1]} SAM requests hit the {sam.MAX_OBJECTS}-object limit; later arrivals "
               "in those parts were not tracked (use person_mode / vehicle_mode \"crowd\": the Crowded and Dense "

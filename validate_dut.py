@@ -131,13 +131,14 @@ def score(truth, events, people, vehicles, our_people, our_vehicles, person_ids,
 
 def our_tracks(site, clip_out):
     """(person boxes, vehicle boxes, pedestrian pieces, vehicle shapes, frame count) of a run, rebuilt from its
-    cached SAM replies the way analyze.py builds them."""
+    cached SAM replies the way analyze.py builds them, auto mode's switch to frame-by-frame included."""
     clip_file = clip_out / "clip.mp4"
     total = analyze.frame_count(clip_file)
     frame_size = tuple(int(v) for v in analyze.probe(clip_file, "stream=width,height").split(","))
     pieces = analyze.parts(clip_file, clip_out, total)  # all cached by the run
+    switched = analyze.auto_switch(site, pieces, analyze.video_plan(site), None, frame_size)
     tracks_of = lambda concept, g=1: analyze.concept_tracks(site, concept, clip_file, total, pieces, clip_out, None,
-                                                            frame_size, g)
+                                                            frame_size, g, switched)
     person_boxes = tracks_of(site.get("person", "person"), site.get("person_grid", 1))[0]
     vehicle_boxes = {f"{c}#{k}": t for c in site["vehicles"] for k, t in tracks_of(c)[0].items()}
     H = road.homography(site["image_points"], site["world_points"])

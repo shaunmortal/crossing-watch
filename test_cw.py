@@ -352,6 +352,78 @@ def test_offline_speed_check_reads_the_dataset_at_its_own_frame_rate():
     assert summary == {"frames": 3, "mean_abs_kmh": 0.67, "p95_abs_kmh": 1.0, "near_bar_wrong_side_pct": 50.0}
 
 
+def test_rebuilt_tracks_follow_auto_modes_switch_to_frame_by_frame():
+    """validate_dut.our_tracks (validate_offline, validate_gate) rebuilds an auto-mode run as analyze.py ran it: a
+    concept whose cached video reply filled up is read from its frame-by-frame replies."""
+    import subprocess, tempfile
+    from pathlib import Path
+    import crowd, validate_dut
+    box = "<|box;x1=1;y1=1;x2=5;y2=5;w=64;h=48|>"
+    site = {"image_points": SQUARE_IMG, "world_points": SQUARE_ROAD, "person": "person", "vehicles": ["car"],
+            "vehicle_mode": "auto"}
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp)
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=64x48:rate=10:duration=2",
+                        "-pix_fmt", "yuv420p", str(out / "clip.mp4")], check=True)
+        sam.cache_path(out, "person").write_text("")
+        sam.cache_path(out, "car").write_text("<5f>" + "".join(f"{i}{box}" for i in range(sam.MAX_OBJECTS)))
+        asked, real = [], crowd.track
+        crowd.track = lambda clip, frames, fps, concept, *_: asked.append(concept) or {}
+        try:
+            validate_dut.our_tracks(site, out)
+        finally:
+            crowd.track = real
+    assert asked == ["car"]
+
+
+def test_gate_speed_trap_checks_each_logged_vehicle_against_its_one_track():
+    """validate_gate (G6): the four tape marks make two lines 15 m apart through the calibration; a logged vehicle is
+    compared with the one track on both lines at its logged moments, in either direction, and two tracks or none are
+    reported, never guessed. G6 needs 20 matched vehicles, 80% within 15% or 2 km/h and a median lean within 10%."""
+    import tempfile
+    from pathlib import Path
+    import analyze, validate_gate
+    H = road.homography([[250, 100], [350, 100], [500, 300], [100, 300]], [[0, 0], [20, 0], [20, 8], [0, 8]])
+    marks = [list(road.to_image(H, x, y)) for x, y in ((2.5, 0), (17.5, 0), (17.5, 8), (2.5, 8))]
+    lines = validate_gate.trap_lines({"trap": {"image_points": marks}}, H)
+    assert abs(validate_gate.lines_apart(*lines) - 15) < 1e-6
+    fps = analyze.FPS  # a 2 m edge driving along the road; `scale` > 1 reads distances, so speeds, that much long
+    drive = lambda kmh, y, x0, scale=1.0: {f: tuple((scale * (x0 + kmh / 3.6 * f / fps) + d, y) for d in (-1, 1))
+                                           for f in range(120)}
+    vehicles = {"car#1": drive(25, 2, 0), "motorcycle#2": drive(-30, 6, 20, 1.1),
+                "car#3": drive(20, 2, -20), "car#4": drive(20, 6, -20)}  # side by side
+    rows = validate_gate.check(vehicles, lines, 15, [(0.36, 2.52), (2.1, 0.3), (4.05, 6.75), (10.0, 11.0)])
+    assert [(r["vehicle"], r["why"]) for r in rows] == [("car#1", None), ("motorcycle#2", None),
+                                                       (None, "2 tracks on both lines"), (None, "no track on both lines")]
+    assert [round(r["trap_kmh"], 1) for r in rows[:2]] == [25.0, 30.0]
+    assert [round(r["ours_kmh"], 1) for r in rows[:2]] == [25.0, 33.0]
+    assert "NOT TESTED: 19 matched" in validate_gate.g6([(25.0, 25.0)] * 19)
+    assert validate_gate.g6([(25.0, 26.0)] * 16 + [(25.0, 35.0)] * 4).startswith("G6 PASS: 16 of 20")
+    assert validate_gate.g6([(25.0, 26.0)] * 15 + [(25.0, 35.0)] * 5).startswith("G6 FAIL: 15 of 20")
+    assert validate_gate.g6([(25.0, 27.6)] * 20).startswith("G6 FAIL: 20 of 20")  # all within 15%, all 10.4% fast
+    assert validate_gate.agrees(8.0, 9.9) and not validate_gate.agrees(8.0, 10.1)  # 2 km/h, not 15%, when slow
+
+    def refused(call):
+        try:
+            call()
+        except SystemExit as err:
+            return str(err)
+        raise AssertionError("accepted")
+    with tempfile.TemporaryDirectory() as tmp:
+        log, site = Path(tmp) / "trap.csv", Path(tmp) / "site.json"
+        log.write_text("line_a_s,line_b_s,note\n0.36,2.52,white car\n2.1,0.3,\n")
+        assert validate_gate.read_log(log) == [(0.36, 2.52), (2.1, 0.3)]
+        for bad in ("1.0,1.0", "1.0,nan", "1.0,", "-1,2"):
+            log.write_text("line_a_s,line_b_s\n" + bad + "\n")
+            assert "line 2" in refused(lambda: validate_gate.read_log(log))
+        one = {"image_points": SQUARE_IMG, "world_points": SQUARE_ROAD, "vehicles": ["car"]}
+        site.write_text(json.dumps(one | {"trap": {"image_points": marks, "distance_m": 15}}))
+        assert analyze.load_site(site)["trap"]["distance_m"] == 15
+        for trap in ({"image_points": marks[:3], "distance_m": 15}, {"image_points": marks, "distance_m": 0}, marks):
+            site.write_text(json.dumps(one | {"trap": trap}))
+            assert "trap must be" in refused(lambda: analyze.load_site(site))
+
+
 def test_page_links_find_an_event_card_and_its_moment():
     """A page link to #event-N finds card N, and data-t is when, in its clip, the near-miss begins."""
     e = {"vehicle": "car#1", "vehicle_kmh": 30.0, "pet_s": 2.5, "t_person_s": 6.0, "t_vehicle_s": 3.5, "gap_m": 0.4,
