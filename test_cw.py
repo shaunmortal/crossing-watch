@@ -939,6 +939,38 @@ def test_case_agent_stops_at_its_turn_and_dollar_caps():
         agent.spark_turn, agent.MAX_TURNS, agent.MAX_USD = old
 
 
+def test_guesses_keep_5_to_150_kmh_and_the_chart_draws_the_measured_speed_in_red():
+    import contextlib, guess, io, sys, tempfile
+    from pathlib import Path
+    replies = "40 🏍️\n@ravi99 about 25 km/h\nlol no way\n2\n500 kmph\n30-35\n\n150\n४५\n"
+    assert guess.guesses(replies) == [40, 25, 30, 150, 45]  # handle, joke, 2, 500 and the blank line dropped
+    chart = guess.svg([40, 25, 30, 150, 45], 34.0)
+    x = f"{guess.LEFT_PX + 34 / guess.MAX_KMH * (guess.WIDTH_PX - guess.LEFT_PX - guess.RIGHT_PX):.1f}"
+    assert f'<line class="measured" x1="{x}"' in chart and f'x2="{x}"' in chart and guess.RED in chart
+    assert chart.count('<rect class="bar"') == 4 and "median 40 km/h" in chart  # 40 and 45 share one; 150 is in 140-150
+    edge = f'x1="{guess.WIDTH_PX - guess.RIGHT_PX:.1f}"'
+    assert edge in guess.svg([5], 200.0).split('class="measured"')[1]  # a pass over 150 km/h widens the axis
+    with tempfile.TemporaryDirectory() as folder:
+        out = Path(folder)
+        (out / "replies.txt").write_text(replies, encoding="utf-8")
+        (out / "events.json").write_text(json.dumps({"events": [{"vehicle_kmh": 87.9}, {"vehicle_kmh": 34.0}]}))
+        (out / "jokes.txt").write_text("lol\n2\n500\n")
+        old = sys.argv
+        try:
+            sys.argv = ["guess.py", str(out / "replies.txt"), str(out / "events.json"), "--event", "2"]
+            printed = io.StringIO()
+            with contextlib.redirect_stdout(printed):
+                guess.main()
+            assert "5 guesses, median 40 km/h. Measured: 34 km/h." in printed.getvalue()
+            assert (out / "guess.svg").read_text() == chart
+            sys.argv[-1] = "3"
+            assert raises_system_exit(guess.main)  # no event #3
+            sys.argv[1:] = [str(out / "jokes.txt"), str(out / "events.json")]
+            assert raises_system_exit(guess.main)  # no guesses at all
+        finally:
+            sys.argv = old
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):
