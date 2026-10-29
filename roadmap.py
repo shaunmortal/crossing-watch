@@ -57,10 +57,11 @@ def extent(events, area, paths=None):
                   + [p for piece in trails(paths) for p in piece] + list(area))
 
 
-def svg(events, area, shown=5, ground=None, paths=None):
+def svg(events, area, shown=5, ground=None, paths=None, measured=True):
     """The map as inline SVG, never empty: `area` is the calibration quad in metres, `paths` the desire lines drawn as
     faint trails, and the events that carry a "where" go on top, the first `shown` numbered like the cards on the
-    page. `ground` is ground()'s (picture, rectangle)."""
+    page. `ground` is ground()'s (picture, rectangle). Not `measured` (pace.warning): every dot a ring, no speed or
+    PET in its label."""
     placed = [e for e in events if e.get("where")]
     x0, y0, x1, y1 = extent(events, area, paths)
     scale = WIDTH_PX / (x1 - x0)
@@ -86,9 +87,9 @@ def svg(events, area, shown=5, ground=None, paths=None):
     for i, e in enumerate(events):  # dots on top of every path, numbered like the cards even when one has no "where"
         if not e.get("where"):
             continue
-        serious = e.get("tier", "serious") == "serious"
+        serious = measured and e.get("tier", "serious") == "serious"
         label = html.escape(f'{e.get("tier", "serious")}: {e["vehicle"].split("#")[0]} at {e["vehicle_kmh"]} km/h, '
-                            f'{e["pet_s"]:.1f} s apart')
+                            f'{e["pet_s"]:.1f} s apart' if measured else f'tracked moment: {e["vehicle"].split("#")[0]}')
         x, y = sx(e["where"][0]), sy(e["where"][1])
         marks.append(f'<circle class="{"hit" if serious else "near"}" cx="{x}" cy="{y}" r="{6 if serious else 4}">'
                      f'<title>{label}</title></circle>')

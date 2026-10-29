@@ -177,7 +177,8 @@ the server rejects the JSON schema with HTTP 400, pack.py asks once more for any
 `json_object`; the number check and the judges still run. No Fireworks run has been made with pack.py yet.
 
 Either model can judge the other's letter. `JUDGE_MODEL` (default: `LETTER_MODEL`) and `JUDGE_MODEL_KEY` belong to the
-judge server alone, and neither server is sent the other's key. A Glimmer writer on Kaggle with a Spark Open judge:
+judge server alone, and neither server is sent the other's key; a judge on the letter's own URL with no
+`JUDGE_MODEL_KEY` uses `LETTER_MODEL_KEY`, as it is the same server. A Glimmer writer on Kaggle with a Spark Open judge:
 
 ```
 LETTER_MODEL_URL=http://127.0.0.1:8080/v1
@@ -341,7 +342,9 @@ to set it.
   its worst stored "near-miss" (87.9 km/h) the pedestrian's box slides over empty road while the car's box jumps
   between cars: the tracker joined different road users across the skipped time. Only its detection coverage, the
   objects found per frame, still means something: SAM video found on average 1.6 people and 6 vehicles a frame, crowd
-  mode 14.9 people and 20 vehicles. The walking-pace guard below now flags it.
+  mode 14.9 people and 20 vehicles. Its site file now says `"not_measurements"`, so pack.py and the case agent
+  show the warning and ask for no letter whatever its events.json holds. The walking-pace guard below flags it on
+  its own only in crowd mode after an analyze.py re-run (SAM video mode keeps too few walkers to judge).
 - **What the real false alarms are:** two are in clip 09 and were checked frame by frame on 28 Oct. One is a real
   person in yellow whom the dataset stops tracking after 1.8 s while they keep walking along the kerb, so it may be a
   gap in the ground truth. The other is a person standing still at the road edge for the whole clip; the dataset
@@ -376,9 +379,12 @@ People walk at about 1.2-1.5 m/s, so the people in a video check its clock and i
 takes the median walking speed, in road metres a second, of the pedestrian pieces that crossed (the crossing count's
 own pieces), and analyze.py writes it to events.json as `"walking"`. With 10 or more walking pieces, a median over
 2.4 m/s (sped up, or a calibration rectangle marked too big) or under 0.5 m/s (slowed down, or marked too small) flags
-the video. The page then says "People here walk at X m/s, about K times normal walking..." in place of the headline,
-leaves out the near-miss and speed tiles, the pyramid, the engineering numbers and the gap barcode, heads the cards
-"not measurements", and no letter is asked for (no Spark or Glimmer call). Medians measured at $0 from the cached SAM
+the video. The page then says "People here walk at X m/s (the median of N walking pieces), about K times a normal
+walking pace of 1.3 m/s..." in place of the headline, leaves out the near-miss and speed tiles, the pyramid, the
+engineering numbers and the gap barcode, shows each card as its clip and time only (no speed, PET, gap, tier or death
+risk) and the map without near-miss tiers, and no letter is asked for (no Spark or Glimmer call). A site file's
+`"not_measurements"` (a sentence, e.g. "This clip is a time-lapse") does the same whatever the walkers show, also for
+an events.json from before pace.py, which has no `"walking"`. Medians measured at $0 from the cached SAM
 replies on 29 Oct (details in `GATES.md`):
 
 | Video | Walking pieces | Median walking speed |

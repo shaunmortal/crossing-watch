@@ -98,7 +98,11 @@ ffmpeg -v error -sseof -1 -i TEST.MOV -update 1 last.png
   the same SHA-256 and the page prints it, which ties the pack to this one recording, so send the original, not a
   copy.
 - What leaves the laptop: `analyze.py` sends the unblurred video to SAM, crops of people to Muse Spark and the sound
-  to Muse Wonder, through Meta's API. Only `out/VIDEO/share/` is published: blurred clips and pictures.
+  to Muse Wonder, through Meta's API. `pack.py` sends the measurements and the first frame, faces and number plates
+  blurred, to the letter's writer: Muse Spark through Meta's API, or the server in `LETTER_MODEL_URL` (e.g. Fireworks,
+  not Meta). The measurements and the letter go to its judges (Muse Spark, and the server in `JUDGE_MODEL_URL`), and
+  the blurred frame to Muse Image through Meta's API. Only `out/VIDEO/share/` is published: blurred clips and
+  pictures.
 - The unblurred files stay in `out/VIDEO/`: `clip.mp4` (and the parts cut from it), the `person-*.jpg` crops Spark
   saw and the `event*.wav` sound. When the study ends (the letter filed, the hackathon judged), delete them with the
   raw video and its backups, as the notice says:

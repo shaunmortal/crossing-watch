@@ -5,6 +5,7 @@
  "image_points": [[290, 285], [560, 285], [590, 352], [227, 352]],
  "world_points": [[0, 0], [12, 0], [12, 6], [0, 6]],
  "calibration_note": "ROUGH: a 12 m x 6 m rectangle guessed around the zebra crossings; nothing measured. Distances may be off by 30% or more; use only to exercise the pipeline. The clip is also a time-lapse, so its speeds, PETs and gaps are not measurements.",
+ "not_measurements": "This clip is a time-lapse (people cross half the road in 16 consecutive frames)",
  "person": "person",
  "vehicles": ["car", "motorcycle", "auto rickshaw"]
 }

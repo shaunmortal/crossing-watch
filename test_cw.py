@@ -1942,6 +1942,29 @@ def test_spark_open_on_fireworks_judges_a_glimmer_letter_with_its_own_model_id_a
     assert pack.writer_label("http://127.0.0.1:8080/v1", "Muse Glimmer 30B") == "Muse Glimmer 30B (open weights, self-hosted)"
 
 
+def test_a_judge_on_the_letter_server_uses_the_letter_key_when_it_has_none():
+    """One key-protected server (e.g. vLLM --api-key) as writer and judge: with only LETTER_MODEL_KEY set, the judge
+    call is authorised too, as it is the same server."""
+    import contextlib, io
+    good = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "PET 0.4 s."}
+    as_reply = lambda content: {"choices": [{"message": {"content": content}, "finish_reason": "stop"}]}
+    server, seen = fake_open_model([as_reply(json.dumps(good)), as_reply('{"problems": []}')])
+    url = f"http://127.0.0.1:{server.server_port}/v1"
+    names = "LETTER_URL", "LETTER_KEY", "JUDGE_URL", "JUDGE_KEY"
+    old = [getattr(pack, n) for n in names]
+    for n, value in zip(names, (url, "letter-key", url, "")):
+        setattr(pack, n, value)
+    try:
+        with contextlib.redirect_stderr(io.StringIO()):
+            pack.ask_plan("PROMPT", '{"pet_s": 0.4}', None)
+    finally:
+        for n, value in zip(names, old):
+            setattr(pack, n, value)
+        server.shutdown()
+        server.server_close()
+    assert [headers.get("Authorization") for _, _, headers in seen] == ["Bearer letter-key", "Bearer letter-key"]
+
+
 def test_fireworks_key_comes_from_env_or_dotenv_only_for_fireworks():
     """With no key set for a Fireworks URL, FIREWORKS_API_KEY is read as sam.load_api_key reads MODEL_API_KEY; any
     other server never gets it, and a key set for the server wins."""
@@ -2749,7 +2772,8 @@ def test_people_walking_too_fast_or_slow_flag_the_video_and_no_letter_is_asked_f
     import agent, analyze, pace, tempfile
     fast, slow = pace.walking(walkers(pace.MIN_PIECES, 3.0), 10), pace.walking(walkers(pace.MIN_PIECES, 0.3), 10)
     assert fast == {"median_mps": 3.0, "pieces": pace.MIN_PIECES, "flag": "fast"} and slow["flag"] == "slow"
-    assert "about 2.3 times normal walking" in pace.warning(fast) and "slowed down" in pace.warning(slow)
+    assert "3.0 m/s (the median of 10 walking pieces), about 2.3 times a normal walking pace of 1.3 m/s" in (
+        pace.warning(fast)) and "slowed down" in pace.warning(slow)
     with tempfile.TemporaryDirectory() as folder:
         out = pack_folder(folder)
         data = json.loads((out / "events.json").read_text())
@@ -2758,7 +2782,32 @@ def test_people_walking_too_fast_or_slow_flag_the_video_and_no_letter_is_asked_f
         page = (out / "index.html").read_text()
         assert "this video looks sped up or the calibration is off" in page and "No letter was asked for." in page
         assert "serious near-misses" not in page and "Worst moments" not in page and "pedestrian crossings" in page
+        assert "tracked moment &middot; car and a pedestrian" in page and "At 3.0 s in the video." in page
+        assert not any(n in page for n in ("30.0 km/h", "0.5 s from", "Adult death risk", "Gap 0.4 m", "serious &"))
         assert "walk at 3.0 m/s" in agent.letter_blocker({}, {}, data["events"], "", fast)
+    placed = [{"where": [5.0, 3.0], "tier": "serious", "vehicle": "car#1", "vehicle_kmh": 30.0, "pet_s": 0.5}]
+    shown, flagged = (pack.map_section(placed, {"world_points": SQUARE_ROAD}, measured=m) for m in (True, False))
+    assert "Filled dots" in shown and "30.0 km/h" in shown and 'class="hit"' in shown
+    assert "Filled dots" not in flagged and "km/h" not in flagged and 'class="hit"' not in flagged
+
+
+def test_a_site_marked_not_measurements_gets_no_letter_whatever_its_walkers_show():
+    """The Indian time-lapse's site file says so: an events.json from before pace.py (no "walking") or with too few
+    walkers to judge still gets the warning, no letter and no paid call, from pack and the case agent."""
+    import agent, pace, tempfile
+    from pathlib import Path
+    site = json.loads((Path(__file__).parent / "sites" / "indian-intersection.json").read_text())
+    few = pace.walking(walkers(pace.MIN_PIECES - 1, 1.3), 10)
+    assert pace.warning(None) == pace.warning(few) == "" and "time-lapse" in pace.warning(None, site)
+    assert pace.warning(few, site) == pace.warning(None, site) and "time-lapse" in agent.letter_blocker({}, site, [1], "")
+    with tempfile.TemporaryDirectory() as folder:
+        out = pack_folder(folder)
+        (out / "site.json").write_text(json.dumps({**json.loads((out / "site.json").read_text()),
+                                                   "not_measurements": "This clip is a time-lapse"}))
+        assert run_pack(out, ask=lambda prompt: 1 / 0, key="key") == [] and not (out / "plan.json").exists()
+        page = (out / "index.html").read_text()
+        assert "This clip is a time-lapse: its speeds, near-miss times and gaps are not trusted." in page
+        assert "30.0 km/h" not in page and "Worst moments" not in page
 
 
 def test_people_walking_normally_leave_the_numbers_and_the_page_unchanged():

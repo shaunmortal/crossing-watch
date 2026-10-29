@@ -32,11 +32,15 @@ def walking(people, fps):
     return {"median_mps": None if median is None else round(median, 2), "pieces": len(mps), "flag": flag}
 
 
-def warning(walk):
-    """The page's and the agent's sentence for a flagged video, "" otherwise (also for an events.json without it)."""
+def warning(walk, site=None):
+    """The page's and the agent's sentence when a video's numbers are not measurements, "" otherwise: the site file's
+    "not_measurements" (a clip known to be a time-lapse, however few walkers were judged and in an events.json from
+    before pace.py), else a flagged walking pace."""
+    if reason := (site or {}).get("not_measurements"):
+        return f"{str(reason).rstrip('.')}: its speeds, near-miss times and gaps are not trusted."
     if not (walk or {}).get("flag"):
         return ""
     looks = "sped up" if walk["flag"] == "fast" else "slowed down"
-    return (f"People here walk at {walk['median_mps']:.1f} m/s, about {walk['median_mps'] / NORMAL_MPS:.1f} times "
-            f"normal walking ({NORMAL_MPS:g} m/s, the median of {walk['pieces']} walking tracks): this video looks "
+    return (f"People here walk at {walk['median_mps']:.1f} m/s (the median of {walk['pieces']} walking pieces), about "
+            f"{walk['median_mps'] / NORMAL_MPS:.1f} times a normal walking pace of {NORMAL_MPS:g} m/s: this video looks "
             f"{looks} or the calibration is off, so its speeds, near-miss times and gaps are not trusted.")

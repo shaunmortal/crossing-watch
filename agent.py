@@ -179,9 +179,9 @@ def off_share(video_m, tape):
 def letter_blocker(p, site, events, notes, walking=None):
     """Why the letter may not be written yet, or "": it needs near-misses tracked in this case with the site's
     current calibration points, a taped check distance that agrees with the video, and people walking at a walking
-    pace (events.json's "walking", pace.warning)."""
+    pace (events.json's "walking") in a video the site file does not mark as no measurement (pace.warning)."""
     video_m, tape = check_distance(site), p.get("tape_m")
-    if warning := pace.warning(walking):
+    if warning := pace.warning(walking, site):
         return warning.rstrip(".")
     if not events:
         return "no near-misses were measured, so there is nothing to report"

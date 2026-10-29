@@ -518,8 +518,11 @@ def add_evidence(video, clip, out_dir, events, people, vehicles, person_boxes, v
             print(f"evidence for event {i + 1} failed: {err}", flush=True)
 
 
-def report(seen, events):
+def report(seen, events, untrusted=""):
+    """The terminal summary; `untrusted` (pace.warning) heads it, as its speeds and near-misses are not measurements."""
     serious = sum(e["tier"] == "serious" for e in events)
+    if untrusted:
+        print(f"NOT MEASUREMENTS: {untrusted}")
     print(f"{seen['minutes']} min, {seen['crossings']} crossings, {seen['vehicles']} moving vehicles, 85th-percentile "
           f"speed {seen['speed_85th_kmh']} km/h; {serious} serious near-misses (PET < {road.PET_MAX_S} s), "
           f"{len(events) - serious} close passes (< {road.CLOSE_PASS_S} s)")
@@ -589,8 +592,8 @@ def main():
     timeline = road.timeline(people, vehicles, FPS, total)  # the gap barcode's spans, kept out of `seen`
     paths = road.crossing_paths(people, vehicles, FPS)  # the desire lines, kept out of `seen` too
     walk = pace.walking(people, FPS)  # people are the clock: a time-lapse or a wrong scale shows in their pace
-    if walk["flag"]:
-        print(f"warning: {pace.warning(walk)}", flush=True)
+    if untrusted := pace.warning(walk, site):
+        print(f"warning: {untrusted}", flush=True)
     full = (*full_requests(pieces, [(c, g) for c, g in plan if c not in switched], frame_size), notes)
     if full[0]:
         print(f"warning: {full[0]} of {full[1]} SAM requests hit the {sam.MAX_OBJECTS}-object limit; later arrivals "
@@ -610,7 +613,7 @@ def main():
                  everyone)
     write_events(out_dir, site, events, seen, cost(len(searched)), full, privacy, source,
                  run_record(out_dir, started, before), timeline, paths, walk)
-    report(seen, events)
+    report(seen, events, untrusted)
 
 
 if __name__ == "__main__":

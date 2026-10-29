@@ -512,9 +512,11 @@ def spark_reply(prompt, image, api_key):
 
 def open_model_reply(prompt, image, schema, judge=False):
     """Chat completion from the letter's OpenAI-compatible server or, with `judge`, the JUDGE_MODEL_URL one, each read
-    at call time with its own model id and key (a key never crosses servers), through openweights.reply: the text and
-    its run record, kept in plan.json."""
-    url, model, key = (JUDGE_URL, JUDGE_MODEL, JUDGE_KEY) if judge else (LETTER_URL, LETTER_MODEL, LETTER_KEY)
+    at call time with its own model id and key (a key never crosses servers; a judge on the letter's own server uses
+    LETTER_MODEL_KEY when it has no key of its own), through openweights.reply: the text and its run record, kept in
+    plan.json."""
+    judge_key = JUDGE_KEY or (LETTER_KEY if JUDGE_URL == LETTER_URL else "")
+    url, model, key = (JUDGE_URL, JUDGE_MODEL, judge_key) if judge else (LETTER_URL, LETTER_MODEL, LETTER_KEY)
     content = [{"type": "text", "text": prompt}] + ([{"type": "image_url", "image_url": {"url": image}}] if image else [])
     return openweights.reply(url, model, openweights.server_key(url, key), content, schema)
 
@@ -598,16 +600,33 @@ def street_photo(clip, out_path, person_concept="person", vehicles=()):
     return out_path
 
 
+def passed(e):
+    """Who the vehicle passed, by Spark's review: the road user and, escaped, "a ..." / "an ..."."""
+    verdict = e.get("review") or {}
+    road_user = verdict.get("road_user", "pedestrian (not reviewed by Spark)")
+    road_user = review.unconfirmed_rider(verdict) or ("pedestrian" if road_user == "unclear" else road_user)
+    return road_user, html.escape(("an " if road_user[0] in "aeiou" else "a ") + road_user)
+
+
+def video_tag(e):
+    return f'<video src="{html.escape(e["clip"])}" controls muted loop playsinline></video>' if e.get("clip") else ""
+
+
+def tracked_card(i, e):
+    """Card #i on a page whose numbers are not measurements (pace.warning): the clip and when, without the speed,
+    PET, gap, tier, stopping strip or death risk."""
+    return (f'<article class="card" id="event-{i}">{video_tag(e)}\n<h3>#{i} &middot; tracked moment &middot; '
+            f'{html.escape(e["vehicle"].split("#")[0])} and {passed(e)[1]}</h3>\n'
+            f'<p class="note">At {e["t_person_s"]:.1f} s in the video.</p></article>')
+
+
 def event_card(i, e, fps, strip=""):
     """Card #i, linkable as #event-i; data-t is the second of its clip when the first of the two reached the spot.
     `strip` is overlay.strip()'s stopping strip for this card, if any."""
     verdict, at30, at20 = e.get("review") or {}, e["with_limit"]["30"], e["with_limit"]["20"]
-    road_user = verdict.get("road_user", "pedestrian (not reviewed by Spark)")
-    road_user = review.unconfirmed_rider(verdict) or ("pedestrian" if road_user == "unclear" else road_user)
-    who = html.escape(("an " if road_user[0] in "aeiou" else "a ") + road_user)
-    video = f'<video src="{html.escape(e["clip"])}" controls muted loop playsinline></video>' if e.get("clip") else ""
+    road_user, who = passed(e)
     moment_s = min(e["t_person_s"], e["t_vehicle_s"]) - render.window(e, fps)[0] / fps
-    return f"""<article class="card" id="event-{i}" data-t="{moment_s:.2f}">{overlay.strobe(e)}{overlay.clip(video, e, strip)}
+    return f"""<article class="card" id="event-{i}" data-t="{moment_s:.2f}">{overlay.strobe(e)}{overlay.clip(video_tag(e), e, strip)}
 <h3>#{i} &middot; {html.escape(e.get("tier", "serious"))} &middot; {html.escape(e["vehicle"].split("#")[0])} at {e["vehicle_kmh"]} km/h, {e["pet_s"]:.1f} s from {who}</h3>
 <table><tr><th></th><th>Impact speed if hit</th><th>Adult death risk</th></tr>
 <tr><td>As driven</td><td>{e.get("impact_kmh", e["vehicle_kmh"])} km/h</td><td>{e["death_risk_pct"]}%</td></tr>
@@ -635,19 +654,21 @@ def heard_line(heard):
 
 
 
-def map_section(events, site, ground=None, paths=None):
-    """The map, drawn even with no near-miss: then it shows where people crossed (the desire lines)."""
+def map_section(events, site, ground=None, paths=None, measured=True):
+    """The map, drawn even with no near-miss: then it shows where people crossed (the desire lines). Not `measured`
+    (pace.warning): no near-miss legend, tiers or numbers."""
     placed = any(e.get("where") for e in events)
     trails = (f" Faint blue: where each person crossed, a point every {road.DESIRE_STEP_S:g} s." if paths else "")
-    near = (" Blue: the pedestrian, red: the vehicle, 2 s either side. Filled dots: serious near-misses; rings: close "
-            "passes." if placed else "")
+    legend = (" Filled dots: serious near-misses; rings: close passes." if measured else
+              " These are tracked moments, not near-misses (see the warning above).")
+    near = f" Blue: the pedestrian, red: the vehicle, 2 s either side.{legend}" if placed else ""
     under = (" Under it, the street photo seen from above: the road surface is to scale, standing objects lean, and "
              f"the {'dots' if placed else 'lines'} are measured positions." if ground else "")
     lines = roadmap.desire_lines(paths, site)  # the counts, then IRC:103-2012's words, shown as a note
     desire = "".join(f"<p>{html.escape(line)}</p>" for line in lines[:-1]) + "".join(
         f'<p class="note">{html.escape(line)}</p>' for line in lines[-1:])
     return (f"<section><h2>{'Where it happened' if placed else 'Where people crossed'}</h2>"
-            f"{roadmap.svg(events, site['world_points'], SHOWN_EVENTS, ground, paths)}<p class=\"note\">Seen from "
+            f"{roadmap.svg(events, site['world_points'], SHOWN_EVENTS, ground, paths, measured)}<p class=\"note\">Seen from "
             f"above, in metres on the road (grid every 5 m; dashed: the measured area).{trails}{near}{under}</p>"
             f"{desire}</section>")
 
@@ -925,20 +946,22 @@ def lead(lines):
     return "".join(f'<p class="{"note" if i else "lead"}">{html.escape(line)}</p>' for i, line in enumerate(lines))
 
 
-def banner(walking):
-    """The warning that replaces the headline when people walk too fast or too slow here (pace.warning), else ""."""
-    warning = pace.warning(walking)
+def banner(walking, site):
+    """The warning that replaces the headline when the site file or the walking pace says the numbers are not
+    measurements (pace.warning), else ""."""
+    warning = pace.warning(walking, site)
     return (f'<p class="lead note bad" role="alert"><b>Not measurements.</b> {html.escape(warning)} No letter was '
             "asked for.</p>" if warning else "")
 
 
 def page(site, events, seen, plan, images, fps, cost=None, full=None, privacy=None, signoff=None, receipt="",
          source_sha256=None, timeline=None, ground=None, paths=None, case="", walking=None):
-    warning = banner(walking)  # then the headline, pyramid, engineering numbers and gap barcode are left out
+    warning = banner(walking, site)  # then the headline, pyramid, engineering numbers, barcode and card numbers go
     measured = "" if warning else (f"{pyramid(events, seen)}\n{engineering(seen, cost)}"
                                    f"{roadmap.gap_strip(timeline, events, SHOWN_EVENTS, full)}")
     moments = "Tracked moments, not measurements (see the warning above)" if warning else "Worst moments"
-    cards = "\n".join(event_card(i + 1, e, fps, overlay.strip(e, site, events[:SHOWN_EVENTS]))
+    cards = "\n".join(tracked_card(i + 1, e) if warning else
+                      event_card(i + 1, e, fps, overlay.strip(e, site, events[:SHOWN_EVENTS]))
                       for i, e in enumerate(events[:SHOWN_EVENTS])) or (
         f"<p>No conflicts under {road.CLOSE_PASS_S} s in these {html.escape(str(seen.get('minutes', '?')))} minutes. "
         "A short recording can miss rare events: record more school-run periods before drawing any conclusion.</p>")
@@ -956,7 +979,7 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None, privacy=No
 <h1>Crossing Watch: near-miss evidence</h1>
 <p class="muted">{html.escape(site.get("name", ""))}</p>{filed_line(site)}{warning or lead(headline(events, seen, site))}
 <div class="stats">{stats(events, seen, not warning)}</div>{limit_note(full)}{privacy_note(privacy)}{measured}
-{map_section(events, site, ground, paths)}<section><h2>{moments}</h2>{cards}</section>{fix_section(plan, images)}{fixband.figure(images)}{legal_section(site)}
+{map_section(events, site, ground, paths, not warning)}<section><h2>{moments}</h2>{cards}</section>{fix_section(plan, images)}{fixband.figure(images)}{legal_section(site)}
 {letter_section(plan, events[:SHOWN_EVENTS], facts(site, events, seen, paths), signoff)}{case}
 {tct_section()}<section><h2>How this was measured</h2><p class="note">{html.escape(method)}</p>
 {f'<p class="note">{html.escape(receipt)}</p>' if receipt else ""}{hash_line(source_sha256, site)}</section>{overlay.SCRIPT}</body></html>"""
@@ -1111,7 +1134,7 @@ def main():
     paths = data.get("paths") or {}  # desire lines: with them a 0-event clip still gets its photo, fix and letter
     measured = facts(site, events, seen, paths)
     prompt = LETTER_PROMPT.format(facts=measured, language=site.get("letter_language", "English"))
-    untrusted = pace.warning(data.get("walking"))  # no letter (no paid call) from speeds and gaps that are not measured
+    untrusted = pace.warning(data.get("walking"), site)  # no letter (no paid call) from numbers not measured
     saved = None if untrusted else saved_plan(out_dir, prompt)
     if untrusted:
         print(f"no letter or fix picture: {untrusted}", file=sys.stderr)
@@ -1150,8 +1173,9 @@ def main():
                      paths=paths, walking=data.get("walking"))
     (out_dir / "index.html").write_text(page_html)
     seal.write_sums(share(out_dir, page_html))  # the only folder to publish, and its hashes
-    print(f"wrote {out_dir / 'index.html'}: {len(serious(events))} serious, {len(events) - len(serious(events))} close "
-          f"passes, fix: {plan['fix'] if plan else 'none'}")
+    counts = ("not measurements, see the page's warning" if untrusted else
+              f"{len(serious(events))} serious, {len(events) - len(serious(events))} close passes")
+    print(f"wrote {out_dir / 'index.html'}: {counts}, fix: {plan['fix'] if plan else 'none'}")
 
 
 if __name__ == "__main__":
