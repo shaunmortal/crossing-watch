@@ -48,11 +48,17 @@ estimated first, and a run over $10 needs `--allow-cost`.
 
 Set `LETTER_MODEL_URL` to any OpenAI-compatible server and the fix and letter come from that model instead of Muse
 Spark, with the same number check. `<removed-run-record>` runs Meta's official 4-bit **Muse Glimmer 30B**
-(`meta-models/Muse-Glimmer-30B-GGUF`, Apache 2.0) with llama.cpp on Kaggle's free 2 x T4, shows it the blurred
-street photo when there is one, and writes the evidence page. Run end to end twice on Kaggle's 2 x T4 with the
-synthetic sample: both times Glimmer proposed a raised zebra crossing and wrote a letter whose every number passed
-the code check, in 627 s and 592 s (Muse Spark: about 20 s). The committed run's log and Glimmer's text are in
-[`<removed-run-record>`](<removed-run-record>). Its letter was correct but stiff, so Muse Spark stays the default writer.
+(`meta-models/Muse-Glimmer-30B-GGUF`, Apache 2.0) with llama.cpp on Kaggle's free 2 x T4 and writes the evidence
+page; when the pack has a blurred street photo, Glimmer is shown it too. One run has a record so far,
+[`<removed-run-record>`](<removed-run-record>): on the synthetic sample, which has no person tracks and so no
+photo, Glimmer's part took 592 s; it proposed a raised zebra crossing and wrote a letter whose every number passed the
+code check. No Glimmer run has been sent a street photo yet. The letter was correct but stiff, so Muse Spark stays the
+default writer. Version 1 ran with llama-server's default sampling and the template's default "high" reasoning. The
+notebook now pins llama.cpp `b11976` and the Hugging Face revision, checks both files against their published sha256,
+runs one 32,768-token slot with medium reasoning and the model card's sampling, stops with a clear error if Glimmer
+runs out of context, and writes `<removed-run-record>` (llama.cpp build, GPUs, timings, the letter's sha256, the git
+commit and pack.py's sha256). The page then says "Muse Glimmer 30B wrote this in N s on Kaggle 2 x T4", with N from
+the server's own timings. The Kaggle notebook was run by the author.
 `sample/` is a synthetic example (made-up tracks, no video) for trying the letter step anywhere.
 
 ```
