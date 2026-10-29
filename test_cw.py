@@ -1150,7 +1150,10 @@ def test_judge_bench_counts_unreadable_replies_apart_and_asks_only_for_missing_r
     control = {**item, "id": "y", "planted": False, "spark": [False, False]}
     text = "\n".join(judge_bench.table([done, control]))
     assert "| k | yes | 0/1 | 1/1 | - | 1/1 |" in text and "Muse Spark 1 of 4 replies" in text
-    assert "| **Clean controls: false alarms** |  | 0/1 (0-79%) | 0/2 (0-66%) | - | 0/1 (0-79%) |" in text
+    assert "| **Clean controls: false alarms** |  | 0/1 (0-79%) | 0/1 (0-79%) | - | 0/1 (0-79%) |" in text
+    # two runs on one letter are one trial in the bounded rows, never two
+    text = "\n".join(judge_bench.table([done, {**done, "id": "z", "spark": [True, True]}, control]))
+    assert "| k | yes | 0/2 | 3/3 | - | 2/2 |" in text and "| **All planted lies** |  | 0/2 (0-66%) | 2/2 (34-100%) |" in text
 
 
 def test_judge_bench_takes_a_cached_spark_letter_in_todays_form_and_never_a_glimmer_one():
@@ -1176,11 +1179,28 @@ def test_blind_set_hides_near_misses_among_spark_checked_decoys_in_same_length_c
                   for p, pet in (("pole/0", 5.1), ("c/0", 2.0), ("d/0", 7.9), ("e/0", 6.0), ("f/0", 5.5))]
     verdicts = {"pole/0": {"is_person": False}, "d/0": {"is_person": True}, "e/0": {"is_person": True}, "f/0": None}
     asked = []
-    fakes = blind_set.decoys(candidates, lambda pid: (asked.append(pid), verdicts.get(pid))[1], 2)
+    fakes = blind_set.decoys(candidates, lambda pid: (asked.append(pid), verdicts.get(pid))[1], 2, 1000)
     assert [e["person"] for e in fakes] == ["e/0", "d/0"] and "c/0" not in asked  # a near-miss is never a decoy
     for e in near + fakes:
-        first, last = render.window(blind_set.blind_window(e), 10)
+        first, last = render.window(blind_set.blind_window(e, 1000), 10)
         assert last - first == 120 and first == max(0, round((min(e["t_person_s"], e["t_vehicle_s"]) - 2) * 10))
+    # e's person nearly hit by a bus inside e's clip (on another piece): the rater would see danger, so not a decoy
+    bus = {"person": "e/1", "vehicle": "bus#3", "pet_s": 1.0, "t_person_s": 39.0, "t_vehicle_s": 40.0}
+    assert [e["person"] for e in blind_set.decoys(candidates + [bus], verdicts.get, 2, 1000)] == ["d/0"]
+    later = {**bus, "t_person_s": 45.0, "t_vehicle_s": 46.0}  # after e's clip ends at 40.0 s
+    assert [e["person"] for e in blind_set.decoys(candidates + [later], verdicts.get, 2, 1000)] == ["e/0", "d/0"]
+    # near the end of a 39 s video the clip starts earlier and still ends on its last frame, 121 frames long
+    end = {**near[0], "t_person_s": 30.8, "t_vehicle_s": 31.2}
+    assert render.window(blind_set.blind_window(end, 390), 10) == (269, 389) and exits(
+        lambda: blind_set.blind_window(end, 120))  # a video shorter than a clip stops the run
+    import analyze, subprocess, tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as tmp:
+        clip, cut = Path(tmp) / "clip.mp4", Path(tmp) / "cut.mp4"
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=64x48:rate=10:duration=13",
+                        "-pix_fmt", "yuv420p", str(clip)], check=True)
+        render.render(clip, blind_set.blind_window({**end, "t_person_s": 12.5, "t_vehicle_s": 12.9}, 130), {}, {}, 10, cut)
+        assert analyze.frame_count(cut) == 121
     clips = blind_set.shuffled(near, fakes)
     assert clips == blind_set.shuffled(near, fakes) and [c[0] for c in clips] == [f"clip0{k}.mp4" for k in range(1, 5)]
     key = blind_set.key_record(clips)

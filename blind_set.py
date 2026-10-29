@@ -27,7 +27,7 @@ import sam
 MAX_NEAR_MISSES = 12   # the most dangerous near-misses Spark kept, at most this many, and as many decoys
 DECOY_MIN_PET_S = 5.0  # a decoy: a pedestrian and a moving vehicle on the same spot at least this far apart...
 DECOY_MAX_PET_S = 8.0  # ...and at most this, so the vehicle still reaches the spot inside the clip
-LEAD_S = 2.0           # every clip starts this long before the first of the two reached the spot...
+LEAD_S = 2.0           # every clip starts this long before the first of the two reached the spot (earlier to fit)...
 CLIP_S = 12.0          # ...and lasts this long, near-miss or decoy alike, so its length gives nothing away
 SEED = 20261102        # the fixed shuffle
 CHOICES = (("serious", f"Serious: the vehicle went through the spot the person was on, or was about to step onto, "
@@ -42,8 +42,8 @@ def refuse(*args):
 
 
 def load_tracks(site, out_dir):
-    """(person boxes, vehicle boxes, pedestrian pieces, vehicle shapes, frame size) as analyze.py built them,
-    from its cached SAM replies only."""
+    """(person boxes, vehicle boxes, pedestrian pieces, vehicle shapes, frame size, frame count) as analyze.py built
+    them, from its cached SAM replies only."""
     sam.request = crowd.request = refuse
     clip = out_dir / "clip.mp4"
     frame_size = tuple(int(v) for v in analyze.probe(clip, "stream=width,height").split(","))
@@ -55,24 +55,42 @@ def load_tracks(site, out_dir):
     vehicle_boxes = {f"{c}#{vid}": t for c in site["vehicles"] for vid, t in tracks_of(c).items()}
     H = road.homography(site["image_points"], site["world_points"])
     return (person_boxes, vehicle_boxes, *analyze.road_tracks(site, H, person_boxes, vehicle_boxes, frame_size),
-            frame_size)
+            frame_size, total)
 
 
-def decoys(candidates, verdict_of, n):
+def decoys(candidates, verdict_of, n, total):
     """Up to n pairs whose closest pass was DECOY_MIN_PET_S to DECOY_MAX_PET_S apart, closest first, each pedestrian
-    one Spark says is a person (so a pole is never a decoy)."""
+    one Spark says is a person (so a pole is never a decoy) and in no near-miss or close pass inside its clip."""
     out = []
     for e in sorted((e for e in candidates if e["pet_s"] >= DECOY_MIN_PET_S), key=lambda e: e["pet_s"]):
         if len(out) == n:
             break
-        if (verdict_of(e["person"]) or {}).get("is_person"):
+        if not endangered(e, candidates, total) and (verdict_of(e["person"]) or {}).get("is_person"):
             out.append(e)
     return out
 
 
-def blind_window(e):
-    """The event with its two times moved so render.window cuts CLIP_S from LEAD_S before the first arrival."""
-    start = max(0.0, min(e["t_person_s"], e["t_vehicle_s"]) - LEAD_S) + render.PAD_S
+def endangered(e, candidates, total):
+    """Whether e's pedestrian passes another vehicle under road.CLOSE_PASS_S apart inside e's clip: the rater would
+    see real danger where the key says none."""
+    start, person = clip_start(e, total), e["person"].split("/")[0]
+    return any(c["person"].split("/")[0] == person and c["vehicle"] != e["vehicle"] and c["pet_s"] < road.CLOSE_PASS_S
+               and min(c["t_person_s"], c["t_vehicle_s"]) <= start + CLIP_S
+               and max(c["t_person_s"], c["t_vehicle_s"]) >= start for c in candidates)
+
+
+def clip_start(e, total):
+    """When e's clip starts: LEAD_S before the first of the two reached the spot, earlier when CLIP_S from there
+    would run past the last of the video's `total` frames, so every clip is CLIP_S long."""
+    latest = (total - 1) / analyze.FPS - CLIP_S
+    if latest < 0:
+        raise SystemExit(f"the video is {total} frames, shorter than a {CLIP_S:g} s blind clip")
+    return min(max(0.0, min(e["t_person_s"], e["t_vehicle_s"]) - LEAD_S), latest)
+
+
+def blind_window(e, total):
+    """The event with its two times moved so render.window cuts CLIP_S from clip_start."""
+    start = clip_start(e, total) + render.PAD_S
     return {**e, "t_person_s": start, "t_vehicle_s": start + CLIP_S - 2 * render.PAD_S}
 
 
@@ -152,7 +170,7 @@ def main():
         raise SystemExit(f"{to / 'blind-key.json'} exists: a blind set is made once. Delete it and {to / 'blind'} "
                          "only if no one has labelled yet")
     events = json.loads((out_dir / "events.json").read_text())["events"]
-    person_boxes, vehicle_boxes, people, vehicles, frame_size = load_tracks(site, out_dir)
+    person_boxes, vehicle_boxes, people, vehicles, frame_size, total = load_tracks(site, out_dir)
     near = pack.confirmed(events)[:MAX_NEAR_MISSES]
     if any(e["person"] not in people or e["vehicle"] not in vehicle_boxes for e in near):
         raise SystemExit("events.json does not match the tracks rebuilt from cache: re-run analyze.py on this folder")
@@ -170,14 +188,17 @@ def main():
                 verdicts[pid] = None
         return verdicts.get(pid)
 
-    fakes = decoys(road.conflicts(people, vehicles, analyze.FPS, pet_max=DECOY_MAX_PET_S), verdict_of, len(near))
+    fakes = decoys(road.conflicts(people, vehicles, analyze.FPS, pet_max=DECOY_MAX_PET_S), verdict_of, len(near),
+                   total)
     clips = shuffled(near, fakes)
     shutil.rmtree(to / "blind", ignore_errors=True)  # no clip left from an earlier set
     (to / "blind").mkdir(parents=True)
     for name, _, e in clips:
-        render.render(out_dir / "clip.mp4", blind_window(e), analyze.piece_boxes(person_boxes, people, e["person"]),
-                      vehicle_boxes[e["vehicle"]], analyze.FPS, to / "blind" / name,
-                      everyone=list(person_boxes.values()), frame_size=frame_size)
+        render.render(out_dir / "clip.mp4", blind_window(e, total),
+                      analyze.piece_boxes(person_boxes, people, e["person"]), vehicle_boxes[e["vehicle"]], analyze.FPS,
+                      to / "blind" / name, everyone=list(person_boxes.values()), frame_size=frame_size)
+        if analyze.frame_count(to / "blind" / name) != round(CLIP_S * analyze.FPS) + 1:  # a shorter clip gives it away
+            raise SystemExit(f"{to / 'blind' / name} is not {CLIP_S:g} s long: no key written, do not hand it out")
     (to / "blind" / "index.html").write_text(page([name for name, _, _ in clips]))
     (to / "blind-key.json").write_text(json.dumps(key_record(clips), indent=1))
     print(f"wrote {to / 'blind'}: {len(near)} near-misses and {len(fakes)} decoys, shuffled; the key is "

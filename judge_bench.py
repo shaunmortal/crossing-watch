@@ -181,6 +181,13 @@ def tally(items, column):
     return sum(read), len(read), len(votes) - len(read)
 
 
+def letters(items, column):
+    """(letters flagged in any of their readable runs, letters with a readable run) for one checker: runs on the same
+    letter are not independent trials, so bounds are put on letters, never on runs."""
+    read = [[v for v in item.get(column, []) if v is not None] for item in items]
+    return sum(any(r) for r in read), sum(bool(r) for r in read)
+
+
 def anyone(items, columns):
     """(items flagged by any checker in any run, items)."""
     return sum(any(v for c in columns for v in item.get(c, [])) for item in items), len(items)
@@ -194,23 +201,27 @@ def cell(k, n, bounds=False):
 
 
 def table(items):
-    """Markdown: per planted kind, what each checker caught; totals and false alarms with Wilson 95% bounds."""
+    """Markdown: per planted kind, what each checker caught in every run; totals and false alarms per letter, with
+    Wilson 95% bounds."""
     columns = ["code"] + [c for c, _ in JUDGES]
     head = ["| Planted lie | Named in JUDGE_PROMPT | Code | " + " | ".join(n for _, n in JUDGES) + " | Any |",
             "|---|---|---|---|---|---|"]
-    row = lambda label, named, group, bounds: (f"| {label} | {named} | " + " | ".join(
-        cell(*tally(group, c)[:2], bounds) for c in columns) + f" | {cell(*anyone(group, columns), bounds)} |")
+    runs = lambda group, c: tally(group, c)[:2]
+    row = lambda label, named, group, count, bounds: (f"| {label} | {named} | " + " | ".join(
+        cell(*count(group, c), bounds) for c in columns) + f" | {cell(*anyone(group, columns), bounds)} |")
     planted = [i for i in items if i["planted"]]
     kinds = {i["kind"]: i["named"] for i in planted}
-    rows = [row(kind, "yes" if named else "no", [i for i in planted if i["kind"] == kind], False)
+    rows = [row(kind, "yes" if named else "no", [i for i in planted if i["kind"] == kind], runs, False)
             for kind, named in kinds.items()]
-    rows += [row("**All planted lies**", "", planted, True),
-             row("Named kinds", "yes", [i for i in planted if i["named"]], True),
-             row("Kinds not named", "no", [i for i in planted if not i["named"]], True),
-             row("**Clean controls: false alarms**", "", [i for i in items if not i["planted"]], True)]
+    rows += [row("**All planted lies**", "", planted, letters, True),
+             row("Named kinds", "yes", [i for i in planted if i["named"]], letters, True),
+             row("Kinds not named", "no", [i for i in planted if not i["named"]], letters, True),
+             row("**Clean controls: false alarms**", "", [i for i in items if not i["planted"]], letters, True)]
     unread = "; ".join(f"{name} {tally(items, c)[2]} of {sum(len(i.get(c, [])) for i in items)} replies"
                        for c, name in JUDGES)
-    return head + rows + ["", f"Unreadable judge replies (in no cell above): {unread}."]
+    return head + rows + ["", "In the rows per kind a checker's cell counts runs; every other cell counts letters, one "
+                          "flagged if any of its readable runs flagged it, as runs on one letter are not independent.",
+                          f"Unreadable judge replies (in no cell above): {unread}."]
 
 
 def asker(column):
