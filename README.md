@@ -9,12 +9,56 @@ adult death risk had they collided, and what a 20 or 30 km/h limit would have ch
 pack a principal can send to the road authority: clips, numbers, a proposed fix drawn onto the real street, and a
 ready letter. That is proof before a child is hit, instead of waiting for crash statistics.
 
-## Status
+## Judges, start here
 
-Not filed yet. The plan is to file the pack with the road authority through CPGRAMS online on Tue 3 Nov 2026, in a
-named person's name. Its reference number will be added here and in the site file's `"submitted"` key. Only "filed,
-reference X" is ever written: whether anything is approved or fixed is for the authority to say, and no resolution
-date is promised.
+**3-minute video:** GATE-TBD · **Release:** GATE-TBD · **Evidence page:** GATE-TBD · **X post:** GATE-TBD
+
+GATE-TBD: one blurred StroMotion still from Monday's run (`event1-strobe.jpg`), checked by eye.
+
+**Our crossing:** GATE-TBD (the headline from Monday's events.json). **Filed:** not yet. The plan is to file the pack
+with the road authority through CPGRAMS online on Tue 3 Nov 2026, in a named person's name. Its reference number will
+be added here and in the site file's `"submitted"` key. Only "filed, reference X" is ever written: whether anything is
+approved or fixed is for the authority to say, and no resolution date is promised.
+
+| Meta model | Its job here | Files | Ran on real data | Measured (caveats behind the link) |
+|---|---|---|---|---|
+| SAM 3.1 | tracks people and vehicles | `sam.py`, `crowd.py` | yes: DUT drone clips, news CCTV | the geometry on its tracks finds 49 of 52 DUT conflicts (crowd mode); speed error 0.16 km/h mean, 0.55 at the 95th percentile (vehicle crowd mode) ([DUT](#end-to-end-against-ground-truth-dut)) |
+| Muse Spark, reviewer | is that a person, and who | `review.py`, `blind_set.py` | yes: DUT | after its review 48 of 52 (vehicle crowd mode, no net change) and 44 of 52 (crowd mode, 5 fewer) ([DUT](#end-to-end-against-ground-truth-dut)) |
+| Muse Spark, writer and judge | picks the fix, writes the letter, checks it apart | `pack.py`, `judge_bench.py` | yes: a DUT clip's letter | as judge it flagged 24 of 24 planted lies and 1 of 8 clean letters; code alone 4 of 24; a Muse judge is not independent of Muse letters ([bench](#checking-the-checks)) |
+| Muse Spark, case agent | works the case, stops for a tape measure | `agent.py` | not yet: GATE-TBD | none: a test drives it with a scripted model |
+| Muse Image | draws the fix onto the real street | `pack.py`, `fixband.py`, `ailabel.py` | yes: a DUT frame, the news CCTV street | GATE-TBD |
+| Muse Wonder | listens for horns, brakes and shouts | `listen.py` | yes: our college clip | none: heard brakes there, not ground truth ([GATES](GATES.md#status-update-wed-28-oct-late-night)) |
+| Muse Glimmer 30B, open weights | the letter, self-hosted on Kaggle 2 x T4 | `<removed-run-record>`, `pack.py` | no: the synthetic sample | v1: 592 s, every number passed the code check; v2 checked the weights' sha256; as judge it flagged 6 of 8 clean letters ([v2](<removed-run-record>)) |
+| Muse Spark Open, open weights | the letter, on Fireworks | `pack.py`, `openweights.py` | no: the synthetic sample | one try, 55.5 s ([record](provenance/spark-open-fireworks-sample.json)) |
+
+**Checked against ground truth:** the near-miss maths on SinD's drone trajectories
+([Validation on ground-truth trajectories](#validation-on-ground-truth-trajectories)), and the whole pipeline against
+DUT's own tracked people and cars ([End to end, against ground truth (DUT)](#end-to-end-against-ground-truth-dut)).
+**Gates, pre-registered in [GATES.md](GATES.md#verdict-now):** G1 passed (news CCTV); G3 passed on DUT drone ground
+truth only; G2, G4, G5, G6 and G8 not run yet; G7 has no verdict before submission. GATE-TBD: Tuesday's verdicts.
+
+**Try it, no key and no video** (Python 3.11+ and ffmpeg):
+
+```
+python3 test_cw.py                        # self-checks, about 20 s
+python3 pack.py sample sample/site.json   # the synthetic sample (made-up tracks) -> sample/index.html
+open sample/index.html                    # macOS; elsewhere open the file in a browser
+```
+
+Without a key the page shows the measurements only; the fix and the letter need `MODEL_API_KEY` (Meta Model API) or
+`LETTER_MODEL_URL` (open weights).
+
+## Files
+
+- **Run:** `analyze.py` (video to events.json) with `sam.py`, `crowd.py`, `road.py`, `pace.py`, `review.py`,
+  `listen.py`, `render.py`, `masks.py` and `seal.py`; before filming, `calibrate.html` and `filmcheck.py`.
+- **Page and letter:** `pack.py` with `summary.py`, `roadmap.py`, `overlay.py`, `fixband.py`, `ailabel.py`,
+  `openweights.py` and `passmark.py`.
+- **Case agent:** `agent.py`.
+- **Checks:** `test_cw.py`; `validate_sind.py`, `validate_dut.py` and `validate_offline.py` (ground truth);
+  `validate_gate.py` (G6, G8); `blind_set.py` and `score_humans.py` (G5); `judge_bench.py`; `vehicle_test.py`.
+- **Video and X:** `video/split.py` (the hero shot); `guess.py` (X replies' speed guesses against the measured speed).
+- **Docs and records:** `FILMING.md`, `GATES.md`, `sites/`, `sample/`, `kaggle/`, `provenance/`, `LICENSES/`.
 
 ## How it works
 
