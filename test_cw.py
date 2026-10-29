@@ -3733,6 +3733,28 @@ def test_filmcheck_help_prints_its_usage_and_a_non_video_file_is_refused_cleanly
     assert refused.returncode == 1 and "could not read it" in refused.stderr and "Traceback" not in refused.stderr
 
 
+def test_readme_first_screen_fits_a_phone_its_links_resolve_and_one_story_on_the_kaggle_account():
+    """The README's first screen (everything before "## Check it yourself") stays under 30 lines; every link to a
+    README or GATES.md heading lands on one (the first screen once pointed at a GATES heading that had been renamed);
+    and the README, its Declarations and the Version 2 record say the same thing about who ran the Kaggle notebook."""
+    import re
+    from pathlib import Path
+    here = Path(__file__).parent
+    readme, gates = (here / "README.md").read_text(), (here / "GATES.md").read_text()
+    assert len(readme.split("\n## Check it yourself")[0].splitlines()) < 30
+
+    def slugs(text):  # GitHub's heading anchors: lower case, punctuation dropped, spaces to hyphens
+        return {re.sub(r"[^\w\- ]", "", h.strip().lower()).replace(" ", "-")
+                for h in re.findall(r"^#+ (.+)$", text, re.M)}
+    for page, anchors in (("", slugs(readme)), ("GATES.md", slugs(gates))):
+        for anchor in re.findall(r"\]\(" + re.escape(page) + r"#([^)]+)\)", readme):
+            assert anchor in anchors, (page or "README.md", anchor)
+    who = "The Kaggle notebook was run by the author."
+    assert who in readme.split("## Declarations")[1]
+    assert " ".join(who.split()) in " ".join((here / "kaggle" / "<removed-run-record>").read_text().split())
+    assert "not downloaded yet" not in readme
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):
