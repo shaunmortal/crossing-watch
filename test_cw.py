@@ -953,7 +953,10 @@ def test_guesses_keep_5_to_150_kmh_and_the_chart_draws_the_measured_speed_in_red
     with tempfile.TemporaryDirectory() as folder:
         out = Path(folder)
         (out / "replies.txt").write_text(replies, encoding="utf-8")
-        (out / "events.json").write_text(json.dumps({"events": [{"vehicle_kmh": 87.9}, {"vehicle_kmh": 34.0}]}))
+        rejected = {"person": "7/0", "vehicle_kmh": 61.0, "review": {"is_person": False}}  # Spark: a pole
+        pole = [rejected, {"person": "7/0", "vehicle_kmh": 50.0}]  # its unreviewed pairing goes too
+        cards = [{"person": "3/0", "vehicle_kmh": 87.9}, {"person": "4/0", "vehicle_kmh": 34.0}]
+        (out / "events.json").write_text(json.dumps({"events": pole[:1] + cards[:1] + pole[1:] + cards[1:]}))
         (out / "jokes.txt").write_text("lol\n2\n500\n")
         old = sys.argv
         try:
@@ -963,8 +966,16 @@ def test_guesses_keep_5_to_150_kmh_and_the_chart_draws_the_measured_speed_in_red
                 guess.main()
             assert "5 guesses, median 40 km/h. Measured: 34 km/h." in printed.getvalue()
             assert (out / "guess.svg").read_text() == chart
+            sys.argv[-1] = "1"
+            with contextlib.redirect_stdout(io.StringIO()) as printed:
+                guess.main()
+            assert "Measured: 87.9 km/h." in printed.getvalue()  # card #1 is the first event Spark did not reject
             sys.argv[-1] = "3"
-            assert raises_system_exit(guess.main)  # no event #3
+            assert raises_system_exit(guess.main)  # the pole's two events are no cards, so there is no card #3
+            many = [{"person": f"{i}/0", "vehicle_kmh": 30.0} for i in range(pack.SHOWN_EVENTS + 1)]
+            (out / "events.json").write_text(json.dumps({"events": many}))
+            sys.argv[-1] = str(pack.SHOWN_EVENTS + 1)
+            assert raises_system_exit(guess.main)  # the page shows only SHOWN_EVENTS cards
             sys.argv[1:] = [str(out / "jokes.txt"), str(out / "events.json")]
             assert raises_system_exit(guess.main)  # no guesses at all
         finally:

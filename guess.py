@@ -1,5 +1,6 @@
 """People vs the machine: the X replies to "How fast was this bike? Guess in km/h." against the measured speed.
-Copy one reply per line into replies.txt, then: python3 guess.py replies.txt out/VIDEO/events.json --event 1"""
+Copy one reply per line into out/VIDEO/replies.txt (git-ignored: X handles, and the answer before the reveal), then:
+python3 guess.py out/VIDEO/replies.txt out/VIDEO/events.json --event 1"""
 import argparse
 import json
 import math
@@ -7,6 +8,8 @@ import re
 import statistics
 from collections import Counter
 from pathlib import Path
+
+from pack import SHOWN_EVENTS, confirmed
 
 MIN_KMH, MAX_KMH = 5, 150  # a reply outside this is a joke or a typo, not a guess
 BIN_KMH = 10               # one bar per 10 km/h
@@ -62,11 +65,11 @@ def main():
     args = parser.parse_args()
     text = args.replies.read_text(encoding="utf-8")
     kept = guesses(text)
-    events = json.loads(args.events.read_text())["events"]
+    events = confirmed(json.loads(args.events.read_text())["events"])[:SHOWN_EVENTS]  # the cards the page shows
     if not kept:
         raise SystemExit(f"no guesses from {MIN_KMH} to {MAX_KMH} km/h in {args.replies}")
     if not 1 <= args.event <= len(events):
-        raise SystemExit(f"{args.events} has events #1 to #{len(events)}, not #{args.event}")
+        raise SystemExit(f"the page of {args.events} has cards #1 to #{len(events)}, not #{args.event}")
     measured = events[args.event - 1]["vehicle_kmh"]
     out = args.out or args.replies.with_name("guess.svg")
     out.write_text(svg(kept, measured))
