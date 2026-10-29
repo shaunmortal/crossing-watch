@@ -59,6 +59,11 @@ runs one 32,768-token slot with medium reasoning and the model card's sampling, 
 runs out of context, and writes `<removed-run-record>` (llama.cpp build, GPUs, timings, the letter's sha256, the git
 commit and pack.py's sha256). The page then says "Muse Glimmer 30B wrote this in N s on Kaggle 2 x T4", with N from
 the server's own timings. The Kaggle notebook was run by the author.
+The open-weights model is also sent a JSON schema whose strings may hold digits only as the measured numbers, each
+followed by a non-digit; llama-server turns it into a grammar that still lets Glimmer think first. No Glimmer run has
+used it yet, the code check and the reviewer still run after it, and the run record counts Glimmer's tries.
+`LETTER_MODEL_KEY` adds a Bearer token for a server that needs one, and the letter says "self-hosted" only when the
+server runs on the same machine.
 `sample/` is a synthetic example (made-up tracks, no video) for trying the letter step anywhere.
 
 ```

@@ -13,6 +13,8 @@ import os
 import re
 import subprocess
 import sys
+import unicodedata
+import urllib.parse
 import urllib.request
 import uuid
 from pathlib import Path
@@ -31,7 +33,19 @@ SHOWN_EVENTS = 5
 MIN_RATE_MINUTES = 15  # shortest video scaled to hourly rates (MUTCD Warrant 4 counts 15-minute periods)
 LETTER_URL = os.environ.get("LETTER_MODEL_URL", "")  # an OpenAI-compatible server, e.g. llama-server with Muse
 LETTER_MODEL = os.environ.get("LETTER_MODEL", "Muse Glimmer 30B")  # Glimmer; empty: Muse Spark writes the letter
-WRITER = f"{LETTER_MODEL} (open weights, self-hosted)" if LETTER_URL else "Muse Spark"
+LETTER_KEY = os.environ.get("LETTER_MODEL_KEY", "")  # sent as a Bearer token, for a letter server that needs one
+LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1")  # a letter server here runs on the machine that ran pack.py
+
+
+def writer_label(url):
+    """Who writes the letter. "Self-hosted" only when the server is this machine; a remote URL could be anyone's."""
+    if not url:
+        return "Muse Spark"
+    local = urllib.parse.urlsplit(url).hostname in LOCAL_HOSTS
+    return f"{LETTER_MODEL} (open weights{', self-hosted' if local else ''})"
+
+
+WRITER = writer_label(LETTER_URL)
 LETTER_HOST = os.environ.get("LETTER_MODEL_HOST", "")  # where it ran, e.g. "Kaggle 2 x T4" (the notebook reads nvidia-smi)
 OPEN_MODEL_TIMEOUT_S = 900  # a 30B model on two T4s writes a letter in minutes, not seconds
 JUDGE = "Muse Spark (a separate reviewer)"
@@ -47,6 +61,8 @@ LETTER:
 {letter}"""
 LETTER_TRIES = 3     # Spark gets this many tries at a letter whose every number was measured
 NUMBER = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?")  # 1,200 is one number
+PLAN_KEYS = ("fix", "why", "image_prompt", "letter")
+JSON_ESCAPE = r'\\["\\/bfnrt]'  # an escape inside a JSON string, but never \u: "\u0032" is a hidden 2
 LETTER_PROMPT = """You help a school ask its road authority to make the crossing outside it safer.
 Below are measurements from a video of the crossing, made by Crossing Watch (SAM 3.1 tracking, road-plane geometry,
 post-encroachment time). Use ONLY these facts; never invent numbers, names, places or dates.
@@ -151,21 +167,52 @@ def unmeasured(text, facts_text):
     return sorted({n for n in NUMBER.findall(text) if value(n) not in known}, key=value)
 
 
+def number_pattern(known):
+    """A JSON-schema "pattern" for a string as written between its quotes: digits only as the numbers NUMBER finds in
+    `known`, each followed by a non-digit (so "2" then "0.6" never reads "20.6"), and no \\u escapes. Digits of every
+    script count, as in Python's \\d, so "۳0" (30) or ०-९ in a Hindi letter cannot slip through either."""
+    zeros = [c for c in range(0x80, sys.maxunicode + 1) if unicodedata.decimal(chr(c), -1) == 0]  # each 0 starts 0-9
+    non_ascii = "".join(f"\\U{a:08x}-\\U{b:08x}" for a, b in zip([0x80] + [z + 10 for z in zeros],
+                                                                   [z - 1 for z in zeros] + [sys.maxunicode]) if a <= b)
+
+    def char(banned=""):
+        """One character of a JSON string that is no digit and not in `banned`. Positive classes only: llama.cpp's
+        grammar rejects half a character whose range touches a negated class, so [^०-९] would also ban ि ी ु े ्."""
+        ascii_ok = "".join(f"\\x{c:02x}" for c in range(0x20, 0x7f) if chr(c) not in f'0123456789"\\{banned}')
+        return f"[{ascii_ok}]|[{non_ascii}]|{JSON_ESCAPE}"
+
+    numbers = "|".join(re.escape(n) for n in sorted(set(NUMBER.findall(known))))
+    if not numbers:
+        return f"^({char()})*$"
+    # No "<" straight after a number either: llama.cpp's grammar reads a special token such as "<s>" as its text, but
+    # the reply leaves it out, so "2<s>0.6" would arrive as "20.6" (seen on a local llama-server)
+    after = f"{char('.,<')}|[.,]({char('<')})"  # "27.3." ends a sentence; "27.3.5" is not 27.3
+    return f"^({char()}|({numbers})({after}))*(({numbers})[.,]?)?$"
+
+
+def plan_schema(known):
+    """The plan as a JSON schema whose strings follow number_pattern(known). llama-server turns it into a grammar that
+    still lets Glimmer think first; a bare GBNF "grammar" would bind from the first token and block its thinking."""
+    text = {"type": "string", "pattern": number_pattern(known)}
+    return {"type": "object", "properties": {k: text for k in PLAN_KEYS}, "required": list(PLAN_KEYS),
+            "additionalProperties": False}
+
+
 def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES):
     """The model's fix and letter, verified before use in two layers (Meta's verifiable-agents workshop): code
     checks that every number was measured, then Muse Spark as a separate reviewer (LLM as judge) lists claims the
     measurements do not support. An invalid reply or either objection goes back with the reason; after the last try
     the letter is kept with what remains listed for a person to check before sending."""
-    note, plan, bad, problems = "", None, [], []
+    note, plan, bad, problems, known = "", None, [], [], prompt + "\n" + measured
     for attempt in range(tries):
         try:
-            plan = model_plan(prompt + note, api_key, photo)
+            plan = model_plan(prompt + note, api_key, photo, known)  # known, not the note: it quotes the bad numbers
         except ValueError as err:  # JSONDecodeError included
             if attempt == tries - 1 and plan is None:
                 raise
             note = f"\n\nYour previous output was invalid: {str(err)[:200]}. Reply with the JSON object only."
             continue
-        bad = unmeasured(plan["letter"] + " " + plan["why"], prompt + "\n" + measured)
+        bad = unmeasured(plan["letter"] + " " + plan["why"], known)
         problems = [] if bad or not api_key else judge_problems(plan["letter"], measured, api_key)
         if not bad and not problems:
             return {**plan, "writer": WRITER, **({"judged_by": JUDGE} if api_key else {})}
@@ -194,14 +241,16 @@ def read_problems(text):
     return [str(p)[:300] for p in data["problems"] if isinstance(p, str) and p.strip()]
 
 
-def model_plan(prompt, api_key, photo=None):
+def model_plan(prompt, api_key, photo=None, known=None):
     """One reply from the letter model, Muse Spark or (with LETTER_MODEL_URL) an open-weights model, parsed into
-    the plan. The blurred street photo, when there is one, lets the model see the street it is fixing."""
+    the plan. The blurred street photo, when there is one, lets the model see the street it is fixing. An
+    open-weights server can write digits only as numbers in `known` (default: the prompt)."""
     image = "data:image/jpeg;base64," + base64.b64encode(photo.read_bytes()).decode() if photo else None
-    text, server = open_model_reply(prompt, image) if LETTER_URL else (spark_reply(prompt, image, api_key), {})
+    text, server = (open_model_reply(prompt, image, plan_schema(known or prompt)) if LETTER_URL
+                    else (spark_reply(prompt, image, api_key), {}))
     match = re.search(r"\{.*\}", text, re.S)
     plan = json.loads(match[0], strict=False) if match else {}  # a letter may hold raw newlines
-    if not isinstance(plan, dict) or not all(isinstance(plan.get(k), str) and plan[k].strip() for k in ("fix", "why", "image_prompt", "letter")):
+    if not isinstance(plan, dict) or not all(isinstance(plan.get(k), str) and plan[k].strip() for k in PLAN_KEYS):
         raise ValueError(f"the plan is incomplete: {text[:200]!r}")
     return {**plan, **server}
 
@@ -220,17 +269,20 @@ def spark_reply(prompt, image, api_key):
                    for c in o.get("content", []))
 
 
-def open_model_reply(prompt, image):
-    """Chat completion from an OpenAI-compatible server, e.g. llama-server running Muse Glimmer 30B on a GPU: the
-    text, and the server's own timings and token usage (kept in plan.json for the run record)."""
+def open_model_reply(prompt, image, schema):
+    """Chat completion from an OpenAI-compatible server, e.g. llama-server running Muse Glimmer 30B on a GPU, held to
+    a JSON schema: the text, and the server's own timings and token usage (kept in plan.json for the run record)."""
     content = [{"type": "text", "text": prompt}] + ([{"type": "image_url", "image_url": {"url": image}}] if image else [])
+    schema_format = {"type": "json_schema", "json_schema": {"name": "plan", "schema": schema}}
     body = json.dumps({"model": LETTER_MODEL, "messages": [{"role": "user", "content": content}],
-                       "response_format": {"type": "json_object"}}).encode()
-    req = urllib.request.Request(LETTER_URL.rstrip("/") + "/chat/completions", data=body,
-                                 headers={"Content-Type": "application/json"})
+                       "response_format": schema_format}).encode()
+    headers = {"Content-Type": "application/json", **({"Authorization": f"Bearer {LETTER_KEY}"} if LETTER_KEY else {})}
+    req = urllib.request.Request(LETTER_URL.rstrip("/") + "/chat/completions", data=body, headers=headers)
     with urllib.request.urlopen(req, timeout=OPEN_MODEL_TIMEOUT_S) as response:
         reply = json.load(response)
     choice = reply["choices"][0]
+    print(f"open model reply: finish_reason {choice.get('finish_reason')}, "  # the Kaggle notebook counts these as tries
+          f"{(reply.get('usage') or {}).get('completion_tokens', '?')} tokens", file=sys.stderr)
     if choice.get("finish_reason") == "length":  # llama-server's only sign: HTTP 200 and an empty answer
         raise ValueError(f"{LETTER_MODEL} ran out of context after {(reply.get('usage') or {}).get('completion_tokens', '?')} "
                          "tokens with no answer: start llama-server with a larger -c or a lower reasoning_strength")

@@ -464,7 +464,7 @@ def test_letters_quoting_unmeasured_numbers_go_back_to_spark():
     good = {"fix": "speed table", "why": "cars at 27.3 km/h", "image_prompt": "add a speed table", "letter": "PET 0.4 s."}
     replies, prompts = [{**good, "letter": "It happened 12 times."}, good], []
     old = pack.model_plan, pack.judge_problems
-    pack.model_plan = lambda prompt, key, photo=None: (prompts.append(prompt), replies.pop(0))[1]
+    pack.model_plan = lambda prompt, key, photo=None, known=None: (prompts.append(prompt), replies.pop(0))[1]
     pack.judge_problems = lambda letter, measured, key: []
     try:
         assert pack.ask_plan("PROMPT", facts, "key") == {**good, "writer": pack.WRITER, "judged_by": pack.JUDGE}
@@ -485,7 +485,7 @@ def test_a_second_model_judges_the_letter_and_its_objections_go_back():
         judged.append(letter)
         return ["Says a warrant is met."] if "warrant" in letter else []
     old = pack.model_plan, pack.judge_problems
-    pack.model_plan = lambda prompt, key, photo=None: (prompts.append(prompt), replies.pop(0))[1]
+    pack.model_plan = lambda prompt, key, photo=None, known=None: (prompts.append(prompt), replies.pop(0))[1]
     pack.judge_problems = judge
     try:
         plan = pack.ask_plan("PROMPT", "{}", "key")
@@ -541,14 +541,14 @@ def test_pedestrian_pieces_shorter_than_a_second_are_dropped():
 
 
 def fake_open_model(replies):
-    """A local stand-in for llama-server: answers each POST with the next reply and keeps (path, body) of each."""
+    """A local stand-in for llama-server: answers each POST with the next reply and keeps (path, body, headers)."""
     import threading
     from http.server import BaseHTTPRequestHandler, HTTPServer
     seen = []
 
     class Fake(BaseHTTPRequestHandler):
         def do_POST(self):
-            seen.append((self.path, json.loads(self.rfile.read(int(self.headers["Content-Length"])))))
+            seen.append((self.path, json.loads(self.rfile.read(int(self.headers["Content-Length"]))), dict(self.headers)))
             reply = json.dumps(replies.pop(0)).encode()
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -566,7 +566,7 @@ def fake_open_model(replies):
 def test_open_weights_letter_writer_gets_the_prompt_and_street_photo():
     """With LETTER_MODEL_URL set, the plan comes from an OpenAI-compatible server (llama-server running Muse Glimmer),
     and the server's own timings and usage travel with it into plan.json."""
-    import tempfile
+    import contextlib, io, tempfile
     from pathlib import Path
     plan = {"fix": "speed table", "why": "w", "image_prompt": "i", "letter": "l"}
     timings, usage = {"prompt_ms": 2000.0, "predicted_ms": 410000.0}, {"prompt_tokens": 900, "completion_tokens": 5000}
@@ -578,29 +578,33 @@ def test_open_weights_letter_writer_gets_the_prompt_and_street_photo():
         with tempfile.TemporaryDirectory() as tmp:
             photo = Path(tmp) / "street.jpg"
             photo.write_bytes(b"\xff\xd8jpeg")
-            assert pack.model_plan("PROMPT", None, photo) == {**plan, "timings": timings, "usage": usage}
+            with contextlib.redirect_stderr(io.StringIO()):
+                assert pack.model_plan("PROMPT", None, photo) == {**plan, "timings": timings, "usage": usage}
     finally:
         pack.LETTER_URL = old
         server.shutdown()
         server.server_close()
-    path, body = seen[0]
+    path, body, _ = seen[0]
     content = body["messages"][0]["content"]
-    assert path == "/v1/chat/completions" and body["response_format"] == {"type": "json_object"}
+    assert path == "/v1/chat/completions" and body["response_format"]["type"] == "json_schema"
     assert content[0] == {"type": "text", "text": "PROMPT"} and content[1]["image_url"]["url"].startswith("data:image/jpeg")
     assert "Muse Glimmer" in pack.letter_section({**plan, "writer": "Muse Glimmer 30B (open weights)"})
 
 
 def test_open_model_out_of_context_is_a_clear_error_not_an_empty_letter():
     """llama-server says only finish_reason "length" with content "" when thinking fills the context."""
+    import contextlib, io
     server, _ = fake_open_model([{"choices": [{"message": {"content": ""}, "finish_reason": "length"}],
                                   "usage": {"completion_tokens": 32000}}])
     old = pack.LETTER_URL
     pack.LETTER_URL = f"http://127.0.0.1:{server.server_port}/v1"
     try:
-        pack.open_model_reply("PROMPT", None)
+        with contextlib.redirect_stderr(io.StringIO()) as log:
+            pack.open_model_reply("PROMPT", None, {"type": "object"})
         raise AssertionError("an out-of-context reply was accepted")
     except ValueError as err:
         assert "ran out of context after 32000 tokens" in str(err) and "-c" in str(err)
+        assert "open model reply: finish_reason length" in log.getvalue()  # still a try in the notebook's count
     finally:
         pack.LETTER_URL = old
         server.shutdown()
@@ -622,6 +626,74 @@ def test_open_model_footer_uses_the_server_timings_only():
         pack.LETTER_URL, pack.LETTER_HOST = old
 
 
+def test_open_model_can_write_digits_only_as_measured_numbers():
+    """The plan's JSON schema holds every string to a "pattern" that llama-server turns into a grammar. Python's re reads
+    the same pattern, so here it stands in for the grammar: every measured number gets through, nothing else does."""
+    import re
+    e = {"person": "1/0", "vehicle": "car#1", "tier": "serious", "pet_s": 0.4, "vehicle_kmh": 27.3, "death_risk_pct": 1.1,
+         "with_limit": {"20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
+    measured = pack.facts({"name": "स्कूल गेट"}, [e], {"minutes": 2.0, "crossings": 3, "vehicles": 1200})
+    known = pack.LETTER_PROMPT.format(facts=measured, language="Hindi") + "\n" + measured
+    schema = pack.plan_schema(known)
+    pattern = schema["properties"]["letter"]["pattern"]
+    assert schema["required"] == list(pack.PLAN_KEYS) and {p["pattern"] for p in schema["properties"].values()} == {pattern}
+    written = lambda text: re.fullmatch(pattern, json.dumps(text, ensure_ascii=False)[1:-1])  # as between the quotes
+    for n in pack.NUMBER.findall(known):
+        assert written(f"{n} km/h, {n}.\nस्कूल के बाहर \"{n}\"") and not pack.unmeasured(n, known), n
+    for lie in ("It happened 7 times.", "27.35 km/h", "0.427.3", "27.3.4", "७ बार", "۳0"):  # ۳0 reads as 30
+        assert not written(lie) and pack.unmeasured(lie, known), lie
+    assert not written("27.3<s>0.4")  # llama.cpp drops a special token's text from the reply: "27.30.4"
+    assert not re.fullmatch(pattern, r"\u0032") and re.fullmatch(pattern, r"\n\"\\")  # \u0032 is a hidden 2
+    assert pack.number_pattern("no numbers") == pack.number_pattern("") and not re.fullmatch(pack.number_pattern(""), "1")
+
+
+def test_open_model_sends_its_key_only_when_set_and_says_where_it_ran():
+    import contextlib, io
+    reply = {"choices": [{"message": {"content": "{}"}, "finish_reason": "stop"}]}
+    server, seen = fake_open_model([reply, reply])
+    old = pack.LETTER_URL, pack.LETTER_KEY
+    pack.LETTER_URL = f"http://127.0.0.1:{server.server_port}/v1"
+    try:
+        with contextlib.redirect_stderr(io.StringIO()) as log:
+            for key in ("", "test-key"):
+                pack.LETTER_KEY = key
+                pack.open_model_reply("PROMPT", None, {"type": "object"})
+    finally:
+        pack.LETTER_URL, pack.LETTER_KEY = old
+        server.shutdown()
+        server.server_close()
+    assert "Authorization" not in seen[0][2] and seen[1][2]["Authorization"] == "Bearer test-key"
+    assert seen[1][1]["response_format"] == {"type": "json_schema", "json_schema": {"name": "plan", "schema": {"type": "object"}}}
+    assert log.getvalue().count("open model reply:") == 2 and "test-key" not in log.getvalue()
+    assert pack.writer_label("") == "Muse Spark"
+    assert pack.writer_label("http://127.0.0.1:8080/v1") == f"{pack.LETTER_MODEL} (open weights, self-hosted)"
+    assert pack.writer_label("https://api.example.com/v1") == f"{pack.LETTER_MODEL} (open weights)"  # could be anyone's
+
+
+def test_open_model_letters_still_face_the_number_check_and_the_judge():
+    """The schema is only the first layer: a server that ignores it is still caught by unmeasured(), then the judge.
+    The retry note quotes the bad number, so the schema comes from the measurements alone and 12 stays out of it."""
+    import contextlib, io, re
+    good = {"fix": "speed table", "why": "cars at 27.3 km/h", "image_prompt": "add a speed table", "letter": "PET 0.4 s."}
+    as_reply = lambda plan: {"choices": [{"message": {"content": json.dumps(plan)}, "finish_reason": "stop"}]}
+    server, seen = fake_open_model([as_reply({**good, "letter": "It happened 12 times."}), as_reply(good)])
+    judged, old = [], (pack.LETTER_URL, pack.judge_problems)
+    pack.LETTER_URL = f"http://127.0.0.1:{server.server_port}/v1"
+    pack.judge_problems = lambda letter, measured, key: judged.append(letter) or []
+    try:
+        with contextlib.redirect_stderr(io.StringIO()):
+            plan = pack.ask_plan("PROMPT", '{"pet_s": 0.4, "vehicle_kmh": 27.3}', "key")
+    finally:
+        pack.LETTER_URL, pack.judge_problems = old
+        server.shutdown()
+        server.server_close()
+    first, second = (body for _, body, _ in seen)
+    pattern = lambda body: body["response_format"]["json_schema"]["schema"]["properties"]["letter"]["pattern"]
+    assert "not in the measurements: 12" in second["messages"][0]["content"][0]["text"]
+    assert pattern(second) == pattern(first) and not re.fullmatch(pattern(second), "It happened 12 times.")
+    assert plan["letter"] == good["letter"] and judged == [good["letter"]] and plan["judged_by"] == pack.JUDGE
+
+
 def test_glimmer_notebook_is_pinned_hash_checked_and_records_its_run():
     """The Kaggle notebook runs unattended for 40 minutes, so its pins and its Python are checked here first."""
     import ast, re
@@ -636,7 +708,8 @@ def test_glimmer_notebook_is_pinned_hash_checked_and_records_its_run():
                 "4cc57c0f51040a226e5a72cc47b7613f7772950e460a665f7083de89f183f60e",
                 "f48b452316f9b213758e8659444029b961a24a07f99a1abb2a9f88b06f7c00c6", "'-np', '1'", "(32768, 16384)",
                 "'reasoning_strength': 'medium'", "'--temp', '1.0', '--top-p', '0.95', '--top-k', '64'",
-                "LETTER_MODEL_HOST", "<removed-run-record>", "build_info", "GIT_SHA", "pack_py_sha256"):
+                "LETTER_MODEL_HOST", "<removed-run-record>", "build_info", "GIT_SHA", "pack_py_sha256",
+                "run.stderr.count('open model reply:')", "'tries': tries"):  # pack.open_model_reply logs each try
         assert pin in text, pin
     assert re.search(r"assert sha256\(path\) == SHA256\[name\]", text)
     assert "shaunmortal" in text
