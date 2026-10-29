@@ -679,9 +679,9 @@ def test_fix_is_kept_only_inside_the_band_and_redrawn_once_when_muse_image_stray
         site, plan = {"image_points": BAND_IMG, "world_points": BAND_ROAD}, {"fix": "a speed table", "image_prompt": "i"}
         people = [{0: [150, 150, 170, 200]}, {3: [0, 0, 9, 9]}]  # someone in the band; someone seen only later
         with contextlib.redirect_stderr(io.StringIO()) as said:
-            images = fixband.draw(photo, plan, BAND_EVENTS, site, people, muse_image, out)
+            images = fixband.draw(photo, plan["fix"], plan["image_prompt"], BAND_EVENTS, site, people, muse_image, out)
         assert "SSIM 0." in said.getvalue() and images == ("street-dots.svg", "street-fixed.webp", "street-band.svg") and len(calls) == 2
-        assert "magenta band in the bottom centre of the photo with a speed table" in calls[0]
+        assert "magenta band in the bottom centre of the photo with this fix: a speed table." in calls[0]
         assert calls[1] == calls[0] + fixband.STRONGER and not (out / fixband.RETRY).exists()  # the redraw was kept
         kept, guide = out / fixband.KEPT, out / fixband.GUIDE
         assert abs(rgb(kept, 40, 60)[1] - rgb(photo, 40, 60)[1]) < 30  # outside the band: the photo
@@ -696,7 +696,7 @@ def test_fix_is_kept_only_inside_the_band_and_redrawn_once_when_muse_image_stray
         assert '<img src="street-band.svg"' in page and fixband.CAPTION in page
         assert fixband.figure(images[:2]) == "" and fixband.figure(None) == ""
         calls.clear()  # no walked path: Muse Image edits the whole photo with Spark's prompt, as before
-        assert fixband.draw(photo, plan, [{"where": [3.0, 2.5]}], site, people, muse_image, out) == (
+        assert fixband.draw(photo, "a speed table", "i", [{"where": [3.0, 2.5]}], site, people, muse_image, out) == (
             "street.jpg", "street-fixed.webp") and calls == ["i"]
 
 

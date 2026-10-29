@@ -101,9 +101,9 @@ def place(quad, size):
 
 
 def instruction(fix, where):
-    return (f"Replace the magenta band in the {where} of the photo with {fix}, on the road surface, filling the band "
-            "exactly. Change nothing else: keep every person, vehicle, building, road marking and the camera view as "
-            "they are.")
+    return (f"Replace the magenta band in the {where} of the photo with this fix: {fix}. Draw it on the road surface, "
+            "filling the band exactly. Change nothing else: keep every person, vehicle, building, road marking and the "
+            "camera view as they are.")
 
 
 def paint_guide(photo, quad, out_path):
@@ -212,17 +212,18 @@ def draw_in_band(photo, fix, quad_m, quad, events, H, boxes, draw_fix, out_dir):
     return (today.name, picture.name, shown.name), score
 
 
-def draw(photo, plan, events, site, people, draw_fix, out_dir):
+def draw(photo, fix, whole_photo_words, events, site, people, draw_fix, out_dir):
     """The page's street pictures. draw_fix(image, instruction, out_path) returns Muse Image's picture. With a
-    measured band: (street with dots, Muse Image's picture, band picture); else Muse Image edits the whole photo:
-    (photo, picture). `people` are the photo's person tracks; their frame-0 boxes stay real."""
+    measured band, `fix` is drawn in it: (street with dots, Muse Image's picture, band picture); else Muse Image
+    edits the whole photo by `whole_photo_words`: (photo, picture). `people` are the photo's person tracks; their
+    frame-0 boxes stay real."""
     H = road.homography(site["image_points"], site["world_points"])
     quad_m = band(events)
     quad = pixels(H, quad_m) if quad_m else None
     if not quad:
-        return photo.name, draw_fix(photo, plan["image_prompt"], out_dir / PICTURE).name
+        return photo.name, draw_fix(photo, whole_photo_words, out_dir / PICTURE).name
     boxes = [t[0] for t in people if 0 in t]
-    images, score = draw_in_band(photo, plan["fix"], quad_m, quad, events, H, boxes, draw_fix, out_dir)
+    images, score = draw_in_band(photo, fix, quad_m, quad, events, H, boxes, draw_fix, out_dir)
     print(f"fix drawn inside the band; outside it Muse Image's picture matches the photo at SSIM {score:.2f}"
           + ("" if score >= SSIM_MIN else f", under {SSIM_MIN}: check the band picture by eye"), file=sys.stderr)
     return images

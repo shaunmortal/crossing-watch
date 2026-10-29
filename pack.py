@@ -440,7 +440,7 @@ def main():
             (out_dir / "plan.json").write_text(json.dumps(plan, indent=1, ensure_ascii=False))  # the paid-for letter
             if photo and key:  # Muse Image draws the fix in the measured band; without a key there is no street image
                 people = photo_people(out_dir / "clip.mp4", site.get("person", "person"), site.get("person_mode") == "crowd")
-                images = fixband.draw(photo, plan, events, site, people,
+                images = fixband.draw(photo, plan["fix"], plan["image_prompt"], events, site, people,
                                       lambda image, words, path: draw_fix(image, words, key, path), out_dir)
         except (SystemExit, OSError, ValueError, KeyError, IndexError, TypeError, AttributeError,
                 http.client.HTTPException, subprocess.CalledProcessError) as err:
