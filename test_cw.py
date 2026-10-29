@@ -2781,6 +2781,8 @@ def test_case_agent_stops_for_a_tape_measure_and_files_the_letter_only_when_it_a
     assert script == [] and len(bodies) == progress["turn"] == 10 and len(log) == 14  # 10 turns, 4 person steps
     assert all(b["parallel_tool_calls"] is False and b["store"] is False for b in bodies)
     assert {t["name"] for t in bodies[0]["tools"]} == set(agent.RUNNERS)
+    assert "Start with the modes the case names" in bodies[0]["instructions"]
+    assert 'names people "video" and vehicles "video" for tracking' in bodies[0]["input"][0]["content"]  # the site's
     assert bodies[3]["input"][-1] == {"role": "user", "content": agent.NUDGE}
     assert not any(item.get("type") == "reasoning" for b in bodies for item in b["input"])
     assert [r["kind"] for r in progress["requests"]] == ["letter_refused", "measurement"] and progress["tape_m"] == 7.2
@@ -3731,6 +3733,102 @@ def test_filmcheck_help_prints_its_usage_and_a_non_video_file_is_refused_cleanly
     assert helped.returncode == 0 and "Run: python3 filmcheck.py CLIP" in helped.stdout
     refused = subprocess.run([sys.executable, "filmcheck.py", "README.md"], cwd=here, capture_output=True, text=True)
     assert refused.returncode == 1 and "could not read it" in refused.stderr and "Traceback" not in refused.stderr
+
+
+def test_case_agent_starts_from_the_modes_the_paid_run_cached():
+    """A crowd-mode paid run: the first message names its modes, and a track call in another mode, which --budget 0
+    refuses with its cost, tells the model which modes are cached instead of dead-ending; "auto" is a mode too."""
+    import agent, contextlib, io, tempfile
+    bodies, old = [], (agent.spark_turn, agent.run_tracker, agent.MAX_TURNS)
+    def tracker(p, site):
+        if site["person_mode"] != "crowd":
+            raise ValueError("estimated SAM cost $2.08 is over the $0.00 this run may still spend")
+        return {"car": [0, 1]}
+    agent.spark_turn, agent.run_tracker, agent.MAX_TURNS = scripted_spark([None], bodies), tracker, 1
+    try:
+        with tempfile.TemporaryDirectory() as folder, contextlib.redirect_stdout(io.StringIO()):
+            out, site, _ = agent_case(folder)
+            (out / "site.json").write_text(json.dumps({**site, "person_mode": "crowd"}))
+            agent.work(out / "video.mp4", out / "site.json", out, "key")
+            p = {"out": str(out), "site": str(out / "site.json"), "video": str(out / "video.mp4")}
+            failed = agent.run_tool(p, {"name": "track", "arguments": '{"people": "video", "vehicles": "video"}'}, "key")
+            tracked = agent.run_tool(p, {"name": "track", "arguments": '{"people": "crowd", "vehicles": "video"}'}, "key")
+            auto = agent.track(p, {"people": "auto", "vehicles": "lorry"}, "key")
+    finally:
+        agent.spark_turn, agent.run_tracker, agent.MAX_TURNS = old
+    assert 'names people "crowd" and vehicles "video" for tracking' in bodies[0]["input"][0]["content"]
+    assert failed["summary"].startswith('track failed: the site file names people "crowd" and vehicles "video"')
+    assert "$2.08" in failed["summary"] and tracked["summary"].startswith("Tracked people in crowd mode")
+    assert "auto" in agent.MODE["enum"] and '"auto"' in auto["summary"]  # refused for "lorry", not for "auto"
+
+
+def test_a_bad_site_file_stops_before_any_re_encoding():
+    """Points on one line, or a check mark above the horizon, stop analyze.py with a message (no traceback) before
+    the video is hashed or re-encoded, so no output folder is made."""
+    import subprocess, sys, tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as tmp:
+        line = {"image_points": [[0, 0], [1, 1], [2, 2], [3, 3]], "world_points": SQUARE_ROAD, "vehicles": ["car"]}
+        sky = {"image_points": [[250, 100], [350, 100], [500, 300], [100, 300]], "world_points": SQUARE_ROAD,
+               "vehicles": ["car"],  # the horizon is at y = 33.3
+               "check": {"what": "line A to line B along the near kerb", "points": [[300, 200], [300, 20]]}}
+        for site, said in ((line, "click them again"), (sky, "below the horizon")):
+            Path(tmp, "site.json").write_text(json.dumps(site))
+            run = subprocess.run([sys.executable, "analyze.py", "missing.mp4", str(Path(tmp, "site.json")), "--out",
+                                  str(Path(tmp, "out"))], capture_output=True, text=True, cwd=Path(__file__).parent)
+            assert run.returncode == 1 and said in run.stderr and "Traceback" not in run.stderr, run.stderr
+            assert not Path(tmp, "out").exists()
+
+
+def test_the_free_estimate_shows_auto_modes_worst_case_and_the_recording_date():
+    """--budget 0 on a first run: the auto-mode line prints before the cost refusal, after the recording date read
+    from the file's creation time in IST (or NOT RECORDED)."""
+    import analyze, contextlib, io, subprocess, sys, tempfile
+    from pathlib import Path
+    old = sam.load_api_key, sys.argv
+    sam.load_api_key = lambda: "key"  # never used: the run stops at the estimate
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            video = Path(tmp, "rec.mp4")
+            subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc2=size=160x90:rate=10", "-t", "2",
+                            "-metadata", "creation_time=2026-11-02T10:28:30Z", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                            str(video)], check=True)
+            Path(tmp, "site.json").write_text(json.dumps({"image_points": SQUARE_IMG, "world_points": SQUARE_ROAD,
+                                                          "vehicles": ["car"], "vehicle_mode": "auto"}))
+            sys.argv = ["analyze.py", str(video), str(Path(tmp, "site.json")), "--out", str(Path(tmp, "out")),
+                        "--budget", "0"]
+            printed = io.StringIO()
+            with contextlib.redirect_stdout(printed):
+                assert exits(analyze.main)
+    finally:
+        sam.load_api_key, sys.argv = old
+    lines = printed.getvalue().splitlines()
+    assert lines[0] == "recorded 2026-11-02 15:58:30 IST"
+    assert lines[1].startswith("auto mode may add up to $") and "SAM cost about" in lines[2], lines
+
+
+def test_a_folder_is_refused_after_a_crowd_sampling_rate_changes_but_not_for_the_recording_date():
+    import analyze, crowd, seal, tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as tmp:
+        video, out = Path(tmp, "a.MOV"), Path(tmp, "out")
+        out.mkdir()
+        video.write_bytes(b"x" * 10)
+        sha = seal.file_sha256(video)
+        assert analyze.check_source(video, out, "", sha) is None  # no creation time in these bytes
+        stamp = json.loads((out / "source.json").read_text())
+        assert stamp["vehicle_fps"] == crowd.VEHICLE_FPS and stamp["recorded"] is None
+        (out / "source.json").write_text(json.dumps({k: v for k, v in stamp.items()
+                                                     if k not in ("crowd_fps", "vehicle_fps", "recorded")}))
+        analyze.check_source(video, out, "", sha)  # stamped before these keys: today's rates assumed
+        (out / "source.json").write_text(json.dumps({**stamp, "recorded": "2026-10-31 10:00:00 IST"}))
+        analyze.check_source(video, out, "", sha)  # the date is kept, never compared
+        old = crowd.VEHICLE_FPS
+        crowd.VEHICLE_FPS = old // 2
+        try:
+            assert exits(lambda: analyze.check_source(video, out, "", sha))  # every cached image would be paid again
+        finally:
+            crowd.VEHICLE_FPS = old
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ SITE.json holds four calibration points (clip pixels) and where they lie on the 
 Writes DIR/events.json and prints the most dangerous moments first.
 """
 import argparse
+import datetime
 import json
 import math
 import re
@@ -43,6 +44,9 @@ MODES = ("video", "crowd", "auto")  # person_mode / vehicle_mode values
 # untested on a real iPhone HLG file, and it may clip a bright sky
 TO_SDR = ":out_transfer=bt709:out_primaries=bt709:out_color_matrix=bt709:out_range=tv"
 STEADY_MIN_S = 2      # a clip this short after its reference frame gets no camera check (as filmcheck.py)
+IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30), "IST")  # the recording date is shown in India's time
+CREATION_TAGS = ("com.apple.quicktime.creationdate", "creation_time")  # iPhone local time with offset; else UTC
+REVIEW_PROGRESS_EVERY = 10  # print "Muse Spark looked at n of N people" this often, so a long review is not silent
 PREP_FILTER = re.compile(r"^((crop|scale|transpose|hflip|vflip)(=[\w.*:+\-/]+)?)(,(crop|scale|transpose|hflip|vflip)(=[\w.*:+\-/]+)?)*$")
 
 
@@ -111,19 +115,44 @@ def load_site(path):
     return site
 
 
+def recorded(video):
+    """When the phone started recording, in IST ("2026-11-02 15:58:30 IST"), from the file's metadata (CREATION_TAGS);
+    None when it carries neither tag (a YouTube rip, a re-encode)."""
+    run = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format_tags", "-of", "json", str(video)],
+                         capture_output=True, text=True)
+    try:
+        tags = json.loads(run.stdout or "{}").get("format", {}).get("tags", {})
+    except json.JSONDecodeError:
+        return None
+    for key in CREATION_TAGS:
+        try:
+            when = datetime.datetime.fromisoformat(tags[key])
+        except (KeyError, ValueError, TypeError):
+            continue
+        return when.replace(tzinfo=when.tzinfo or datetime.timezone.utc).astimezone(IST).strftime("%Y-%m-%d %H:%M:%S %Z")
+    return None
+
+
 def check_source(video, out_dir, prep_filter, sha256=None, window=None):
     """Refuse to reuse an output folder (its clip and paid SAM replies) made from another video or settings. The
-    video is known by its bytes and SHA-256, not its path: the same file moved or renamed keeps its paid replies."""
+    video is known by its bytes and SHA-256, not its path: the same file moved or renamed keeps its paid replies.
+    Crowd mode's sampling rates are stamped too: a changed rate makes every cached image reply a new paid one. Returns
+    when the video was recorded (recorded(), also kept in source.json; None when the file does not say)."""
     stat = Path(video).stat()
     stamp = {"video": str(Path(video).resolve()), "bytes": stat.st_size, "sha256": sha256, "prep_filter": prep_filter,
              "fps": FPS, "width": WIDTH, "chunk_frames": CHUNK_FRAMES, "overlap_frames": OVERLAP_FRAMES,
+             "crowd_fps": crowd.CROWD_FPS, "vehicle_fps": crowd.VEHICLE_FPS, "recorded": recorded(video),
              **({"window_s": window} if window else {})}  # absent when unset, so older folders still match
     stamp_file = out_dir / "source.json"
-    old = json.loads(stamp_file.read_text()) if stamp_file.exists() else None
-    settings = lambda s: {k: v for k, v in s.items() if k not in ("video", "sha256")}
+    # a folder stamped before the sampling rates were: taken as made with today's rates
+    old = ({"crowd_fps": crowd.CROWD_FPS, "vehicle_fps": crowd.VEHICLE_FPS, **json.loads(stamp_file.read_text())}
+           if stamp_file.exists() else None)
+    settings = lambda s: {k: v for k, v in s.items() if k not in ("video", "sha256", "recorded")}
     if old and (settings(old) != settings(stamp) or old.get("sha256", sha256) != sha256):  # older stamps: no sha256
-        raise SystemExit(f"{out_dir} was made from a different video or settings; pass a new --out folder")
+        raise SystemExit(f"{out_dir} was made from a different video or settings; pass a new --out folder (or delete "
+                         "it if nothing was paid yet)")
     stamp_file.write_text(json.dumps(stamp, indent=1))
+    return stamp["recorded"]
 
 
 def prepare(video, out_dir, extra_filter="", window=None):
@@ -513,6 +542,7 @@ def review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, ke
     reused while the crop is the same (review.review)."""
     rideables = [t for name, t in vehicle_boxes.items() if name.split("#")[0].lower() in review.RIDEABLE]
     verdicts, reused = {}, 0
+    total = min(MAX_REVIEWS, len({e["person"] for e in events}))
     for e in events:
         pid = e["person"]
         if pid not in verdicts and len(verdicts) < MAX_REVIEWS:
@@ -527,6 +557,8 @@ def review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, ke
             verdicts[pid] = review.gated(verdict, boxes, rideables, walking_kmh(people[pid]))
             if line := review.said(pid, verdicts[pid]):  # a Meta model judging, on screen; never the crop's path
                 print(line, flush=True)
+            if len(verdicts) % REVIEW_PROGRESS_EVERY == 0:  # main prints the total after the last
+                print(f"Muse Spark looked at {len(verdicts)} of {total} people", flush=True)
         e["review"] = verdicts.get(pid)
     return reused, len(verdicts)
 
@@ -587,7 +619,8 @@ def add_evidence(video, clip, out_dir, events, people, vehicles, person_boxes, v
     the frames of the track piece that made the event are drawn (SAM silhouettes, boxes where no mask is cached); the
     heads of `everyone` and every number plate are blurred. Each clip's frames are also saved in road metres, for
     video/split.py. `offset_s`: where the clip starts in the video (window_s), as the sound is cut from the video."""
-    for i, e in enumerate(evidence_events(events)):
+    shown = evidence_events(events)
+    for i, e in enumerate(shown):
         pair = piece_boxes(person_boxes, people, e["person"]), vehicle_boxes[e["vehicle"]]
         try:
             e["clip"] = render.render(clip, e, *pair, FPS, out_dir / f"event{i + 1}.mp4", everyone=everyone,
@@ -596,6 +629,7 @@ def add_evidence(video, clip, out_dir, events, people, vehicles, person_boxes, v
             e["heard"] = listen.listen(video, e, out_dir / f"event{i + 1}.wav", key, offset_s)
             e["strobe"] = render.strobe(out_dir / e["clip"], e, *pair, FPS, frame_size,
                                         out_dir / f"event{i + 1}-strobe.jpg")  # the whole near-miss in one picture
+            print(f"evidence clip {i + 1} of {len(shown)} written", flush=True)
         except (subprocess.CalledProcessError, OSError) as err:
             print(f"evidence for event {i + 1} failed: {err}", flush=True)
 
@@ -605,8 +639,9 @@ def report(seen, events, untrusted=""):
     serious = sum(e["tier"] == "serious" for e in events)
     if untrusted:
         print(f"NOT MEASUREMENTS: {untrusted}")
+    speed = seen["speed_85th_kmh"]
     print(f"{seen['minutes']} min, {seen['crossings']} crossings, {seen['vehicles']} moving vehicles, 85th-percentile "
-          f"speed {seen['speed_85th_kmh']} km/h; {serious} serious near-misses (PET < {road.PET_MAX_S} s), "
+          f"speed {'no moving vehicle' if speed is None else f'{speed} km/h'}; {serious} serious near-misses (PET < {road.PET_MAX_S} s), "
           f"{len(events) - serious} close passes (< {road.CLOSE_PASS_S} s)")
     for e in events:
         verdict, at20 = e.get("review") or {}, e["with_limit"]["20"]
@@ -629,6 +664,12 @@ def main():
         parser.error("--budget must be 0 or more US dollars")
 
     site = load_site(args.site)
+    import agent  # here, not at the top: agent imports this module
+    try:  # a bad calibration or check distance stops here, not after minutes of re-encoding
+        H = road.homography(site["image_points"], site["world_points"])
+        agent.check_distance(site)
+    except ValueError as err:
+        raise SystemExit(f"{args.site}: {err}")
     out_dir = Path(args.out or Path("out") / Path(args.video).stem)
     out_dir.mkdir(parents=True, exist_ok=True)
     window = site.get("window_s")
@@ -637,7 +678,8 @@ def main():
         raise SystemExit(f"window_s ends at {window[1]:g} s but {args.video} is {recording_s:g} s long: the page would "
                          "claim seconds that were never analysed")
     started, source, before = time.monotonic(), seal.file_sha256(args.video), sam_replies(out_dir)  # pack receipt
-    check_source(args.video, out_dir, site.get("prep_filter", ""), source, window)
+    when = check_source(args.video, out_dir, site.get("prep_filter", ""), source, window)
+    print(f"recorded {when}" if when else "recording date NOT RECORDED (the file has no creation time)", flush=True)
     clip = prepare(args.video, out_dir, site.get("prep_filter", ""), window)
     frame_size = tuple(int(v) for v in probe(clip, "stream=width,height").split(","))
     if site.get("frame_size") and tuple(site["frame_size"]) != frame_size:
@@ -646,16 +688,15 @@ def main():
     if site.get("prep_filter") and site.get("marked_on") == "raw video frame":
         raise SystemExit(f"prep_filter changes the frame, but the points were marked on the raw video: open a frame of "
                          f"{clip} in calibrate.html, tick 'frame is from clip.mp4' and mark them again")
-    H = road.homography(site["image_points"], site["world_points"])
     key = sam.load_api_key()
     total = frame_count(clip)
     pieces = parts(clip, out_dir, total)
     person_concept, grid = site.get("person", "person"), site.get("person_grid", 1)
     crowded, plan = crowd_concepts(site), video_plan(site)
     cap = spend_cap(args.budget, args.allow_cost)
-    spent, sam_usd = check_cost(pieces, plan, frame_size, total, cap, *image_requests(site, crowded, total, out_dir))
-    if bill := auto_bill(site, total, out_dir, cap):
+    if bill := auto_bill(site, total, out_dir, cap):  # before check_cost, so even a --budget 0 estimate shows it
         print(bill, flush=True)
+    spent, sam_usd = check_cost(pieces, plan, frame_size, total, cap, *image_requests(site, crowded, total, out_dir))
     prefetch(pieces, plan, key, frame_size)
     switched = auto_switch(site, pieces, plan, key, frame_size)
     notes = [switch_note(c, seconds, len(pieces)) for c, seconds in switched.items()]
