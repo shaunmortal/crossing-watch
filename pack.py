@@ -27,6 +27,8 @@ from pathlib import Path
 
 import ailabel
 import crowd
+import fixband
+import overlay
 import render
 import review
 import roadmap
@@ -78,7 +80,7 @@ Write every number in digits, exactly as given (speeds in km/h), and never put o
 with another near-miss's time gap.
 Death-risk figures are for adults hit by a car front: never state a death risk for a child.
 From the engineering lines, mention at most PV² and the share of time in gaps, briefly, with their main caveat;
-never say a standard is met.
+never say a standard is met. If desire_lines is given, you may say where people crossed and quote its IRC:103-2012 words.
 
 {facts}
 
@@ -166,10 +168,11 @@ def serious(events):
     return [e for e in events if e.get("tier", "serious") == "serious"]
 
 
-def facts(site, events, seen):
+def facts(site, events, seen, paths=None):
     """The measurements a letter may quote, as JSON. Arrays (paths, spans, replays) never enter: they are not facts
-    for a letter, and their many numbers would let almost any number in a letter pass the measured-number check."""
-    worst, lines = events[:SHOWN_EVENTS], headline(events, seen, site)
+    for a letter, and their many numbers would let almost any number in a letter pass the measured-number check.
+    The desire lines (`paths`) enter only as roadmap.desire_lines()' counts."""
+    worst, lines, desire = events[:SHOWN_EVENTS], headline(events, seen, site), roadmap.desire_lines(paths, site)
     return json.dumps({
         **({"headline": " ".join(lines)} if lines else {}),
         "site": site.get("name", ""), "observed": {k: v for k, v in seen.items() if not isinstance(v, (list, tuple, set))},
@@ -183,6 +186,7 @@ def facts(site, events, seen):
                    or (e.get("review") or {}).get("road_user", "not reviewed")} for e in worst],
         "risk_source": "Rosén & Sander 2009, adults 15+, car fronts",
         "engineering": engineering_lines(seen, None),
+        **({"desire_lines": " ".join(desire)} if desire else {}),
     }, indent=1, ensure_ascii=False)  # \u escapes would add digits the number check counts as measured
 
 
@@ -472,41 +476,57 @@ def draw_fix(photo, instruction, api_key, out_path):
     return out_path
 
 
-def street_photo(clip, out_path, person_concept="person", vehicles=()):
-    """First frame of the clip with every head and number plate blurred (it is shown on the page and sent to Muse
-    Image). Blurs what every SAM reply analyze wrote for that frame holds: the frame-by-frame one (crowd mode, auto
-    mode after it switched, or analyze's search for the people a full video reply missed) and the video one (part0/
-    for long videos). Without a person reply, or with only a full video one, there is no photo rather than unblurred
-    faces."""
+def frame0_replies(clip, concept):
+    """The SAM replies analyze cached for the clip's first frame: the frame-by-frame one (crowd mode, auto mode after
+    it switched, or analyze's search for the people a full video reply missed), then the video one (part0/ for long
+    videos)."""
     folder = clip.parent / "part0" if (clip.parent / "part0").is_dir() else clip.parent
-    frame0 = lambda concept: [f for f in (crowd.cache_dir(clip.parent, concept) / f"{0:06d}.sam.txt",
-                                          sam.cache_path(folder, concept)) if f.exists()]
-    tracks = lambda concepts: [t for c in concepts for f in frame0(c) for t in sam.parse(f.read_text()).values()]
-    replies = frame0(person_concept)
+    return [f for f in (crowd.cache_dir(clip.parent, concept) / f"{0:06d}.sam.txt", sam.cache_path(folder, concept))
+            if f.exists()]
+
+
+def frame0_tracks(clip, concepts):
+    """Every track in the first-frame replies of `concepts`."""
+    return [t for c in concepts for f in frame0_replies(clip, c) for t in sam.parse(f.read_text()).values()]
+
+
+def photo_people(clip, person_concept="person"):
+    """Person tracks of the clip's first frame from every reply (frame0_replies): the heads the street photo blurs
+    and the people the fix picture keeps real. Without a person reply, or with only a full video one, it raises
+    rather than leave faces unblurred."""
+    replies, people = frame0_replies(clip, person_concept), frame0_tracks(clip, [person_concept])
     if not replies:
         raise ValueError(f"no person tracks for {clip}; not showing an unblurred street photo")
-    if replies == [sam.cache_path(folder, person_concept)] and len(tracks([person_concept])) >= sam.MAX_OBJECTS:
+    if replies[0].parent != crowd.cache_dir(clip.parent, person_concept) and len(people) >= sam.MAX_OBJECTS:
         raise ValueError(f"SAM's video reply for people in {clip} is full and frame 0 was not searched image by image "
                          "(run analyze.py again); not showing a street photo with unblurred faces")
+    return people
+
+
+def street_photo(clip, out_path, person_concept="person", vehicles=()):
+    """First frame of the clip with every head (photo_people) and number plate blurred (it is shown on the page and
+    sent to Muse Image); no photo rather than unblurred faces."""
+    people = photo_people(clip, person_concept)
     size = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
                            "-of", "csv=p=0", str(clip)], check=True, capture_output=True, text=True).stdout.strip()
     frame_size = tuple(int(v) for v in size.split(","))
-    filters = ",".join(render.blur_filters(tracks([person_concept]), 0, 0, frame_size)
-                       + render.plate_filters(tracks(vehicles), 0, 0, frame_size)) or "null"
+    filters = ",".join(render.blur_filters(people, 0, 0, frame_size)
+                       + render.plate_filters(frame0_tracks(clip, vehicles), 0, 0, frame_size)) or "null"
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(clip), "-vf", filters, "-frames:v", "1", str(out_path)],
                    check=True)
     return out_path
 
 
-def event_card(i, e, fps):
-    """Card #i, linkable as #event-i; data-t is the second of its clip when the first of the two reached the spot."""
+def event_card(i, e, fps, strip=""):
+    """Card #i, linkable as #event-i; data-t is the second of its clip when the first of the two reached the spot.
+    `strip` is overlay.strip()'s stopping strip for this card, if any."""
     verdict, at30, at20 = e.get("review") or {}, e["with_limit"]["30"], e["with_limit"]["20"]
     road_user = verdict.get("road_user", "pedestrian (not reviewed by Spark)")
     road_user = review.unconfirmed_rider(verdict) or ("pedestrian" if road_user == "unclear" else road_user)
     who = html.escape(("an " if road_user[0] in "aeiou" else "a ") + road_user)
     video = f'<video src="{html.escape(e["clip"])}" controls muted loop playsinline></video>' if e.get("clip") else ""
     moment_s = min(e["t_person_s"], e["t_vehicle_s"]) - render.window(e, fps)[0] / fps
-    return f"""<article class="card" id="event-{i}" data-t="{moment_s:.2f}">{video}
+    return f"""<article class="card" id="event-{i}" data-t="{moment_s:.2f}">{overlay.strobe(e)}{overlay.clip(video, e, strip)}
 <h3>#{i} &middot; {html.escape(e.get("tier", "serious"))} &middot; {html.escape(e["vehicle"].split("#")[0])} at {e["vehicle_kmh"]} km/h, {e["pet_s"]:.1f} s from {who}</h3>
 <table><tr><th></th><th>Impact speed if hit</th><th>Adult death risk</th></tr>
 <tr><td>As driven</td><td>{e.get("impact_kmh", e["vehicle_kmh"])} km/h</td><td>{e["death_risk_pct"]}%</td></tr>
@@ -534,13 +554,21 @@ def heard_line(heard):
 
 
 
-def map_section(events, site):
-    drawn = roadmap.svg(events, site["world_points"], SHOWN_EVENTS)
-    if not drawn:
-        return ""
-    return (f"<section><h2>Where it happened</h2>{drawn}<p class=\"note\">Seen from above, in metres on the road "
-            "(grid every 5 m; dashed: the measured area). Blue: the pedestrian, red: the vehicle, 2 s either side. "
-            "Filled dots: serious near-misses; rings: close passes.</p></section>")
+def map_section(events, site, ground=None, paths=None):
+    """The map, drawn even with no near-miss: then it shows where people crossed (the desire lines)."""
+    placed = any(e.get("where") for e in events)
+    trails = (f" Faint blue: where each person crossed, a point every {road.DESIRE_STEP_S:g} s." if paths else "")
+    near = (" Blue: the pedestrian, red: the vehicle, 2 s either side. Filled dots: serious near-misses; rings: close "
+            "passes." if placed else "")
+    under = (" Under it, the street photo seen from above: the road surface is to scale, standing objects lean, and "
+             f"the {'dots' if placed else 'lines'} are measured positions." if ground else "")
+    lines = roadmap.desire_lines(paths, site)  # the counts, then IRC:103-2012's words, shown as a note
+    desire = "".join(f"<p>{html.escape(line)}</p>" for line in lines[:-1]) + "".join(
+        f'<p class="note">{html.escape(line)}</p>' for line in lines[-1:])
+    return (f"<section><h2>{'Where it happened' if placed else 'Where people crossed'}</h2>"
+            f"{roadmap.svg(events, site['world_points'], SHOWN_EVENTS, ground, paths)}<p class=\"note\">Seen from "
+            f"above, in metres on the road (grid every 5 m; dashed: the measured area).{trails}{near}{under}</p>"
+            f"{desire}</section>")
 
 
 def fix_section(plan, images):
@@ -815,8 +843,9 @@ def lead(lines):
 
 
 def page(site, events, seen, plan, images, fps, cost=None, full=None, privacy=None, signoff=None, receipt="",
-         source_sha256=None):
-    cards = "\n".join(event_card(i + 1, e, fps) for i, e in enumerate(events[:SHOWN_EVENTS])) or (
+         source_sha256=None, timeline=None, ground=None, paths=None):
+    cards = "\n".join(event_card(i + 1, e, fps, overlay.strip(e, site, events[:SHOWN_EVENTS]))
+                      for i, e in enumerate(events[:SHOWN_EVENTS])) or (
         f"<p>No conflicts under {road.CLOSE_PASS_S} s in these {html.escape(str(seen.get('minutes', '?')))} minutes. "
         "A short recording can miss rare events: record more school-run periods before drawing any conclusion.</p>")
     method = (f"SAM 3.1 tracked every pedestrian and vehicle. Four points on the road turned pixels into metres. "
@@ -829,15 +858,15 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None, privacy=No
               f"{road.BRAKING_MPS2} m/s² braking. {site.get('calibration_note', '')}")
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>Crossing Watch evidence</title>
-<style>{STYLE}{roadmap.STYLE}</style></head><body>
+<style>{STYLE}{roadmap.STYLE}{overlay.STYLE}</style></head><body>
 <h1>Crossing Watch: near-miss evidence</h1>
 <p class="muted">{html.escape(site.get("name", ""))}</p>{filed_line(site)}{lead(headline(events, seen, site))}
 <div class="stats">{stats(events, seen)}</div>{limit_note(full)}{privacy_note(privacy)}{pyramid(events, seen)}
-{engineering(seen, cost)}
-{map_section(events, site)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{legal_section(site)}
-{letter_section(plan, events[:SHOWN_EVENTS], facts(site, events, seen), signoff)}
+{engineering(seen, cost)}{roadmap.gap_strip(timeline, events, SHOWN_EVENTS, full)}
+{map_section(events, site, ground, paths)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{fixband.figure(images)}{legal_section(site)}
+{letter_section(plan, events[:SHOWN_EVENTS], facts(site, events, seen, paths), signoff)}
 {tct_section()}<section><h2>How this was measured</h2><p class="note">{html.escape(method)}</p>
-{f'<p class="note">{html.escape(receipt)}</p>' if receipt else ""}{hash_line(source_sha256, site)}</section></body></html>"""
+{f'<p class="note">{html.escape(receipt)}</p>' if receipt else ""}{hash_line(source_sha256, site)}</section>{overlay.SCRIPT}</body></html>"""
 
 
 def share(out_dir, page_html):
@@ -976,29 +1005,34 @@ def main():
     events = confirmed(data["events"])
     seen = real_crossers(data["events"],
                          data.get("exposure") or {"minutes": round(clip_minutes(out_dir / "clip.mp4", data["fps"]), 1)})
-    measured = facts(site, events, seen)
+    paths = data.get("paths") or {}  # desire lines: with them a 0-event clip still gets its photo, fix and letter
+    measured = facts(site, events, seen, paths)
     prompt = LETTER_PROMPT.format(facts=measured, language=site.get("letter_language", "English"))
     saved = saved_plan(out_dir, prompt)
     if (notes or all(signer)) and not saved:
         sys.exit("pack.py: --notes and --approved-by work on plan.json's letter from these same measurements, and "
                  "there is none: run pack.py without them first, and have that letter read")
-    plan, images = saved, None  # saved stays if a revision fails
-    if events:
+    plan, images, ground = saved, None, None  # saved stays if a revision fails
+    if events or paths:
         try:
             photo = street_photo(out_dir / "clip.mp4", out_dir / "street.jpg", site.get("person", "person"),
                                  site.get("vehicles", []))
         except (ValueError, OSError, subprocess.CalledProcessError) as err:
             print(f"no street photo: {err}", file=sys.stderr)
             photo = None
+        ground = roadmap.ground(photo, site, events, out_dir, paths) if photo else None  # the street seen from above
         try:
             key = optional_key()
             plan = (saved if saved and not notes else  # a re-run pays nothing
                     new_plan(out_dir, prompt, measured, key, photo, saved if notes else None, notes))
-            drawn = out_dir / "street-fixed.webp"
+            drawn = out_dir / fixband.PICTURE
             if photo and saved and drawn.is_file() and fix_instruction(saved) == fix_instruction(plan):
-                images = (photo.name, drawn.name)  # drawn for this same fix by an earlier run: no new Muse Image call
-            elif photo and key:  # Muse Image draws the fix; without a key there is no street image on the page
-                images = (photo.name, draw_fix(photo, fix_instruction(plan), key, drawn).name)
+                muse = lambda image, words, path: drawn  # drawn for this same fix by an earlier run: no new call
+            else:  # Muse Image draws the fix in the measured band; without a key there is no street image
+                muse = (lambda image, words, path: draw_fix(image, words, key, path)) if photo and key else None
+            if muse:
+                images = fixband.draw(photo, plan["fix"], fix_instruction(plan), events, site,
+                                      photo_people(out_dir / "clip.mp4", site.get("person", "person")), muse, out_dir)
         except (SystemExit, OSError, ValueError, KeyError, IndexError, TypeError, AttributeError,
                 http.client.HTTPException, subprocess.CalledProcessError) as err:
             print(f"letter or fix image failed, the page shows plan.json's letter if any, else the measurements only: "
@@ -1006,7 +1040,8 @@ def main():
     signoff = sign(out_dir, plan, *signer) if plan and all(signer) else read_signoff(out_dir)
     page_html = page(site, events, seen, plan, images, data["fps"], data.get("cost"), data.get("sam_full_requests"),
                      data.get("privacy"), signoff=signoff, receipt=receipt_line(data, plan, images),
-                     source_sha256=data.get("source_sha256"))
+                     source_sha256=data.get("source_sha256"), timeline=data.get("timeline"), ground=ground,
+                     paths=paths)
     (out_dir / "index.html").write_text(page_html)
     seal.write_sums(share(out_dir, page_html))  # the only folder to publish, and its hashes
     print(f"wrote {out_dir / 'index.html'}: {len(serious(events))} serious, {len(events) - len(serious(events))} close "

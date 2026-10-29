@@ -52,6 +52,8 @@ SMOOTH_FRAMES = 2     # footprint centre: median over this many frames either si
 FIT_STEPS = 8         # Gauss-Newton steps placing a footprint under its SAM box
 FIT_STEP_M = 0.01     # finite-difference step for the fit's slopes
 FIT_DONE_M = 0.001    # the fit stops once a step moves the centre less than this
+DESIRE_ACROSS = 0.6       # a desire line runs at least this share of its way across the road, not along a pavement
+DESIRE_STEP_S = 0.5       # desire lines keep one point every this many seconds
 
 
 def solve(rows, rhs):
@@ -503,19 +505,41 @@ def crossing_cells(people, fps):
     return cells
 
 
-def traffic_gaps(vehicles, fps, cells, frames):
-    """Lengths in seconds of the stretches with no moving vehicle on the crossing (any of `cells`): the gaps a
-    pedestrian could cross in. The first and last are cut short by the video, so they are lower bounds."""
+def busy_spans(vehicles, fps, cells):
+    """[[start_s, end_s], ...] in order: the stretches with a moving vehicle on the crossing (any of `cells`)."""
     def on_crossing(shape):
         return any((math.floor(x / GRID_M), math.floor(y / GRID_M)) in cells for x, y in (*shape, centroid(shape)))
     busy = {f for edges in vehicles.values() for f, v in speeds(edges, fps).items()
             if v >= MOVING_MPS and on_crossing(edges[f])}
-    gaps, start = [], 0
-    for f in sorted(busy) + [frames]:
-        if f > start:
-            gaps.append((f - start) / fps)
-        start = f + 1
-    return gaps
+    starts, ends = sorted(f for f in busy if f - 1 not in busy), sorted(f + 1 for f in busy if f + 1 not in busy)
+    return [[round(a / fps, 2), round(b / fps, 2)] for a, b in zip(starts, ends)]
+
+
+def gaps_between(spans, duration_s):
+    """[[start_s, end_s], ...] of the gaps around busy `spans` in a video `duration_s` long. The first and last are
+    cut short by the video, so they are lower bounds."""
+    edges = [0.0, *(t for span in spans for t in span), duration_s]
+    return [[a, b] for a, b in zip(edges[::2], edges[1::2]) if b > a]
+
+
+def longest_without(gaps, duration_s, gap_s=GAP_ADULT_S):
+    """Longest stretch in seconds with no gap of `gap_s` or more starting: the longest anyone who needs that gap
+    could have waited. A lower bound, since the video cuts the first and last stretch."""
+    edges = [0.0, *(t for a, b in gaps if round(b - a, 2) >= gap_s for t in (a, b)), duration_s]
+    return round(max(b - a for a, b in zip(edges[::2], edges[1::2])), 1)
+
+
+def traffic_gaps(vehicles, fps, cells, frames):
+    """Lengths in seconds of the stretches with no moving vehicle on the crossing (any of `cells`): the gaps a
+    pedestrian could cross in. The first and last are cut short by the video, so they are lower bounds."""
+    return [round(b - a, 2) for a, b in gaps_between(busy_spans(vehicles, fps, cells), frames / fps)]
+
+
+def timeline(people, vehicles, fps, frames):
+    """The whole recording for the gap barcode: its length and the busy spans where people crossed, or None when
+    nobody crossed. Its own key in events.json, never in exposure(), so its arrays stay out of a letter's facts."""
+    cells = crossing_cells(people, fps)
+    return {"duration_s": round(frames / fps, 2), "busy_s": busy_spans(vehicles, fps, cells)} if cells else None
 
 
 def pv2(crossings, vehicles, minutes):
@@ -542,7 +566,53 @@ def exposure(people, vehicles, fps, frames):
     cells = crossing_cells(people, fps)
     if not cells:
         return seen
-    gaps = traffic_gaps(vehicles, fps, cells, frames)
+    gaps_at = gaps_between(busy_spans(vehicles, fps, cells), frames / fps)
+    gaps = [round(b - a, 2) for a, b in gaps_at]
     return {**seen, "gaps_6s": sum(g >= GAP_ADULT_S for g in gaps), "gaps_12s": sum(g >= GAP_SLOW_S for g in gaps),
             "longest_gap_s": round(max(gaps, default=0.0), 1),
-            "gap_6s_share_pct": round(100 * sum(g for g in gaps if g >= GAP_ADULT_S) * fps / frames, 1)}
+            "gap_6s_share_pct": round(100 * sum(g for g in gaps if g >= GAP_ADULT_S) * fps / frames, 1),
+            "longest_without_6s_gap_s": longest_without(gaps_at, frames / fps)}
+
+
+def road_axis(vehicles, fps):
+    """Unit vector along the road: the median heading of the moving vehicles, either way counted the same; None
+    without a vehicle that moved MIN_CROSSING_M or more."""
+    angles = []
+    for edges in vehicles.values():
+        moving = sorted(f for f, v in speeds(edges, fps).items() if v >= MOVING_MPS)
+        if not moving:
+            continue
+        a, b = centroid(edges[moving[0]]), centroid(edges[moving[-1]])
+        if math.dist(a, b) >= MIN_CROSSING_M:
+            angles.append(math.atan2(b[1] - a[1], b[0] - a[0]) % math.pi)
+    if not angles:
+        return None
+    # headings wrap at 180 degrees, so each is measured from their doubled-angle mean before taking the median
+    mean = math.atan2(sum(math.sin(2 * a) for a in angles), sum(math.cos(2 * a) for a in angles)) / 2
+    axis = mean + statistics.median((a - mean + math.pi / 2) % math.pi - math.pi / 2 for a in angles)
+    return math.cos(axis), math.sin(axis)
+
+
+def crossing_paths(people, vehicles, fps, across=DESIRE_ACROSS, step_s=DESIRE_STEP_S):
+    """Desire lines, {person id: [[[x, y], ...] per piece]}: the moving pieces that crossed (the crossing_cells rule)
+    and went at least `across` of their way across the road axis (any way when no vehicle moved), a point every
+    `step_s`, grouped per person like exposure()'s crossings. Their own key in events.json, never in exposure()."""
+    # ponytail: one road axis, so at a junction people crossing the other road read as pavement walks
+    axis, step = road_axis(vehicles, fps), max(1, round(step_s * fps))
+    out = {}
+    for pid, feet in people.items():
+        if not crossing_cells({pid: feet}, fps):
+            continue
+        moving = moving_frames(feet, fps)
+        first, last = moving[min(moving)], moving[max(moving)]
+        dx, dy = last[0] - first[0], last[1] - first[1]
+        if axis and abs(dx * axis[1] - dy * axis[0]) < across * math.hypot(dx, dy):
+            continue
+        path, kept = [], None
+        for f in sorted(moving):
+            if kept is None or f - kept >= step:  # by frame gap, so sparse crowd-mode frames keep their rate
+                path.append([round(moving[f][0], 1), round(moving[f][1], 1)])
+                kept = f
+        if len(path) > 1:
+            out.setdefault(pid.split("/")[0], []).append(path)
+    return out

@@ -4,6 +4,7 @@ import json
 import math
 
 import listen
+import overlay
 import pack
 import render
 import review
@@ -237,6 +238,147 @@ def test_evidence_clip_runs_until_the_vehicle_arrives():
     assert calls[0][calls[0].index("-ss") + 1] == "1.000" and calls[0][calls[0].index("-frames:v") + 1] == "66"
 
 
+def test_footsteps_stay_on_screen_and_the_meeting_spot_appears_with_the_first_arrival():
+    walker = {f: [100 + 4 * f, 50, 120 + 4 * f, 150] for f in range(10, 16)}  # walking right, feet at y = 150
+    car_first = {"t_person_s": 1.4, "t_vehicle_s": 1.2}
+    dots = render.trail_filters(walker, car_first, 10, 10, 16)
+    assert dots[0] == "drawbox=x=147:y=147:w=6:h=6:color=cyan:t=fill:enable='gte(n,0)'"  # bottom centre, from frame 0
+    assert [d.split("enable=")[1] for d in dots] == ["'gte(n,0)'", "'gte(n,2)'", "'gte(n,4)'", "'gte(n,2)'"]
+    assert dots[-1] == "drawbox=x=159:y=143:w=14:h=14:color=yellow:t=fill:enable='gte(n,2)'"  # feet at 1.4 s, from 1.2 s
+    assert render.foot([0, 0, 10, 20], top_down=True) == (5.0, 10.0) and render.trail_filters({}, car_first, 10, 0, 5) == []
+    calls, old = [], render.subprocess.run
+    render.subprocess.run = lambda args, **kwargs: calls.append(args)
+    try:
+        render.render("clip.mp4", car_first, walker, {12: [0, 0, 50, 30]}, 10, "event1.mp4")
+    finally:
+        render.subprocess.run = old
+    filters = calls[0][calls[0].index("-vf") + 1]
+    assert filters.count("t=fill") == 4 and filters.index("t=fill") < filters.index("t=3")  # boxes drawn over the dots
+
+
+SHAPE = ["000000", "011100", "011110", "001110", "000100"]  # a 5 x 6 mask
+SHAPE_TEXT = "!!!!)Hl*-9hfWz"  # SHAPE as SAM sends it after "!", made by meta-sam-parser's own encoder
+
+
+def test_sam_one_bit_masks_decode_and_are_found_under_their_tracked_box():
+    import masks, tempfile
+    from pathlib import Path
+    assert masks.decode(SHAPE_TEXT, 5, 6) == [bytes(int(c) for c in row) for row in SHAPE]
+    for broken in (SHAPE_TEXT[:-1], SHAPE_TEXT.replace("z", "}"), ""):  # cut short; a digit outside the 85; empty
+        try:
+            masks.decode(broken, 5, 6)
+            raise AssertionError(broken)
+        except ValueError:
+            pass
+    with tempfile.TemporaryDirectory() as tmp:
+        tile = Path(tmp) / "part1" / "tile288_0"  # a crop's reply: its boxes are 288 px left of the clip's
+        tile.mkdir(parents=True)
+        (tile / "person.sam.txt").write_text(
+            f"<3f>0<|box;x1=10;y1=20;x2=15;y2=24;w=352;h=208|><|mask;x=0;y=0;data=5,6,!{SHAPE_TEXT}|>")
+        assert masks.find(tmp, [[298.0, 20.0, 303.0, 24.0], [10, 20, 15, 24]]) == {(298, 20, 303, 24): (5, 6, SHAPE_TEXT)}
+
+
+def test_evidence_clips_draw_sam_silhouettes_instead_of_boxes_where_masks_are_cached():
+    import tempfile
+    from pathlib import Path
+    walker = {10: [100, 50, 105, 54], 11: [102.5, 50.5, 107.5, 54.5], 12: [105, 51, 110, 55], 14: [300, 50, 310, 90]}
+    car_first = {"t_person_s": 1.1, "t_vehicle_s": 1.0}  # 11 is filled in between samples; 14 has no mask near
+    calls, old = [], render.subprocess.run
+    render.subprocess.run = lambda args, **kwargs: calls.append((args, kwargs))
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "person.sam.txt").write_text("".join(
+                f"<{f}f>0<|box;x1={b[0]};y1={b[1]};x2={b[2]};y2={b[3]};w=640;h=360|><|mask;x=0;y=0;data=5,6,!{SHAPE_TEXT}|>"
+                for f, b in walker.items() if f in (10, 12)))
+            render.render(Path(tmp) / "clip.mp4", car_first, walker, {}, 10, "event1.mp4", frame_size=(640, 360))
+    finally:
+        render.subprocess.run = old
+    (args, kwargs), size = calls[0], 640 * 360 * 4
+    graph, tint = args[args.index("-filter_complex") + 1], kwargs["input"]
+    assert "-vf" not in args and "overlay" in graph and len(tint) == 32 * size  # frames 0-31, one RGBA frame each
+    pixel = lambda n, x, y: tint[n * size + (y * 640 + x) * 4:n * size + (y * 640 + x) * 4 + 4]
+    assert pixel(10, 101, 51) == b"\x00\xff\xff" + bytes([render.TINT]) and pixel(10, 100, 50) == bytes(4)
+    assert pixel(11, 103, 51) == pixel(10, 101, 51)  # the frame between borrows a neighbour's mask, at its own box
+    assert "eq(n,10)" not in graph and "eq(n,14)" in graph and pixel(14, 301, 51) == bytes(4)  # no mask: its box
+
+
+def test_stromotion_still_copies_both_at_a_fixed_step_and_skips_piled_up_copies():
+    import subprocess, tempfile
+    from pathlib import Path
+    fast = {f: [10 * f, 100, 20 + 10 * f, 160] for f in range(40)}
+    slow = {f: [100 + f, 100, 120 + f, 160] for f in range(40)}  # 5 frames on it still overlaps its copy by 0.6
+    assert render.copies(fast, 20, 5, 0, 39) == [0, 5, 10, 15, 20, 25, 30, 35]
+    assert render.copies(slow, 20, 5, 0, 39) == [5, 20, 35] and render.copies({20: [0, 0, 9, 9]}, 20, 5, 0, 39) == [20]
+    assert render.crop([-5, 10, 30, 400], (640, 360)) == (0, 10, 31, 350) and render.crop([639.6, 0, 700, 9], (640, 360)) is None
+    with tempfile.TemporaryDirectory() as tmp:
+        clip = Path(tmp) / "event1.mp4"
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=10:duration=5",
+                        "-pix_fmt", "yuv420p", str(clip)], check=True)
+        walker = {f: [10 + 5 * f, 40, 30 + 5 * f, 100] for f in range(50)}
+        car = {f: [300 - 12 * f, 100, 340 - 12 * f, 140] for f in range(50)}  # off the frame from 3 s
+        still = render.strobe(clip, {"vehicle": "car#1", "t_person_s": 2.0, "t_vehicle_s": 2.5}, walker, car, 10,
+                              (320, 180), Path(tmp) / "event1-strobe.jpg")
+        size = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=width,height", "-of", "csv=p=0",
+                               str(Path(tmp) / "event1-strobe.jpg")], check=True, capture_output=True, text=True).stdout
+    # cars every 1.0 s from the first arrival at 2.0 s: walker at 0-4 s, car at 0-2 s (then off the frame)
+    assert still == {"image": "event1-strobe.jpg", "moments": 5, "step_s": 1.0} and size.strip() == "320,180"
+
+
+def test_evidence_clips_save_one_road_position_per_clip_frame_for_the_hero_split():
+    import analyze, subprocess, tempfile
+    from pathlib import Path
+    e = {"person": "p/0", "vehicle": "car#1", "t_person_s": 2.0, "t_vehicle_s": 2.4}
+    feet = {f: (0.1 * f, 5.0) for f in range(0, 40, 2)}  # crowd mode: people every 2nd frame
+    shapes = {f: ((20 - 0.5 * f, 4.0), (20 - 0.5 * f, 6.0)) for f in range(10, 50)}
+    boxes = {f: [10 + 2 * f, 40, 30 + 2 * f, 100] for f in feet}
+    old = analyze.listen.listen
+    analyze.listen.listen = lambda *args: []  # no Wonder call
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            clip = Path(tmp) / "clip.mp4"
+            subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=10:duration=8",
+                            "-pix_fmt", "yuv420p", str(clip)], check=True)
+            analyze.add_evidence(clip, clip, Path(tmp), [e], {"p/0": feet}, {"car#1": shapes}, {"p": boxes},
+                                 {"car#1": {}}, None, (320, 180))
+            frames = analyze.frame_count(Path(tmp) / e["clip"])
+    finally:
+        analyze.listen.listen = old
+    assert len(e["replay"]) == frames == 45  # 2 s before she was on the spot to 2 s after the car was
+    assert e["replay"][0] == {"frame": 0, "person": [0.0, 5.0], "vehicle": None} and e["replay"][1]["person"] is None
+    assert e["replay"][24]["vehicle"] == [[8.0, 4.0], [8.0, 6.0]]
+
+
+def test_hero_split_steps_one_map_tile_per_clip_frame_beside_the_clip():
+    import subprocess, tempfile
+    from pathlib import Path
+    from video import split
+    replay = [{"frame": f, "person": [0.1 * f, 5.0] if f % 2 == 0 and f <= 40 else None,
+               "vehicle": [[20 - 0.5 * f, 4.0], [20 - 0.5 * f, 6.0]] if f >= 10 else None} for f in range(45)]
+    e = {"vehicle": "car#1", "tier": "serious", "pet_s": 0.4, "t_person_s": 2.0, "t_vehicle_s": 2.4, "where": [2.0, 5.0],
+         "replay": replay}
+    assert split.clock(e, -0.1) is None and split.clock(e, 0.25) == ("0.2 s", False)
+    assert split.clock(e, 0.39) == ("0.4 s, serious near-miss, under 1.5 s", True)  # freezes on the page clock's frame
+    tiles = split.page(e, 10).split("<svg")[1:]
+    assert len(tiles) == 45 and 'class="ring"' not in tiles[19] and 'class="ring"' in tiles[20]  # from her arrival
+    assert "frozen" not in tiles[23] and "0.3 s" in tiles[23] and "frozen" in tiles[24]
+    assert 'class="feet"' in tiles[41] and 'class="feet"' not in tiles[42]  # a missing frame borrows one, not two
+    with tempfile.TemporaryDirectory() as tmp:
+        clip, sheet, hero = (Path(tmp) / name for name in ("event1.mp4", "tiles.png", "hero.mp4"))
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=10:duration=2",
+                        "-pix_fmt", "yuv420p", str(clip)], check=True)
+        (w, h), cols, grey = split.TILE, split.COLS, lambda k: f"{20 + 18 * k:02x}" * 3
+        shades = ",".join(f"drawbox=x={k % cols * w}:y={k // cols * h}:w={w}:h={h}:color=0x{grey(k)}:t=fill"
+                          for k in range(12))  # tile k a flat grey, lighter each frame
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", f"color=black:size={cols * w}x{2 * h}",
+                        "-vf", shades, "-frames:v", "1", str(sheet)], check=True)
+        split.stack(clip, sheet, 12, 10, hero)
+        size = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=width,height", "-of", "csv=p=0",
+                               str(hero)], check=True, capture_output=True, text=True).stdout.strip()
+        levels = subprocess.run(["ffmpeg", "-v", "error", "-i", str(hero), "-vf", f"crop={w}:{h}:{w}:0,scale=1:1,format=gray",
+                                 "-f", "rawvideo", "-"], check=True, capture_output=True).stdout
+    assert size == f"{2 * w},{h}" and len(levels) == 12 and all(b - a > 10 for a, b in zip(levels, levels[1:]))
+
+
 def test_spark_verdicts_are_validated():
     ok = review.read_verdict('Sure: {"cyan_is_a_pedestrian": false, "road_user": "not a person", "reason": "a pole"}')
     assert ok == {"is_person": False, "road_user": "not a person", "reason": "a pole"}
@@ -431,6 +573,62 @@ def test_page_links_find_an_event_card_and_its_moment():
                                                "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
     assert '<article class="card" id="event-3" data-t="2.00">' in pack.event_card(3, e, 10)  # clip starts at 1.5 s
     assert 'data-t="1.00"' in pack.event_card(1, e | {"t_vehicle_s": 1.0}, 10)  # clip starts at 0, not -1 s
+
+
+def test_cards_open_with_their_stromotion_still_only_when_there_is_one():
+    e = {"vehicle": "motorcycle#1", "vehicle_kmh": 30.0, "pet_s": 0.5, "t_person_s": 3.0, "t_vehicle_s": 3.5,
+         "gap_m": 0.4, "death_risk_pct": 1.5, "clip": "event1.mp4",
+         "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5}, "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
+    assert overlay.strobe(e) == "" and "<figure" not in pack.event_card(1, e, 10)
+    card = pack.event_card(1, e | {"strobe": {"image": "event1-strobe.jpg", "moments": 9, "step_s": 0.5}}, 10)
+    assert card.index('<img src="event1-strobe.jpg"') < card.index("<video")  # at the top of the card
+    assert "Composite of 9 moments, 0.5 s apart" in card and "the motorcycle in red" in card
+
+
+def test_gap_clock_says_who_came_first_and_freezes_on_the_tier():
+    e = {"person": "1/0", "vehicle": "motorcycle#c28", "tier": "serious", "pet_s": 0.8, "t_person_s": 3.0,
+         "t_vehicle_s": 3.8, "vehicle_kmh": 30.0, "gap_m": 0.4, "death_risk_pct": 1.5, "clip": "event1.mp4",
+         "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5}, "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
+    assert overlay.clock_text(e) == "The motorcycle reached the pedestrian's spot 0.8 s after they left it."
+    assert overlay.clock_text(e | {"t_vehicle_s": 2.4, "pet_s": 0.6000000000000001}) == (
+        "The pedestrian stepped where the motorcycle was 0.6 s earlier.")
+    assert overlay.clock_text(e | {"t_vehicle_s": 3.0, "pet_s": 0.0}) == (
+        "The pedestrian and the motorcycle were on the same spot at once.")
+    clock = overlay.clip("<video></video>", e | {"tier": "close pass", "pet_s": 2.0})
+    assert 'data-pet="2.0" data-word="close pass, 1.5-3.0 s">2.0 s, close pass, 1.5-3.0 s</span>' in clock  # no JS: final gap
+    assert overlay.clip("", e) == '<p class="gap">The motorcycle reached the pedestrian&#x27;s spot 0.8 s after they left it.</p>'
+    page = pack.page({"world_points": SQUARE_ROAD}, [e], {"minutes": 0.3}, None, None, 10)
+    assert '<div class="clip"><video src="event1.mp4"' in page and 'data-word="serious near-miss, under 1.5 s"' in page
+    assert page.count("<script>") == 1 and "requestAnimationFrame" in page and page.index("<script>") > page.index("event-1")
+
+
+def test_stopping_strip_runs_past_the_spot_only_on_the_worst_fast_person_first_card():
+    assert round(overlay.stopping_m(38), 2) == 23.79 and round(overlay.stopping_m(20), 1) == 10.5
+    site = {"image_points": SQUARE_IMG, "world_points": SQUARE_ROAD}  # 20 px a metre; zone -10..20 m
+    e = {"person": "1/0", "vehicle": "car#1", "tier": "serious", "pet_s": 1.2, "t_person_s": 3.0, "t_vehicle_s": 4.2,
+         "vehicle_kmh": 38.0, "gap_m": 0.4, "death_risk_pct": 1.5, "clip": "event1.mp4", "where": [8.0, 5.0],
+         "path_vehicle": [[x, 5.0] for x in range(-8, 14)],
+         "with_limit": {"30": {"impact_kmh": 30.0, "death_risk_pct": 1.5}, "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
+    drawn = overlay.strip(e, site, [e])
+    assert "needed 23.8 m to stop, had 12.7 m" in drawn and "stopped in 10.5 m, short of the spot" in drawn
+    assert "Not new evidence" in drawn and all(f'class="{c}"' in drawn for c in ("red", "green", "ring"))
+    stop, H, zone = overlay.stopping(e), road.homography(SQUARE_IMG, SQUARE_ROAD), road.zone_around(SQUARE_ROAD)
+    red = overlay.strip_pixels(stop, stop["needed_m"], overlay.STRIP_WIDTH_M, zone, H)  # from 12.7 m back to 23.8 m on
+    assert math.dist(red[0], (100 + 20 * (8 - 38 / 3.6 * 1.2), 182)) < 1e-6 and abs(red[1][0] - 482.4) < 2
+    fast = overlay.stopping(e | {"vehicle_kmh": 60.0})  # 20 m back and 44.8 m long: cut to the zone, -10 to 20 m
+    assert [round(p[0]) for p in overlay.strip_pixels(fast, fast["needed_m"], 1.8, zone, H)] == [-100, 500, 500, -100]
+    vehicle_first = e | {"t_vehicle_s": 1.8}
+    assert overlay.strip(vehicle_first, site, [vehicle_first]) == ""
+    for no in ({"vehicle_kmh": 24.9, "pet_s": 2.0, "t_vehicle_s": 5.0},  # slow, though 13.8 m away
+               {"pet_s": 0.9, "t_vehicle_s": 3.9},  # 9.5 m away: under 10.5 m, the go/no-go fails
+               {"path_vehicle": [[x, 5.0] for x in range(-8, 2)] + [[2.0, y] for y in range(6, 16)]}):  # turns 90 degrees
+        assert overlay.strip(e | no, site, [e | no]) == "", no
+    second = e | {"person": "2/0"}
+    assert overlay.strip(second, site, [e, second]) == "" and overlay.strip(e, site, [vehicle_first, e]) == drawn
+    page = pack.page(site, [vehicle_first, e, second], {"minutes": 0.3}, None, None, 10)
+    assert page.count('<svg class="strip"') == 1 and page.index('<svg class="strip"') > page.index('id="event-2"')
+    assert '<div class="clip"><video' in page and "viewBox" in page
+    assert '<svg class="strip"' not in pack.page(site, [e | {"clip": None}], {"minutes": 0.3}, None, None, 10)
 
 
 def test_long_videos_are_tracked_in_overlapping_parts_and_ids_joined():
@@ -1473,11 +1671,155 @@ def test_map_draws_each_event_where_it_happened():
     svg = roadmap.svg(events, [[-2, -2], [2, -2], [2, 2], [-2, 2]])
     assert svg.count("<circle") == 2 and svg.count('class="hit"') == 1 and svg.count('class="near"') == 1
     assert "#1" in svg and "#2" in svg and "car at 30.0 km/h" in svg and svg.count("<polyline") == 2
-    assert roadmap.svg([], [[0, 0], [1, 0], [1, 1], [0, 1]]) == ""
+    empty = roadmap.svg([], [[0, 0], [1, 0], [1, 1], [0, 1]])
+    assert 'class="area"' in empty and "<circle" not in empty  # never empty: at least the measured area
     site = {"world_points": [[-2, -2], [2, -2], [2, 2], [-2, 2]]}
-    assert "Where it happened" in pack.map_section(events, site) and pack.map_section(events[2:], site) == ""
+    assert "Where it happened" in pack.map_section(events, site)
+    assert "Where people crossed" in pack.map_section(events[2:], site)  # no near-miss placed: still a map
     unplaced_first = roadmap.svg(events[2:] + events[:1], [[-2, -2], [2, -2], [2, 2], [-2, 2]])
     assert ">#2</text>" in unplaced_first and ">#1</text>" not in unplaced_first  # the dot keeps card #2's number
+
+
+def test_busy_spans_give_the_gaps_and_the_longest_wait_for_one():
+    cells = road.crossing_cells({"p": walking_across(40)}, 10)
+    moving, parked = edges_along_x(8.0, 10, 60), {f: ((-1.0, 2.0), (1.0, 2.0)) for f in range(600)}
+    assert road.busy_spans({"car#1": moving, "car#2": parked}, 10, cells) == [[2.9, 3.4]]  # frames 29-33
+    assert road.gaps_between([[2.9, 3.4]], 60.0) == [[0.0, 2.9], [3.4, 60.0]]
+    assert road.gaps_between([], 5.0) == [[0.0, 5.0]]
+    line = road.timeline({"p": walking_across(40)}, {"car#1": moving}, 10, 600)
+    assert line == {"duration_s": 60.0, "busy_s": [[2.9, 3.4]]}
+    assert road.timeline({}, {"car#1": moving}, 10, 600) is None  # nobody crossed: no crossing to time
+    assert road.exposure({"p": walking_across(40)}, {"car#1": moving}, 10, 600)["longest_without_6s_gap_s"] == 3.4
+    gaps = [[0.0, 2.0], [3.0, 10.0], [11.0, 24.0], [25.0, 52.0], [53.0, 60.0]]  # 2, 7, 13, 27, 7 s
+    assert road.longest_without(gaps, 60.0) == 3.0 and road.longest_without(gaps[:1], 60.0) == 60.0
+    assert road.longest_without([[2.9, 8.9]], 10.0) == 2.9  # exactly 6 s is a gap of 6 s, float error or not
+
+
+def test_gap_barcode_colours_every_gap_and_links_the_near_misses():
+    import analyze, tempfile
+    from pathlib import Path
+    import roadmap
+    timeline = {"duration_s": 60.0, "busy_s": [[2.0, 3.0], [10.0, 11.0], [24.0, 25.0], [52.0, 53.0]]}
+    events = [{"tier": "serious", "vehicle": "car#1", "pet_s": 0.4, "t_person_s": 10.5},
+              {"tier": "close pass", "vehicle": "bus#2", "pet_s": 2.0, "t_person_s": 24.2}]
+    strip = roadmap.gap_strip(timeline, events, shown=1)
+    assert strip.count('class="busy"') == 4 and strip.count('class="gap12"') == 2 and strip.count('class="gap6"') == 2
+    assert strip.count('class="cut"') == 2 and 'href="#event-1"' in strip and "#event-2" not in strip  # 1 card shown
+    assert strip.index('href="#event-1"') > strip.index("close pass at 24.2 s: bus")  # the linked dot is on top
+    assert "Longest stretch with no gap of 6 s: 3 s." in strip and "may be shorter" not in strip
+    assert "the whole recording" in roadmap.gap_strip({"duration_s": 39.0, "busy_s": [[0.2, 38.0]]}, [])
+    assert "may be shorter" in roadmap.gap_strip(timeline, events, 5, [2, 10])  # missed vehicles make false gaps
+    assert roadmap.gap_strip(None, events) == "" and roadmap.time_labels(39.0) == [0, 5, 10, 15, 20, 25, 30, 35]
+    page = pack.page({"world_points": SQUARE_ROAD}, [], {"minutes": 1}, None, None, 10, timeline=timeline)
+    assert "Gaps in traffic" in page
+    with tempfile.TemporaryDirectory() as folder:  # analyze keeps the spans apart from the facts' exposure
+        analyze.write_events(Path(folder), {}, [], {"minutes": 1}, None, None, timeline)
+        assert json.loads((Path(folder) / "events.json").read_text())["timeline"] == timeline
+
+
+def test_map_ground_is_the_photo_seen_from_above():
+    """A 320 x 240 photo, 20 px a metre, road (0, 0) at pixel (100, 100): in view -5 to 11 m across, -5 to 7 m down."""
+    import contextlib, io, subprocess, tempfile
+    from pathlib import Path
+    import roadmap
+    H = road.homography(SQUARE_IMG, SQUARE_ROAD)
+    rect = roadmap.view_rect(H, (-8, -2, 9, 12), (5, 5), (320, 240))
+    assert [round(v, 3) for v in rect] == [-5.0, -2.0, 9.0, 7.0]  # the largest part of the map in the photo
+    assert roadmap.in_photo(H, (-6, 0, 1, 1), (320, 240)) is None  # a corner left of the photo
+    assert roadmap.view_rect(H, (20, 20, 30, 30), (25, 25), (320, 240)) is None  # all of it out of view
+    site = {"image_points": SQUARE_IMG, "world_points": SQUARE_ROAD}
+    events = [{"tier": "serious", "vehicle": "car#1", "vehicle_kmh": 30.0, "pet_s": 0.4, "where": [5.0, 5.0]}]
+    with tempfile.TemporaryDirectory() as folder:
+        out, photo = Path(folder), Path(folder) / "street.jpg"
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=red:s=320x240", "-vf",
+                        "drawbox=x=100:y=100:w=220:h=140:color=lime:t=fill", "-frames:v", "1", str(photo)], check=True)
+        picture, rect = roadmap.ground(photo, site, events, out)
+        assert rect == [-2.0, -2.0, 11.0, 7.0] and picture.startswith("data:image/jpeg;base64,")  # map: -2..12 m
+        size = (round(13 * 2 * 640 / 14), round(9 * 2 * 640 / 14))  # 2 ground pixels per map pixel
+        raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(out / roadmap.GROUND), "-f", "rawvideo", "-pix_fmt",
+                              "rgb24", "-"], check=True, capture_output=True).stdout
+        rgb = lambda x, y: raw[3 * (round(y) * size[0] + round(x)):3 * (round(y) * size[0] + round(x)) + 3]
+        assert len(raw) == 3 * size[0] * size[1]
+        px = lambda u, v: rgb((u + 2) * size[0] / 13, (v + 2) * size[1] / 9)  # road metres to ground pixels
+        assert px(5, 5)[1] > 200 > 60 > px(5, 5)[0] and px(-1, -1)[0] > 200 > 60 > px(-1, -1)[1]  # lime road, red kerb
+        assert px(0.5, 3)[1] > 200 > 60 > px(-0.5, 3)[1]  # the edge stays where it is in metres
+        svg = roadmap.svg(events, SQUARE_ROAD, ground=(picture, rect))
+        assert '<image class="ground" href="data:image/jpeg;base64,' in svg and 'x="0.0" y="0.0"' in svg
+        assert "standing objects lean" in pack.map_section(events, site, (picture, rect))
+        assert "standing objects lean" not in pack.map_section(events, site)
+        assert roadmap.ground(photo, site | {"view": "top-down"}, events, out) is None  # already seen from above
+        assert roadmap.ground(photo, site, [{"tier": "serious"}], out)[1] == rect  # nothing placed: the area's ground
+        with contextlib.redirect_stderr(io.StringIO()) as said:
+            assert roadmap.ground(out / "missing.jpg", site, events, out) is None
+        assert "no street photo under the map" in said.getvalue()
+
+
+BAND_IMG = [[60, 120], [260, 120], [260, 220], [60, 220]]  # 20 px a metre on a 320 x 240 photo
+BAND_ROAD = [[0, 0], [10, 0], [10, 5], [0, 5]]
+BAND_EVENTS = [{"tier": "serious", "where": [3.0, 2.5], "path_person": [[3.0, 0.5], [3.0, 4.5]]},
+               {"tier": "close pass", "where": [5.0, 2.0], "path_person": [[5.0, 4.5], [5.0, 1.0]]}]  # the other way
+
+
+def test_fix_band_runs_along_the_walk_over_every_near_miss():
+    import fixband
+    assert fixband.band(BAND_EVENTS) == [[6.0, -0.5], [6.0, 5.5], [2.0, 5.5], [2.0, -0.5]]  # 1 m past paths and spots
+    one = fixband.band(BAND_EVENTS[:1])
+    assert math.dist(one[1], one[2]) == fixband.BAND_MIN_WIDTH_M and math.dist(one[0], one[1]) == 6.0
+    assert fixband.band([{"where": [3.0, 2.5]}]) is None and fixband.band([]) is None  # no walked path, no band
+    quad = fixband.pixels(road.homography(BAND_IMG, BAND_ROAD), fixband.band(BAND_EVENTS))
+    assert [tuple(round(v) for v in p) for p in quad] == [(180, 110), (180, 230), (100, 230), (100, 110)]
+    for corners in (quad, quad[::-1]):  # either way round
+        test = fixband.inside(corners)
+        assert [eval(test, {"gte": lambda a, b: a >= b, "X": x, "Y": y}) for x, y in ((140, 170), (90, 170), (140, 240))] == [1, 0, 0]
+    assert fixband.place(quad, (320, 240)) == "bottom centre" and fixband.place([(160, 120)] * 4, (320, 240)) == "centre"
+    assert fixband.place([(10, 10)] * 4, (320, 240)) == "top left"
+
+
+def test_fix_is_kept_only_inside_the_band_and_redrawn_once_when_muse_image_strays():
+    """Muse Image stubbed by local pictures: a first one flipped (it moved the street), then one that kept it."""
+    import contextlib, fixband, io, subprocess, tempfile
+    from pathlib import Path
+
+    def rgb(image, x, y):
+        raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(image), "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                             check=True, capture_output=True).stdout
+        return raw[3 * (y * 320 + x):3 * (y * 320 + x) + 3]
+
+    with tempfile.TemporaryDirectory() as tmp:
+        out, calls = Path(tmp), []
+        photo = out / "street.jpg"
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=s=320x240", "-frames:v", "1", "-q:v", "2",
+                        str(photo)], check=True)
+
+        def muse_image(image, words, path):
+            calls.append(words)
+            flip = ",hflip" if len(calls) == 1 else ""
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(image), "-vf", f"scale=640:480{flip}", "-f", "image2",
+                            "-c:v", "png", str(path)], check=True)
+            return path
+
+        site, plan = {"image_points": BAND_IMG, "world_points": BAND_ROAD}, {"fix": "a speed table", "image_prompt": "i"}
+        people = [{0: [150, 150, 170, 200]}, {3: [0, 0, 9, 9]}]  # someone in the band; someone seen only later
+        with contextlib.redirect_stderr(io.StringIO()) as said:
+            images = fixband.draw(photo, plan["fix"], plan["image_prompt"], BAND_EVENTS, site, people, muse_image, out)
+        assert "SSIM 0." in said.getvalue() and images == ("street-dots.svg", "street-fixed.webp", "street-band.svg") and len(calls) == 2
+        assert "magenta band in the bottom centre of the photo with this fix: a speed table." in calls[0]
+        assert calls[1] == calls[0] + fixband.STRONGER and not (out / fixband.RETRY).exists()  # the redraw was kept
+        kept, guide = out / fixband.KEPT, out / fixband.GUIDE
+        assert abs(rgb(kept, 40, 60)[1] - rgb(photo, 40, 60)[1]) < 30  # outside the band: the photo
+        assert abs(rgb(kept, 110, 200)[1] - rgb(guide, 110, 200)[1]) < 30 < abs(rgb(photo, 110, 200)[1] - rgb(guide, 110, 200)[1])
+        assert abs(rgb(kept, 160, 175)[1] - rgb(photo, 160, 175)[1]) < 30  # the person in the band: the photo
+        assert max(rgb(photo, 4, 231)) < 40 < 200 < min(rgb(kept, 4, 231))  # a dot of the "AI-generated" label's A
+        shown, today = (out / images[2]).read_text(), (out / images[0]).read_text()
+        assert "6.0 m" in shown and "4.0 m" in shown and fixband.CAPTION in shown and "data:image/jpeg;base64," in shown
+        assert shown.count("<circle") == today.count("<circle") == 2 and today.count('fill="#c0392b"') == 1
+        assert shown.count("<polyline") == 2 and "<polygon" in shown and "<polygon" not in today
+        page = pack.page(site, [], {"minutes": 0.3}, plan | {"why": "w", "letter": "l"}, images, 10)
+        assert '<img src="street-band.svg"' in page and fixband.CAPTION in page
+        assert fixband.figure(images[:2]) == "" and fixband.figure(None) == ""
+        calls.clear()  # no walked path: Muse Image edits the whole photo with Spark's prompt, as before
+        assert fixband.draw(photo, "a speed table", "i", [{"where": [3.0, 2.5]}], site, people, muse_image, out) == (
+            "street.jpg", "street-fixed.webp") and calls == ["i"]
 
 
 def test_fast_two_wheelers_keep_one_track_in_vehicle_crowd_mode():
@@ -1519,6 +1861,15 @@ def test_site_concepts_must_not_share_a_cache_name():
                 raise AssertionError(f"bad vehicle_sizes_m accepted: {sizes}")
             except SystemExit as err:
                 assert "vehicle_sizes_m" in str(err)
+        base = {"image_points": SQUARE_IMG, "world_points": SQUARE_ROAD, "vehicles": ["car"]}
+        for extra, ok in (({"zebra_m": []}, True), ({"zebra_m": SQUARE_ROAD, "gate_m": [[0, 0], [2, 0]]}, True),
+                          ({"zebra_m": [[0, 0]]}, False), ({"gate_m": [[0, 0], [2, 0], [4, 0]]}, False),
+                          ({"gate_m": [[0, "a"], [2, 0]]}, False)):
+            path.write_text(json.dumps(base | extra))
+            try:
+                assert analyze.load_site(path)["vehicles"] == ["car"] and ok, extra
+            except SystemExit as err:
+                assert not ok and ("zebra_m" in str(err) or "gate_m" in str(err)), extra
 
 
 def test_number_check_reads_grouped_numbers_and_non_english_facts():
@@ -1599,6 +1950,76 @@ def test_filmcheck_reads_a_real_ffprobe_reply():
         subprocess.run(["ffmpeg", "-v", "error", "-display_rotation", "90", "-i", str(clip), "-c", "copy", str(upright)],
                        check=True)
         assert filmcheck.problems(filmcheck.probe(upright))[0].startswith("shown 1080x1920")
+
+
+DESIRE = {"a": [[[0.3, -3.7], [0.3, 3.9]]], "b": [[[1.1, -3.7], [1.1, 3.9]]], "c": [[[1.7, 3.9], [1.7, -3.7]]],
+          "d": [[[9.4, -3.7], [9.4, 3.9]]]}  # four people across a road along x; a, b and c within 2 m
+
+
+def test_desire_lines_are_crossings_not_pavement_walks():
+    import analyze, tempfile
+    from pathlib import Path
+    fps, car = 10, edges_along_x(8.0, 10, 60)  # the road runs along x
+    people = {"a/0": walking_across(40), "a/1": {f: (4.0, 1.5 * (f - 60) / 10) for f in range(60, 100)},
+              "b/0": {f: (-6 + 0.15 * f, -3.0) for f in range(40)},  # 6 m along the pavement
+              "c/0": {f: (8.0, 0.01 * (f % 3)) for f in range(40)}}  # waits in one spot
+    paths = road.crossing_paths(people, {"car#1": car}, fps)
+    assert list(paths) == ["a"] and len(paths["a"]) == 2  # one person, both pieces; the pavement walk is not a crossing
+    assert paths["a"][0][:2] == [[0.0, -3.0], [0.0, -2.2]] and len(paths["a"][0]) == 8  # a point every 0.5 s
+    assert set(road.crossing_paths(people, {}, fps)) == {"a", "b"}  # no vehicle, no road axis: every crossing stays
+    tilt = lambda deg: {f: tuple((x * math.cos(math.radians(deg)), x * math.sin(math.radians(deg))) for x, _ in e)
+                        for f, e in car.items()}
+    axis = road.road_axis({"car#1": tilt(1), "car#2": tilt(-1)}, fps)  # headings 1 and 179 degrees: the road is x
+    assert abs(axis[1]) < 1e-9 and abs(abs(axis[0]) - 1) < 1e-9
+    with tempfile.TemporaryDirectory() as folder:  # analyze keeps the paths apart from the facts' exposure
+        analyze.write_events(Path(folder), {}, [], {"minutes": 1}, None, None, None, DESIRE)
+        assert json.loads((Path(folder) / "events.json").read_text())["paths"] == DESIRE
+
+
+def test_desire_lines_count_crossings_against_the_zebra_or_the_gate():
+    import roadmap
+    zebra, gate = [[8.6, -3.0], [11.2, -3.0], [11.2, 3.0], [8.6, 3.0]], [[-1.0, -3.5], [1.0, -3.5]]
+    lines = roadmap.desire_lines(DESIRE, {})
+    assert lines[0] == ("Where people crossed: 4 people walked 2 m or more, mostly across the road; 3 of them within "
+                        "the busiest 2 m stretch of road.")
+    assert len(lines) == 2 and "6.1.9.2 (iii)" in lines[1] and "shortest possible direct route" in lines[1]
+    assert "3 of 4 (75%) crossed more than 2 m outside the marked crossing." in roadmap.desire_lines(DESIRE, {"zebra_m": zebra})
+    assert "No marked crossing; 3 of 4 crossed straight out of the gate" in roadmap.desire_lines(
+        DESIRE, {"zebra_m": [], "gate_m": gate})[1]
+    assert len(roadmap.desire_lines(DESIRE, {"gate_m": gate})) == 2  # a zebra not stated either way: no claim
+    assert roadmap.desire_lines(None, {}) == [] and roadmap.desire_lines({}, {}) == []
+    text = pack.facts({"name": "gate", "zebra_m": zebra}, [], {"minutes": 1}, DESIRE)
+    assert '"desire_lines": "Where people crossed: 4 people' in text and "(75%)" in text
+    assert pack.unmeasured("9.4 1.7 3.7 3.9", text) == ["1.7", "3.7", "3.9", "9.4"]  # never the paths' coordinates
+    svg = roadmap.svg([], SQUARE_ROAD, paths=DESIRE)
+    assert svg.count('class="trail"') == 4 and roadmap.extent([], SQUARE_ROAD, DESIRE) == (-2.0, -5.7, 12.0, 12.0)
+    section = pack.map_section([], {"world_points": SQUARE_ROAD, "zebra_m": zebra}, paths=DESIRE)
+    assert "Where people crossed" in section and "Faint blue" in section and "(75%)" in section
+
+
+def test_a_clip_without_near_misses_still_gets_its_letter_from_the_desire_lines():
+    import contextlib, io, sys, tempfile
+    from pathlib import Path
+    plan = {"fix": "raised zebra", "why": "w", "image_prompt": "i", "letter": "3 of 4.", "writer": "Muse Spark"}
+    asked = []
+    with tempfile.TemporaryDirectory() as folder:
+        out = Path(folder)
+        (out / "site.json").write_text(json.dumps({"name": "gate", "world_points": SQUARE_ROAD}))
+        old = sys.argv, pack.optional_key, pack.street_photo, pack.ask_plan
+        sys.argv = ["pack.py", folder, str(out / "site.json")]
+        pack.optional_key, pack.street_photo = lambda: None, lambda *args: None  # no key, no network, no photo
+        pack.ask_plan = lambda prompt, measured, key, photo: asked.append(measured) or plan
+        try:
+            for paths in ({}, DESIRE):
+                (out / "events.json").write_text(json.dumps({"fps": 10, "exposure": {"minutes": 0.3}, "events": [],
+                                                             "paths": paths}))
+                with contextlib.redirect_stdout(io.StringIO()):
+                    pack.main()
+                assert (out / "plan.json").exists() == bool(paths)  # nobody crossed: nothing to write a letter on
+        finally:
+            sys.argv, pack.optional_key, pack.street_photo, pack.ask_plan = old
+        page = (out / "index.html").read_text()
+        assert len(asked) == 1 and "desire_lines" in asked[0] and "Where people crossed" in page and "raised zebra" in page
 
 
 def test_sam_text_parses_into_tracks():

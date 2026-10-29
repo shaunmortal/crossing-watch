@@ -62,6 +62,11 @@ def load_site(path):
         raise SystemExit(f"{path}: zone_m must be [x_min, y_min, x_max, y_max] in metres")
     if "roadway_m" in site and not numeric_points(site["roadway_m"]):
         raise SystemExit(f"{path}: roadway_m must be a polygon of at least three [x, y] points in metres")
+    if "zebra_m" in site and site["zebra_m"] != [] and not numeric_points(site["zebra_m"]):
+        raise SystemExit(f"{path}: zebra_m must be the marked crossing's corners as [x, y] points in metres, or [] for none")
+    if "gate_m" in site and not (isinstance(site["gate_m"], list) and len(site["gate_m"]) == 2
+                                 and numeric_points(site["gate_m"] * 2)):  # numeric_points wants three or more
+        raise SystemExit(f"{path}: gate_m must be the gate's two posts as [x, y] points in metres")
     for key, crowd_of in (("person_mode", "crowds"), ("vehicle_mode", "traffic")):
         if site.get(key, "video") not in MODES:
             raise SystemExit(f"{path}: {key} must be \"video\", \"crowd\" (frame-by-frame detection for dense {crowd_of}) "
@@ -357,11 +362,13 @@ def run_record(out_dir, started, replies_before):
     return {"minutes": round((time.monotonic() - started) / 60, 1), "sam_requests": sam_replies(out_dir) - replies_before}
 
 
-def write_events(out_dir, site, events, seen, cost, full, privacy=None, source_sha256=None, run=None):
+def write_events(out_dir, site, events, seen, cost, full, privacy=None, source_sha256=None, run=None, timeline=None,
+                 paths=None):
     (out_dir / "events.json").write_text(json.dumps({"site": site.get("name", ""), "fps": FPS, "exposure": seen,
                                                      "cost": cost,
                                                      "sam_full_requests": full, "privacy": privacy,
                                                      "source_sha256": source_sha256, "run": run,
+                                                     "timeline": timeline, "paths": paths,
                                                      "events": events}, indent=1))
 
 
@@ -491,16 +498,21 @@ def heads(person_boxes, found, frames):
     return [*person_boxes.values(), *found.values()], counts
 
 
-def add_evidence(video, clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size, everyone):
+def add_evidence(video, clip, out_dir, events, people, vehicles, person_boxes, vehicle_boxes, key, frame_size,
+                 everyone):
     """Evidence clip and sound check for evidence_events; one failure costs that event's evidence, not the run. Only
-    the frames of the track piece that made the event are boxed; the heads of `everyone` and every number plate are
-    blurred."""
+    the frames of the track piece that made the event are drawn (SAM silhouettes, boxes where no mask is cached); the
+    heads of `everyone` and every number plate are blurred. Each clip's frames are also saved in road metres, for
+    video/split.py."""
     for i, e in enumerate(evidence_events(events)):
         pair = piece_boxes(person_boxes, people, e["person"]), vehicle_boxes[e["vehicle"]]
         try:
             e["clip"] = render.render(clip, e, *pair, FPS, out_dir / f"event{i + 1}.mp4", everyone=everyone,
                                       frame_size=frame_size, vehicles=list(vehicle_boxes.values())).name
+            e["replay"] = render.replay(e, people[e["person"]], vehicles[e["vehicle"]], FPS)  # frame for frame
             e["heard"] = listen.listen(video, e, out_dir / f"event{i + 1}.wav", key)
+            e["strobe"] = render.strobe(out_dir / e["clip"], e, *pair, FPS, frame_size,
+                                        out_dir / f"event{i + 1}-strobe.jpg")  # the whole near-miss in one picture
         except (subprocess.CalledProcessError, OSError) as err:
             print(f"evidence for event {i + 1} failed: {err}", flush=True)
 
@@ -573,6 +585,8 @@ def main():
     events = with_unseen(placed(road.conflicts(people, vehicles, FPS), people, vehicles), person_detected,
                          vehicle_detected)
     seen = road.exposure(people, vehicles, FPS, total)
+    timeline = road.timeline(people, vehicles, FPS, total)  # the gap barcode's spans, kept out of `seen`
+    paths = road.crossing_paths(people, vehicles, FPS)  # the desire lines, kept out of `seen` too
     full = (*full_requests(pieces, [(c, g) for c, g in plan if c not in switched], frame_size), notes)
     if full[0]:
         print(f"warning: {full[0]} of {full[1]} SAM requests hit the {sam.MAX_OBJECTS}-object limit; later arrivals "
@@ -581,16 +595,17 @@ def main():
 
     # saved before the slower, network-bound evidence step
     write_events(out_dir, site, events, seen, cost(), full, source_sha256=source,
-                 run=run_record(out_dir, started, before))
+                 run=run_record(out_dir, started, before), timeline=timeline, paths=paths)
     review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size, top_down)
     everyone, privacy, searched = list(person_boxes.values()), None, []
     if events and person_concept not in crowded + list(switched) and \
             full_requests(pieces, [(person_concept, grid)], frame_size)[0]:
         found, searched = search_heads(site, clip, out_dir, events, total, pieces, key, cap - spent)
         everyone, privacy = heads(person_boxes, found, searched)
-    add_evidence(args.video, clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size, everyone)
+    add_evidence(args.video, clip, out_dir, events, people, vehicles, person_boxes, vehicle_boxes, key, frame_size,
+                 everyone)
     write_events(out_dir, site, events, seen, cost(len(searched)), full, privacy, source,
-                 run_record(out_dir, started, before))
+                 run_record(out_dir, started, before), timeline, paths)
     report(seen, events)
 
 
