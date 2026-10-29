@@ -1520,18 +1520,23 @@ def test_filed_reference_under_the_title_tct_steps_and_a_print_view():
 
 def test_docs_folder_lets_in_only_blurred_evidence_clips():
     """docs/ is published (GitHub Pages): *.mp4 stays ignored there except eventN.mp4 and eventN-hero.mp4, and the
-    unblurred person crops and the blind set never get in."""
+    unblurred person crops and the blind set never get in. Nor do iPhone originals in either case (a clone on a
+    case-sensitive disk), sound, the test clip's frames, notes, raters' answers or a replaced letter."""
     import shutil, subprocess, tempfile
     from pathlib import Path
     with tempfile.TemporaryDirectory() as tmp:
         shutil.copyfile(Path(__file__).with_name(".gitignore"), Path(tmp) / ".gitignore")
         subprocess.run(["git", "init", "-q", tmp], check=True)
-        ignored = lambda name: subprocess.run(["git", "-C", tmp, "check-ignore", "-q", name]).returncode == 0
-        for name in ("docs/event1.mp4", "docs/gate/event12-hero.mp4", "docs/gate/index.html", "docs/gate/street.jpg"):
+        ignored = lambda name: subprocess.run(["git", "-C", tmp, "-c", "core.ignorecase=false", "check-ignore", "-q",
+                                               name]).returncode == 0
+        for name in ("docs/event1.mp4", "docs/gate/event12-hero.mp4", "docs/gate/index.html", "docs/gate/street.jpg",
+                     "<removed-run-record>", "provenance/spark-open-fireworks-sample.json"):
             assert not ignored(name), name
         for name in ("docs/clip.mp4", "docs/gate/clip.mp4", "docs/gate/part0/clip.mp4", "docs/gate/person-c1-0.jpg",
                      "docs/gate/blind/clip01.mp4", "docs/gate/blind/index.html", "docs/gate/blind-key.json",
-                     "out/gate/event1.mp4", ".env"):
+                     "out/gate/event1.mp4", ".env", "CLIP.MOV", "TEST.MOV", "first.png", "last.png", "notes.txt",
+                     "answers-a.json", "docs/gate/event1.wav", "docs/gate/raw.mov", ".env.local",
+                     "sample/plan-1a2b3c4d.json", "docs/gate/person-c1.json"):
             assert ignored(name), name
 
 
