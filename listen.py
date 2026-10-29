@@ -8,6 +8,7 @@ import subprocess
 import urllib.request
 
 import sam
+import seal
 
 MODEL = "muse-wonder-1.0"
 TIMEOUT_S = 120
@@ -51,12 +52,21 @@ def audio_around(video, t_s, out_path):
 
 def listen(video, event, out_path, api_key, offset_s=0.0):
     """Sounds heard around the event, times relative to the near-miss (negative = before); None if there is no
-    audio or the call failed. `offset_s`: where the analysed clip starts in `video` (window_s)."""
+    audio or the call failed. `offset_s`: where the analysed clip starts in `video` (window_s). Wonder's reply is
+    kept beside the WAV (event1.wav: event1-heard.json) and read again while the WAV, model and prompt are the same;
+    delete it to make Wonder listen again."""
     t_s = min(event["t_person_s"], event["t_vehicle_s"]) + offset_s
     wav, start = audio_around(video, t_s, out_path)
     if wav is None:
         return None
     seconds = 2 * PAD_S
+    heard = seal.reused(out_path.with_name(f"{out_path.stem}-heard.json"), [wav.read_bytes(), MODEL, PROMPT],
+                        lambda: hear(wav, seconds, api_key), lambda text: read_sounds(text, seconds))
+    return None if heard is None else [{"t_s": round(start + s["t_s"] - t_s, 1), "sound": s["sound"]} for s in heard]
+
+
+def hear(wav, seconds, api_key):
+    """Wonder's raw reply text about one WAV ("" when it held no message), or None if the call failed."""
     body = json.dumps({"model": MODEL, "reasoning": {"effort": "minimal"}, "input": [{"role": "user", "content": [
         {"type": "input_text", "text": PROMPT.format(seconds=seconds)},
         {"type": "input_file", "filename": "street.wav",
@@ -69,9 +79,5 @@ def listen(video, event, out_path, api_key, offset_s=0.0):
     except (OSError, ValueError, http.client.HTTPException) as err:
         print(f"listening failed for {wav.name}: {err}", flush=True)
         return None
-    text = "".join(c.get("text", "") for o in reply.get("output", []) if o.get("type") == "message"
+    return "".join(c.get("text", "") for o in reply.get("output", []) if o.get("type") == "message"
                    for c in o.get("content", []) if isinstance(c, dict)) if isinstance(reply, dict) else ""
-    heard = read_sounds(text, seconds)
-    if heard is None:
-        return None
-    return [{"t_s": round(start + s["t_s"] - t_s, 1), "sound": s["sound"]} for s in heard]

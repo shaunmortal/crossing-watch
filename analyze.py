@@ -481,21 +481,30 @@ def walking_kmh(feet):
 def review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size, top_down):
     """Spark looks once at each pedestrian piece involved in a conflict (most dangerous first, at most
     MAX_REVIEWS), and its verdict is attached to all that piece's events. A rider call stands only with a
-    rideable vehicle's box under the person (review.gated)."""
+    rideable vehicle's box under the person (review.gated). Returns (verdicts read from a reply saved by an earlier
+    run, people reviewed): a saved reply is reused while the crop is the same (review.review)."""
     rideables = [t for name, t in vehicle_boxes.items() if name.split("#")[0].lower() in review.RIDEABLE]
-    verdicts = {}
+    verdicts, reused = {}, 0
     for e in events:
         pid = e["person"]
         if pid not in verdicts and len(verdicts) < MAX_REVIEWS:
-            boxes = piece_boxes(person_boxes, people, pid)
+            boxes, crop = piece_boxes(person_boxes, people, pid), out_dir / f"person-{pid.replace('/', '-')}.jpg"
+            before = saved_reply(crop)
             try:
-                verdict = review.review(clip, boxes, frame_size, out_dir / f"person-{pid.replace('/', '-')}.jpg",
-                                        key, top_down)
+                verdict = review.review(clip, boxes, frame_size, crop, key, top_down)
             except (subprocess.CalledProcessError, OSError) as err:
                 print(f"review of {pid} failed: {err}", flush=True)
                 verdict = None
+            reused += verdict is not None and before is not None and saved_reply(crop) == before  # not asked again
             verdicts[pid] = review.gated(verdict, boxes, rideables, walking_kmh(people[pid]))
         e["review"] = verdicts.get(pid)
+    return reused, len(verdicts)
+
+
+def saved_reply(crop):
+    """The bytes of Spark's reply saved beside a person crop (review.review), or None."""
+    path = crop.with_suffix(".json")
+    return path.read_bytes() if path.exists() else None
 
 
 def evidence_events(events):
@@ -656,7 +665,10 @@ def main():
     write_events(out_dir, site, events, seen, cost(), full, source_sha256=source,
                  run=run_record(out_dir, started, before), timeline=timeline, paths=paths, walking=walk,
                  recording_s=recording_s)
-    review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size, top_down)
+    reused, reviewed = review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size,
+                                     top_down)
+    if reviewed:  # same footage, same numbers: delete person-*.json for a fresh look
+        print(f"Spark verdicts reused: {reused} of {reviewed}", flush=True)
     everyone, privacy, searched = list(person_boxes.values()), None, []
     # with no events this searches frame 0 only (one image): the street photo is still shown for the desire lines
     if person_concept not in crowded + list(switched) and full_requests(pieces, [(person_concept, grid)], frame_size)[0]:
@@ -665,7 +677,8 @@ def main():
     add_evidence(args.video, clip, out_dir, events, people, vehicles, person_boxes, vehicle_boxes, key, frame_size,
                  everyone, (window or [0.0])[0])
     write_events(out_dir, site, events, seen, cost(len(searched)), full, privacy, source,
-                 run_record(out_dir, started, before), timeline, paths, walk, recording_s)
+                 {**run_record(out_dir, started, before), "spark_reviewed": reviewed, "spark_reused": reused}, timeline,
+                 paths, walk, recording_s)
     report(seen, events, untrusted)
 
 

@@ -3311,6 +3311,47 @@ def test_page_reads_without_colour_and_on_a_phone():
     assert "22 minutes of video" in pack.stats([], {"minutes": 22.0, "vehicles": 3})[1]
 
 
+def test_a_saved_verdict_is_reused_until_its_inputs_change_and_a_failure_is_not_saved():
+    """Spark's and Wonder's raw replies are kept by the SHA-256 of each input and parsed again on every read; a failed
+    call or an unreadable reply is not kept. analyze counts the verdicts it reused; Wonder's go to event<N>-heard.json."""
+    import analyze, seal, subprocess, tempfile
+    from pathlib import Path
+    adult = '{"cyan_is_a_pedestrian": true, "road_user": "adult", "reason": "walking"}'
+    with tempfile.TemporaryDirectory() as tmp:
+        path, asked = Path(tmp, "person-1.json"), []
+        ask = lambda *_: asked.append(1) or adult
+        assert seal.reused(path, [b"crop", "model"], ask, review.read_verdict)["road_user"] == "adult"
+        assert seal.reused(path, [b"crop", "model"], ask, review.read_verdict)["road_user"] == "adult"
+        fixed = lambda text: {**review.read_verdict(text), "fixed": True}  # a later parser fix reads the saved reply
+        assert seal.reused(path, [b"crop", "model"], ask, fixed)["fixed"] and len(asked) == 1
+        assert seal.reused(path, [b"other crop", "model"], ask, review.read_verdict) and len(asked) == 2
+        assert seal.inputs_sha256([b"ab", b"c"]) != seal.inputs_sha256([b"a", b"bc"])
+        for failed in (lambda: None, lambda: "no json"):  # a dropped call, an unreadable reply: asked again next run
+            assert seal.reused(Path(tmp, "x.json"), [b"crop"], failed, review.read_verdict) is None
+            assert not Path(tmp, "x.json").exists()
+
+        def crop(clip, track, size, out):
+            out.write_bytes(b"the same crop")
+            return out
+        video = Path(tmp, "v.mp4")
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=4", "-c:a", "aac",
+                        str(video)], check=True)
+        old = review.person_crop, review.ask, listen.hear
+        review.person_crop, review.ask = crop, ask
+        listen.hear = lambda *_: asked.append(1) or '{"sounds": [{"t_s": 3.0, "sound": "horn"}]}'
+        try:
+            runs = [analyze.review_people(None, Path(tmp), [{"person": "7/0"}], {"7/0": {f: (0.14 * f, 0.0)
+                                          for f in range(20)}}, {"7": {5: [100, 100, 120, 140]}}, {}, None,
+                                          (640, 360), False) for _ in range(2)]
+            heard = [listen.listen(video, {"t_person_s": 2.0, "t_vehicle_s": 2.5}, Path(tmp, "event1.wav"), "key")
+                     for _ in range(2)]
+        finally:
+            review.person_crop, review.ask, listen.hear = old
+        assert runs == [(0, 1), (1, 1)] and Path(tmp, "person-7-0.json").exists()
+        assert heard[0] == heard[1] == [{"t_s": 1.0, "sound": "horn"}] and Path(tmp, "event1-heard.json").exists()
+        assert len(asked) == 4  # one Spark look and one Wonder listen for the two runs
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):

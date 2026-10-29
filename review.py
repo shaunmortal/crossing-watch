@@ -12,6 +12,7 @@ import urllib.request
 
 import road
 import sam
+import seal
 
 MODEL = "muse-spark-1.3"
 TIMEOUT_S = 120
@@ -91,6 +92,7 @@ def person_crop(clip, person_track, frame_size, out_path):
 
 
 def ask(image_path, api_key, top_down=False):
+    """Spark's raw reply text about one crop ("" when it held no message), or None if the call failed."""
     url = "data:image/jpeg;base64," + base64.b64encode(image_path.read_bytes()).decode()
     body = json.dumps({"model": MODEL, "reasoning": {"effort": "minimal"}, "text": {"format": {"type": "json_object"}},
                        "input": [{"role": "user", "content": [
@@ -104,13 +106,16 @@ def ask(image_path, api_key, top_down=False):
     except (OSError, ValueError, http.client.HTTPException) as err:  # URLError and JSONDecodeError included
         print(f"review failed for {image_path.name}: {err}", flush=True)
         return None
-    text = "".join(c.get("text", "") for o in reply.get("output", []) if o.get("type") == "message"
+    return "".join(c.get("text", "") for o in reply.get("output", []) if o.get("type") == "message"
                    for c in o.get("content", []) if isinstance(c, dict)) if isinstance(reply, dict) else ""
-    return read_verdict(text)
 
 
 def review(clip, person_track, frame_size, out_path, api_key, top_down=False):
-    """Spark's verdict on one tracked pedestrian (None if the call or its reply failed)."""
+    """Spark's verdict on one tracked pedestrian (None if the call or its reply failed). Its reply is kept beside the
+    crop (`out_path` as .json) and read again while the crop, model and prompt are the same, so a re-run neither pays
+    again nor changes the counts a signed letter quotes; delete the .json to make Spark look again."""
     if not person_track:
         return None
-    return ask(person_crop(clip, person_track, frame_size, out_path), api_key, top_down)
+    crop = person_crop(clip, person_track, frame_size, out_path)
+    return seal.reused(out_path.with_suffix(".json"), [crop.read_bytes(), MODEL, PROMPT, VIEWS[top_down]],
+                       lambda: ask(crop, api_key, top_down), read_verdict)
