@@ -204,6 +204,24 @@ def test_evidence_clip_runs_until_the_vehicle_arrives():
     assert calls[0][calls[0].index("-ss") + 1] == "1.000" and calls[0][calls[0].index("-frames:v") + 1] == "66"
 
 
+def test_footsteps_stay_on_screen_and_the_meeting_spot_appears_with_the_first_arrival():
+    walker = {f: [100 + 4 * f, 50, 120 + 4 * f, 150] for f in range(10, 16)}  # walking right, feet at y = 150
+    car_first = {"t_person_s": 1.4, "t_vehicle_s": 1.2}
+    dots = render.trail_filters(walker, car_first, 10, 10, 16)
+    assert dots[0] == "drawbox=x=147:y=147:w=6:h=6:color=cyan:t=fill:enable='gte(n,0)'"  # bottom centre, from frame 0
+    assert [d.split("enable=")[1] for d in dots] == ["'gte(n,0)'", "'gte(n,2)'", "'gte(n,4)'", "'gte(n,2)'"]
+    assert dots[-1] == "drawbox=x=159:y=143:w=14:h=14:color=yellow:t=fill:enable='gte(n,2)'"  # feet at 1.4 s, from 1.2 s
+    assert render.foot([0, 0, 10, 20], top_down=True) == (5.0, 10.0) and render.trail_filters({}, car_first, 10, 0, 5) == []
+    calls, old = [], render.subprocess.run
+    render.subprocess.run = lambda args, **kwargs: calls.append(args)
+    try:
+        render.render("clip.mp4", car_first, walker, {12: [0, 0, 50, 30]}, 10, "event1.mp4")
+    finally:
+        render.subprocess.run = old
+    filters = calls[0][calls[0].index("-vf") + 1]
+    assert filters.count("t=fill") == 4 and filters.index("t=fill") < filters.index("t=3")  # boxes drawn over the dots
+
+
 def test_spark_verdicts_are_validated():
     ok = review.read_verdict('Sure: {"cyan_is_a_pedestrian": false, "road_user": "not a person", "reason": "a pole"}')
     assert ok == {"is_person": False, "road_user": "not a person", "reason": "a pole"}
@@ -236,6 +254,7 @@ def test_page_links_find_an_event_card_and_its_moment():
                                                "20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}}}
     assert '<article class="card" id="event-3" data-t="2.00">' in pack.event_card(3, e, 10)  # clip starts at 1.5 s
     assert 'data-t="1.00"' in pack.event_card(1, e | {"t_vehicle_s": 1.0}, 10)  # clip starts at 0, not -1 s
+
 
 
 def test_long_videos_are_tracked_in_overlapping_parts_and_ids_joined():
