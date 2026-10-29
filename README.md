@@ -9,6 +9,12 @@ than 1.5 seconds apart. It measures the vehicle's speed, the adult death risk ha
 clips, numbers, a proposed fix drawn onto the real street, and a ready letter. That is proof before a child is
 hit, instead of waiting for crash statistics.
 
+## Status
+
+Not filed yet. The pack goes to the road authority by hand on Mon 2 or Tue 3 Nov 2026, in a named person's name.
+Its reference number will be added here and in the site file's `"submitted"` key. Only "filed, reference X" is ever
+written: whether anything is approved or fixed is for the authority to say, and no resolution date is promised.
+
 ## How it works
 
 | Step | Model or method | File |
@@ -35,8 +41,32 @@ Needs Python 3.11+ and ffmpeg. No other dependencies. Put `MODEL_API_KEY=...` (M
 open calibrate.html                      # tape-measured rectangle, or no tape: match 4 points to a satellite view
 python3 analyze.py VIDEO site.json       # tracks, near-misses, clips, Spark review -> out/VIDEO/events.json
 python3 pack.py out/VIDEO site.json      # letter, fix image, evidence page -> out/VIDEO/index.html
+python3 pack.py out/VIDEO site.json --notes notes.txt                                  # the principal's notes
+python3 pack.py out/VIDEO site.json --approved-by "A. Rao, Principal" --school "..."   # sign the letter as it is
 python3 test_cw.py                       # self-checks
 ```
+
+**Signed and filed.** `pack.py` keeps the fix and letter in `out/VIDEO/plan.json` with the sha256 of the prompt they
+came from. A re-run from the same measurements, language and letter model reuses it, and the Muse Image picture of the
+same fix: no new Spark or Muse Image call. Other measurements ask for a new letter; to ask again anyway, delete
+`plan.json`.
+
+- `--notes FILE` sends the principal's notes back with the letter: "change only the sentences the notes ask for". The
+  revised letter goes through both checks again (the legal-agent workshop's "Reject with notes"). The notes reach
+  the code check and the judge labelled "stated by the principal, not measured", so the school's own facts (say, its
+  number of pupils) are not rejected, and the page then says the letter was drafted from the measurements and the
+  principal's notes. Notes can be given more than once.
+- `--approved-by` with `--school` writes `signoff.json`: the name, school, date and the sha256 of the exact letter.
+  The page fills in "Read and approved by" with them and says how many sentences the notes changed, counted by
+  difflib against the first AI draft ("N of M sentences changed after the principal's notes"). If the letter
+  changes after that, the page says "changed after sign-off, not signed". Signing asks no model.
+- Once the pack is filed, `"submitted": {"to": ..., "channel": ..., "date": ..., "reference": ...}` in the site file
+  prints "Filed with {to} on {channel}, {date}: reference {reference}." under the title.
+- The page says where it fits in the CDC/FIA school-zone Traffic Conflict Technique toolkit: steps 5-7 (baseline
+  counts, pre-intervention conflicts, analysis), without the trained observers step 3 normally needs, with a
+  severity that is not the toolkit's observer scales; step 9 is the same film again after the fix.
+- Printed, the page keeps light colours even in dark mode, shows only the 3 worst near-misses (a letter number from
+  another reads "(clip N, not printed)") and puts the letter on its own sheet.
 
 Filming your own crossing: [`FILMING.md`](FILMING.md) (phone locked at 1080p 30 fps, tape marks, consent notice; `python3 filmcheck.py CLIP` checks the test clip).
 
@@ -190,11 +220,13 @@ The DUT data has no licence and was used only for internal testing; it is not in
 - Ministry of Road Transport and Highways (MoRTH), Road Accidents in India 2023, Annexure 46 (the 50 million-plus
   cities). The morth.nic.in link no longer serves the PDF; mirror: https://data.opencity.in/dataset/road-accidents-in-india-2023
 - UK Department for Transport (2019), Traffic Signs Manual chapter 6, section 13.5 (gaps in traffic).
+- Traffic Conflict Technique (TCT) toolkit, school zones (CDC/FIA), one-pager:
+  https://www.childhealthinitiative.org/media/v5bntgmp/tct-toolkit__one-pager_final_508_updated.pdf
 - Tefft BC (2013). Impact speed and a pedestrian's risk of severe injury or death. *Accident Analysis & Prevention* 50:871–878. doi:10.1016/j.aap.2012.07.022 (checked; higher risks than Rosén & Sander, which we use to avoid overstating)
 
 ## Declarations
 
-All code in this repository was written during the hackathon. The check-then-retry pattern for Spark's letter and the
-JSON-mode request field follow Meta's legal-agent workshop (github.com/meta-models/legal-agent-workshop, shown at a
+All code in this repository was written during the hackathon. The check-then-retry pattern for Spark's letter, the
+reject-with-notes revision and the JSON-mode request field follow Meta's legal-agent workshop (github.com/meta-models/legal-agent-workshop, shown at a
 hackathon session); no code was copied from it. No third-party code or libraries; Python standard
 library and ffmpeg only. Test videos from YouTube were used only for local testing and are not included. The SinD sample (SOTIF-AVLab, non-commercial use) was used only for validation and is not included.
