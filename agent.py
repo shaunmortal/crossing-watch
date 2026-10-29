@@ -7,7 +7,9 @@ Run: python3 agent.py VIDEO SITE.json [--out DIR]               start, or contin
                                                                 the head of the school signs the letter off
      python3 agent.py VIDEO SITE.json --reject --notes "..."    ...or sends it back with notes
 The case lives in DIR/case/: progress.json (the whole conversation, so a stopped case resumes) and agent_log.jsonl (one
-line per step). analyze.py and pack.py never call the agent: without this script nothing changes. Its tracking
+line per step). With AGENT_MODEL_URL set, an open-weights model takes the turns instead (openagent.py, e.g. Muse Spark
+Open on Fireworks), and MODEL_API_KEY is needed only for what Muse Spark does in the tools. analyze.py and pack.py
+never call the agent: without this script nothing changes. Its tracking
 re-reads the SAM replies an earlier analyze.py run cached (--budget 0): new SAM requests that round to a cent or more
 stop the run, and the tool fails instead of paying.
 The site file marks the distance to tape, in clip pixels, along the road and apart from the calibration points (kerb
@@ -24,11 +26,13 @@ import math
 import re
 import subprocess
 import sys
+import time
 import urllib.request
 from pathlib import Path
 
 import analyze
 import fixband
+import openagent
 import pace
 import pack
 import review
@@ -36,6 +40,7 @@ import road
 import roadmap
 import sam
 import seal
+import writers_table
 
 MAX_TURNS = 25           # model turns per start or resume (the workshop's turn limit); then the case pauses
 MAX_USD = 1.00           # estimated Spark spend on agent turns per case; tracking and pack.ask_plan's calls are apart
@@ -47,6 +52,7 @@ MAX_REFUSALS = 3         # submit_letter refused this often in a row: a person i
 CHECK_TOLERANCE = 0.15   # GATES.md G2: a distance not used for calibration agrees with the tape within 15%
 TAPE = re.compile(r"\s*([0-9]+(?:\.[0-9]+)?)\s*(m|cm)\s*", re.I)  # the whole answer: "7.2 m", "7.2m" or "720 cm"
 LOG = "agent_log.jsonl"
+SPARK = "Muse Spark"     # who takes the turns without AGENT_MODEL_URL
 HEAD_NOTES = ("notes", "draft_letter")  # what a revised letter keeps of the one sent back, as pack.new_plan does
 # a sent-back letter on the public page: the notes may name a pupil or a teacher, so only agent_log.jsonl keeps them
 NOTES_HIDDEN = "The head of the school sent the letter back with notes (kept in the case log, not shown here)."
@@ -279,6 +285,36 @@ def run_tool(p, call, key):
         return {"summary": f"{call.get('name')} failed: {str(err)[:300]}"}
 
 
+def model_label():
+    return openagent.label() if openagent.URL else SPARK
+
+
+def rates():
+    """USD per 1M input / output tokens for the turns (cached input counted in full, as for Spark)."""
+    return (openagent.quote()[0], openagent.quote()[2]) if openagent.URL else (USD_PER_M_IN, USD_PER_M_OUT)
+
+
+def model_turn(p, key):
+    """One turn: (the tool call or None, the usage), from Muse Spark on the Meta API or, with AGENT_MODEL_URL, from
+    openagent (Chat Completions; the Meta key never goes there)."""
+    if openagent.URL:
+        return openagent.step(INSTRUCTIONS, p["messages"], TOOLS)
+    body = {"model": review.MODEL, "instructions": INSTRUCTIONS, "input": p["messages"], "tools": TOOLS,
+            "parallel_tool_calls": False, "store": False, "reasoning": {"effort": "low"}}
+    reply = spark_turn(body, key)
+    call = next((o for o in reply.get("output") or [] if o.get("type") == "function_call"), None)
+    return call, reply.get("usage") or {}
+
+
+def replay(call, result):
+    """The call and its output for the next turn: only these are replayed, reasoning is not kept with store=False."""
+    if openagent.URL:
+        return openagent.replay(call, result)
+    arguments = call.get("arguments") if isinstance(call.get("arguments"), str) else json.dumps(call.get("arguments"))
+    return [{"type": "function_call", "call_id": call.get("call_id"), "name": call.get("name"), "arguments": arguments},
+            {"type": "function_call_output", "call_id": call.get("call_id"), "output": json.dumps(result)}]
+
+
 def spark_turn(body, key):
     req = urllib.request.Request(sam.API_URL, data=json.dumps(body).encode(), headers={
         "Authorization": f"Bearer {key}", "Content-Type": "application/json"})
@@ -306,31 +342,28 @@ def drive(p, key):
             p["status"] = "over_budget"
             save(p, {"summary": f"Stopped: agent turns cost about ${p['usd']:.2f}, the cap is ${MAX_USD:.2f}."})
             return p["status"]
-        body = {"model": review.MODEL, "instructions": INSTRUCTIONS, "input": p["messages"], "tools": TOOLS,
-                "parallel_tool_calls": False, "store": False, "reasoning": {"effort": "low"}}
+        started = time.monotonic()
         try:
-            reply = spark_turn(body, key)
+            call, usage = model_turn(p, key)
         except (OSError, ValueError, http.client.HTTPException) as err:  # URLError and JSONDecodeError included
             p["status"] = "paused"
             save(p, {"summary": f"Paused: the model call failed ({str(err)[:200]})."})
             return p["status"]
-        usage = reply.get("usage") or {}
-        used_in, used_out = usage.get("input_tokens") or 0, usage.get("output_tokens") or 0
-        p["usd"] += (used_in * USD_PER_M_IN + used_out * USD_PER_M_OUT) / 1e6
+        wall_s = round(time.monotonic() - started, 1)
+        used_in, _, used_out, _ = (n or 0 for n in writers_table.tokens(usage))
+        usd_in, usd_out = rates()
+        p["usd"] += (used_in * usd_in + used_out * usd_out) / 1e6
         p["turn"] += 1
-        call = next((o for o in reply.get("output") or [] if o.get("type") == "function_call"), None)
-        if call:  # only the call and its output are replayed: reasoning items are not kept with store=False
+        if call:
             result = run_tool(p, call, key)
-            arguments = call.get("arguments") if isinstance(call.get("arguments"), str) else json.dumps(call.get("arguments"))
-            p["messages"] += [{"type": "function_call", "call_id": call.get("call_id"), "name": call.get("name"),
-                               "arguments": arguments},
-                              {"type": "function_call_output", "call_id": call.get("call_id"), "output": json.dumps(result)}]
+            p["messages"] += replay(call, result)
         else:
             result = {"summary": "Answered in plain text; told to call exactly one tool."}
             p["messages"].append({"role": "user", "content": NUDGE})
         p["status"] = result.get("status", "running")
         save(p, {"turn": p["turn"], "tool": call and call.get("name"), "summary": result["summary"],
-                 "status": p["status"], "input_tokens": used_in, "output_tokens": used_out, "usd": round(p["usd"], 4)})
+                 "status": p["status"], "model": model_label(), "input_tokens": used_in, "output_tokens": used_out,
+                 "usage": usage, "wall_s": wall_s, "usd": round(p["usd"], 4)})
         if p["status"] == "needs_review":
             write_page(p)
         if p["status"] != "running":
@@ -349,8 +382,11 @@ def case_section(out_dir):
     items = "".join(f"<li>{step_time(s)}{'Person: ' if s.get('person') else ''}"
                     f"{html.escape(NOTES_HIDDEN if s.get('person') == 'reject' else s['summary'])}</li>" for s in steps)
     turns, usd = sum("turn" in s for s in steps), max([s.get("usd", 0) for s in steps] or [0])
-    return (f'<section id="case"><h2>How the agent worked this case</h2><ol>{items}</ol><p class="note">Muse Spark '
-            f"chose one tool per turn: {turns} turns, about ${usd:.2f}, estimated at the {PRICE}, with cached input "
+    model = next((s["model"] for s in steps if s.get("model")), SPARK)  # work() keeps one model per case
+    price = PRICE if model == SPARK else openagent.price_words()
+    return (f'<section id="case"><h2>How the agent worked this case</h2><ol>{items}</ol><p class="note">'
+            f"{html.escape(model)} chose one tool per turn: {turns} turns, about ${usd:.2f}, estimated at the "
+            f"{html.escape(price)}, with cached input "
             "counted at the full input price. Tracking (SAM, Spark's pedestrian reviews, the sound check) is billed "
             "apart and is not in this figure. Steps marked Person were a person's answers.</p></section>")
 
@@ -464,9 +500,14 @@ def work(video, site, out_dir, key, answer=None, approve=None, notes=None):
     case_dir.mkdir(parents=True, exist_ok=True)
     p = json.loads(saved.read_text()) if saved.exists() else {
         "video": str(Path(video).resolve()), "site": str(Path(site).resolve()), "out": str(out_dir), "status": "new",
-        "turn": 0, "usd": 0.0, "messages": [], "requests": [], "tape_m": None, "refusals": 0, "letter": None}
+        "turn": 0, "usd": 0.0, "messages": [], "requests": [], "tape_m": None, "refusals": 0, "letter": None,
+        "agent_model": model_label()}
     if p["video"] != str(Path(video).resolve()):
         raise SystemExit(f"{case_dir} is the case of {p['video']}; pass a new --out folder")
+    if p.get("agent_model", SPARK) != model_label():  # its messages are in that model's API format
+        raise SystemExit(f"{case_dir} is a case {p.get('agent_model', SPARK)} worked, not {model_label()}: set "
+                         "AGENT_MODEL_URL and AGENT_MODEL as it ran, or pass a new --out folder")
+    rates()  # an unpriced open model stops here, before any turn
     message = person_step(p, key, answer, approve, notes)
     if not message:
         return p["status"]
@@ -495,7 +536,8 @@ def main():
     if args.approve and args.reject:
         parser.error("--approve or --reject, not both")
     out_dir = Path(args.out or Path("out") / Path(args.video).stem)
-    status = work(args.video, args.site, out_dir, sam.load_api_key(), args.answer, signer if args.approve else None,
+    key = sam.env_value("MODEL_API_KEY") if openagent.URL else sam.load_api_key()  # Spark's tools still use it
+    status = work(args.video, args.site, out_dir, key, args.answer, signer if args.approve else None,
                   args.notes)
     print(f"case {status}: {out_dir / 'case' / 'progress.json'}")
 
