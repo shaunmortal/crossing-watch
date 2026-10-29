@@ -402,8 +402,9 @@ def shown_frames(events, total):
 def search_heads(site, clip, out_dir, events, total, pieces, key, budget):
     """When a SAM video request for people was full, people who came later have no track, so no blur. SAM image
     search looks for them, as crowd mode would, on the person frames within one sample of a shown frame (so the boxes
-    filled in between samples cover each one), within `budget` dollars (check_cost). Returns (their tracks, the
-    frames searched)."""
+    filled in between samples cover each one), within `budget` dollars (check_cost). Each found box is also held on the
+    frames up to the next sample either side that have none, so the last frame of a clip and the frames next to a
+    person seen on one sample are covered too. Returns (their tracks, the frames searched)."""
     person = site.get("person", "person")
     sampled, shown = crowd_frames(site, person, total), shown_frames(events, total)
     frames = [f for f in sampled if not shown.isdisjoint(range(f - sampled.step + 1, f + sampled.step))]
@@ -412,7 +413,9 @@ def search_heads(site, clip, out_dir, events, total, pieces, key, budget):
           "the people it missed", flush=True)
     check_cost(pieces, [], None, total, budget, sum(not (cache / f"{f:06d}.sam.txt").exists() for f in frames),
                len(frames))
-    return crowd.track(clip, frames, FPS, person, key, cache), frames
+    near = lambda f: (g for d in range(1, sampled.step) for g in (f - d, f + d) if 0 <= g < total)
+    found = crowd.track(clip, frames, FPS, person, key, cache)
+    return {tid: {**{g: b for f, b in t.items() for g in near(f)}, **t} for tid, t in found.items()}, frames
 
 
 def heads(person_boxes, found, frames):

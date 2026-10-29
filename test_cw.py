@@ -701,6 +701,26 @@ def test_heads_a_full_video_request_missed_are_searched_on_every_published_frame
     assert pack.privacy_note(None) == ""
 
 
+def test_found_heads_cover_the_last_published_frame_and_frames_next_to_a_lone_sample():
+    import contextlib, io, tempfile
+    from pathlib import Path
+    import analyze, crowd
+    site = {"person": "person", "vehicles": ["car"]}
+    events = [{"t_person_s": 13.0, "t_vehicle_s": 13.5}]  # its clip runs to the end of a 150-frame clip
+    shown = analyze.shown_frames(events, 150)
+    assert max(shown) == 149  # an odd frame: samples are 0, 2, ..., 148
+    real = crowd.track  # the search sees one person on every sample, a new short track each time (it flickers)
+    crowd.track = lambda clip, frames, fps, concept, key, cache: {f"c{f}": {f: [0, 0, 9, 30]} for f in frames}
+    try:
+        with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stdout(io.StringIO()):
+            found, searched = analyze.search_heads(site, None, Path(tmp), events, 150, [(0, None, Path(tmp))], None, 1.0)
+    finally:
+        crowd.track = real
+    boxed = {f for t in found.values() for f in t}
+    assert shown <= boxed and max(boxed) == 149  # every published frame has a box, none past the clip
+    assert analyze.heads({}, found, searched)[1] == {"heads_tracked": 0, "heads_found": 1}  # counts on samples only
+
+
 def test_crowd_tracker_keeps_ids_through_a_short_gap_and_apart_from_neighbours():
     import crowd
     walker = lambda x0: {f: [x0 + 2 * f, 100, x0 + 2 * f + 20, 160] for f in range(0, 40, 2)}

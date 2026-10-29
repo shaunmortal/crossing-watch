@@ -157,7 +157,7 @@ def privacy_note(privacy):
     counts = html.escape(f"up to {privacy['heads_tracked']} heads a frame blurred from tracks + up to "
                          f"{privacy['heads_found']} found by SAM image search")
     return (f'<p class="note">Faces in the clips and the street photo: {counts} (a SAM video request for people was '
-            "full, so each published frame was searched image by image).</p>")
+            "full, so the published clips were searched image by image every 0.2 s, with boxes filled in between).</p>")
 
 
 def unmeasured(text, facts_text):
