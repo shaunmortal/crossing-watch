@@ -49,8 +49,9 @@ def load_tracks(site, out_dir):
     frame_size = tuple(int(v) for v in analyze.probe(clip, "stream=width,height").split(","))
     total = analyze.frame_count(clip)
     pieces = analyze.parts(clip, out_dir, total)
+    switched = analyze.auto_switch(site, pieces, analyze.video_plan(site), None, frame_size)  # as analyze.py did
     tracks_of = lambda concept, grid=1: analyze.concept_tracks(site, concept, clip, total, pieces, out_dir, None,
-                                                               frame_size, grid)
+                                                               frame_size, grid, switched)[0]
     person_boxes = tracks_of(site.get("person", "person"), site.get("person_grid", 1))
     vehicle_boxes = {f"{c}#{vid}": t for c in site["vehicles"] for vid, t in tracks_of(c).items()}
     H = road.homography(site["image_points"], site["world_points"])
@@ -196,7 +197,8 @@ def main():
     for name, _, e in clips:
         render.render(out_dir / "clip.mp4", blind_window(e, total),
                       analyze.piece_boxes(person_boxes, people, e["person"]), vehicle_boxes[e["vehicle"]], analyze.FPS,
-                      to / "blind" / name, everyone=list(person_boxes.values()), frame_size=frame_size)
+                      to / "blind" / name, everyone=list(person_boxes.values()), frame_size=frame_size,
+                      vehicles=list(vehicle_boxes.values()))
         if analyze.frame_count(to / "blind" / name) != round(CLIP_S * analyze.FPS) + 1:  # a shorter clip gives it away
             raise SystemExit(f"{to / 'blind' / name} is not {CLIP_S:g} s long: no key written, do not hand it out")
     (to / "blind" / "index.html").write_text(page([name for name, _, _ in clips]))

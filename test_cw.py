@@ -586,7 +586,7 @@ def test_headline_counts_each_person_who_crossed_once():
     seen = road.exposure({"p/0": walking_across(40), "p/1": walking_across(40), "q/0": walking_across(40)}, {}, 10, 600)
     assert seen["crossers"] == ["p", "q"] and seen["crossings"] == 2
     hit = lambda person, pet: {"person": person, "vehicle": f"car#{pet}", "pet_s": pet, "vehicle_kmh": 30.0,
-                               "death_risk_pct": 1.5, "with_limit": {"20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}},
+                               "t_person_s": 5.0, "t_vehicle_s": 5.0 + pet, "death_risk_pct": 1.5, "with_limit": {"20": {"impact_kmh": 9.9, "death_risk_pct": 0.2}},
                                "tier": "serious" if pet < road.PET_MAX_S else "close pass"}
     events = [hit("c1/0", 0.4), hit("c1/1", 2.0), hit("c1/0", 1.0), hit("c2/0", 2.5), hit("pole/0", 0.1)]
     seen = {"minutes": 1.0, "duration_s": 60.0, "crossings": 9, "crossers": [f"c{i}" for i in range(1, 10)]}
@@ -1703,6 +1703,28 @@ def test_blind_set_hides_near_misses_among_spark_checked_decoys_in_same_length_c
     assert page.count('type="radio"') == 16 and "new Blob" in page and "localStorage" in page
     assert not any(word in page for word in ("decoy", "pet_s", "car#", "e/0"))  # nothing on the page gives a clip away
 
+
+
+def test_blind_set_rebuilds_tracks_from_cache_with_auto_modes_switch():
+    """blind_set's tracks are analyze's: concept_tracks gives (tracks, detected), and an auto-mode concept that
+    filled its SAM video requests is read frame by frame, as analyze.py read it."""
+    import analyze, blind_set
+    from pathlib import Path
+    site = {"person": "person", "vehicles": ["car"], "image_points": SQUARE_IMG, "world_points": SQUARE_ROAD}
+    calls, saved = [], {n: getattr(analyze, n) for n in ("probe", "frame_count", "parts", "auto_switch",
+                                                         "concept_tracks", "road_tracks")}
+    try:
+        analyze.probe, analyze.frame_count, analyze.parts = (lambda *a: "64,48"), (lambda clip: 50), (lambda *a: [])
+        analyze.auto_switch = lambda *a: {"person": 1.6}
+        analyze.concept_tracks = lambda site, concept, *a: (calls.append((concept, a[-1])) or
+                                                             ({0: {1: [0, 0, 1, 1]}}, {0: {1: [0, 0, 1, 1]}}))
+        analyze.road_tracks = lambda site, H, people, vehicles, size: ({"0/0": people[0]}, vehicles)
+        people, vehicles, pieces, shapes, size, total = blind_set.load_tracks(site, Path("x"))
+    finally:
+        for n, f in saved.items():
+            setattr(analyze, n, f)
+    assert people == {0: {1: [0, 0, 1, 1]}} and vehicles == {"car#0": {1: [0, 0, 1, 1]}} and (size, total) == ((64, 48), 50)
+    assert calls == [("person", {"person": 1.6}), ("car", {"person": 1.6})]
 
 def test_score_humans_scores_danger_against_none_with_kappa_and_wilson():
     import score_humans, tempfile
