@@ -43,16 +43,22 @@ def refuse(*args):
 
 def load_tracks(site, out_dir):
     """(person boxes, vehicle boxes, pedestrian pieces, vehicle shapes, frame size, frame count) as analyze.py built
-    them, from its cached SAM replies only."""
+    them, from its cached SAM replies only. Refuses when a SAM video request for people was full: people who came
+    later have no track, so their faces would go to the rater unblurred."""
     sam.request = crowd.request = refuse
     clip = out_dir / "clip.mp4"
     frame_size = tuple(int(v) for v in analyze.probe(clip, "stream=width,height").split(","))
     total = analyze.frame_count(clip)
     pieces = analyze.parts(clip, out_dir, total)
     switched = analyze.auto_switch(site, pieces, analyze.video_plan(site), None, frame_size)  # as analyze.py did
+    person, grid = site.get("person", "person"), site.get("person_grid", 1)
+    if person not in analyze.crowd_concepts(site) + list(switched) and \
+            analyze.full_requests(pieces, [(person, grid)], frame_size)[0]:
+        raise SystemExit(f"a SAM video request for {person} hit the {sam.MAX_OBJECTS}-object limit, so some faces have "
+                         'no track to blur: analyze this video with "person_mode": "crowd" first')
     tracks_of = lambda concept, grid=1: analyze.concept_tracks(site, concept, clip, total, pieces, out_dir, None,
                                                                frame_size, grid, switched)[0]
-    person_boxes = tracks_of(site.get("person", "person"), site.get("person_grid", 1))
+    person_boxes = tracks_of(person, grid)
     vehicle_boxes = {f"{c}#{vid}": t for c in site["vehicles"] for vid, t in tracks_of(c).items()}
     H = road.homography(site["image_points"], site["world_points"])
     return (person_boxes, vehicle_boxes, *analyze.road_tracks(site, H, person_boxes, vehicle_boxes, frame_size),
@@ -125,9 +131,9 @@ fieldset {{ border: 0; padding: 8px 0; }} article {{ border-top: 1px solid #8886
 input[type=text] {{ width: 100%; font: inherit; padding: 6px; box-sizing: border-box; }}
 button {{ font: inherit; padding: 8px 16px; }}</style></head><body><form>
 <h1>Blind check: {len(names)} clips</h1>
-<p>Each clip shows one person in a <b>cyan</b> box and one vehicle in a <b>red</b> box; faces are blurred. Judge only
-those two. Some clips were flagged by software as near-misses and some were not; you are not told which, and the
-order is random. Watch each clip as often as you like.</p>
+<p>Each clip shows one person in a <b>cyan</b> box and one vehicle in a <b>red</b> box; the faces SAM found are
+blurred. Judge only those two. Some clips were flagged by software as near-misses and some were not; you are not told
+which, and the order is random. Watch each clip as often as you like.</p>
 <label>Your name and role (for example: A. Rao, transport lecturer)<input type="text" name="rater"></label>
 {cards}<p id="status"></p><button type="button" id="save">Download answers</button></form>
 <script>{{
@@ -204,7 +210,8 @@ def main():
     (to / "blind" / "index.html").write_text(page([name for name, _, _ in clips]))
     (to / "blind-key.json").write_text(json.dumps(key_record(clips), indent=1))
     print(f"wrote {to / 'blind'}: {len(near)} near-misses and {len(fakes)} decoys, shuffled; the key is "
-          f"{to / 'blind-key.json'}: keep it away from the rater")
+          f"{to / 'blind-key.json'}: keep it away from the rater. Blurred are the faces SAM found: watch every "
+          "clip before handing it out")
 
 
 if __name__ == "__main__":

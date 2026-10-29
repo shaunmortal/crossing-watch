@@ -2,7 +2,10 @@
 out/
 __pycache__/
 *.mp4
-!docs/**/*.mp4
+# docs/ (GitHub Pages) may hold only the blurred evidence clips and hero shots, never clip.mp4 or blind clips
+!docs/**/event[0-9]*.mp4
+docs/**/person-*.jpg
+docs/**/blind*
 test-videos/
 data/
 .DS_Store

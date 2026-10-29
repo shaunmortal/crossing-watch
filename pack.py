@@ -271,8 +271,10 @@ def headline(events, seen, site):
     days, length = (site.get(key) for key in SCHOOL_YEAR)
     minutes = watched_minutes(seen)
     if all(isinstance(v, (int, float)) and v > 0 for v in (days, length)) and minutes >= MIN_RATE_MINUTES:
-        per_year = lambda k: f"{float(f'{k * length / minutes * days:.2g}'):,.0f}"  # "about": 2 significant figures
-        lines.append(f"If every dismissal is like this one: about {per_year(k3)} crossings a school year with a moving "
+        scaled = lambda count: f"{float(f'{count * length / minutes * days:.2g}'):,.0f}"  # 2 significant figures
+        # 0 seen is never 0 a year: Poisson's upper bound, scaled the same way
+        per_year = lambda k: f"about {scaled(k)}" if k else f"up to {scaled(poisson_range(0)[1])}"
+        lines.append(f"If every dismissal is like this one: {per_year(k3)} crossings a school year with a moving "
                      f"vehicle through the same spot within {s3:g} s, {per_year(k15)} within {s15:g} s ({days:g} school "
                      f"days, {length:g}-minute dismissals).")
     return lines
@@ -583,7 +585,8 @@ def photo_people(clip, person_concept="person"):
         raise ValueError(f"no person tracks for {clip}; not showing an unblurred street photo")
     if replies[0].parent != crowd.cache_dir(clip.parent, person_concept) and len(people) >= sam.MAX_OBJECTS:
         raise ValueError(f"SAM's video reply for people in {clip} is full and frame 0 was not searched image by image "
-                         "(run analyze.py again); not showing a street photo with unblurred faces")
+                         "(run analyze.py on this folder again: it now searches frame 0 even with no near-misses); "
+                         "not showing a street photo with unblurred faces")
     return people
 
 

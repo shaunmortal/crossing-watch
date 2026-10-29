@@ -598,8 +598,8 @@ def main():
                  run=run_record(out_dir, started, before), timeline=timeline, paths=paths)
     review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size, top_down)
     everyone, privacy, searched = list(person_boxes.values()), None, []
-    if events and person_concept not in crowded + list(switched) and \
-            full_requests(pieces, [(person_concept, grid)], frame_size)[0]:
+    # with no events this searches frame 0 only (one image): the street photo is still shown for the desire lines
+    if person_concept not in crowded + list(switched) and full_requests(pieces, [(person_concept, grid)], frame_size)[0]:
         found, searched = search_heads(site, clip, out_dir, events, total, pieces, key, cap - spent)
         everyone, privacy = heads(person_boxes, found, searched)
     add_evidence(args.video, clip, out_dir, events, people, vehicles, person_boxes, vehicle_boxes, key, frame_size,

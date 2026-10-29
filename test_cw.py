@@ -701,6 +701,43 @@ def test_budget_is_a_hard_cap_on_new_sam_spending():
                 assert "$0.04 is over the $0.04" in str(err) and "--budget" in str(err)
 
 
+def test_vehicle_concept_test_matches_vehicle_boxes_to_the_three_concepts_and_never_sends_without_spend():
+    """vehicle_test.py: a box two concepts both found counts once, each is found by one "vehicle" box at IoU 0.5,
+    and "vehicle" is adopted only at 95% recall. Nothing is sent without --spend."""
+    import contextlib, io, tempfile
+    from pathlib import Path
+    import crowd, vehicle_test
+    reply = lambda boxes: "<0f>" + ",".join(f"{i}<|box;x1={b[0]};y1={b[1]};x2={b[2]};y2={b[3]};w=640;h=360|>"
+                                            for i, b in enumerate(boxes))
+    car, bike, auto, bus = [0, 0, 40, 20], [100, 0, 120, 30], [200, 0, 230, 25], [300, 0, 380, 40]
+    cached = {"car": [car], "motorcycle": [bike, [1, 0, 41, 20]], "auto rickshaw": [auto]}  # the motorcycle one boxed the car too
+    real = crowd.request
+    crowd.request = lambda *a: (_ for _ in ()).throw(AssertionError("sent to SAM"))
+    try:
+        with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stdout(io.StringIO()):
+            out = Path(tmp)
+            for concept, boxes in cached.items():
+                crowd.cache_dir(out, concept).mkdir()
+                for f in (0, 2):
+                    (crowd.cache_dir(out, concept) / f"{f:06d}.sam.txt").write_text(reply(boxes))
+            try:
+                vehicle_test.main([tmp])
+                raise AssertionError("ran without --spend")
+            except SystemExit as err:
+                assert "--spend" in str(err)
+            crowd.cache_dir(out, "vehicle").mkdir()
+            for f, boxes in ((0, [car, bike, auto, bus]), (2, [car, bus])):
+                (crowd.cache_dir(out, "vehicle") / f"{f:06d}.sam.txt").write_text(reply(boxes))
+            result = vehicle_test.main([tmp])  # all cached: free, no --spend needed
+            assert json.loads((out / "vehicle-test-result.json").read_text()) == result
+    finally:
+        crowd.request = real
+    assert result["per_concept"] == {"car": {"found": 2, "of": 2}, "motorcycle": {"found": 1, "of": 2},
+                                     "auto rickshaw": {"found": 1, "of": 2}}
+    assert result["recall"] == 0.667 and not result["adopt"] and result["vehicle_boxes_matching_none"] == 2  # the bus
+    assert vehicle_test.ADOPT_RECALL == 0.95 and vehicle_test.spread(list(range(10)), 3) == [0, 4, 9]
+
+
 def test_auto_mode_switches_a_concept_whose_video_requests_fill_up():
     import tempfile
     from pathlib import Path
@@ -827,8 +864,13 @@ def test_school_year_line_needs_both_site_keys_and_15_minutes():
     school = {"school_days": 200, "dismissal_minutes": 30}
     year = pack.headline(events, seen, school)[-1]
     assert year == ("If every dismissal is like this one: about 300 crossings a school year with a moving vehicle "
-                    "through the same spot within 3 s, 300 within 1.5 s (200 school days, 30-minute dismissals).")
+                    "through the same spot within 3 s, about 300 within 1.5 s (200 school days, 30-minute dismissals).")
     assert "about 300 crossings" in pack.headline(events, seen, {**school, "school_days": 197})[-1]  # not 295.5
+    # 0 seen is never "about 0": Poisson's upper bound 3.69, scaled the same way (x 30 / 20 x 200)
+    close = [{**events[0], "pet_s": 2.0, "tier": "close"}]
+    assert ("about 300 crossings a school year with a moving vehicle through the same spot within 3 s, up to 1,100 "
+            "within 1.5 s") in pack.headline(close, seen, school)[-1]
+    assert pack.headline([], seen, school)[-1].startswith("If every dismissal is like this one: up to 1,100 crossings")
     assert not any("dismissal" in line for line in pack.headline(events, seen, {"school_days": 200}))
     short = {**seen, "minutes": 14.9, "duration_s": 894.0}
     assert not any("dismissal" in line for line in pack.headline(events, short, school))
@@ -1173,6 +1215,24 @@ def test_found_heads_cover_the_last_published_frame_and_frames_next_to_a_lone_sa
     assert analyze.heads({}, found, searched)[1] == {"heads_tracked": 0, "heads_found": 1}  # counts on samples only
 
 
+def test_a_clip_without_near_misses_still_gets_frame_0_searched_for_its_street_photo():
+    """With 0 events, a full people reply still gets its search: one image, frame 0, the street photo's frame."""
+    import contextlib, io, tempfile
+    from pathlib import Path
+    import analyze, crowd
+    site = {"person": "person", "vehicles": ["car"]}
+    real = crowd.track
+    crowd.track = lambda clip, frames, fps, concept, key, cache: {"c0": {f: [0, 0, 9, 30] for f in frames}}
+    try:
+        with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stdout(io.StringIO()):
+            found, searched = analyze.search_heads(site, None, Path(tmp), [], 100, [(0, None, Path(tmp))], None, 0.01)
+    finally:
+        crowd.track = real
+    assert searched == [0] and 0 in found["c0"]  # $0.0025, inside a $0.01 budget
+    source = Path(analyze.__file__).read_text()
+    assert "if events and person_concept" not in source  # main no longer skips the search when nothing happened
+
+
 def test_crowd_tracker_keeps_ids_through_a_short_gap_and_apart_from_neighbours():
     import crowd
     walker = lambda x0: {f: [x0 + 2 * f, 100, x0 + 2 * f + 20, 160] for f in range(0, 40, 2)}
@@ -1457,6 +1517,23 @@ def test_filed_reference_under_the_title_tct_steps_and_a_print_view():
            'printed)"; }' in pack.STYLE
     assert ".letter-sheet { break-before: page; break-after: page; }" in pack.STYLE
     assert pack.letter_section({"letter": "x"}).startswith('<section class="letter-sheet">')
+
+def test_docs_folder_lets_in_only_blurred_evidence_clips():
+    """docs/ is published (GitHub Pages): *.mp4 stays ignored there except eventN.mp4 and eventN-hero.mp4, and the
+    unblurred person crops and the blind set never get in."""
+    import shutil, subprocess, tempfile
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as tmp:
+        shutil.copyfile(Path(__file__).with_name(".gitignore"), Path(tmp) / ".gitignore")
+        subprocess.run(["git", "init", "-q", tmp], check=True)
+        ignored = lambda name: subprocess.run(["git", "-C", tmp, "check-ignore", "-q", name]).returncode == 0
+        for name in ("docs/event1.mp4", "docs/gate/event12-hero.mp4", "docs/gate/index.html", "docs/gate/street.jpg"):
+            assert not ignored(name), name
+        for name in ("docs/clip.mp4", "docs/gate/clip.mp4", "docs/gate/part0/clip.mp4", "docs/gate/person-c1-0.jpg",
+                     "docs/gate/blind/clip01.mp4", "docs/gate/blind/index.html", "docs/gate/blind-key.json",
+                     "out/gate/event1.mp4", ".env"):
+            assert ignored(name), name
+
 
 def test_share_folder_holds_only_what_the_page_shows_and_never_the_unblurred_files():
     import tempfile
@@ -1843,7 +1920,9 @@ def test_glimmer_notebook_is_pinned_hash_checked_and_records_its_run():
                 "LETTER_MODEL_HOST", "<removed-run-record>", "build_info", "GIT_SHA", "pack_py_sha256",
                 "run.stderr.count('open model reply:')", "'tries': tries",  # pack.open_model_reply logs each try
                 "os.path.exists(f'{CW}/judge_bench.py')", "'JUDGE_MODEL_URL': 'http://127.0.0.1:8080/v1'",
-                "k != 'MODEL_API_KEY'", "<removed-run-record>", "'--out', BENCH_JSON, '--glimmer', '1'"):  # the Glimmer-only judge pass, skipped without a bench
+                "k != 'MODEL_API_KEY'", "<removed-run-record>", "'--out', BENCH_JSON, '--glimmer', '1'",  # the Glimmer-only judge pass, skipped without a bench
+                "glob.glob('/kaggle/input/**/judge-bench.json', recursive=True)",  # both bases: out/ is not in the zip
+                "shutil.copyfile(attached[0], BENCH_JSON)", "f'bench: {BENCH_FROM}"):
         assert pin in text, pin
     assert re.search(r"assert sha256\(path\) == SHA256\[name\]", text)
     assert "shaunmortal" in text
@@ -2319,24 +2398,34 @@ def test_blind_set_hides_near_misses_among_spark_checked_decoys_in_same_length_c
 
 def test_blind_set_rebuilds_tracks_from_cache_with_auto_modes_switch():
     """blind_set's tracks are analyze's: concept_tracks gives (tracks, detected), and an auto-mode concept that
-    filled its SAM video requests is read frame by frame, as analyze.py read it."""
+    filled its SAM video requests is read frame by frame, as analyze.py read it. A full people video request left
+    alone stops it: those faces have no track to blur."""
     import analyze, blind_set
     from pathlib import Path
     site = {"person": "person", "vehicles": ["car"], "image_points": SQUARE_IMG, "world_points": SQUARE_ROAD}
     calls, saved = [], {n: getattr(analyze, n) for n in ("probe", "frame_count", "parts", "auto_switch",
-                                                         "concept_tracks", "road_tracks")}
+                                                         "concept_tracks", "road_tracks", "full_requests")}
     try:
         analyze.probe, analyze.frame_count, analyze.parts = (lambda *a: "64,48"), (lambda clip: 50), (lambda *a: [])
         analyze.auto_switch = lambda *a: {"person": 1.6}
+        analyze.full_requests = lambda *a: (1, 4)  # full, but auto mode switched people to frame by frame
         analyze.concept_tracks = lambda site, concept, *a: (calls.append((concept, a[-1])) or
                                                              ({0: {1: [0, 0, 1, 1]}}, {0: {1: [0, 0, 1, 1]}}))
         analyze.road_tracks = lambda site, H, people, vehicles, size: ({"0/0": people[0]}, vehicles)
         people, vehicles, pieces, shapes, size, total = blind_set.load_tracks(site, Path("x"))
+        analyze.auto_switch = lambda *a: {}  # people left in video mode with a full request
+        try:
+            blind_set.load_tracks(site, Path("x"))
+            raise AssertionError("a full people request was not refused")
+        except SystemExit as err:
+            assert "16-object limit" in str(err) and '"person_mode": "crowd"' in str(err)
+        blind_set.load_tracks({**site, "person_mode": "crowd"}, Path("x"))  # crowd mode: every frame searched
     finally:
         for n, f in saved.items():
             setattr(analyze, n, f)
     assert people == {0: {1: [0, 0, 1, 1]}} and vehicles == {"car#0": {1: [0, 0, 1, 1]}} and (size, total) == ((64, 48), 50)
-    assert calls == [("person", {"person": 1.6}), ("car", {"person": 1.6})]
+    assert calls[:2] == [("person", {"person": 1.6}), ("car", {"person": 1.6})]
+    assert "the faces SAM found are\nblurred" in blind_set.page(["clip01.mp4"])  # never "faces are blurred"
 
 def test_score_humans_scores_danger_against_none_with_kappa_and_wilson():
     import score_humans, tempfile
