@@ -529,13 +529,15 @@ def test_letters_quoting_unmeasured_numbers_go_back_to_spark():
     pack.model_plan = lambda prompt, key, photo=None: (prompts.append(prompt), replies.pop(0))[1]
     pack.judge_problems = lambda letter, measured, key: []
     try:
-        assert pack.ask_plan("PROMPT", facts, "key") == {**good, "writer": pack.WRITER, "judged_by": pack.JUDGE}
+        assert pack.ask_plan("PROMPT", facts, "key") == {**good, "writer": pack.WRITER, "tries": 2,
+                                                         "judged_by": pack.JUDGE}  # the receipt's letter tries
         assert "12" in prompts[1] and "not in the measurements" in prompts[1]
         replies[:] = [{**good, "letter": "It happened 12 times."}] * pack.LETTER_TRIES
         stubborn = pack.ask_plan("PROMPT", facts, "key")
     finally:
         pack.model_plan, pack.judge_problems = old
     assert stubborn["unmeasured"] == ["12"] and "12" in pack.letter_section(stubborn)
+    assert stubborn["tries"] == pack.LETTER_TRIES
 
 
 def test_a_second_model_judges_the_letter_and_its_objections_go_back():
@@ -790,6 +792,94 @@ def test_share_folder_holds_only_what_the_page_shows_and_never_the_unblurred_fil
         shared = pack.share(out, page)
         assert sorted(p.name for p in shared.iterdir()) == ["event1.mp4", "index.html", "street-fixed.webp", "street.jpg"]
         assert (shared / "street-fixed.webp").read_bytes() == (out / "street-fixed.webp").read_bytes()  # AI tag kept
+
+
+def test_shared_folder_gets_sha256sums_and_verify_names_each_changed_file():
+    """SHA256SUMS in shasum's own format covers the shared page; --verify says MATCH, CHANGED or MISSING per file and
+    exits 1 unless all match. The page gives the original video's SHA-256 and the analysis receipt; the BSA
+    certificate pointer only for a site in India."""
+    import contextlib, hashlib, io, shutil, subprocess, sys, tempfile
+    import seal
+    def verify(*args):
+        printed, old = io.StringIO(), sys.argv
+        sys.argv = ["pack.py", *args]
+        try:
+            with contextlib.redirect_stdout(printed), contextlib.redirect_stderr(io.StringIO()):
+                pack.main()
+        except SystemExit as stop:
+            return stop.code, printed.getvalue()
+        finally:
+            sys.argv = old
+    with tempfile.TemporaryDirectory() as folder:
+        out = pack_folder(folder)
+        data = json.loads((out / "events.json").read_text())
+        run = {"minutes": 12.3, "sam_requests": 0}
+        (out / "events.json").write_text(json.dumps({**data, "source_sha256": "ab" * 32, "run": run}))
+        run_pack(out)
+        shared = out / "share"
+        page = (shared / "index.html").read_bytes()
+        assert (shared / "SHA256SUMS").read_text() == f"{hashlib.sha256(page).hexdigest()}  index.html\n"
+        if shutil.which("shasum"):
+            subprocess.run(["shasum", "-a", "256", "-c", "SHA256SUMS"], cwd=shared, check=True, capture_output=True)
+        assert verify("--verify", str(shared)) == (0, "MATCH   index.html\n")
+        text = page.decode()
+        assert f"The original video's SHA-256 is <code>{'ab' * 32}</code>." in text and "Bharatiya" not in text
+        assert "every SAM reply from cache, so it paid nothing new" in text
+        (shared / "street.jpg").write_bytes(b"jpeg")
+        seal.write_sums(shared)
+        (shared / "index.html").write_bytes(page.replace(b"gate", b"gat3"))
+        (shared / "street.jpg").unlink()
+        assert verify("--verify", str(shared)) == (1, "CHANGED index.html\nMISSING street.jpg\n")
+        assert verify("--verify", str(shared), str(out))[0] == 2  # --verify goes alone: argparse refuses
+        (shared / "SHA256SUMS").write_text(f"{'0' * 64}  ../events.json\n")
+        assert raises_value_error(lambda: seal.verify(shared))  # only files in the folder itself
+    law = pack.hash_line(None, {"country": "IN"})
+    assert "Schedule to the Bharatiya Sakshya Adhiniyam, 2023 (section 63(4))" in law and "original video" not in law
+
+
+def test_receipt_counts_what_made_the_pack_and_says_when_sam_came_from_cache():
+    import analyze, tempfile, time
+    from pathlib import Path
+    with tempfile.TemporaryDirectory() as folder:
+        out = Path(folder)
+        for sub in ("part0", "crowd-person"):
+            (out / sub).mkdir()
+        (out / "part0" / "car.sam.txt").write_text("")
+        before = analyze.sam_replies(out)
+        (out / "part0" / "person.sam.txt").write_text("")  # a video part's reply and a crowd-mode image's
+        (out / "crowd-person" / "000000.sam.txt").write_text("")
+        record = analyze.run_record(out, time.monotonic() - 90, before)
+    assert before == 1 and record == {"minutes": 1.5, "sam_requests": 2}
+    events = [{"person": "1/0", "review": {"is_person": True}, "heard": []}, {"person": "1/0", "review": {"is_person": True}},
+              {"person": "2/0", "review": {"is_person": False}, "heard": None}, {"person": "3/0", "review": None}]
+    line = pack.receipt_line({"run": record, "events": events}, {"writer": "Muse Spark", "tries": 2}, ("a.jpg", "b.webp"))
+    assert line == ("Receipt: the analysis ran 1.5 minutes and sent 2 new SAM requests; Muse Spark looked at 2 people; "
+                    "Muse Wonder listened around 1 near-miss; Muse Spark wrote the letter in 2 tries; Muse Image drew 1 "
+                    "picture. Dollar costs on this page are for SAM only.")  # rejected people were looked at too
+    cached = pack.receipt_line({"run": {"minutes": 0.4, "sam_requests": 0}, "events": []}, None, None)
+    assert cached == ("Receipt: the analysis ran 0.4 minutes and took every SAM reply from cache, so it paid nothing "
+                      "new. Dollar costs on this page are for SAM only.")
+    assert pack.receipt_line({"events": []}, None, None) == ""  # an older events.json and no letter
+
+
+def test_safety_pyramid_shows_the_headline_people_and_never_reads_as_safe():
+    """Not to scale, base to tip: who crossed, within 3 s, within 1.5 s (each person once, as in the headline), and
+    collisions, not measured: even 0 of n leaves Clopper-Pearson's upper bound."""
+    import re
+    hit = lambda person, pet: {"person": person, "vehicle": "car#1", "pet_s": pet,
+                               "tier": "serious" if pet < road.PET_MAX_S else "close pass"}
+    events = [hit("c1/0", 0.4), hit("c1/1", 2.0), hit("c2/0", 2.5), hit("pole/0", 0.1)]
+    seen = {"minutes": 1.0, "crossings": 9, "crossers": [f"c{i}" for i in range(1, 10)]}
+    drawn = pack.pyramid(events, seen)
+    tip, *labels = re.findall(r"<span>(.*?)</span>", drawn)
+    assert labels == ["1 of 9 had a moving vehicle through their spot within 1.5 s", "2 of 9 within 3 s",
+                      "9 people crossed"]
+    assert tip.startswith("Collisions: not measured.") and f"up to {100 * (1 - 0.025 ** (1 / 9)):.1f}% of crossings" in tip
+    assert re.findall(r"width: (\d+)%", drawn) == ["20", "45", "70", "100"] and "Not to scale." in drawn
+    assert pack.pyramid(events, {"minutes": 1.0, "crossings": 9}) == ""  # an older events.json: no crosser list
+    quiet = pack.pyramid([], seen)
+    assert "0 of 9 within 3 s" in quiet and quiet in pack.page({"name": "gate", "world_points": SQUARE_ROAD}, [], seen,
+                                                                 None, None, 10)
 
 
 def test_muse_image_webp_is_kept_untouched_and_shown_as_an_ai_proposal():

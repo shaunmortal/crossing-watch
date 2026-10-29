@@ -3,8 +3,9 @@ letter from the measured events only; Muse Image draws that fix onto the real st
 
 Run after analyze.py: python3 pack.py OUT_DIR SITE.json
 Writes OUT_DIR/index.html next to the clips (open it in a browser), and OUT_DIR/share/: the page and only the files it
-shows, the one folder to publish. The letter is kept in OUT_DIR/plan.json, so a re-run pays nothing; --notes FILE
-revises it, and --approved-by NAME --school SCHOOL signs it (OUT_DIR/signoff.json).
+shows, the one folder to publish, with their SHA256SUMS. The letter is kept in OUT_DIR/plan.json, so a re-run pays
+nothing; --notes FILE revises it, and --approved-by NAME --school SCHOOL signs it (OUT_DIR/signoff.json).
+python3 pack.py --verify FOLDER checks a shared folder: MATCH, CHANGED or MISSING per file.
 """
 import argparse
 import base64
@@ -31,6 +32,7 @@ import review
 import roadmap
 import road
 import sam
+import seal
 
 IMAGE_EDIT_URL = "https://api.meta.ai/v1/images/edits"
 IMAGE_MODEL = "muse-image-1.0"
@@ -106,6 +108,7 @@ SIGNOFF_KEYS = ("approved_by", "school", "date", "letter_sha256")  # signoff.jso
 FILED_KEYS = ("to", "channel", "date", "reference")  # the site's "submitted" record, once the pack is filed
 TCT_TOOLKIT = "https://www.childhealthinitiative.org/media/v5bntgmp/tct-toolkit__one-pager_final_508_updated.pdf"
 PRINTED_CARDS = 3  # on paper only the worst 3 near-misses, so the letter's own sheet comes soon
+PYRAMID_WIDTHS = (20, 45, 70, 100)  # % of its column, tip to base: not to scale, the labels give the counts
 # Muse Image only: IRC 103-2022 as the Supreme Court quotes it (order para 21 and its footnote 1). Never in
 # LETTER_PROMPT, where 4, 10 and 20 would count as measured numbers.
 RAISED_SPEC = ("Draw the crossing raised to the level of the footpath and 4 m wide, with a speed hump 10-20 m before it "
@@ -350,7 +353,8 @@ def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES, stated=(
     measurements do not support. An invalid reply or either objection goes back with the reason; after the last try
     the letter is kept with what remains listed for a person to check before sending. Numbers are checked against
     `measured` only, never the prompt (its wording would let "3.1" from "SAM 3.1" pass), plus `stated`, the
-    principal's notes, which both checks read labelled as stated by the principal, not measured."""
+    principal's notes, which both checks read labelled as stated by the principal, not measured. "tries" counts the
+    model's replies, for the pack's receipt."""
     note, plan, bad, crossed, problems = "", None, [], [], []
     worst, measured = json.loads(measured).get("worst", []), measured + stated_text(stated)
     for attempt in range(tries):
@@ -365,9 +369,9 @@ def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES, stated=(
         crossed = mixed(plan["letter"], worst)
         problems = [] if bad or crossed or not api_key else judge_problems(plan["letter"], measured, api_key)
         if not bad and not crossed and not problems:
-            return {**plan, "writer": WRITER, **({"judged_by": JUDGE} if api_key else {})}
+            return {**plan, "writer": WRITER, "tries": attempt + 1, **({"judged_by": JUDGE} if api_key else {})}
         note = retry_note(bad, crossed, problems)
-    return {**plan, "writer": WRITER, "unmeasured": bad, "mixed": crossed, "unsupported": problems}
+    return {**plan, "writer": WRITER, "tries": tries, "unmeasured": bad, "mixed": crossed, "unsupported": problems}
 
 
 def stated_text(notes):
@@ -530,10 +534,14 @@ def fix_instruction(plan):
     return plan["image_prompt"] + (" " + RAISED_SPEC if RAISED.search(plan["fix"]) else "")
 
 
+def in_india(site):
+    return str(site.get("country", "")).upper() == "IN"
+
+
 def legal_section(site):
     """For a site in India ("country": "IN"), why the authority can act: the Supreme Court's own sentences, each
     linked to its page of the order. Paragraph 35.6 only when the site's "city" is in Annexure 46."""
-    if str(site.get("country", "")).upper() != "IN":
+    if not in_india(site):
         return ""
     city = str(site.get("city", "")).strip()
     listed = city.casefold() in ANNEXURE_46
@@ -574,6 +582,60 @@ def tct_section():
             "post-encroachment time and the measured speed, not the toolkit's observer severity scales, so the two do "
             "not compare one to one. Step 9 comes after the fix is in place: film the same dismissal from the same spot "
             "for as long, run this pack again and compare.</p></section>")
+
+
+def pyramid(events, seen):
+    """This crossing's safety pyramid (Laureshyn, Svensson & Hydén 2010), not to scale: the people who crossed at the
+    base, those with a moving vehicle through their spot within CLOSE_PASS_S and within PET_MAX_S above them, and
+    collisions at the tip, which nothing here measures: the exact 95% bound says how many even 0 would leave possible.
+    The headline's own k and n, so none without its crosser list."""
+    if not seen.get("crossers"):
+        return ""
+    crossers = set(seen["crossers"])
+    n = len(crossers)
+    tiers = [("tip", f"Collisions: not measured. Even 0 in {n} crossings would still allow up to "
+                     f"{100 * share_range(0, n)[1]:.1f}% of crossings to end in one (exact 95% bound), so no recording "
+                     "can show a crossing is safe."),
+             ("serious", f"{people_hit(serious(events), crossers)} of {n} had a moving vehicle through their spot "
+                         f"within {road.PET_MAX_S:g} s"),
+             ("close", f"{people_hit(events, crossers)} of {n} within {road.CLOSE_PASS_S:g} s"),
+             ("base", f"{n} people crossed")]
+    rows = "".join(f'<i class="{kind}" style="width: {width}%"></i><span>{html.escape(text)}</span>'
+                   for (kind, text), width in zip(tiers, PYRAMID_WIDTHS))
+    return (f'<section><h2>The safety pyramid at this crossing</h2><div class="pyramid">{rows}</div><p class="note">Not '
+            "to scale. Near-misses happen far more often than collisions, so they can be counted now, before anyone is "
+            "hurt (the traffic-safety pyramid: Laureshyn, Svensson & Hydén 2010).</p></section>")
+
+
+def receipt_line(data, plan, images):
+    """What made this pack, said by code: the analysis run's wall-clock minutes and the SAM requests it sent (none:
+    every reply came from cache), the people Muse Spark looked at, the moments Muse Wonder listened to, the letter's
+    tries and the Muse Image picture. Counts only: dollars are for SAM alone, in the cost line."""
+    run, events = data.get("run") or {}, data.get("events", [])
+    sent = run.get("sam_requests")
+    parts = ([f"the analysis ran {run['minutes']:g} minutes and " + (
+        f"sent {sent} new SAM request{'' if sent == 1 else 's'}" if sent else
+        "took every SAM reply from cache, so it paid nothing new")] if run else [])
+    looked, heard = len({e["person"] for e in events if e.get("review")}), sum(e.get("heard") is not None for e in events)
+    parts += [f"Muse Spark looked at {looked} {'person' if looked == 1 else 'people'}"] if looked else []
+    parts += [f"Muse Wonder listened around {heard} near-miss{'' if heard == 1 else 'es'}"] if heard else []
+    if plan and plan.get("tries"):
+        parts.append(f"{plan.get('writer') or 'the model'} wrote the letter in {plan['tries']} "
+                     f"tr{'y' if plan['tries'] == 1 else 'ies'}")
+    parts += ["Muse Image drew 1 picture"] if images else []
+    return f"Receipt: {'; '.join(parts)}. Dollar costs on this page are for SAM only." if parts else ""
+
+
+def hash_line(source_sha256, site):
+    """Where the hashes are that show a changed file: the original video's (from analyze.py) and SHA256SUMS in the
+    shared folder; for a site in India, the evidence-law form that asks for them, which the school fills and signs."""
+    video = (f"The original video's SHA-256 is <code>{html.escape(source_sha256)}</code>. " if source_sha256 else "")
+    law = (" In India, Part A of the certificate for electronic evidence in the Schedule to the Bharatiya Sakshya "
+           "Adhiniyam, 2023 (section 63(4)) asks for these hash values: the school fills and signs it."
+           if in_india(site) else "")
+    return (f'<p class="note">{video}{seal.SUMS} in the shared folder lists every shared file\'s SHA-256: '
+            f"<code>shasum -a 256 -c {seal.SUMS}</code> or <code>python3 pack.py --verify FOLDER</code> says if any "
+            f"changed.{html.escape(law)}</p>")
 
 
 def linked(text, events):
@@ -696,7 +758,11 @@ blockquote { margin: 16px 0; padding-left: 16px; border-left: 3px solid var(--ac
 cite { display: block; margin-top: 4px; font-style: normal; color: var(--muted); } a { color: inherit; }
 .letter:focus { outline: 2px solid var(--line); outline-offset: 6px; } .note.ok { color: var(--ok); }
 .note.bad { color: var(--accent); } ::highlight(unmeasured) { text-decoration: underline wavy #e5372a 2px; }
-.filed { font-weight: 600; }
+.filed { font-weight: 600; } code { overflow-wrap: anywhere; }
+.pyramid { display: grid; grid-template-columns: minmax(96px, 35%) 1fr; gap: 6px 12px; align-items: center; }
+.pyramid i { display: block; height: 28px; margin: 0 auto; background: var(--muted); print-color-adjust: exact; }
+.pyramid i.base { background: var(--line); } .pyramid i.serious { background: var(--accent); }
+.pyramid i.tip { box-sizing: border-box; background: none; border: 2px dashed var(--accent); }
 @media print { a.clip { text-decoration: none; } a.clip::after { content: " (see clip " attr(data-clip) ")"; }
                .letter-sheet { break-before: page; break-after: page; } }
 """ + (  # dark colours are for screens only (dark ink on white paper); on paper only the worst cards, so say so
@@ -722,7 +788,7 @@ def lead(lines):
     return "".join(f'<p class="{"note" if i else "lead"}">{html.escape(line)}</p>' for i, line in enumerate(lines))
 
 
-def page(site, events, seen, plan, images, fps, cost=None, full=None, signoff=None):
+def page(site, events, seen, plan, images, fps, cost=None, full=None, signoff=None, receipt="", source_sha256=None):
     cards = "\n".join(event_card(i + 1, e, fps) for i, e in enumerate(events[:SHOWN_EVENTS])) or (
         f"<p>No conflicts under {road.CLOSE_PASS_S} s in these {html.escape(str(seen.get('minutes', '?')))} minutes. "
         "A short recording can miss rare events: record more school-run periods before drawing any conclusion.</p>")
@@ -739,11 +805,12 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None, signoff=No
 <style>{STYLE}{roadmap.STYLE}</style></head><body>
 <h1>Crossing Watch: near-miss evidence</h1>
 <p class="muted">{html.escape(site.get("name", ""))}</p>{filed_line(site)}{lead(headline(events, seen, site))}
-<div class="stats">{stats(events, seen)}</div>{limit_note(full)}
+<div class="stats">{stats(events, seen)}</div>{limit_note(full)}{pyramid(events, seen)}
 {engineering(seen, cost)}
 {map_section(events, site)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{legal_section(site)}
 {letter_section(plan, events[:SHOWN_EVENTS], facts(site, events, seen), signoff)}
-{tct_section()}<section><h2>How this was measured</h2><p class="note">{html.escape(method)}</p></section></body></html>"""
+{tct_section()}<section><h2>How this was measured</h2><p class="note">{html.escape(method)}</p>
+{f'<p class="note">{html.escape(receipt)}</p>' if receipt else ""}{hash_line(source_sha256, site)}</section></body></html>"""
 
 
 def share(out_dir, page_html):
@@ -829,14 +896,20 @@ def read_signoff(out_dir):
 def parse_args():
     """The command line, the notes' text and (approved_by, school), refusing flags that cannot go together."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("out_dir")
-    parser.add_argument("site")
+    parser.add_argument("out_dir", nargs="?")
+    parser.add_argument("site", nargs="?")
+    parser.add_argument("--verify", metavar="FOLDER", help=f"check a shared folder against its {seal.SUMS}: MATCH, "
+                        "CHANGED or MISSING per file (alone, without out_dir and site)")
     parser.add_argument("--notes", metavar="FILE", help="the principal's notes on plan.json's letter: only the "
                         "sentences they ask about change")
     parser.add_argument("--approved-by", default="", metavar="NAME",
                         help='who read and approved plan.json\'s letter, e.g. "A. Rao, Principal" (with --school)')
     parser.add_argument("--school", default="", help="the school that sends the letter")
     args = parser.parse_args()
+    if args.verify and (args.out_dir or args.notes or args.approved_by or args.school):
+        parser.error("--verify FOLDER goes alone")
+    if not args.verify and not (args.out_dir and args.site):
+        parser.error("give out_dir and site (or --verify FOLDER)")
     signer = (args.approved_by.strip(), args.school.strip())
     if any(signer) and not all(signer):
         parser.error("--approved-by and --school go together")
@@ -851,8 +924,22 @@ def parse_args():
     return args, notes, signer
 
 
+def verify_folder(folder):
+    """--verify: each listed file's MATCH, CHANGED or MISSING; the exit status is 0 only when every one matches."""
+    try:
+        status = seal.verify(folder)
+    except (OSError, ValueError) as err:
+        sys.exit(f"pack.py --verify: {err}")
+    if not status:
+        sys.exit(f"pack.py --verify: {Path(folder) / seal.SUMS} lists no files")
+    print("\n".join(f"{state:8}{name}" for name, state in status.items()))
+    sys.exit(0 if set(status.values()) == {"MATCH"} else 1)
+
+
 def main():
     args, notes, signer = parse_args()
+    if args.verify:
+        verify_folder(args.verify)
     out_dir, site = Path(args.out_dir), json.loads(Path(args.site).read_text())
     try:
         submitted(site)
@@ -891,9 +978,9 @@ def main():
                   f"{err}", file=sys.stderr)
     signoff = sign(out_dir, plan, *signer) if plan and all(signer) else read_signoff(out_dir)
     page_html = page(site, events, seen, plan, images, data["fps"], data.get("cost"), data.get("sam_full_requests"),
-                     signoff=signoff)
+                     signoff=signoff, receipt=receipt_line(data, plan, images), source_sha256=data.get("source_sha256"))
     (out_dir / "index.html").write_text(page_html)
-    share(out_dir, page_html)  # the only folder to publish
+    seal.write_sums(share(out_dir, page_html))  # the only folder to publish, and its hashes
     print(f"wrote {out_dir / 'index.html'}: {len(serious(events))} serious, {len(events) - len(serious(events))} close "
           f"passes, fix: {plan['fix'] if plan else 'none'}")
 
