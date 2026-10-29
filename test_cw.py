@@ -632,6 +632,43 @@ def test_map_draws_each_event_where_it_happened():
     assert "Where it happened" in pack.map_section(events, site) and pack.map_section(events[2:], site) == ""
 
 
+def test_map_ground_is_the_photo_seen_from_above():
+    """A 320 x 240 photo, 20 px a metre, road (0, 0) at pixel (100, 100): in view -5 to 11 m across, -5 to 7 m down."""
+    import contextlib, io, subprocess, tempfile
+    from pathlib import Path
+    import roadmap
+    H = road.homography(SQUARE_IMG, SQUARE_ROAD)
+    rect = roadmap.view_rect(H, (-8, -2, 9, 12), (5, 5), (320, 240))
+    assert [round(v, 3) for v in rect] == [-5.0, -2.0, 9.0, 7.0]  # the largest part of the map in the photo
+    assert roadmap.in_photo(H, (-6, 0, 1, 1), (320, 240)) is None  # a corner left of the photo
+    assert roadmap.view_rect(H, (20, 20, 30, 30), (25, 25), (320, 240)) is None  # all of it out of view
+    site = {"image_points": SQUARE_IMG, "world_points": SQUARE_ROAD}
+    events = [{"tier": "serious", "vehicle": "car#1", "vehicle_kmh": 30.0, "pet_s": 0.4, "where": [5.0, 5.0]}]
+    with tempfile.TemporaryDirectory() as folder:
+        out, photo = Path(folder), Path(folder) / "street.jpg"
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "color=red:s=320x240", "-vf",
+                        "drawbox=x=100:y=100:w=220:h=140:color=lime:t=fill", "-frames:v", "1", str(photo)], check=True)
+        picture, rect = roadmap.ground(photo, site, events, out)
+        assert rect == [-2.0, -2.0, 11.0, 7.0] and picture.startswith("data:image/jpeg;base64,")  # map: -2..12 m
+        size = (round(13 * 2 * 640 / 14), round(9 * 2 * 640 / 14))  # 2 ground pixels per map pixel
+        raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(out / roadmap.GROUND), "-f", "rawvideo", "-pix_fmt",
+                              "rgb24", "-"], check=True, capture_output=True).stdout
+        rgb = lambda x, y: raw[3 * (round(y) * size[0] + round(x)):3 * (round(y) * size[0] + round(x)) + 3]
+        assert len(raw) == 3 * size[0] * size[1]
+        px = lambda u, v: rgb((u + 2) * size[0] / 13, (v + 2) * size[1] / 9)  # road metres to ground pixels
+        assert px(5, 5)[1] > 200 > 60 > px(5, 5)[0] and px(-1, -1)[0] > 200 > 60 > px(-1, -1)[1]  # lime road, red kerb
+        assert px(0.5, 3)[1] > 200 > 60 > px(-0.5, 3)[1]  # the edge stays where it is in metres
+        svg = roadmap.svg(events, SQUARE_ROAD, ground=(picture, rect))
+        assert '<image class="ground" href="data:image/jpeg;base64,' in svg and 'x="0.0" y="0.0"' in svg
+        assert "standing objects lean" in pack.map_section(events, site, (picture, rect))
+        assert "standing objects lean" not in pack.map_section(events, site)
+        assert roadmap.ground(photo, site | {"view": "top-down"}, events, out) is None  # already seen from above
+        assert roadmap.ground(photo, site, [{"tier": "serious"}], out) is None  # nothing placed: no map
+        with contextlib.redirect_stderr(io.StringIO()) as said:
+            assert roadmap.ground(out / "missing.jpg", site, events, out) is None
+        assert "no street photo under the map" in said.getvalue()
+
+
 BAND_IMG = [[60, 120], [260, 120], [260, 220], [60, 220]]  # 20 px a metre on a 320 x 240 photo
 BAND_ROAD = [[0, 0], [10, 0], [10, 5], [0, 5]]
 BAND_EVENTS = [{"tier": "serious", "where": [3.0, 2.5], "path_person": [[3.0, 0.5], [3.0, 4.5]]},

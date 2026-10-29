@@ -313,13 +313,15 @@ def heard_line(heard):
 
 
 
-def map_section(events, site):
-    drawn = roadmap.svg(events, site["world_points"], SHOWN_EVENTS)
+def map_section(events, site, ground=None):
+    drawn = roadmap.svg(events, site["world_points"], SHOWN_EVENTS, ground)
     if not drawn:
         return ""
+    under = (" Under it, the street photo seen from above: the road surface is to scale, standing objects lean, and "
+             "the dots are measured positions." if ground else "")
     return (f"<section><h2>Where it happened</h2>{drawn}<p class=\"note\">Seen from above, in metres on the road "
             "(grid every 5 m; dashed: the measured area). Blue: the pedestrian, red: the vehicle, 2 s either side. "
-            "Filled dots: serious near-misses; rings: close passes.</p></section>")
+            f"Filled dots: serious near-misses; rings: close passes.{under}</p></section>")
 
 
 def fix_section(plan, images):
@@ -377,7 +379,7 @@ def stats(events, seen):
     return "".join(f"<div><b>{html.escape(str(v))}</b>{html.escape(label)}</div>" for v, label in tiles)
 
 
-def page(site, events, seen, plan, images, fps, cost=None, full=None):
+def page(site, events, seen, plan, images, fps, cost=None, full=None, ground=None):
     cards = "\n".join(event_card(i + 1, e, fps) for i, e in enumerate(events[:SHOWN_EVENTS])) or (
         f"<p>No conflicts under {road.CLOSE_PASS_S} s in these {html.escape(str(seen.get('minutes', '?')))} minutes. "
         "A short recording can miss rare events: record more school-run periods before drawing any conclusion.</p>")
@@ -396,7 +398,7 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None):
 <p class="muted">{html.escape(site.get("name", ""))}</p>
 <div class="stats">{stats(events, seen)}</div>{limit_note(full)}
 {engineering(seen, cost)}
-{map_section(events, site)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{fixband.figure(images)}{letter_section(plan)}
+{map_section(events, site, ground)}<section><h2>Worst moments</h2>{cards}</section>{fix_section(plan, images)}{fixband.figure(images)}{letter_section(plan)}
 <section><h2>How this was measured</h2><p class="note">{html.escape(method)}</p></section>{overlay.SCRIPT}</body></html>"""
 
 
@@ -424,7 +426,7 @@ def main():
     data = json.loads((out_dir / "events.json").read_text())
     events = confirmed(data["events"])
     seen = data.get("exposure") or {"minutes": round(clip_minutes(out_dir / "clip.mp4", data["fps"]), 1)}
-    plan, images = None, None
+    plan, images, ground = None, None, None
     if events:
         try:
             photo = street_photo(out_dir / "clip.mp4", out_dir / "street.jpg", site.get("person", "person"),
@@ -432,6 +434,7 @@ def main():
         except (ValueError, OSError, subprocess.CalledProcessError) as err:
             print(f"no street photo: {err}", file=sys.stderr)
             photo = None
+        ground = roadmap.ground(photo, site, events, out_dir) if photo else None  # the street seen from above
         try:
             key = optional_key()
             measured = facts(site, events, seen)
@@ -446,7 +449,7 @@ def main():
                 http.client.HTTPException, subprocess.CalledProcessError) as err:
             print(f"letter or fix image failed, page will show the measurements only: {err}", file=sys.stderr)
     (out_dir / "index.html").write_text(page(site, events, seen, plan, images, data["fps"], data.get("cost"),
-                                             data.get("sam_full_requests")))
+                                             data.get("sam_full_requests"), ground=ground))
     print(f"wrote {out_dir / 'index.html'}: {len(serious(events))} serious, {len(events) - len(serious(events))} close "
           f"passes, fix: {plan['fix'] if plan else 'none'}")
 
