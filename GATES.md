@@ -54,7 +54,7 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 - **G2 not yet tested.** Both test clips were calibrated from assumed lengths, so no independent measured distance exists. This waits for the user's footage with measured points.
 - **G3 partial.**
   - On the schoolchildren CCTV clip, the pipeline reports 1 event. It is a pole tracked as a person, and Muse Spark rejects it, so the evidence pack shows 0 near-misses. Checked by eye: no real close pass happened there (the children were 1.4 m or more from slow, turning cars). So: no false alarm in the final output, but no true positive tested yet either.
-  - The Indian intersection clip (rough calibration) gives 0 events after the review fixes.
+  - The Indian intersection clip's event count is *withdrawn 29 Oct: the clip is a time-lapse; see the last section*.
   - A true positive needs footage with a real near-miss.
 - A 13-agent review found 14 confirmed defects, all fixed:
   - speed teleports from ID switches;
@@ -162,8 +162,8 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 - DUT re-run after both changes (`validate_dut.py ... --mode crowd --out out/dut-15s`): 29 of 36 found, 3 real false alarms (was 2).
   *Corrected 29 Oct: stale. Clip 15's events.json was rewritten after this validation.json; scored as stored, the run gives 26 of 36.*
 - Vehicle crowd mode: DUT 35 of 36 (4 real false alarms); dense Indian clip coverage 6 -> 20 vehicles a frame. Found and
-  fixed on the way: one-frame pedestrian fragments (543 -> 83 events) and riders accepted as pedestrians by Spark
-  (83 -> 18 after review). Speed on that clip is untestable (guessed calibration); G2 on real footage still pending.
+  fixed on the way: one-frame pedestrian fragments and riders accepted as pedestrians by Spark (that clip's event
+  counts are *withdrawn 29 Oct: the clip is a time-lapse; see the last section*). G2 on real footage still pending.
 - Fifth review (2 reviewers, findings checked): crowd-mode vehicles over ~36 km/h were lost at 5 samples a second (now
   10); synonym concepts shared one cache (now refused); letter check missed non-English facts and comma numbers, and
   flagged "SAM 3.1" from the prompt (fixed). DUT with vehicles at 10 a second: 12 of 36, speed bias +0.2 km/h, 1 real
@@ -181,8 +181,8 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
      frames, and the old median of steps read 0.83 x the true speed: our tracks and the dataset's own tracks (resampled
      the same way for scoring) were both read slow. With a least-squares slope, cars at about 10 km/h now count as
      moving, so the truth set grows from 36 to 52 conflicts (24 to 34 serious). This is the "moving" bar being read
-     right, not better detection. The same commit's phantom-speed guard leaves the Indian clip with no event above
-     57 km/h (88 before).
+     right, not better detection. The same commit added the phantom-speed guard (its Indian-clip speeds are
+     *withdrawn 29 Oct: the clip is a time-lapse; see the last section*).
   2. **Rider gate (b54d1ab).** Spark called walking students "rider" or "cyclist". DUT tracks no bikes, so no bike box
      is ever under them and every such call is now overruled.
   3. **New events.** Today's code finds conflicts in track pieces Spark never saw: 8 events in crowd mode, 17 in
@@ -209,10 +209,10 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 | Matched events, PET | within about 1 s | 38 of 44 within 1 s, 2.5 s at worst |
 | Gaps of 6 s or more where people crossed | right on 7 of 8 clips | right on 8 of 8 |
 | Dataset pedestrians followed by our tracks | 297 of 301, at most 5 tracks each | 296 of 301, at most 4 |
-| Indian crowd clip (no ground truth), after review | 18 events (6 serious), up to 88 km/h | 10 events (5 serious, 2 not yet reviewed), up to 57 km/h |
+| Indian crowd clip (no ground truth), after review | withdrawn | withdrawn |
 
-*Corrected later on 29 Oct: the Indian row's new column is from the truth-pass commit 93d94ac. On the merged code it
-is 6 events (4 serious, 1 not yet reviewed), up to 36.4 km/h; see the last section.*
+*Corrected later on 29 Oct: the Indian row is withdrawn. The clip is a time-lapse, so its events and speeds were never
+measurements; see the last section.*
 
 - Unchanged: moving vehicles counted right on 8 of 8 clips, longest gap within 0.5 s on 6 of 8, pedestrian crossings
   374 against the dataset's 280.
@@ -241,13 +241,11 @@ is 6 events (4 serious, 1 not yet reviewed), up to 36.4 km/h; see the last secti
 - Offline recomputes (cached tracks or ground truth, no API calls; SAM requests were stubbed to fail on a cache miss):
   - SinD ground truth, 20 min: 37 of 63 crossings (1 in 1.7) within 3 s, 25 of 63 within 1.5 s. Old tile: 103.2
     (104.8 on the merged code: 66 conflicts / 63 crossings; the 37 and 25 do not change).
-  - Dense Indian clip, crowd cache (the recompute matches the stored 83 events pair for pair and its 15 crossings;
-    Spark's stored verdicts leave 18 events): Spark rejected 10 of the 15 tracked crossers as not people (8 riders,
-    2 "not a person"), so the clip has only 5 real crossers and the ranges are wide: 5 of 5 (1 in 1) within 3 s,
-    2 of 5 (1 in 2.5) within 1.5 s; 95% ranges 47.8-100.0% and 5.3-85.3%. Old tile: 120.0 (18 events over all 15
-    crossers).
-  - Review fix: the first version kept Spark's rejected crossers in n but not in k, which printed 5 of 15 here, 3x
-    too low. `pack.real_crossers` now drops them from n by person (one with any piece still confirmed stays).
+  - Dense Indian clip, crowd cache: its one number is *withdrawn 29 Oct: the clip is a time-lapse; see the last
+    section*. It did show that Spark rejected 10 of the 15 tracked crossers as not people (8 riders, 2 "not a
+    person").
+  - Review fix: the first version kept Spark's rejected crossers in n but not in k, so the share read too low.
+    `pack.real_crossers` now drops them from n by person (one with any piece still confirmed stays).
   - Kids 15-second parts: 0 of 7, 95% range 0.0-41.0%, up to 3.7 people in a recording this long.
 - Pages built from an events.json written before this change show no headline, rather than a count that could hold
   someone twice.
@@ -298,7 +296,9 @@ These rules do not change after anyone labels.
 
 Tooling dry runs (offline, not the gate): on a copy of the cached dense Indian clip (390 frames), with the vehicle
 sampling rate its cache was made at and no `--review-decoys` (so decoys are limited to pedestrians Spark had
-already looked at), `blind_set.py` rebuilt the tracks from cache with no SAM request.
+already looked at), `blind_set.py` rebuilt the tracks from cache with no SAM request. *Added 29 Oct: that clip is a
+time-lapse (see the last section), so the near-misses and gaps below test the tool only; they say nothing about the
+street.*
 
 - The first version wrote 12 near-misses and 8 decoys, but 6 near-miss clips, with events at 30.0-30.8 s, were cut
   short by the video's end: 102, 102, 102, 106, 110 and 110 frames (frame counts from ffprobe). And every decoy's
@@ -353,17 +353,8 @@ code (no API calls: SAM and Spark were stubbed to fail on a cache miss).
 
   The new conflict is P15 with motorcycle#108, a close pass (PET 2.7 s) at 10.1 km/h: the old median of steps read
   that motorcycle at 9.6 km/h there, under the 10 km/h "moving" bar. No conflict was lost and no tier changed.
-- **Dense Indian clip** (crowd cache; tracks rebuilt as `validate_dut.our_tracks` does from exactly the cached frames,
-  vehicles at the 5 a second the cache was made at; Spark's stored verdicts through the rider gate; a scratch script,
-  not in the repo). The README had kept the figure from the truth-pass commit 93d94ac; later lane commits changed the
-  tracks on this angled view.
-
-| Number | At 93d94ac | Merged code |
-|---|---|---|
-| Conflicts before Spark's review (serious) | 25 (11) | 22 (14) |
-| After review | 10 events (5 serious, 2 not yet reviewed) | 6 events (4 serious, 1 not yet reviewed) |
-| Fastest vehicle after review / before | 57.0 / 57.0 km/h | 36.4 / 45.9 km/h |
-| One number (crossers left after Spark's rejections) | 5 of 5 within 3 s, 2 of 5 within 1.5 s (as published above) | 3 of 8 within 3 s, 3 of 8 within 1.5 s (95% range 8.5-75.5%) |
+- **Dense Indian clip:** re-scored here on the merged code, then withdrawn the same day: the clip is a time-lapse,
+  so its conflicts, speeds and one number were never measurements (see the last section).
 
 - **Rank 35, tracker tweak after OC-SORT: tried, not shipped.** Velocity from 3 samples back and a second greedy
   round against each unmatched track's last seen box, scored with `validate_offline.py` on `out/dut-15s` and
@@ -397,3 +388,51 @@ code (no API calls: SAM and Spark were stubbed to fail on a cache miss).
   bound scaled the same way: "up to 1,100" for 20 minutes of 40 crossers, 30-minute dismissals, 200 days.
 - **Kaggle judge pass:** `out/` is not in the repo zip, so the notebook rebuilt the bench from Glimmer's letter alone
   (12 lies and 4 controls, not 24 and 8). It now copies an attached `judge-bench.json` and its record says which.
+
+## The Indian clip is a time-lapse; people are the clock (Thu 29 Oct 2026)
+
+- **Finding.** `test-videos/indian-intersection.mp4`, the YouTube stock clip behind `out/indian-crowd`,
+  `out/indian-15s` and `out/indian-intersection`, is a time-lapse. It is 39 s at 30 fps; in 16 consecutive source
+  frames (0.53 s; frames 300-315 checked by eye) people cross half the road and the whole traffic state changes.
+  Its worst cached near-miss (`out/indian-crowd/event1.mp4`, 87.9 km/h, PET 1.2 s) is the pedestrian's box sliding
+  over empty road while the car's box jumps between cars: crowd mode's tracker joined different road users across
+  the skipped time. That is where the stored events' "phantom" speeds came from: up to 87.9 km/h in `out/indian-crowd`
+  and 100.5 km/h in `out/indian-15s`.
+- **Withdrawn:** every speed, PET, near-miss count, one number and gap from that clip. Rewritten in place above: the
+  28 Oct status's event count, vehicle crowd mode's event counts, the speed fix's 88 and 57 km/h, the re-score
+  table's Indian row and its note, the one-number recompute, the merged-code re-score and its table, and a note on
+  the blind-set dry run. In the README: the DUT section's Indian paragraph (543 near-misses, 22 and 6 events, 36 and
+  46 km/h) and the Limits section's 12 of 22 inferred positions.
+- **Still meaningful:** only its detection coverage, objects found per frame (SAM video 1.6 people and 6 vehicles a
+  frame, crowd mode 14.9 people and 20), and what follows from it: all 12 SAM video requests filled, people's within
+  1.0-1.6 s of each part. The SAM bill per video second ($0.34 for 39 s) and the `vehicle_test.py` design (boxes
+  matched per frame) are not about time on the street, so they stand.
+- **Guard, `pace.py` (commit 30bdc87).** People walk at about 1.2-1.5 m/s. analyze.py writes the median walking speed
+  of the pedestrian pieces that crossed (each piece's median speed over its moving frames, the crossing count's own
+  pieces) to events.json as `"walking"`. With 10 or more walking pieces, a median over 2.4 m/s (sped up, or a
+  calibration rectangle marked too big) or under 0.5 m/s (slowed down, or marked too small) flags the video: the
+  page shows a warning in place of the headline, near-miss and speed tiles, pyramid, engineering numbers and gap
+  barcode, heads the cards "not measurements", and neither pack.py nor the case agent asks any model for a letter.
+  An unflagged run's numbers and page are unchanged (self-checked).
+- **Medians measured to set the thresholds**, at $0: each run's tracks rebuilt from its cached SAM replies (crowd
+  caches from exactly the frames cached), Spark and SAM stubbed to fail on a cache miss, nothing written under
+  `out/` (a scratch script, not in the repo); SinD and DUT ground truth cut into pieces the way analyze.py cuts ours.
+
+| Video | Walking pieces | Median walking speed | Guard |
+|---|---|---|---|
+| DUT, our tracks, crowd mode (8 clips; `out/dut`, `out/dut-15s` and `out/dut-vcrowd` share these caches) | 13-129 per clip | 1.08-1.47 m/s | not flagged |
+| DUT, our tracks, SAM video, whole frame / 2 x 2 tiles (8 clips each) | 11-16 / 12-48 | 1.11-1.44 / 1.05-1.48 m/s | not flagged |
+| DUT, the dataset's own tracks (8 clips) | 280 | 1.22 m/s | not flagged |
+| SinD, the dataset's own tracks (20 min) | 63 | 1.13 m/s | not flagged |
+| Schoolchildren CCTV, assumed calibration: one request / 15 s parts | 13 / 14 | 0.80 / 1.66 m/s | not flagged |
+| Indian time-lapse, crowd mode | 13 | 2.71 m/s | flagged: sped up |
+| Indian time-lapse, SAM video: 15 s parts / one request | 0 / 0 | none | not judged |
+
+- **Why these thresholds.** Every real video here reads 0.80-1.66 m/s. 2.4 m/s is 1.45x the fastest of them; 0.5 m/s
+  is 0.6x the slowest. 10 pieces: the fewest on a real run here is 11.
+- **Limits.** The guard sees only the people the tracker keeps. On the time-lapse the fastest were cut at the 10 m/s
+  jump rule or lost, so crowd mode reads 2.1x normal walking, not the true speed-up, and SAM video mode kept no
+  walking piece at all: those runs are not judged, and their numbers are withdrawn by this entry, not by the code. A
+  video sped up less than about 2x would pass. The kids clip's two runs differ by 2x (waiting children and running
+  ones), so a crossing where most people run could be flagged.
+- 137 self-checks pass.

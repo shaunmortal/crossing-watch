@@ -116,7 +116,7 @@ tracked in 4 overlapping tiles (SAM returns at most 16 objects per request) and 
 estimated first at Meta's list prices: a run over $10 needs `--allow-cost`, and `--budget USD` is a hard cap that
 nothing lifts. With `"person_mode": "auto"` or `"vehicle_mode": "auto"`, a concept goes to SAM video first; if a part
 fills its 16 objects before the next part takes over, that concept is detected frame by frame instead and the page
-says when it filled (on the Indian clip: "person: 16 objects taken within 1.0-1.6 s in 3 of 3 parts").
+says when it filled (on the Indian time-lapse: "person: 16 objects taken within 1.0-1.6 s in 3 of 3 parts").
 
 ### Open weights: Muse Glimmer writes the letter
 
@@ -291,12 +291,13 @@ to set it.
   the self-check): 0.52 and 1.89 km/h. DUT's cars crawl at about 10 km/h, right on the "moving" bar, so this decides
   which conflicts exist: of the frames with the car at 7–13 km/h, 7.5% still land on the wrong side of the bar (28%
   before).
-- **Dense Indian intersection** (39 s, no ground truth, calibration guessed): SAM video saw on average 1.6 people and
-  6 vehicles a frame, crowd mode 14.9 people and 20 vehicles. Before the fixes above it reported 543 serious
-  near-misses, nearly all one-frame track fragments and riders. Re-scored at $0 from its cache with today's code
-  (vehicles as cached, 5 a second): 22 conflicts before Spark's review (14 serious), 6 events after it (4 serious; 1
-  from a piece Spark has not seen). Speeds there are not trustworthy (up to 36 km/h after the review, 46 km/h
-  before) because nothing was measured on that road.
+- **Dense Indian intersection** (a YouTube stock clip, 39 s, no ground truth, calibration guessed) **is a
+  time-lapse.** In 16 consecutive source frames (0.53 s at 30 fps) people cross half the road and the whole traffic
+  state changes. Every speed, PET and near-miss count we gave for it is withdrawn (listed in `GATES.md`, 29 Oct). In
+  its worst stored "near-miss" (87.9 km/h) the pedestrian's box slides over empty road while the car's box jumps
+  between cars: the tracker joined different road users across the skipped time. Only its detection coverage, the
+  objects found per frame, still means something: SAM video found on average 1.6 people and 6 vehicles a frame, crowd
+  mode 14.9 people and 20 vehicles. The walking-pace guard below now flags it.
 - **What the real false alarms are:** two are in clip 09 and were checked frame by frame on 28 Oct. One is a real
   person in yellow whom the dataset stops tracking after 1.8 s while they keep walking along the kerb, so it may be a
   gap in the ground truth. The other is a person standing still at the road edge for the whole clip; the dataset
@@ -324,6 +325,28 @@ to set it.
     scales with this count, so the page says so.
 
 The DUT data has no licence and was used only for internal testing; it is not included.
+
+### People are the clock
+
+People walk at about 1.2-1.5 m/s, so the people in a video check its clock and its calibration at once. `pace.py`
+takes the median walking speed, in road metres a second, of the pedestrian pieces that crossed (the crossing count's
+own pieces), and analyze.py writes it to events.json as `"walking"`. With 10 or more walking pieces, a median over
+2.4 m/s (sped up, or a calibration rectangle marked too big) or under 0.5 m/s (slowed down, or marked too small) flags
+the video. The page then says "People here walk at X m/s, about K times normal walking..." in place of the headline,
+leaves out the near-miss and speed tiles, the pyramid, the engineering numbers and the gap barcode, heads the cards
+"not measurements", and no letter is asked for (no Spark or Glimmer call). Medians measured at $0 from the cached SAM
+replies on 29 Oct (details in `GATES.md`):
+
+| Video | Walking pieces | Median walking speed |
+|---|---|---|
+| DUT drone clips, our tracks (8 clips, each in crowd mode, SAM video and 2 x 2 tiles) | 11-129 per run | 1.05-1.48 m/s |
+| DUT and SinD, the datasets' own tracks | 280 / 63 | 1.22 / 1.13 m/s |
+| Schoolchildren CCTV (assumed calibration), two runs | 13 / 14 | 0.80 / 1.66 m/s |
+| Indian time-lapse, crowd mode | 13 | 2.71 m/s: flagged |
+| Indian time-lapse, SAM video | 0 | not judged |
+
+It sees only the people the tracker keeps: on the time-lapse the fastest were lost, so it reads 2.1x normal walking,
+not the true speed-up, and a video sped up less than about 2x would pass.
 
 ## Scale
 
@@ -364,9 +387,8 @@ python3 vehicle_test.py out/indian-crowd --spend   # 60 cached crowd frames, abo
 - Crowd mode fills in a box across up to 1 s of missed detections, so a near-miss can sit on an inferred position
   rather than a seen one. Each card says which: "Seen at the moment", or how long SAM did not detect the person or
   the vehicle when that was 0.5 s or more ("position inferred"). Re-scored at $0 from the cached replies on 29 Oct,
-  before Spark's review: 12 of 22 conflicts on the dense Indian clip (a phone at an angle, crowd mode for people and
-  vehicles), against 1 of 54 (vehicle crowd mode) and 1 of 55 (crowd mode) on the top-down DUT clips. SAM video mode
-  fills nothing in, so it never flags one.
+  before Spark's review: 1 of 54 conflicts (vehicle crowd mode) and 1 of 55 (crowd mode) on the top-down DUT clips.
+  SAM video mode fills nothing in, so it never flags one.
 - A person standing still on the carriageway when a car passes within 1 m is reported as a near-miss.
 - The death-risk curve is for adults (15+) hit by a car front; children are not covered by that study.
 - Distances are only as good as the measured calibration rectangle.
