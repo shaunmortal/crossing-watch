@@ -11,9 +11,20 @@ own planting functions then put one lie in a copy (its 12 kinds; the 9 inserted 
 bench stays unseen) or one true sentence (a clean control), and each copy becomes one chat row:
 {"messages": [user: the judge prompt pack sends, assistant: the reply pack.read_problems reads]}.
 
-Run: python3 finetune_judge.py --dir DIR [--letters 50] [--cap 1.50] [--yes]
-Without --yes it estimates and builds rows from cached letters only. Letters are cached in DIR/letters, so a re-run
-pays nothing. Writes DIR/judge_train.jsonl and DIR/judge_train.manifest.json.
+Run: python3 finetune_judge.py --dir DIR [--writers spark-open=50] [--cap 1.50] [--yes]
+                                [--dev-letters N --out-dir OUT --name NAME]
+--writers also takes spark=N: Muse Spark on the Meta API (MODEL_API_KEY), the writer pack.py uses by default, at
+pack's reasoning effort "low", on packs from seed 10000 on (Spark Open's start at 0), so no pack has two letters.
+Without --yes it estimates and builds rows from cached letters only. Letters are cached in DIR/letters (Spark Open)
+and DIR/letters-spark, so a re-run pays nothing; DIR/reviewed.json holds the verdicts. Writes OUT/NAME.jsonl and
+OUT/NAME.manifest.json (OUT is DIR unless given). With --dev-letters N, N whole letters (writers in turn) are dev and
+the file is the starter's input (muse_glimmer_starter.py --file, seed 0, --n-eval from OUT/split.json): its shuffle
+holds out every dev row and every public-bench prompt and trains on the rest; OUT/split.json labels the holdout.
+v1 (commit 4b5f9fd, --writers spark-open=50 with no dev letters) had no "pairs restated" clean control and no inserted
+"near-misses swapped" lie, so its rows come from that commit's finetune_judge.py; this one adds both.
+
+v2: python3 finetune_judge.py --dir DIR --writers spark-open=100,spark=50 --dev-letters 15 --out-dir DIR/v2 \
+        --name judge_v2 --cap 6.80 --yes
 """
 import argparse
 import hashlib
@@ -27,11 +38,17 @@ from pathlib import Path
 
 import judge_bench
 import pack
+import review
 import road
+import sam
 import writers_table
 
 FIREWORKS_URL = "https://api.fireworks.ai/inference/v1"
 WRITER_MODEL = "accounts/fireworks/models/muse-spark-open"  # the writer of the public bench's spark-open letter
+# --writers name: (its letter cache under --dir, its first pack seed, its model, its server; "" = the Meta API as pack.py
+# asks Muse Spark, spark_run). A record cached without "writer" is Spark Open's (v1).
+WRITERS = {"spark-open": ("letters", 0, WRITER_MODEL, FIREWORKS_URL), "spark": ("letters-spark", 10_000, review.MODEL, "")}
+STARTER_SEED = 0  # muse_glimmer_starter.py --seed: _prepare shuffles the file with random.Random(seed), holds out n_eval
 WORKERS = 4  # letters asked at once: one takes Spark Open 60-110 s
 WORST_CALL_USD = 0.03  # budget guard per call: the sample's letter took 2,732 completion tokens, about $0.012
 FPS = 10  # PET is whole frames, as in sample/
@@ -202,6 +219,20 @@ def reply(problems):
     return json.dumps({"problems": problems}, ensure_ascii=False)
 
 
+def pair_sentence(worst, swap):
+    """A sentence putting two near-misses' speeds with their time gaps, the speeds swapped when `swap`; None when no
+    two near-misses differ in both. Every number is measured. v2: Spark Open rarely names two near-misses in one
+    sentence, so judge_bench.swapped gave only 2 rows in v1."""
+    pairs = [(a, b) for i, a in enumerate(worst) for b in worst[i + 1:]
+             if a["pet_s"] != b["pet_s"] and a["vehicle_kmh"] != b["vehicle_kmh"]]
+    if not pairs:
+        return None
+    a, b = pairs[0]
+    first, second = (b, a) if swap else (a, b)
+    return (f"In the near-miss with a time gap of {a['pet_s']} s the vehicle was going at {first['vehicle_kmh']} km/h, "
+            f"and in the one with a time gap of {b['pet_s']} s it was going at {second['vehicle_kmh']} km/h.")
+
+
 def planted(letter, worst, rng):
     """(kind, copy with one lie, the one problem a judge should list) for every kind this letter can carry."""
     out = []
@@ -222,6 +253,9 @@ def planted(letter, worst, rng):
         a, b = moved[0], moved[-1]
         out.append(("near-misses swapped", swap, f"The speeds {a} and {b} are swapped: each is put with the other "
                     "near-miss's time gap and death risk."))
+    elif lie := pair_sentence(worst, swap=True):
+        out.append(("near-misses swapped", judge_bench.inserted(letter, lie), f'"{lie}": the two speeds are swapped; '
+                    "each is put with the other near-miss's time gap."))
     return [o for o in out if o[1]]
 
 
@@ -230,6 +264,7 @@ def true_sentences(facts):
     n, c = facts["serious_near_misses"], facts["close_passes"]
     many = lambda k, one, more: f"{k} {one if k == 1 else more}"
     fastest = max(e["vehicle_kmh"] for e in facts["worst"])
+    pair = pair_sentence(facts["worst"], swap=False)
     return [("meeting offered", "We would be glad to walk the crossing with your engineers whenever it suits them."),
             ("counts restated", f"To sum up, the recording showed {many(n, 'serious near-miss', 'serious near-misses')} "
                                 f"and {many(c, 'close pass', 'close passes')}."),
@@ -237,7 +272,8 @@ def true_sentences(facts):
             ("recording length", f"The recording these figures come from lasted {facts['observed']['minutes']} minutes."),
             ("fastest restated", f"Among the worst near-misses measured, the fastest vehicle was going at {fastest} km/h."),
             ("one recording", "These figures come from a single recording and may differ on other days."),
-            ("adult risk source", f"The death-risk figures are for adults hit by a car front ({facts['risk_source']}).")]
+            ("adult risk source", f"The death-risk figures are for adults hit by a car front ({facts['risk_source']}).")] + (
+        [("pairs restated", pair)] if pair else [])
 
 
 def letter_rows(letter, measured, key):
@@ -255,38 +291,45 @@ def letter_rows(letter, measured, key):
             + [row(f"clean: {kind}", text, []) for kind, text in clean if text])
 
 
-def cost_usd(usage):
-    """A call's price from its usage at writers_table's quoted Spark Open price; WORST_CALL_USD when not reported."""
-    price, (prompt, cached, completion, _) = writers_table.PRICES[WRITER_MODEL], writers_table.tokens(usage)
+def cost_usd(usage, model=WRITER_MODEL):
+    """A call's price from its usage at writers_table's quoted price; WORST_CALL_USD when not reported."""
+    price, (prompt, cached, completion, _) = writers_table.PRICES[model], writers_table.tokens(usage)
     if prompt is None or completion is None:
         return WORST_CALL_USD
     cached = cached or 0
     return ((prompt - cached) * price[0] + cached * price[1] + completion * price[2]) / writers_table.PER
 
 
-def write_letter(seed, measured):
-    """Spark Open's letter for one pack, through pack.model_plan exactly as pack.py asks it (no judge here). An
-    unreadable plan is a paid reply: it is kept, at WORST_CALL_USD, so a re-run never asks again. A refused or failed
-    request (no key, network) is None: nothing cached, and the run stops after this batch."""
-    pack.LETTER_URL, pack.LETTER_MODEL, pack.LETTER_KEY = FIREWORKS_URL, WRITER_MODEL, ""  # key: FIREWORKS_API_KEY
+def write_letter(seed, measured, writer="spark-open", key=None):
+    """`writer`'s letter for one pack, through pack.model_plan exactly as pack.py asks it (no judge here, no street
+    photo: a synthetic pack has none). `key` is the Meta API key, for Muse Spark. An unreadable plan is a paid reply:
+    it is kept, at WORST_CALL_USD, so a re-run never asks again. A refused or failed request (network, HTTP error) is
+    None: nothing cached, and the run stops after this batch."""
+    _, _, model, url = WRITERS[writer]
+    pack.LETTER_URL, pack.LETTER_MODEL, pack.LETTER_KEY = url, model, ""  # Fireworks key: FIREWORKS_API_KEY
     prompt = pack.LETTER_PROMPT.format(facts=measured, language="English")
     try:
-        plan = pack.model_plan(prompt, None, None, measured)
+        plan = pack.model_plan(prompt, key, None, measured)
     except (OSError, http.client.HTTPException) as err:
         print(f"finetune_judge: the letter call failed, nothing cached for pack {seed}: {err}", file=sys.stderr)
         return None
     except (ValueError, KeyError, TypeError) as err:
-        return {"seed": seed, "measured": measured, "error": str(err)[:300], "cost_usd": WORST_CALL_USD}
-    return {"seed": seed, "measured": measured, "prompt_chars": len(prompt), "cost_usd": cost_usd(plan.get("usage")),
+        return {"seed": seed, "writer": writer, "measured": measured, "error": str(err)[:300], "cost_usd": WORST_CALL_USD}
+    return {"seed": seed, "writer": writer, "model": model, "measured": measured, "prompt_chars": len(prompt),
+            "cost_usd": cost_usd(plan.get("usage"), model),
             "plan": {k: plan[k] for k in pack.PLAN_KEYS}, **{k: plan.get(k) for k in ("usage", "request_id", "wall_s")}}
 
 
-def letters(cache, target, cap, pay, public, reviewed):
-    """(base letters, rejected {seed: why}, USD spent on every cached call) once `target` letters pass, the cap
-    would be passed, or (without `pay`) the cache runs out."""
+def cached_usd(cache):
+    return sum(json.loads(p.read_text())["cost_usd"] for p in cache.glob("*.json"))
+
+
+def letters(cache, target, cap, pay, public, reviewed, writer="spark-open", spent=None, key=None):
+    """(base letters, rejected {seed: why}, USD spent) once `target` of `writer`'s letters pass, the cap would be
+    passed, or (without `pay`) the cache runs out. `spent` is every writer's cached spend (default: this cache's)."""
     bases, rejected = [], {}
-    spent = sum(json.loads(p.read_text())["cost_usd"] for p in cache.glob("*.json"))
-    seed = 0
+    spent = cached_usd(cache) if spent is None else spent
+    seed = WRITERS[writer][1]
     while len(bases) < target:
         path = cache / f"{seed:04d}.json"
         if not path.is_file():
@@ -297,7 +340,7 @@ def letters(cache, target, cap, pay, public, reviewed):
             if not batch:
                 break
             with ThreadPoolExecutor(len(batch)) as pool:
-                made = list(pool.map(lambda s: write_letter(s, synthetic_pack(s)), batch))
+                made = list(pool.map(lambda s: write_letter(s, synthetic_pack(s), writer, key), batch))
             for record in filter(None, made):
                 (cache / f"{record['seed']:04d}.json").write_text(json.dumps(record, indent=1, ensure_ascii=False))
                 spent += record["cost_usd"]
@@ -305,7 +348,7 @@ def letters(cache, target, cap, pay, public, reviewed):
             if None in made:
                 break
             continue
-        record = json.loads(path.read_text())
+        record = {"writer": "spark-open", **json.loads(path.read_text())}
         why = rejection(record, public, reviewed)
         if why:
             rejected[seed] = why
@@ -329,8 +372,9 @@ def manifest(rows, bases, rejected, spent, overlap, jsonl):
     kinds = {}
     for r in rows:
         kinds[r["kind"]] = kinds.get(r["kind"], 0) + 1
-    chars = sum(b["prompt_chars"] for b in bases)
-    per_char = sum(writers_table.tokens(b["usage"])[0] or 0 for b in bases) / chars if chars else 0
+    sparked = [b for b in bases if b["writer"] == "spark-open"]  # Glimmer's family: the closest tokenizer at hand
+    chars = sum(b["prompt_chars"] for b in sparked)
+    per_char = sum(writers_table.tokens(b["usage"])[0] or 0 for b in sparked) / chars if chars else 0
     longest = max(len(r["messages"][0]["content"]) for r in rows)
     starts = [0]
     for b in bases:
@@ -339,35 +383,131 @@ def manifest(rows, bases, rejected, spent, overlap, jsonl):
             "planted": sum(r["planted"] for r in rows), "clean": sum(not r["planted"] for r in rows),
             "clean_share": round(sum(not r["planted"] for r in rows) / len(rows), 3), "kinds": kinds,
             "letters": len(bases), "rows_by_letter": {b["seed"]: [starts[i], starts[i + 1]] for i, b in enumerate(bases)},
-            "rejected_letters": rejected, "letter_writer": f"{WRITER_MODEL} on {FIREWORKS_URL}",
+            "rejected_letters": rejected, "letters_by_writer": {w: sum(b["writer"] == w for b in bases) for w in WRITERS},
+            "letter_writer": {w: f"{m} on {u or 'the Meta API (' + sam.API_URL + ')'}" for w, (_, _, m, u) in WRITERS.items()},
             "letter_cost_usd": round(spent, 4), "public_bench_overlap": overlap,
             "longest_judge_prompt": {"chars": longest, "tokens_est": round(longest * per_char),
                                      "how": "chars x Spark Open's prompt tokens per char on these letters' prompts"},
             "data": "synthetic packs only (finetune_judge.synthetic_pack): no real video, no DUT, no SinD, no out/"}
 
 
+def dev_split(bases, n_dev):
+    """(train, dev) whole letters: dev takes each writer's next letter in turn, each writer's letters in a seeded order,
+    so it mixes writers and is the same on every run."""
+    queues = [random.Random(f"dev/{w}").sample(own, len(own))
+              for w in WRITERS if (own := [b for b in bases if b["writer"] == w])]
+    turns = [q[i] for i in range(max(map(len, queues), default=0)) for q in queues if i < len(q)]
+    dev = {b["seed"] for b in turns[:n_dev]}
+    return [b for b in bases if b["seed"] not in dev], [b for b in bases if b["seed"] in dev]
+
+
+def public_rows():
+    """The 31 public-bench prompts as rows, each the judge prompt pack sends and its label's reply."""
+    return [{"kind": i["kind"], "planted": i["planted"], "id": i["id"], "messages": [
+        {"role": "user", "content": pack.JUDGE_PROMPT.format(facts=i["measured"], letter=i["letter"])},
+        {"role": "assistant", "content": reply([i["kind"]] if i["planted"] else [])}]}
+        for i in json.loads(judge_bench.PUBLIC.read_text())]
+
+
+def starter_order(train, hold, seed=STARTER_SEED):
+    """`train` and `hold` (JSONL lines) in one order whose random.Random(seed).shuffle, as the starter's _prepare does,
+    puts `hold` first, in its own order, and every `train` line after: the starter's n_eval is len(hold). Checked by
+    replaying that shuffle."""
+    perm = list(range(len(train) + len(hold)))
+    random.Random(seed).shuffle(perm)  # shuffle moves items by the list's length only: the file's moves are these
+    at, rest = dict(zip(perm, hold)), iter(train)
+    out = [at[i] if i in at else next(rest) for i in range(len(perm))]
+    replay = list(out)
+    random.Random(seed).shuffle(replay)
+    if replay[:len(hold)] != hold or sorted(replay[len(hold):]) != sorted(train):
+        raise AssertionError("the starter's shuffle would not hold out exactly the dev and public rows")
+    return out
+
+
+def line(row):
+    return json.dumps({"messages": row["messages"]}, ensure_ascii=False)
+
+
+def counts(rows):
+    return {"rows": len(rows), "planted": sum(r["planted"] for r in rows), "clean": sum(not r["planted"] for r in rows),
+            "swapped": sum(r["kind"] == "near-misses swapped" for r in rows)}
+
+
+def write_starter(rows, bases, n_dev, out, name):
+    """OUT/NAME.jsonl in starter order and OUT/split.json: n_eval and the holdout's labels in post-shuffle order."""
+    train_letters, dev_letters = dev_split(bases, n_dev)
+    dev_seeds = {b["seed"] for b in dev_letters}
+    dev = [r for r in rows if r["seed"] in dev_seeds]
+    train = [r for r in rows if r["seed"] not in dev_seeds]
+    public = public_rows()
+    if {line(r) for r in public} & {line(r) for r in rows}:
+        raise SystemExit("finetune_judge: a public-bench prompt is among the synthetic rows, nothing written")
+    hold = dev + public
+    jsonl = out / f"{name}.jsonl"
+    jsonl.write_text("".join(x + "\n" for x in starter_order([line(r) for r in train], [line(r) for r in hold])))
+    labels = [{"set": "dev", "planted": r["planted"], "kind": r["kind"], "id": f"{r['writer']}/{r['seed']}/{r['k']}"}
+              for r in dev] + [{"set": "public", "planted": r["planted"], "kind": r["kind"], "id": r["id"]} for r in public]
+    split = {"file": jsonl.name, "sha256": hashlib.sha256(jsonl.read_bytes()).hexdigest(), "starter_seed": STARTER_SEED,
+             "n_eval": len(hold), "train_rows": len(train),
+             "dev_letters": [{"seed": b["seed"], "writer": b["writer"]} for b in dev_letters],
+             "train_letters": len(train_letters), "sets": {"train": counts(train), "dev": counts(dev),
+                                                           "public": counts(public)},
+             "how": "the starter's _prepare shuffles the file with random.Random(seed) and holds out the first n_eval "
+                    "rows: these, in this order (replayed when the file was written)", "holdout": labels}
+    (out / "split.json").write_text(json.dumps(split, indent=1, ensure_ascii=False))
+    return jsonl, split
+
+
+def parse_writers(text):
+    """"spark-open=100,spark=50" as {"spark-open": 100, "spark": 50}."""
+    wanted = {}
+    for part in text.split(","):
+        name, _, n = part.partition("=")
+        if name.strip() not in WRITERS or not n.strip().isdigit():
+            raise argparse.ArgumentTypeError(f"{part!r}: give NAME=COUNT, NAME one of {', '.join(WRITERS)}")
+        wanted[name.strip()] = int(n)
+    return wanted
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--dir", required=True, help="where letters/, judge_train.jsonl and its manifest go")
-    parser.add_argument("--letters", type=int, default=50, help="base letters to use")
-    parser.add_argument("--cap", type=float, default=1.50, help="USD: no new call once this could be passed")
+    parser.add_argument("--dir", required=True, help="where the letter caches and reviewed.json are")
+    parser.add_argument("--writers", type=parse_writers, default={"spark-open": 50},
+                        help=f"usable letters per writer, e.g. spark-open=100,spark=50 ({', '.join(WRITERS)})")
+    parser.add_argument("--cap", type=float, default=1.50,
+                        help="USD, every cached call counted: no new call once this could be passed")
     parser.add_argument("--yes", action="store_true", help="pay for missing letters (else estimate only)")
+    parser.add_argument("--dev-letters", type=int, default=0,
+                        help="whole letters held out as dev; the file is then the starter's input with the public bench")
+    parser.add_argument("--out-dir", help="where NAME.jsonl, its manifest and split.json go (default --dir)")
+    parser.add_argument("--name", default="judge_train", help="the file's name, without .jsonl")
     args = parser.parse_args()
-    out, public = Path(args.dir), public_spans()
-    (out / "letters").mkdir(parents=True, exist_ok=True)
-    review = out / "reviewed.json"  # a person's verdicts on letters with RISKY words: {"seed": "keep: ..."}
-    reviewed = json.loads(review.read_text()) if review.is_file() else {}
-    bases, rejected, spent = letters(out / "letters", args.letters, args.cap, args.yes, public, reviewed)
-    for seed, why in rejected.items():
-        if why.startswith("not reviewed"):
-            letter = json.loads((out / "letters" / f"{seed:04d}.json").read_text())["plan"]["letter"]
-            print(f"to review, pack {seed}:", *(s for s in pack.SENTENCE.split(letter) if RISKY.search(s.lower())),
-                  sep="\n  ")
-    print(estimate(args.letters, len(bases), spent, args.cap))
+    cache, public = Path(args.dir), public_spans()
+    out = Path(args.out_dir or args.dir)
+    out.mkdir(parents=True, exist_ok=True)
+    review_file = cache / "reviewed.json"  # a person's verdicts on letters with RISKY words: {"seed": "keep: ..."}
+    reviewed = json.loads(review_file.read_text()) if review_file.is_file() else {}
+    key = pack.optional_key() if "spark" in args.writers else None
+    if args.yes and "spark" in args.writers and not key:
+        raise SystemExit("finetune_judge: spark letters need MODEL_API_KEY (environment or .env)")
+    for folder, *_ in WRITERS.values():
+        (cache / folder).mkdir(parents=True, exist_ok=True)
+    spent = sum(cached_usd(cache / folder) for folder, *_ in WRITERS.values())
+    bases, rejected = [], {}
+    for writer, target in args.writers.items():
+        folder = cache / WRITERS[writer][0]
+        got, why, spent = letters(folder, target, args.cap, args.yes, public, reviewed, writer, spent, key)
+        bases, rejected = bases + got, {**rejected, **why}
+        for seed, reason in why.items():
+            if reason.startswith("not reviewed"):
+                letter = json.loads((folder / f"{seed:04d}.json").read_text())["plan"]["letter"]
+                print(f"to review, {writer} pack {seed}:",
+                      *(s for s in pack.SENTENCE.split(letter) if RISKY.search(s.lower())), sep="\n  ")
+        print(f"{writer}: {estimate(target, len(got), spent, args.cap)}")
     if not bases:
         return
-    rows = [{**r, "seed": b["seed"], "measured": b["measured"]} for b in bases
-            for r in letter_rows(b["plan"]["letter"], b["measured"], b["seed"])]
+    rows = [{**r, "seed": b["seed"], "writer": b["writer"], "measured": b["measured"], "k": k} for b in bases
+            for k, r in enumerate(letter_rows(b["plan"]["letter"], b["measured"], b["seed"]))]
     public_letters = {i["letter"] for i in json.loads(judge_bench.PUBLIC.read_text())}
     near = [r["seed"] for r in rows if shared(r["letter"], r["measured"], public)]
     overlap = {"rows_checked": len(rows), "exact_copies": sum(r["letter"] in public_letters for r in rows),
@@ -377,11 +517,18 @@ def main():
     print(f"public-bench overlap: {json.dumps(overlap)}")
     if overlap["exact_copies"] or near:
         raise SystemExit("finetune_judge: rows overlap the public bench, nothing written")
-    jsonl = out / "judge_train.jsonl"
-    jsonl.write_text("".join(json.dumps({"messages": r["messages"]}, ensure_ascii=False) + "\n" for r in rows))
+    if args.dev_letters:
+        jsonl, split = write_starter(rows, bases, args.dev_letters, out, args.name)
+    else:
+        jsonl, split = out / f"{args.name}.jsonl", None
+        jsonl.write_text("".join(line(r) + "\n" for r in rows))
     summary = {**manifest(rows, bases, rejected, spent, overlap, jsonl), "reviewed": {
         str(b["seed"]): reviewed[str(b["seed"])] for b in bases if str(b["seed"]) in reviewed}}
-    (out / "judge_train.manifest.json").write_text(json.dumps(summary, indent=1, ensure_ascii=False))
+    if split:  # the file's rows are in the starter's order, not by letter: split.json says which row is which
+        summary = {**{k: v for k, v in summary.items() if k != "rows_by_letter"},
+                   **{k: split[k] for k in ("n_eval", "train_rows", "sets", "dev_letters")},
+                   "file_rows": len(rows) + split["sets"]["public"]["rows"]}  # "rows", "kinds": the synthetic rows
+    (out / f"{args.name}.manifest.json").write_text(json.dumps(summary, indent=1, ensure_ascii=False))
     print(json.dumps({k: v for k, v in summary.items() if k not in ("rows_by_letter", "rejected_letters")}, indent=1))
     print(f"rejected letters: {len(rejected)}", *(f"  pack {s}: {w}" for s, w in rejected.items()), sep="\n")
 

@@ -2636,6 +2636,42 @@ def test_finetune_judge_rows_hold_the_judge_prompt_and_the_reply_pack_reads_and_
         spark_letter, worst)
 
 
+def test_finetune_judge_pair_sentence_swaps_each_speed_onto_the_other_near_miss_time_gap():
+    """Offline: swap=True puts each speed with the other near-miss's time gap (the planted lie); swap=False is the
+    measured pairing (a clean control), and it passes the code check."""
+    import re
+    import finetune_judge
+    import judge_bench
+    worst = [{"pet_s": 0.6, "vehicle_kmh": 41.0}, {"pet_s": 0.6, "vehicle_kmh": 30.0}, {"pet_s": 1.4, "vehicle_kmh": 25.5}]
+    true, lie = finetune_judge.pair_sentence(worst, swap=False), finetune_judge.pair_sentence(worst, swap=True)
+    as_pairs = lambda s: re.findall(r"time gap of ([\d.]+) s (?:the vehicle|it) was going at ([\d.]+) km/h", s)
+    assert as_pairs(true) == [("0.6", "41.0"), ("1.4", "25.5")]  # the first two near-misses differing in both
+    assert as_pairs(lie) == [("0.6", "25.5"), ("1.4", "41.0")]
+    assert finetune_judge.pair_sentence(worst[:2], swap=True) is None  # one time gap: nothing to swap
+    measured = next(m for m in map(finetune_judge.synthetic_pack, range(50))
+                    if finetune_judge.pair_sentence(json.loads(m)["worst"], False))
+    assert not judge_bench.code_flags(finetune_judge.pair_sentence(json.loads(measured)["worst"], False), measured)
+
+
+def test_finetune_judge_dev_split_keeps_whole_letters_apart_and_the_starter_holds_out_dev_and_public_rows():
+    """Offline: dev and train share no letter and mix writers; the starter's own shuffle (Random(0), first n_eval)
+    of the written order holds out exactly the dev rows and the public bench, which are never trained on."""
+    import random
+    import finetune_judge
+    bases = [{"seed": s, "writer": w} for w, first in (("spark-open", 0), ("spark", 10_000)) for s in range(first, first + 9)]
+    train, dev = finetune_judge.dev_split(bases, 5)
+    assert len(dev) == 5 and not {b["seed"] for b in train} & {b["seed"] for b in dev} and len(train) + len(dev) == 18
+    assert {b["writer"] for b in dev} == {"spark-open", "spark"} and (train, dev) == finetune_judge.dev_split(bases, 5)
+    public = [finetune_judge.line(r) for r in finetune_judge.public_rows()]
+    assert len(public) == 31
+    train_rows = [f'{{"t": {i}}}' for i in range(200)]
+    hold = [f'{{"d": {i}}}' for i in range(12)] + public
+    order = finetune_judge.starter_order(train_rows, hold)
+    assert sorted(order) == sorted(train_rows + hold)
+    random.Random(0).shuffle(order)  # what muse_glimmer_starter._prepare does
+    assert order[:len(hold)] == hold and not set(public) & set(order[len(hold):])
+
+
 def test_judge_bench_counts_unreadable_replies_apart_and_asks_only_for_missing_runs():
     import judge_bench
     item = {"id": "x", "kind": "k", "named": True, "planted": True, "letter": "L", "measured": "{}", "code": [False]}
