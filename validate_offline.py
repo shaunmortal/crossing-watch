@@ -41,7 +41,7 @@ def with_verdicts(events, verdicts, person_boxes, vehicle_boxes, people):
     pieces without one stay unreviewed."""
     rideables = [t for name, t in vehicle_boxes.items() if name.split("#")[0].lower() in review.RIDEABLE]
     return [{**e, "review": review.gated(verdicts[e["person"]], analyze.piece_boxes(person_boxes, people, e["person"]),
-                                         rideables, analyze.walking_kmh(people[e["person"]]))}
+                                         rideables, *analyze.motion(people, e["person"]))}
             if e["person"] in verdicts else e for e in events]
 
 

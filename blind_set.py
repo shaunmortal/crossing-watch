@@ -74,7 +74,8 @@ def decoys(candidates, verdict_of, n, total):
         if len(out) == n:
             break
         verdict = verdict_of(e["person"]) or {}
-        if not endangered(e, candidates, total) and verdict.get("is_person") and not verdict.get("review_unclear"):
+        if (not endangered(e, candidates, total) and verdict.get("is_person") and not verdict.get("review_unclear")
+                and not verdict.get("review_disputed")):
             out.append(e)
     return out
 

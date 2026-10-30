@@ -30,6 +30,10 @@ RIDER_VERDICTS = {"rider", "cyclist"}
 RIDEABLE = {"motorcycle", "bicycle", "scooter", "auto rickshaw",  # vehicle concepts a person can ride on or in;
             "vehicle"}  # the single concept "vehicle" covers two-wheelers too, so its boxes count
 RIDER_GATE_SHARE = 0.3  # a rider call stands only if the person's box is this much inside a rideable box
+RIDE_KMH = 8            # ...or if the person's median speed is over this: faster than a walk
+WALK_KMH = (1.5, 8)     # a "not a person" piece walking at a median speed in this band...
+WALK_MIN_M = 2          # ...that moved this far start to end is kept (review_disputed)...
+SHADOW_M = 1.5          # ...unless another piece stays this close on most of its frames: then it is that walker's shadow
 VIEWS = {False: "a traffic camera looking down at a street crossing at an angle",
          True: "a drone looking straight down on a street crossing; people look like small heads and shoulders from above"}
 PROMPT = ('Zoomed crop from {view}. Is the thing in the thin CYAN box a pedestrian on foot? Someone riding or sitting '
@@ -55,29 +59,40 @@ def read_verdict(text):
             "reason": str(data.get("reason", ""))[:200]}
 
 
-def gated(verdict, person_boxes, rideables, walk_kmh=None):
+def gated(verdict, person_boxes, rideables, walk_kmh=None, moved_m=0.0, beside=False):
     """Spark's verdict, except that "rider" or "cyclist" rejects the person only when SAM found a rideable vehicle
     under them: their box RIDER_GATE_SHARE or more inside its box on the same frame, feet no lower than its bottom
     plus road.RIDER_FEET_PX (road.without_riders' rule: a walker passing in front of a parked bike has lower feet).
     Otherwise they stay a pedestrian, marked rider_unconfirmed (on the DUT drone test Spark called walking students
     riders). "unclear" keeps the person too, marked review_unclear: only a sure "no" rejects (a rule set after seeing
-    3 DUT cases, not checked on held-out data). "not a person" always stands: a shadow moves at walking pace too."""
+    3 DUT cases, not checked on held-out data). A rider call over RIDE_KMH stands without a bike box. Any other "no"
+stands unless the piece walked (WALK_KMH, WALK_MIN_M) with no other piece beside it (`beside`, within SHADOW_M on
+most frames): then it is kept, marked review_disputed (on DUT, Spark's "not a person" was 0 for 6, all walkers; a
+rule set after seeing those DUT cases, its first held-out test is new footage)."""
     if verdict and not verdict["is_person"] and verdict["road_user"] == "unclear":
         return {**verdict, "is_person": True, "review_unclear": True}
-    if not verdict or verdict["is_person"] or verdict["road_user"] not in RIDER_VERDICTS:
+    if not verdict or verdict["is_person"]:
         return verdict
+    if verdict["road_user"] not in RIDER_VERDICTS:
+        walking = walk_kmh is not None and WALK_KMH[0] <= walk_kmh <= WALK_KMH[1] and moved_m >= WALK_MIN_M
+        return {**verdict, "is_person": True, "review_disputed": True, "walk_kmh": walk_kmh} \
+            if walking and not beside else verdict
     share = max((road.inside_share(b, w[f]) for w in rideables for f, b in person_boxes.items()
                  if f in w and b[3] <= w[f][3] + road.RIDER_FEET_PX), default=0.0)
-    if share >= RIDER_GATE_SHARE:
+    if share >= RIDER_GATE_SHARE or (walk_kmh or 0) > RIDE_KMH:
         return verdict
     return {**verdict, "is_person": True, "rider_unconfirmed": True, "walk_kmh": walk_kmh}
 
 
 def unconfirmed_rider(verdict):
-    """How a page names someone Spark called a rider with no bike under them, or None for any other verdict."""
-    if not (verdict or {}).get("rider_unconfirmed"):
-        return None
+    """How a page names someone Spark called a rider with no bike under them, or a walker it called not a person
+    (review_disputed), or None for any other verdict."""
+    verdict = verdict or {}
     walk = "" if verdict.get("walk_kmh") is None else f"; measured walking {verdict['walk_kmh']} km/h"
+    if verdict.get("review_disputed"):
+        return f"pedestrian (Spark thought {verdict['road_user']}; kept{walk})"
+    if not verdict.get("rider_unconfirmed"):
+        return None
     return f"pedestrian (Spark thought {verdict['road_user']}; no bike found under them{walk})"
 
 
