@@ -17,7 +17,9 @@ WORKERS = 6          # parallel image requests
 MATCH_IOU = 0.3      # a detection continues a track when it overlaps the predicted box this much...
 MATCH_SIZES = 1.0    # ...or when its centre is within one box size (the larger side) of the predicted centre:
                      # between samples a walker moves less than their own body width
-MAX_GAP_S = 1.0      # a track hidden for up to this long picks up its ID again
+MAX_GAP_S = 2.0      # a track hidden for up to this long picks up its ID again (a walker behind a passing car)
+GAP_WIDEN_SIZES = 0.5  # per sample a track was not seen, its match gate widens this many box sizes: the hidden
+                       # walker may have changed pace, so the constant-velocity guess drifts
 MAX_AREA_JUMP = 2.5  # vehicles: a box this many times larger or smaller than the track's last is another vehicle
                      # (a motorcycle went 43x68 to 30x18 px: a phantom 81 km/h); people may just be partly hidden
 
@@ -87,7 +89,7 @@ def predicted(track, last_frame, frame):
     return [box[0] + dx, box[1] + dy, box[2] + dx, box[3] + dy]
 
 
-def closeness(expected, box, max_area_jump=math.inf):
+def closeness(expected, box, max_area_jump=math.inf, gate=MATCH_SIZES):
     """How well a detection continues a track, given where the track was expected: from IoU, or failing that
     from centre distance in box sizes; None when it is too far, or too different in size, to be the same object."""
     jump = (box[2] - box[0]) * (box[3] - box[1]) / ((expected[2] - expected[0]) * (expected[3] - expected[1]))
@@ -98,21 +100,23 @@ def closeness(expected, box, max_area_jump=math.inf):
         return 1 + overlap
     size = max(expected[2] - expected[0], expected[3] - expected[1], 1.0)
     shift = math.dist(centre(expected), centre(box)) / size
-    return 1 - shift / MATCH_SIZES if shift <= MATCH_SIZES else None
+    return 1 - shift / gate if shift <= gate else None
 
 
 def associate(detections, clip_fps, max_area_jump=math.inf):
     """{track id: {frame: box}} from {frame: [box, ...]}: each frame's boxes join the best-matching live track
-    (greedy, best match first; never one whose box is over `max_area_jump` times larger or smaller); a track unseen
-    for MAX_GAP_S ends; unmatched boxes start new tracks."""
+    (greedy, best match first; never one whose box is over `max_area_jump` times larger or smaller; the gate widens
+    by GAP_WIDEN_SIZES per missed sample); a track unseen for MAX_GAP_S ends; unmatched boxes start new tracks."""
     tracks, last = {}, {}  # id -> {frame: box}; id -> last frame seen
     max_gap = round(MAX_GAP_S * clip_fps)
+    step = min((b - a for a, b in zip(sorted(detections), sorted(detections)[1:])), default=1)
     for frame in sorted(detections):
         boxes = detections[frame]
         live = [tid for tid, seen in last.items() if frame - seen <= max_gap]
         expected = {tid: predicted(tracks[tid], last[tid], frame) for tid in live}
+        gate = {tid: MATCH_SIZES + GAP_WIDEN_SIZES * max(0, (frame - last[tid]) // step - 1) for tid in live}
         pairs = sorted(((score, tid, i) for tid in live for i, box in enumerate(boxes)
-                        if (score := closeness(expected[tid], box, max_area_jump)) is not None), reverse=True)
+                        if (score := closeness(expected[tid], box, max_area_jump, gate[tid])) is not None), reverse=True)
         used_t, used_b = set(), set()
         for _, tid, i in pairs:
             if tid in used_t or i in used_b:
