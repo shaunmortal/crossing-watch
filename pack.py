@@ -35,6 +35,7 @@ import crowd
 import filmcheck
 import fixband
 import gazette
+import hindi
 import openweights
 import overlay
 import pace
@@ -151,7 +152,7 @@ NOTES:
 # school's own facts nor take them as measured
 STATED = "\n\nSTATED BY THE PRINCIPAL, NOT MEASURED (a letter may give these as the school's own statements):\n"
 SIGNOFF_KEYS = ("approved_by", "school", "date", "letter_sha256")  # signoff.json
-PLAN_BACKUP = "plan-{sha8}.json"  # a replaced plan.json, named by the first 8 hex digits of its letter's sha256
+PLAN_BACKUP = "plan-{sha8}.json"  # a replaced plan.json, named by the first 8 hex digits of its signed_sha
 FILED_KEYS = ("to", "channel", "date", "reference")  # the site's "submitted" record, once the pack is filed
 TCT_TOOLKIT = "https://www.childhealthinitiative.org/media/v5bntgmp/tct-toolkit__one-pager_final_508_updated.pdf"
 PRINTED_CARDS = 3  # on paper only the worst 3 near-misses, so the letter's own sheet comes soon
@@ -1023,8 +1024,21 @@ def letter_section(plan, events=(), measured="", signoff=None):
     return (f'<section class="letter-sheet" id="letter"><h2>Letter to the road authority</h2>{writer}<div class="letter" '
             f'contenteditable="plaintext-only" spellcheck="false" role="textbox" aria-multiline="true" '
             f'aria-label="Letter, editable" data-measured="{known}">{paragraphs}</div>{check}<p class="note ok" id="letter-check"'
-            f'{"" if clean else " hidden"}>{html.escape(checked) if clean else ""}</p>{disclosure(plan, signoff)}'
+            f'{"" if clean else " hidden"}>{html.escape(checked) if clean else ""}</p>{hindi_section(plan)}'
+            f"{disclosure(plan, signoff)}"
             f"{LETTER_SCRIPT}</section>")
+
+
+def hindi_section(plan):
+    """The Hindi copy under the English letter, on its own printed sheet, or why there is none (hindi.translate)."""
+    if plan.get("letter_hi"):
+        paragraphs = "".join(f"<p>{html.escape(p)}</p>" for p in plan["letter_hi"].split("\n") if p.strip())
+        by = html.escape(plan.get("writer") or "the letter's writer")
+        return (f'<div class="hindi-copy"><h3>Hindi copy, translated by {by}, numbers checked against the English '
+                f'letter</h3><div class="letter" lang="hi">{paragraphs}</div></div>')
+    if plan.get("letter_hi_failed"):
+        return f'<p class="note bad">No Hindi copy, send the English letter: {html.escape(plan["letter_hi_failed"])}.</p>'
+    return ""
 
 
 # the same three checks as unmeasured(), re-run in the browser on every edit, a linked number's click, and on paper
@@ -1107,8 +1121,15 @@ def letter_status(site, plan, signoff):
 
 
 def is_signed(plan, signoff):
-    """signoff.json (read_signoff) approves this plan's letter: its letter_sha256 is still the letter's."""
-    return bool(plan and signoff) and signoff["letter_sha256"] == sha256(plan["letter"])
+    """signoff.json (read_signoff) approves this plan's letter: its letter_sha256 is still signed_sha's."""
+    return bool(plan and signoff) and signoff["letter_sha256"] == signed_sha(plan)
+
+
+def signed_sha(plan):
+    """What a sign-off approves: the letter's sha256, or with a Hindi copy the sha256 of both, so changing either one
+    reads as changed after sign-off."""
+    hi = plan.get("letter_hi")
+    return sha256(json.dumps([plan["letter"], hi], ensure_ascii=False) if hi else plan["letter"])
 
 
 def edits(plan):
@@ -1153,7 +1174,7 @@ cite { display: block; margin-top: 4px; font-style: normal; color: var(--muted);
 .pyramid i.base { background: var(--line); } .pyramid i.serious { background: var(--accent); }
 .pyramid i.tip { box-sizing: border-box; background: none; border: 2px dashed var(--accent); }
 @media print { a.clip { text-decoration: none; } a.clip::after { content: " (see clip " attr(data-clip) ")"; }
-               .letter-sheet { break-before: page; break-after: page; } }
+               .letter-sheet { break-before: page; break-after: page; } .hindi-copy { break-before: page; } }
 @media print { h2, h3 { break-after: avoid; } figure, table, blockquote, .pair { break-inside: avoid; }
                .letter-sheet:first-child { break-before: auto; } }
 """ + (  # dark colours are for screens only (dark ink on white paper); on paper only the worst cards, so say so
@@ -1303,6 +1324,31 @@ def new_plan(out_dir, prompt, measured, key, photo, revise=None, notes="", spoke
     return plan
 
 
+def with_hindi(out_dir, plan, api_key, signoff, signing):
+    """plan with its Hindi copy (site "hindi_copy": true), asked for once per letter and kept in plan.json:
+    "letter_hi" when hindi.translate found the English letter's numbers in it, else "letter_hi_failed" (the English
+    letter only). Never for a signed letter nor in the run that signs: the principal reads the copy before signing."""
+    if {"letter_hi", "letter_hi_failed"} & plan.keys():
+        return plan
+    if signing or is_signed(plan, signoff) or not (api_key or LETTER_URL):
+        print("no Hindi copy: it is made by the letter's writer (MODEL_API_KEY or LETTER_MODEL_URL) before the letter "
+              "is signed (run without --approved-by; a signed letter needs --new-letter)", file=sys.stderr)
+        return plan
+    ask = ((lambda prompt: open_model_reply(prompt, None, hindi.SCHEMA)[0]) if LETTER_URL
+           else lambda prompt: spark_reply(prompt, None, api_key))
+    try:
+        text, why = hindi.translate(plan["letter"], ask, NUMBER, NUMBER_WORD)
+    except (OSError, http.client.HTTPException) as err:
+        print(f"no Hindi copy this run (asked again next run), the English letter only: {err}", file=sys.stderr)
+        return plan
+    if why:
+        print(f"no Hindi copy, the English letter only: {why}", file=sys.stderr)
+    plan = {**plan, **({"letter_hi": text} if text else {"letter_hi_failed": why})}
+    # the same letter with its copy added: nothing to back up, and its provenance is unchanged
+    (out_dir / "plan.json").write_text(json.dumps(plan, indent=1, ensure_ascii=False))
+    return plan
+
+
 def write_plan(out_dir, plan):
     """plan.json, the paid-for letter, after copying the letter it held to plan-<first 8 of its sha256>.json, so no
     paid-for or signed letter is ever lost (signoff.json's letter_sha256 names its file); pack and the case agent both
@@ -1311,7 +1357,7 @@ def write_plan(out_dir, plan):
     key)."""
     path, old = out_dir / "plan.json", read_json(out_dir / "plan.json")
     if isinstance(old, dict) and isinstance(old.get("letter"), str):
-        shutil.copyfile(path, out_dir / PLAN_BACKUP.format(sha8=sha256(old["letter"])[:8]))
+        shutil.copyfile(path, out_dir / PLAN_BACKUP.format(sha8=signed_sha(old)[:8]))
     path.write_text(json.dumps(plan, indent=1, ensure_ascii=False))
     if "wall_s" in plan:
         model, url = (LETTER_MODEL, LETTER_URL) if LETTER_URL else (review.MODEL, sam.API_URL)
@@ -1346,7 +1392,7 @@ def sign(out_dir, plan, approved_by, school):
     letter that still holds a blank (check_signable): pack.py and agent.py --approve both sign through here."""
     check_signable(plan["letter"])
     record = {"approved_by": approved_by, "school": school, "date": datetime.date.today().isoformat(),
-              "letter_sha256": sha256(plan["letter"])}
+              "letter_sha256": signed_sha(plan)}
     (out_dir / "signoff.json").write_text(json.dumps(record, indent=1, ensure_ascii=False))
     return record
 
@@ -1482,6 +1528,8 @@ def main():
             key = optional_key()
             plan = (saved if saved and not notes else  # a re-run pays nothing
                     new_plan(out_dir, prompt, measured, key, photo, saved if notes else None, notes, spoken))
+            if site.get("hindi_copy") is True:
+                plan = with_hindi(out_dir, plan, key, signoff, all(signer))
             drawn = out_dir / fixband.PICTURE
             if photo and saved and drawn.is_file() and fix_instruction(saved) == fix_instruction(plan):
                 muse = lambda image, words, path: drawn  # drawn for this same fix by an earlier run: no new call

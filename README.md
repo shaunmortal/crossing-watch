@@ -108,7 +108,11 @@ letter (`signoff.json`) and asks for its own `--out` folder.
 - `--voice-notes AUDIO` takes the notes spoken into a phone (m4a, opus, wav; Hindi, English or both): Muse Voice
   Transcribe writes them down, the text is shown and saved as `notes-<sha8>.txt`, and it goes on as `--notes`. The
   audio is never copied; the sign-off line says the notes were spoken and transcribed.
-- `--approved-by` with `--school` writes `signoff.json`: the name, school, date and the sha256 of the exact letter.
+- `"hindi_copy": true` in the site file keeps the English letter and adds a Hindi copy for the local office, translated
+  by the same writer; code checks it holds exactly the English letter's numbers (Devanagari digits read as digits),
+  asks up to 3 times, else says English only. The page shows it under the letter; signing covers both.
+- `--approved-by` with `--school` writes `signoff.json`: the name, school, date and the sha256 of the exact letter
+  (with its Hindi copy, if any).
   The page fills in "Read and approved by" with them and says how many sentences the notes changed, counted by
   difflib against the first AI draft ("N of M sentences changed after the principal's notes"). If the letter
   changes after that, the page says "changed after sign-off, not signed". Signing asks no model.

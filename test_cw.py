@@ -4500,6 +4500,89 @@ def test_an_empty_transcript_stops_with_a_clear_message_and_revises_nothing():
         restore()
 
 
+def test_hindi_copy_holds_exactly_the_english_letters_numbers():
+    """hindi.mismatch: Devanagari digits read as digits; a changed, missing or added number, or a number in words of
+    either language, is refused; a word that only holds a number word (विचार, दोनों) is not."""
+    import hindi
+    check = lambda text: hindi.mismatch("A car at 30.0 km/h passed 0.5 s from one of our 1,200 pupils.", text,
+                                        pack.NUMBER, pack.NUMBER_WORD)
+    assert check("एक कार ३०.० km/h पर हमारे 1200 विद्यार्थियों में से एक से ०.५ s दूर से निकली। इस पर विचार करें, दोनों ओर।") == ""
+    assert check("एक कार 35.0 km/h पर 1,200 विद्यार्थियों में से एक से 0.5 s दूर से निकली।") == (
+        "missing 30; not in the English letter: 35")
+    assert check("एक कार 30.0 km/h पर 0.5 s दूर से निकली।") == "missing 1200"
+    assert check("30.0 km/h, 0.5 s, 1,200 विद्यार्थी, दो बार, two cars") == "numbers in words: two, दो"
+
+
+def test_hindi_copy_goes_back_while_its_numbers_differ_and_stops_after_three_tries():
+    import hindi
+    letter = "A car at 30.0 km/h passed 0.5 s from a child."
+    good, bad = '{"letter_hi": "एक कार ३०.० km/h पर एक बच्चे से ०.५ s दूर से निकली।"}', '{"letter_hi": "कार 31 km/h, 0.5 s"}'
+    prompts, replies = [], ["no json", bad, good]
+    ask = lambda prompt: (prompts.append(prompt), replies.pop(0))[1]
+    assert hindi.translate(letter, ask, pack.NUMBER, pack.NUMBER_WORD) == (json.loads(good)["letter_hi"], "")
+    assert letter in prompts[0] and "could not be read" in prompts[1] and "(missing 30; not in the English letter: 31)" in prompts[2]
+    prompts.clear()
+    text, why = hindi.translate(letter, lambda p: (prompts.append(p), bad)[1], pack.NUMBER, pack.NUMBER_WORD)
+    assert text == "" and len(prompts) == hindi.TRIES == 3 and "missing 30" in why
+
+
+def test_hindi_copy_is_shown_under_the_letter_and_signed_with_it():
+    """site "hindi_copy": true: the writer translates the checked English letter once; the page shows the copy under
+    it; the sign-off's sha covers both, so a changed Hindi copy reads as changed after sign-off. A copy whose numbers
+    never match leaves the English letter only, said on the page; a signing run asks for no copy."""
+    import datetime, tempfile
+    draft = {"fix": "speed table", "why": "w", "image_prompt": "i", "writer": pack.WRITER,
+             "letter": "Dear Sir. A car at 30.0 km/h passed 0.5 s from a child. We ask for a speed table."}
+    hindi_letter = "महोदय। एक कार ३०.० km/h पर एक बच्चे से ०.५ s दूर से निकली। हम स्पीड टेबल का अनुरोध करते हैं।"
+    sign = ["--approved-by", "A. Rao, Principal", "--school", "Gate School"]
+    asked, old = [], pack.spark_reply
+    try:
+        with tempfile.TemporaryDirectory() as folder:
+            out = pack_folder(folder)
+            site = json.loads((out / "site.json").read_text())
+            (out / "site.json").write_text(json.dumps({**site, "hindi_copy": True}))
+            pack.spark_reply = lambda prompt, image, key: (asked.append(prompt), json.dumps({"letter_hi": hindi_letter}))[1]
+            run_pack(out, ask=lambda p: draft, key="meta-key")
+            plan = json.loads((out / "plan.json").read_text())
+            assert plan["letter"] == draft["letter"] and plan["letter_hi"] == hindi_letter and len(asked) == 1
+            assert draft["letter"] in asked[0] and "never write a number in words" in asked[0]
+            page = (out / "index.html").read_text()
+            assert (f"Hindi copy, translated by {pack.WRITER}, numbers checked against the English letter</h3>"
+                    f'<div class="letter" lang="hi"><p>{hindi_letter}</p>') in page
+            assert page.index('lang="hi"') > page.index('contenteditable') and ".hindi-copy { break-before: page; }" in page
+            assert run_pack(out, key="meta-key") == [] and len(asked) == 1  # a re-run pays nothing
+            run_pack(out, *sign)
+            record = json.loads((out / "signoff.json").read_text())
+            assert record["letter_sha256"] == pack.signed_sha(plan) != pack.sha256(draft["letter"])
+            assert "Read and approved by: A. Rao, Principal" in (out / "index.html").read_text()
+            (out / "plan.json").write_text(json.dumps({**plan, "letter_hi": hindi_letter.replace("३०.०", "३५.०")}))
+            run_pack(out)
+            today = datetime.date.today().isoformat()
+            assert f"Changed after sign-off by A. Rao, Principal on {today}, not signed." in (out / "index.html").read_text()
+        with tempfile.TemporaryDirectory() as folder:
+            out = pack_folder(folder)
+            site = json.loads((out / "site.json").read_text())
+            (out / "site.json").write_text(json.dumps({**site, "hindi_copy": True}))
+            asked.clear()
+            pack.spark_reply = lambda prompt, image, key: (asked.append(prompt), '{"letter_hi": "कार 31 km/h"}')[1]
+            run_pack(out, ask=lambda p: draft, key="meta-key")
+            plan = json.loads((out / "plan.json").read_text())
+            assert len(asked) == 3 and "letter_hi" not in plan and "missing 0.5, 30" in plan["letter_hi_failed"]
+            assert "No Hindi copy, send the English letter: no translation kept" in (out / "index.html").read_text()
+            assert run_pack(out, key="meta-key") == [] and len(asked) == 3  # tried once per letter
+        with tempfile.TemporaryDirectory() as folder:
+            out = pack_folder(folder)
+            run_pack(out, ask=lambda p: draft, key="meta-key")
+            site = json.loads((out / "site.json").read_text())
+            (out / "site.json").write_text(json.dumps({**site, "hindi_copy": True}))
+            asked.clear()
+            run_pack(out, *sign, key="meta-key")  # the principal reads a copy before signing it: none made here
+            assert asked == [] and "letter_hi" not in json.loads((out / "plan.json").read_text())
+            assert json.loads((out / "signoff.json").read_text())["letter_sha256"] == pack.sha256(draft["letter"])
+    finally:
+        pack.spark_reply = old
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):
