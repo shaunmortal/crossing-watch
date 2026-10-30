@@ -133,13 +133,14 @@ Serving the LoRA for $0 on Kaggle (`--lora` on the same Q4_K_M base) is not done
 ## Spark-free mode
 
 Each closed-model step and its open-weights substitute, measured against the closed one (DUT: numbers only, crops stay
-private; crop reviewer run Sat 31 Oct 2026, 175 Spark Open calls, 80,500 in / 77,668 out tokens, about $0.43).
+private; crop reviewer run Sat 31 Oct 2026, 175 Spark Open calls, 80,500 in / 77,668 out tokens, about $0.43, then
+the last 6 vehicle-crowd pieces for about $0.02).
 
 | Component | Closed | Open substitute | Measured result |
 |---|---|---|---|
 | Letter writer | Muse Spark (1 try) | Spark Open on Fireworks; Glimmer 30B on Kaggle | number check passed on try 1; Glimmer on try 2 (writers table) |
-| Letter judge | Muse Spark (its column on the public bench not yet run) | Spark Open, effort low; Glimmer + our LoRA | public bench 22/23 lies, 0/8 false alarms; 18/23 (21 with code), 0/8 |
-| Crop reviewer | Muse Spark: crowd 47/52, 3 extra; vehicle crowd 48/52, 4 extra | Spark Open (`REVIEW_MODEL_URL`, `validate_offline.py --reviewer open`) | crowd 49/52, 3 extra; vehicle crowd 48/52, 3 extra, 6 events unreviewed; same keep/remove call as Spark on 51/53 and 45/46 pieces |
+| Letter judge | Muse Spark: public bench 21/23 lies, 0/8 false alarms | Spark Open, effort low; Glimmer + our LoRA | public bench 22/23 lies, 0/8 false alarms; 18/23 (21 with code), 0/8 |
+| Crop reviewer | Muse Spark: crowd 47/52, 3 extra; vehicle crowd 48/52, 4 extra | Spark Open (`REVIEW_MODEL_URL`, `validate_offline.py --reviewer open`) | crowd 49/52, 3 extra; vehicle crowd 48/52, 3 extra (none unreviewed); same keep/remove call as Spark on 51 of 53 and 45 of 46 pieces both judged |
 
 ## Runs still to come
 
