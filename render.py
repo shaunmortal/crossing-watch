@@ -4,6 +4,7 @@ where the two met, and every person's head blurred so clips of children can be s
 each clip: the whole near-miss in one picture.
 Captions (PET, gap, speed) are shown by the evidence page, since this ffmpeg build has no text filter."""
 import subprocess
+import tempfile
 from pathlib import Path
 
 import crowd
@@ -13,6 +14,7 @@ PAD_S = 2.0
 HEAD_SHARE = 0.3   # the top 30% of a person box holds the head
 MIN_BLUR_PX = 3    # heads smaller than this are unrecognisable anyway, and delogo needs room
 PLATE_SHARE = 0.25  # the bottom 25% of a vehicle box holds its number plate
+MAX_FILTERS = 2000  # ffmpeg 9 died (SIGBUS) on one chain of 5000 delogos (fine at 3000): a crowd is blurred in passes
 TRAIL_STEP = 2     # a footstep dot every 2nd frame
 DOT_PX = 6         # footstep dot size
 SPOT_PX = 14       # the meeting spot, larger than a footstep
@@ -174,16 +176,26 @@ def render(clip, event, person_track, vehicle_track, fps, out_path, everyone=(),
     marks = trail_filters(person_track, event, fps, first, last, top_down) + box_filters(
         [({f: b for f, b in track.items() if f not in done}, colour) for (track, colour), done in zip(pairs, drawn)],
         first, last)
-    args = ["ffmpeg", "-v", "error", "-y", "-ss", f"{first / fps:.3f}", "-i", str(clip)]
-    if tint:  # silhouettes go over the blurred heads, under the footsteps
-        args += ["-f", "rawvideo", "-pix_fmt", "rgba", "-video_size", "{}x{}".format(*frame_size),
-                 "-framerate", str(fps), "-i", "-",
-                 "-filter_complex", f"[0:v]setpts=PTS-STARTPTS,{','.join(blurs) or 'null'}[v];"
-                 f"[1:v]setpts=PTS-STARTPTS[s];[v][s]overlay=shortest=1,{','.join(marks) or 'null'}"]
-    else:
-        args += ["-vf", ",".join(blurs + marks) or "null"]
-    subprocess.run(args + ["-frames:v", str(last - first + 1), "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                           "-movflags", "+faststart", str(out_path)], check=True, input=tint or None)
+    frames = ["-frames:v", str(last - first + 1), "-an"]
+    passes = [blurs[k:k + MAX_FILTERS] for k in range(0, len(blurs), MAX_FILTERS)] or [[]]
+    with tempfile.TemporaryDirectory() as tmp:
+        source, start = Path(clip), f"{first / fps:.3f}"
+        for k, chunk in enumerate(passes[:-1]):  # a crowd: blurred in lossless passes first, the cut's frame numbers
+            done = Path(tmp) / f"pass{k}.mkv"     # (eq(n,...)) kept
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", start, "-i", str(source), "-vf", ",".join(chunk)]
+                           + frames + ["-c:v", "ffv1", str(done)], check=True)
+            source, start = done, "0"
+        blurs = passes[-1]
+        args = ["ffmpeg", "-v", "error", "-y", "-ss", start, "-i", str(source)]
+        if tint:  # silhouettes go over the blurred heads, under the footsteps
+            args += ["-f", "rawvideo", "-pix_fmt", "rgba", "-video_size", "{}x{}".format(*frame_size),
+                     "-framerate", str(fps), "-i", "-",
+                     "-filter_complex", f"[0:v]setpts=PTS-STARTPTS,{','.join(blurs) or 'null'}[v];"
+                     f"[1:v]setpts=PTS-STARTPTS[s];[v][s]overlay=shortest=1,{','.join(marks) or 'null'}"]
+        else:
+            args += ["-vf", ",".join(blurs + marks) or "null"]
+        subprocess.run(args + frames + ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+                                        str(out_path)], check=True, input=tint or None)
     return out_path
 
 

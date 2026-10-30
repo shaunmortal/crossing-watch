@@ -483,6 +483,21 @@ def test_offline_dut_check_puts_stored_verdicts_through_todays_rider_gate():
     assert "review" not in events[4]
 
 
+def test_offline_dut_check_asks_spark_at_most_the_paid_limit():
+    """validate_offline --spark N: at most N paid calls, then no reply (the piece stays unreviewed); 0 asks nothing."""
+    from pathlib import Path
+    import validate_offline
+    calls, old = [], (validate_offline.original_ask, sam.load_api_key)
+    validate_offline.original_ask = lambda path, key, top_down=False: calls.append(path) or "reply"
+    sam.load_api_key = lambda: "k"
+    try:
+        none, one = validate_offline.spark_asker(0), validate_offline.spark_asker(1)
+        assert none(Path("a.jpg"), "") is None and calls == []
+        assert one(Path("a.jpg"), "") == "reply" and one(Path("b.jpg"), "") is None and calls == [Path("a.jpg")]
+    finally:
+        validate_offline.original_ask, sam.load_api_key = old
+
+
 def test_offline_speed_check_reads_the_dataset_at_its_own_frame_rate():
     """validate_offline's speed reference: a DUT car at 3 m/s reads 3 m/s on its evenly spaced 23.976 fps frames,
     with no speed where a frame lacks neighbours; the summary counts cars near the 10 km/h bar put on the wrong side."""
@@ -2640,6 +2655,21 @@ def test_blind_set_hides_near_misses_among_spark_checked_decoys_in_same_length_c
     page = blind_set.page([c[0] for c in clips])
     assert page.count('type="radio"') == 16 and "new Blob" in page and "localStorage" in page
     assert not any(word in page for word in ("decoy", "pet_s", "car#", "e/0"))  # nothing on the page gives a clip away
+
+
+def test_render_blurs_a_crowd_in_passes_so_ffmpeg_survives():
+    """A crowded 12 s blind clip had 9392 heads and plates to blur, one delogo each, and ffmpeg 9 died (SIGBUS) on one
+    chain that long (fine at 3000, dead at 5000): render blurs in passes of at most render.MAX_FILTERS."""
+    import analyze, subprocess, tempfile
+    from pathlib import Path
+    heads = [{f: [4 + k % 40, 4, 14 + k % 40, 40] for f in range(130)} for k in range(50)]  # 50 x 121 = 6050 blurs
+    with tempfile.TemporaryDirectory() as tmp:
+        clip, cut = Path(tmp) / "clip.mp4", Path(tmp) / "cut.mp4"
+        subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=64x48:rate=10:duration=13",
+                        "-pix_fmt", "yuv420p", str(clip)], check=True)
+        render.render(clip, {"t_person_s": 2.0, "t_vehicle_s": 10.0}, {}, {}, 10, cut, everyone=heads,
+                      frame_size=(64, 48))
+        assert analyze.frame_count(cut) == 121
 
 
 

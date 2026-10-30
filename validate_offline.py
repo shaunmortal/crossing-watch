@@ -1,10 +1,11 @@
 """DUT check re-run at $0 on cached runs (validate_dut.py --out folders) with the code as it now stands: tracks rebuilt
 from the cached SAM replies, today's near-miss rules, Spark's stored verdicts re-applied through today's rider gate,
-and validate_dut's scoring. Nothing is sent to SAM or Spark and no events.json or reply is written: a cache miss
-stops the check. A pedestrian piece Spark never saw stays in, as unreviewed events do on the page; "unreviewed"
-counts those events, since a Spark run could still reject them.
+and validate_dut's scoring. Nothing is sent to SAM and no events.json is written: a cache miss stops the check. A
+piece with no stored verdict takes Spark's reply saved beside its crop (review.review), while the crop is the same;
+one with neither stays in, as unreviewed events do on the page, and "unreviewed" counts those events. --spark N asks
+Spark (paid) about at most N such crops and saves its replies there, so later runs read them at $0.
 Also checks our vehicle speeds against the dataset's positions at its own, evenly spaced frame rate.
-Run: python3 validate_offline.py DUT_REPO out/dut-vcrowd out/dut-15s [--site '{"person_mode": "video"}'] [--json FILE]
+Run: python3 validate_offline.py DUT_REPO out/dut-vcrowd out/dut-15s [--site '{"person_mode": "video"}'] [--json FILE] [--spark N]
 """
 import argparse
 import csv
@@ -45,14 +46,36 @@ def with_verdicts(events, verdicts, person_boxes, vehicle_boxes, people):
             if e["person"] in verdicts else e for e in events]
 
 
+def spark_asker(limit):
+    """review.ask for at most `limit` paid calls (the key loaded only if one is made); after that, and with limit 0,
+    no reply, so the piece stays unreviewed."""
+    asked = []
+    def ask(image_path, _key, top_down=False):
+        if len(asked) >= limit:
+            return None
+        asked.append(image_path)
+        print(f"asking Spark ({len(asked)} of at most {limit}): {image_path.parent.name}/{image_path.name}", flush=True)
+        return original_ask(image_path, sam.load_api_key(), top_down)
+    return ask
+
+
+original_ask = review.ask
+
+
 def rebuild(site, clip_out):
     """validate_dut.our_tracks plus today's events with the stored verdicts, cut in the run's own SAM parts."""
     stamp = json.loads((clip_out / "source.json").read_text())
     analyze.CHUNK_FRAMES, analyze.OVERLAP_FRAMES = stamp["chunk_frames"], stamp["overlap_frames"]  # as this run cut
     person_boxes, vehicle_boxes, people, vehicles, total = validate_dut.our_tracks(site, clip_out)
     verdicts = stored_verdicts(json.loads((clip_out / "events.json").read_text())["events"])
-    events = with_verdicts(road.conflicts(people, vehicles, analyze.FPS), verdicts, person_boxes, vehicle_boxes, people)
-    return events, people, vehicles, total
+    events = road.conflicts(people, vehicles, analyze.FPS)
+    clip, top_down = clip_out / "clip.mp4", site.get("view") == "top-down"
+    frame_size = tuple(int(v) for v in analyze.probe(clip, "stream=width,height").split(","))
+    for pid in list(dict.fromkeys(e["person"] for e in events))[:analyze.MAX_REVIEWS]:  # as analyze.review_people
+        if pid not in verdicts and (v := review.review(clip, analyze.piece_boxes(person_boxes, people, pid), frame_size,
+                                                       clip_out / f"person-{pid.replace('/', '-')}.jpg", "", top_down)):
+            verdicts[pid] = v
+    return with_verdicts(events, verdicts, person_boxes, vehicle_boxes, people), people, vehicles, total
 
 
 def native_speeds(repo, clip):
@@ -110,9 +133,12 @@ def main():
     parser.add_argument("runs", type=Path, nargs="+", help="cached validate_dut.py --out folders")
     parser.add_argument("--site", type=json.loads, help="site overrides as JSON, e.g. another cached person_mode")
     parser.add_argument("--json", type=Path, help="also save every clip's result here")
+    parser.add_argument("--spark", type=int, default=0, metavar="N",
+                        help="ask Spark (paid) about at most N crops with no saved reply; default 0: none")
     args = parser.parse_args()
     sam.request = crowd.request = analyze.encode = offline
     sam.RETRY_WAITS_S = ()  # a reply missing from the cache fails at once, not after the retries' waits
+    review.ask = spark_asker(args.spark)
     results = {}
     for run in args.runs:
         clips = sorted(p.stem.removeprefix("site-") for p in run.glob("site-*.json"))
