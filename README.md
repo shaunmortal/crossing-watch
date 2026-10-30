@@ -273,7 +273,7 @@ Muse Glimmer 30B on Kaggle's free 2 x T4 wrote the sample letter for $0 in 313 s
 The judge bench that can be published is [`kaggle/judge-bench-public.json`](kaggle/judge-bench-public.json), built only
 from letters about the synthetic `sample/`: Muse Spark flagged 21 of 23 planted lies and 0 of 8 clean letters.
 `JUDGE_VOTES=2` asks an open-weights judge twice and counts a problem only when both replies list it, because Glimmer,
-asked once, flagged 6 of 8 clean letters; its 2-vote result comes from the Kaggle Version 3 run.
+asked once, flagged 6 of 8 clean letters. With two votes on the public bench (Kaggle Version 3) Glimmer flagged all 23 planted lies, two more than Spark, and 5 of 8 clean letters, so Spark stays the default judge ([`<removed-run-record>`](<removed-run-record>)).
 
 `LETTER_MODEL` is the model id sent to the server; the page shows the product name and where it ran. A self-hosted
 server is named "self-hosted" only when it runs on the machine that ran pack.py, and Fireworks' API "on Fireworks".
