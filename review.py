@@ -10,12 +10,20 @@ import re
 import subprocess
 import urllib.request
 
+import openweights
 import road
 import sam
 import seal
 
 # Standard mode only: never a -contributor id (Meta trains on Contributor-mode content).
 MODEL = "muse-spark-1.3"
+# opt-in, for measuring an open-weights reviewer in Spark's place (validate_offline.py --reviewer open): any
+# OpenAI-compatible chat server that takes images, e.g. Fireworks' https://api.fireworks.ai/inference/v1. Same prompt,
+# same read_verdict; its replies are saved beside the crop as .open.json, so Spark's saved .json replies stay as they are.
+OPEN_URL = sam.env_value("REVIEW_MODEL_URL")
+OPEN_MODEL = sam.env_value("REVIEW_MODEL") or "accounts/fireworks/models/muse-spark-open"
+OPEN_KEY = sam.env_value("REVIEW_MODEL_KEY")  # its own key, else FIREWORKS_API_KEY on Fireworks only (openweights)
+OPEN_EFFORT = "low"  # reasoning_effort, sent to Fireworks only, as pack.JUDGE_EFFORT
 TIMEOUT_S = 120
 CROP_FACTOR = 3     # crop this many box-sizes around the person
 MIN_CROP_PX = 80
@@ -111,7 +119,7 @@ def said(pid, verdict):
         return None
     why = (f"{verdict['road_user']}, bike box under them" if verdict["road_user"] in RIDER_VERDICTS
            else "not a pedestrian")
-    line = f"Muse Spark: track {pid} removed: {why}"
+    line = f"{reviewer()}: track {pid} removed: {why}"
     reason = public_reason(verdict.get("reason"), min(REASON_CHARS, LINE_COLS - len(line) - len(' ("")')))
     return line + (f' ("{reason}")' if reason else "")
 
@@ -145,8 +153,21 @@ def outline(box, x, y, side):
     return f"drawbox=x={left:.0f}:y={top:.0f}:w={width:.0f}:h={height:.0f}:color=cyan:t={BOX_PX}"
 
 
+def reviewer():
+    """Who reviews, as a terminal line names them: the REVIEW_MODEL_URL model when one is set, else Muse Spark."""
+    return openweights.name(OPEN_MODEL) if OPEN_URL else "Muse Spark"
+
+
+def reply_path(crop):
+    """Where the reviewer's reply about `crop` is saved: .json for Spark, .open.json for a REVIEW_MODEL_URL model."""
+    return crop.with_suffix(".open.json" if OPEN_URL else ".json")
+
+
 def ask(image_path, api_key, top_down=False):
-    """Spark's raw reply text about one crop ("" when it held no message), or None if the call failed."""
+    """Spark's raw reply text about one crop ("" when it held no message), or None if the call failed. With
+    REVIEW_MODEL_URL set, the open model's reply instead (ask_open); `api_key` is then not sent anywhere."""
+    if OPEN_URL:
+        return ask_open(image_path, top_down)
     url = "data:image/jpeg;base64," + base64.b64encode(image_path.read_bytes()).decode()
     body = json.dumps({"model": MODEL, "reasoning": {"effort": "minimal"}, "text": {"format": {"type": "json_object"}},
                        "input": [{"role": "user", "content": [
@@ -164,12 +185,34 @@ def ask(image_path, api_key, top_down=False):
                    for c in o.get("content", []) if isinstance(c, dict)) if isinstance(reply, dict) else ""
 
 
+def ask_open(image_path, top_down=False):
+    """The REVIEW_MODEL_URL model's reply text about one crop, on the same prompt as Spark's, or None if the call
+    failed. JSON object format, as Spark is asked; the key goes to that server only (openweights.server_key)."""
+    url = "data:image/jpeg;base64," + base64.b64encode(image_path.read_bytes()).decode()
+    body = {"model": OPEN_MODEL, "response_format": {"type": "json_object"},
+            **({"reasoning_effort": OPEN_EFFORT} if openweights.host(OPEN_URL) == openweights.FIREWORKS_HOST else {}),
+            "messages": [{"role": "user", "content": [
+                {"type": "text", "text": PROMPT.format(view=VIEWS[top_down])},
+                {"type": "image_url", "image_url": {"url": url}}]}]}
+    try:
+        answer = openweights.post(OPEN_URL, openweights.server_key(OPEN_URL, OPEN_KEY), body)
+        usage = answer.get("usage") or {}
+        print(f"open review {image_path.name}: {usage.get('prompt_tokens', '?')} in, "
+              f"{usage.get('completion_tokens', '?')} out", flush=True)
+        return answer["choices"][0]["message"]["content"] or ""
+    except (OSError, ValueError, http.client.HTTPException, KeyError, IndexError, TypeError, AttributeError) as err:
+        print(f"open review failed for {image_path.name}: {err}", flush=True)
+        return None
+
+
 def review(clip, person_track, frame_size, out_path, api_key, top_down=False):
     """Spark's verdict on one tracked pedestrian (None if the call or its reply failed). Its reply is kept beside the
-    crop (`out_path` as .json) and read again while the crop, model and prompt are the same, so a re-run neither pays
-    again nor changes the counts a signed letter quotes; delete the .json to make Spark look again."""
+    crop (`out_path` as .json, or .open.json for a REVIEW_MODEL_URL model) and read again while the crop, model and
+    prompt are the same, so a re-run neither pays again nor changes the counts a signed letter quotes; delete the
+    .json to make Spark look again."""
     if not person_track:
         return None
     crop = person_crop(clip, person_track, frame_size, out_path)
-    return seal.reused(out_path.with_suffix(".json"), [crop.read_bytes(), MODEL, PROMPT, VIEWS[top_down]],
+    model = OPEN_MODEL if OPEN_URL else MODEL
+    return seal.reused(reply_path(out_path), [crop.read_bytes(), model, PROMPT, VIEWS[top_down]],
                        lambda: ask(crop, api_key, top_down), read_verdict)

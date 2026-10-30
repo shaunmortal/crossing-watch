@@ -4,8 +4,12 @@ and validate_dut's scoring. Nothing is sent to SAM and no events.json is written
 piece with no stored verdict takes Spark's reply saved beside its crop (review.review), while the crop is the same;
 one with neither stays in, as unreviewed events do on the page, and "unreviewed" counts those events. --spark N asks
 Spark (paid) about at most N such crops and saves its replies there, so later runs read them at $0.
+--reviewer open puts an open-weights reviewer (review.py's REVIEW_MODEL_URL, e.g. Muse Spark Open on Fireworks) in
+Spark's place: every piece takes the open model's reply saved beside its crop (.open.json) and no stored Spark verdict;
+--spark N then asks that model, not Spark, about at most N crops.
 Also checks our vehicle speeds against the dataset's positions at its own, evenly spaced frame rate.
 Run: python3 validate_offline.py DUT_REPO out/dut-vcrowd out/dut-15s [--site '{"person_mode": "video"}'] [--json FILE] [--spark N]
+     [--reviewer open]
 """
 import argparse
 import csv
@@ -47,15 +51,16 @@ def with_verdicts(events, verdicts, person_boxes, vehicle_boxes, people):
 
 
 def spark_asker(limit):
-    """review.ask for at most `limit` paid calls (the key loaded only if one is made); after that, and with limit 0,
-    no reply, so the piece stays unreviewed."""
+    """review.ask for at most `limit` paid calls (Spark's key loaded only if one is made, and never for the open
+    reviewer); after that, and with limit 0, no reply, so the piece stays unreviewed."""
     asked = []
     def ask(image_path, _key, top_down=False):
         if len(asked) >= limit:
             return None
         asked.append(image_path)
-        print(f"asking Spark ({len(asked)} of at most {limit}): {image_path.parent.name}/{image_path.name}", flush=True)
-        return original_ask(image_path, sam.load_api_key(), top_down)
+        print(f"asking {review.reviewer()} ({len(asked)} of at most {limit}): {image_path.parent.name}/{image_path.name}",
+              flush=True)
+        return original_ask(image_path, "" if review.OPEN_URL else sam.load_api_key(), top_down)
     return ask
 
 
@@ -67,7 +72,7 @@ def rebuild(site, clip_out):
     stamp = json.loads((clip_out / "source.json").read_text())
     analyze.CHUNK_FRAMES, analyze.OVERLAP_FRAMES = stamp["chunk_frames"], stamp["overlap_frames"]  # as this run cut
     person_boxes, vehicle_boxes, people, vehicles, total = validate_dut.our_tracks(site, clip_out)
-    verdicts = stored_verdicts(json.loads((clip_out / "events.json").read_text())["events"])
+    verdicts = {} if review.OPEN_URL else stored_verdicts(json.loads((clip_out / "events.json").read_text())["events"])
     events = road.conflicts(people, vehicles, analyze.FPS)
     clip, top_down = clip_out / "clip.mp4", site.get("view") == "top-down"
     frame_size = tuple(int(v) for v in analyze.probe(clip, "stream=width,height").split(","))
@@ -134,8 +139,13 @@ def main():
     parser.add_argument("--site", type=json.loads, help="site overrides as JSON, e.g. another cached person_mode")
     parser.add_argument("--json", type=Path, help="also save every clip's result here")
     parser.add_argument("--spark", type=int, default=0, metavar="N",
-                        help="ask Spark (paid) about at most N crops with no saved reply; default 0: none")
+                        help="ask the reviewer (paid) about at most N crops with no saved reply; default 0: none")
+    parser.add_argument("--reviewer", choices=("spark", "open"), default="spark",
+                        help="open: the REVIEW_MODEL_URL model's saved replies in place of Spark's verdicts")
     args = parser.parse_args()
+    if args.reviewer == "open" and not review.OPEN_URL:
+        parser.error("--reviewer open needs REVIEW_MODEL_URL (and REVIEW_MODEL) set")
+    review.OPEN_URL = review.OPEN_URL if args.reviewer == "open" else ""  # spark: never an open reply mixed in
     sam.request = crowd.request = analyze.encode = offline
     sam.RETRY_WAITS_S = ()  # a reply missing from the cache fails at once, not after the retries' waits
     review.ask = spark_asker(args.spark)

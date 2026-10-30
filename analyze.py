@@ -576,7 +576,7 @@ def review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, ke
 
 def saved_reply(crop):
     """The bytes of Spark's reply saved beside a person crop (review.review), or None."""
-    path = crop.with_suffix(".json")
+    path = review.reply_path(crop)
     return path.read_bytes() if path.exists() else None
 
 

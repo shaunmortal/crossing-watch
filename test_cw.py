@@ -4772,6 +4772,48 @@ def test_monday_runner_spends_only_with_yes_and_a_budget():
     assert plan["pack"][0][:2] == ["cp", "-cR"] and plan["agent"][0][-2:] == ["--out", "out/CLIP-agent"]
 
 
+def test_open_reviewer_route_asks_the_open_server_and_saves_beside_sparks_reply():
+    """REVIEW_MODEL_URL: review.ask sends Spark's prompt and the crop to that OpenAI-compatible server (the key only to
+    its own host), the reply is read by the same read_verdict and saved as .open.json, Spark's .json untouched; unset,
+    nothing changes. validate_offline's paid asker then loads no Meta key."""
+    import tempfile
+    from pathlib import Path
+    import validate_offline
+    sent, old = [], (review.OPEN_URL, review.OPEN_KEY, openweights.post, review.person_crop, sam.load_api_key,
+                     validate_offline.original_ask)
+    reply = '{"cyan_is_a_pedestrian": false, "road_user": "rider", "reason": "on a scooter"}'
+    openweights.post = lambda url, key, body: sent.append((url, key, body)) or {
+        "choices": [{"message": {"content": reply}}], "usage": {"prompt_tokens": 1, "completion_tokens": 2}}
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            crop = Path(tmp) / "person-c1-0.jpg"
+            review.person_crop = lambda clip, track, size, out: out.write_bytes(b"jpeg") and out
+            (Path(tmp) / "person-c1-0.json").write_text("spark's")
+            assert review.reply_path(crop).name == "person-c1-0.json" and review.reviewer() == "Muse Spark"
+            review.OPEN_URL, review.OPEN_KEY = "http://127.0.0.1:8080/v1", ""
+            verdict = review.review(None, {0: (0, 0, 1, 1)}, (9, 9), crop, "meta-key", top_down=True)
+            assert verdict == review.read_verdict(reply) and not verdict["is_person"]
+            url, key, body = sent[0]
+            assert url == review.OPEN_URL and key == "" and "reasoning_effort" not in body  # no Meta key, no effort
+            text, image = body["messages"][0]["content"]
+            assert text["text"] == review.PROMPT.format(view=review.VIEWS[True])
+            assert image["image_url"]["url"].startswith("data:image/jpeg;base64,")
+            assert json.loads((Path(tmp) / "person-c1-0.open.json").read_text())["reply"] == reply
+            assert (Path(tmp) / "person-c1-0.json").read_text() == "spark's"
+            assert review.review(None, {0: (0, 0, 1, 1)}, (9, 9), crop, "", top_down=True) == verdict and len(sent) == 1
+            review.OPEN_URL, review.OPEN_KEY = "https://api.fireworks.ai/inference/v1", "fw"
+            review.ask(crop, "meta-key")
+            assert sent[1][1] == "fw" and sent[1][2]["reasoning_effort"] == review.OPEN_EFFORT
+            openweights.post = lambda *_: {"choices": []}
+            assert review.ask(crop, "") is None  # a malformed answer is a failed call, not a crash
+            sam.load_api_key = lambda: (_ for _ in ()).throw(AssertionError("Meta key loaded"))
+            validate_offline.original_ask = lambda path, key, top_down=False: key
+            assert validate_offline.spark_asker(1)(crop, "") == ""
+    finally:
+        (review.OPEN_URL, review.OPEN_KEY, openweights.post, review.person_crop, sam.load_api_key,
+         validate_offline.original_ask) = old
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):
