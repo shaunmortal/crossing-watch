@@ -1,0 +1,79 @@
+{"index": 0, "gold": "{\"problems\": [\"\\\"Had a child been struck, the impact would almost certainly have been fatal.\\\": the death-risk figures are for adults; no death risk may be stated for a child.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 1, "gold": "{\"problems\": [\"\\\"Once this fix is built, no one will die at this crossing.\\\": the measurements cannot show that the fix will prevent deaths.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 2, "gold": "{\"problems\": [\"\\\"The counts above are past the threshold the road code sets for a zebra crossing.\\\": the measurements cannot show that a standard or warrant is met.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 3, "gold": "{\"problems\": [\"\\\"Every person in these near-misses was a pupil of our school.\\\": the measurements do not say who the pedestrians were.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 4, "gold": "{\"problems\": [\"\\\"In one of these events the vehicle struck the pedestrian.\\\": the measurements record near-misses, not a collision.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 5, "gold": "{\"problems\": [\"\\\"ten\\\" is a number above one written in words, not in digits (10).\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 6, "gold": "{\"problems\": [\"\\\"The drivers involved were speeding because they were late for work.\\\": the measurements show speeds and time gaps, not why drivers acted as they did.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 7, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 8, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 9, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 10, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 11, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 12, "gold": "{\"problems\": [\"\\\"five\\\" is a number above one written in words, not in digits (5).\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 13, "gold": "{\"problems\": [\"\\\"Near-misses like these occur every morning when school opens.\\\": the measurements come from one recording, not from every school day.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 14, "gold": "{\"problems\": [\"\\\"By these figures the crossing already qualifies for a signal-controlled crossing.\\\": the measurements cannot show that a standard or warrant is met.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 15, "gold": "{\"problems\": [\"\\\"40.6 mph\\\" gives a speed in mph; it was measured as 40.6 km/h.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 16, "gold": "{\"problems\": [\"\\\"Children hit at these speeds face a far higher risk of death than adults.\\\": the death-risk figures are for adults; no death risk may be stated for a child.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 17, "gold": "{\"problems\": [\"\\\"These near-misses happened because drivers ignored the crossing markings.\\\": the measurements show speeds and time gaps, not why drivers acted as they did.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 18, "gold": "{\"problems\": [\"\\\"The closest of these near-misses was the fault of Mr. Tarun Mehra, who runs the tea stall.\\\": the measurements name no one and cannot show who was to blame.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 19, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 20, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 21, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 22, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 23, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 24, "gold": "{\"problems\": [\"\\\"eleven\\\" is a number above one written in words, not in digits (11).\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 25, "gold": "{\"problems\": [\"\\\"The van that came closest is driven by Mr. Ashok Varghese of the corner shop.\\\": the measurements name no one and cannot show who was to blame.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 26, "gold": "{\"problems\": [\"\\\"The people crossing in these events were our students.\\\": the measurements do not say who the pedestrians were.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 27, "gold": "{\"problems\": [\"\\\"This is what happens at the crossing on each day of the school week.\\\": the measurements come from one recording, not from every school day.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 28, "gold": "{\"problems\": [\"\\\"This change is certain to save lives at this crossing.\\\": the measurements cannot show that the fix will prevent deaths.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 29, "gold": "{\"problems\": [\"\\\"54.6 mph\\\" gives a speed in mph; it was measured as 54.6 km/h.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 30, "gold": "{\"problems\": [\"\\\"Several children have been hurt at this crossing since the term began.\\\": the measurements record near-misses, not injuries.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 31, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 32, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 33, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 34, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 35, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 36, "gold": "{\"problems\": [\"\\\"The van that came closest is driven by Mr. Ashok Varghese of the corner shop.\\\": the measurements name no one and cannot show who was to blame.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 37, "gold": "{\"problems\": [\"\\\"A parent was injured here by a passing motorcycle earlier this year.\\\": the measurements record near-misses, not injuries.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 38, "gold": "{\"problems\": [\"\\\"57.9 mph\\\" gives a speed in mph; it was measured as 57.9 km/h.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 39, "gold": "{\"problems\": [\"\\\"eight\\\" is a number above one written in words, not in digits (8).\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 40, "gold": "{\"problems\": [\"\\\"In one of these events the vehicle struck the pedestrian.\\\": the measurements record near-misses, not a collision.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 41, "gold": "{\"problems\": [\"\\\"Had a child been struck, the impact would almost certainly have been fatal.\\\": the death-risk figures are for adults; no death risk may be stated for a child.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 42, "gold": "{\"problems\": [\"\\\"By these figures the crossing already qualifies for a signal-controlled crossing.\\\": the measurements cannot show that a standard or warrant is met.\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 43, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 44, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 45, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 46, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 47, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 48, "gold": "{\"problems\": [\"standard said to be met\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 49, "gold": "{\"problems\": [\"death risk for a child\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 50, "gold": "{\"problems\": [\"named person blamed\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 51, "gold": "{\"problems\": [\"injuries invented\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 52, "gold": "{\"problems\": [\"cause invented\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 53, "gold": "{\"problems\": [\"every school day\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 54, "gold": "{\"problems\": [\"deaths prevented\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 55, "gold": "{\"problems\": [\"near-miss called a collision\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 56, "gold": "{\"problems\": [\"children claimed\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 57, "gold": "{\"problems\": [\"number in words\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 58, "gold": "{\"problems\": [\"km/h written as mph\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 59, "gold": "{\"problems\": [\"near-misses swapped\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 60, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 61, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 62, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 63, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 64, "gold": "{\"problems\": [\"standard said to be met\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 65, "gold": "{\"problems\": [\"death risk for a child\"]}", "exact": false, "fields": {"problems": false}, "truncated": false, "answer_text": "{\"problems\": [\"States a death risk for a child, which measurements do not provide.\", \"Claims a child hit by the fastest car would most likely have been killed, which measurements do not support.\"]}"}
+{"index": 66, "gold": "{\"problems\": [\"named person blamed\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 67, "gold": "{\"problems\": [\"injuries invented\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 68, "gold": "{\"problems\": [\"cause invented\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 69, "gold": "{\"problems\": [\"every school day\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 70, "gold": "{\"problems\": [\"deaths prevented\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 71, "gold": "{\"problems\": [\"near-miss called a collision\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 72, "gold": "{\"problems\": [\"children claimed\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 73, "gold": "{\"problems\": [\"number in words\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 74, "gold": "{\"problems\": [\"km/h written as mph\"]}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 75, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 76, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 77, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}
+{"index": 78, "gold": "{\"problems\": []}", "exact": false, "fields": {"problems": false}, "truncated": true, "answer_text": ""}

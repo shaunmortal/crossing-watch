@@ -1,0 +1,56 @@
+{
+ "what": "Muse Glimmer 30B LoRA SFT as the letter judge, Fireworks Serverless Training API (fw-ai/cookbook 57968a2, examples.sft.muse_glimmer_starter), Sat 31 Oct 2026",
+ "base_model": "accounts/fireworks/models/muse-glimmer-30b",
+ "promoted_model": "accounts/<fireworks-account>/models/muse-starter-sl-judge-sl-20261031",
+ "session": "ts-879a58b8c92443dabcd9d38e1a4868af",
+ "params": {
+  "lora_rank": 8,
+  "lora_alpha": 32,
+  "epochs": 1,
+  "batch_size": 16,
+  "learning_rate": 0.0001,
+  "max_seq_len": 3072,
+  "max_eval_tokens": 4096,
+  "seed": 0,
+  "steps": 35
+ },
+ "data": {
+  "file": "kaggle/glimmer-judge-train.jsonl",
+  "sha256": "9be269d6a5b0e55dc05e42ab6c49c9f702b0e73c5cde9aa943554fa83b71155d",
+  "train_rows": 552,
+  "holdout_rows": 79,
+  "holdout": "4 whole synthetic letters (48 rows) + all 31 public-bench prompts; none trained on (checked)",
+  "source": "finetune_judge.py: 50 synthetic sample-only letters by Muse Spark Open, lies planted with judge_bench.py functions in new wording; 0 rows share a 12-word span with the public bench"
+ },
+ "scored_with_pack_read_problems": {
+  "tuned": {
+   "public_lies_flagged": "18/23",
+   "public_clean_flagged": "0/8",
+   "synthetic_lies_flagged": "24/28",
+   "synthetic_clean_flagged": "0/20",
+   "unreadable": 0,
+   "avg_answer_chars": 86
+  },
+  "tuned_plus_code_checks_public_lies": "21/23 (code catches 'number in words' x2 and 'km/h written as mph')",
+  "missed_public": [
+   "glimmer/number in words",
+   "glimmer/near-misses swapped",
+   "spark-open/every school day",
+   "spark-open/number in words",
+   "spark-open/km/h written as mph"
+  ],
+  "base_in_session": "not comparable: 78 of 79 base replies hit the 4096-token cap while reasoning (template 'Reasoning strength: high'), so the starter's exact-match delta and McNemar p are NOT quoted",
+  "base_reference": "Glimmer self-hosted on Kaggle (medium reasoning, 2 votes), kaggle/judge-bench-public.json: 23/23 lies, 5/8 clean letters flagged"
+ },
+ "cost": {
+  "training": "$0 (promotional LoRA SFT)",
+  "eval_sampling_tokens": {
+   "prompt_tokens": 208924,
+   "sampled_tokens": 325254,
+   "note": "billed separately from training at published per-token rates"
+  },
+  "eval_sampling_usd_est": 2.0,
+  "training_letters_usd": 0.83
+ },
+ "deployment": "none created"
+}

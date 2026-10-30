@@ -108,6 +108,28 @@ revision and sha256 checks, `-c 32768`, medium reasoning, the card's sampling), 
 The case agent (`agent.py`) can also take its turns on Muse Spark Open on Fireworks (`AGENT_MODEL_URL`, see the
 README's case agent section); no such run has been made yet.
 
+## Fine-tuned Glimmer judge
+
+Sat 31 Oct 2026: a LoRA (rank 8, 1 epoch, 35 steps) on Muse Glimmer 30B through Fireworks' Serverless Training API
+(`fw-ai/cookbook` 57968a2, `muse_glimmer_starter`; training $0 under Fireworks' promotion, evaluation sampling about
+$2.00; no deployment). Data: `finetune_judge.py` wrote 50 letters for made-up packs with Muse Spark Open ($0.83),
+planted lies with `judge_bench.py`'s own functions in new wording, and kept clean letters (42% of rows); no row shares
+a 12-word span with the public bench. The file trained on is `glimmer-judge-train.jsonl`; its holdout (`.split.json`)
+is 4 whole synthetic letters plus all 31 public-bench prompts, none trained on. Scored with `pack.read_problems`
+(record: `provenance/glimmer-judge-lora.json`, replies in `provenance/glimmer-judge-lora/`):
+
+| Judge | Public bench: lies flagged | Clean letters flagged | Reply |
+|---|---|---|---|
+| Glimmer, self-hosted, 2 votes (above) | 23/23 | 5/8 | about 2,300 tokens of reasoning |
+| **Glimmer + our LoRA**, 1 vote | 18/23 (21/23 with the code checks) | **0/8** | about 90 characters |
+| Muse Spark Open, effort low, 1 vote | 22/23 | 0/8 | about 740 tokens |
+
+Synthetic holdout: 24/28 lies, 0/20 clean letters flagged. Misses on the public bench: two "number in words" and one
+"km/h written as mph" (the code checks catch all three), "near-misses swapped" (2 training rows: Spark Open rarely
+puts two near-misses in one sentence) and one "every school day". The in-session base column is not quoted: 78 of 79
+base replies ran out of the 4,096-token cap while reasoning, so the starter's base-vs-tuned delta is not a fair test.
+Serving the LoRA for $0 on Kaggle (`--lora` on the same Q4_K_M base) is not done yet.
+
 ## Runs still to come
 
 1. **Kaggle Version 3, the clean bench** (free GPU, no paid call; Kaggle step). Zip one commit:

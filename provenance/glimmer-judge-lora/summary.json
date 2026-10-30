@@ -1,0 +1,40 @@
+{
+  "steps": 35,
+  "base": {
+    "label": "base",
+    "exact_match": 0.0,
+    "unterminated": 78,
+    "prompt_tokens": 104462,
+    "sampled_tokens": 323364,
+    "field_accuracy": {
+      "problems": 0.0
+    }
+  },
+  "tuned": {
+    "label": "tuned",
+    "exact_match": 0.6582278481012658,
+    "unterminated": 0,
+    "prompt_tokens": 104462,
+    "sampled_tokens": 1890,
+    "field_accuracy": {
+      "problems": 0.6582278481012658
+    }
+  },
+  "promoted_model": "accounts/<fireworks-account>/models/muse-starter-sl-judge-sl-20261031",
+  "exact_match_delta": 0.6582,
+  "paired": {
+    "only_tuned_correct": 52,
+    "only_base_correct": 0,
+    "p_value": 4.440892098500626e-16
+  },
+  "session": "ts-879a58b8c92443dabcd9d38e1a4868af",
+  "log": "muse_starter_logs/judge-sl-20261031",
+  "cost": {
+    "training": "$0 (promotional)",
+    "evaluation_sampling": {
+      "prompt_tokens": 208924,
+      "sampled_tokens": 325254,
+      "note": "billed separately from training at published per-token rates"
+    }
+  }
+}
