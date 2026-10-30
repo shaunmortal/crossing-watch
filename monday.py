@@ -11,6 +11,7 @@ Glimmer cannot run here; the end prints the Kaggle steps for the gate pack.
 import argparse
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -111,26 +112,28 @@ def by_eye(args):
           f"- review_disputed or rider without a bike ({len(lines)}): open each clip on the page", *lines,
           f"- pace: median {walk.get('median_mps')} m/s, flag {walk.get('flag') or 'none'}",
           f"- {hit} of {total} SAM video requests hit the {sam.MAX_OBJECTS}-object limit",
-          f"- the page: open {args.out}/index.html; the agent's case: {args.out}-agent/index.html#case", sep="\n")
+          f"- the page: open {shlex.quote(f'{args.out}/index.html')}; the agent's case: "
+          f"{shlex.quote(f'{args.out}-agent/index.html')}#case", sep="\n")
 
 
 def kaggle_steps(args):
     gate = "~/cw-footage/kaggle-gate"
     return f"""
 Glimmer on the gate pack (Kaggle, notebook <removed-run-record> Version 3; never v2):
- 1. mkdir -p {gate} && cp {args.out}/events.json {gate}/ && cp {args.site} {gate}/site.json
+ 1. mkdir -p {gate} && cp {shlex.quote(f"{args.out}/events.json")} {gate}/ && cp {shlex.quote(args.site)} {gate}/site.json
     (only these two: never clip.mp4, frames or person crops)
  2. Kaggle > Datasets > New, name it cw-gate, PRIVATE, upload the two files.
  3. Open the v3 notebook > Add Input > cw-gate. In cell "4. Write the evidence pack" replace the OUT line with:
     OUT = f'{{CW}}/gate'; os.makedirs(OUT, exist_ok=True); [shutil.copy(p, OUT) for p in glob.glob('/kaggle/input/**/cw-gate/*.json', recursive=True)]
- 4. GPU T4 x2, Internet on, secret MODEL_API_KEY attached if Spark should judge. Delete cells 13-14 (the public
-    bench, about 3 h) in this version. Save Version > Save & Run All. Keep the version PRIVATE.
+ 4. GPU T4 x2, Internet on, secret MODEL_API_KEY attached if Spark should judge. Delete the last two cells, section
+    "6. Glimmer as the judge on the public planted-lies bench" (about 3 h); keep "5. Run record" above them.
+    Save Version > Save & Run All. Keep the version PRIVATE.
  5. Download glimmer-letter.txt, plan.json and <removed-run-record>; keep them outside the repo until checked."""
 
 
 def run(step, cmds, env, args):
     for cmd in cmds:
-        print("$ " + " ".join(cmd), flush=True)
+        print("$ " + shlex.join(cmd), flush=True)
         if args.dry_run:
             continue
         code = subprocess.run(cmd, cwd=HERE, env=env).returncode
@@ -163,8 +166,9 @@ def main(argv=None):
         for step in [s for s in steps if s in ("filmcheck", "analyze")]:
             run(step, plan[step], env, args)
         # ponytail: a crashed paid run with SAM all cached but no events.json would re-ask Spark here (cents)
-        print(f"\nFree part done. Pick N from the SAM line above, then:\n  python3 monday.py {args.video} "
-              f"{args.site} --out {args.out} --budget N --yes" + (f" --trap {args.trap}" if args.trap else ""))
+        paid = ["python3", "monday.py", args.video, args.site, "--out", args.out, "--budget", "N", "--yes",
+                *(["--trap", args.trap] if args.trap else [])]
+        print(f"\nFree part done. Pick N from the SAM line above, then:\n  {shlex.join(paid)}")
         print(costs("N", judge_line))
         if (Path(args.out) / "events.json").exists():
             by_eye(args)
@@ -178,11 +182,11 @@ def main(argv=None):
             pace_guard(args.out, site)
         elif step == "g6" and not args.trap:
             print(f"G6 skipped: no --trap. Log 30 vehicles from second {(site.get('window_s') or [0])[0]:g} "
-                  f"(GATES.md G6), then: python3 validate_gate.py {args.site} {args.out} TRAP.csv")
+                  f"(GATES.md G6), then: python3 validate_gate.py {shlex.join([args.site, args.out])} TRAP.csv")
         else:
             run(step, plan[step], env, args)
     print(f"\nAgent: answer its tape question with the real taped distance, using the R id it printed:\n"
-          f'  python3 agent.py {args.video} {args.site} --out {args.out}-agent --answer R1 "[taped] m"\n'
+          f'  python3 agent.py {shlex.join([args.video, args.site, "--out", f"{args.out}-agent"])} --answer R1 "[taped] m"\n'
           "Stop at needs_review. Never --approve on Monday.")
     if not args.dry_run:
         by_eye(args)
