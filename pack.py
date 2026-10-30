@@ -629,6 +629,11 @@ def spark_run(prompt, image, api_key):
                   "wall_s": round(time.monotonic() - started, 1), "response_format": "json_object"}
 
 
+# Spark Open as judge on the public bench (31 Oct): 22/23 lies, 0/8 false alarms at "low" and at Fireworks' default,
+# for 739 vs 1,480 completion tokens a letter (GATES.md, "Spark Open judge effort"). The writer was not measured.
+JUDGE_EFFORT = "low"
+
+
 def open_model_reply(prompt, image, schema, judge=False):
     """Chat completion from the letter's OpenAI-compatible server or, with `judge`, the JUDGE_MODEL_URL one, each read
     at call time with its own model id and key (a key never crosses servers; a judge on the letter's own server uses
@@ -637,7 +642,8 @@ def open_model_reply(prompt, image, schema, judge=False):
     judge_key = JUDGE_KEY or (LETTER_KEY if JUDGE_URL == LETTER_URL else "")
     url, model, key = (JUDGE_URL, JUDGE_MODEL, judge_key) if judge else (LETTER_URL, LETTER_MODEL, LETTER_KEY)
     content = [{"type": "text", "text": prompt}] + ([{"type": "image_url", "image_url": {"url": image}}] if image else [])
-    return openweights.reply(url, model, openweights.server_key(url, key), content, schema)
+    return openweights.reply(url, model, openweights.server_key(url, key), content, schema,
+                             JUDGE_EFFORT if judge else None)
 
 
 def writer_note(plan):

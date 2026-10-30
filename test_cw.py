@@ -4,6 +4,7 @@ import json
 import math
 
 import listen
+import openweights
 import overlay
 import pack
 import render
@@ -1786,6 +1787,23 @@ def test_open_weights_letter_writer_gets_the_prompt_and_street_photo():
     assert path == "/v1/chat/completions" and body["response_format"]["type"] == "json_schema"
     assert content[0] == {"type": "text", "text": "PROMPT"} and content[1]["image_url"]["url"].startswith("data:image/jpeg")
     assert "Muse Glimmer" in pack.letter_section({**plan, "writer": "Muse Glimmer 30B (open weights)"})
+
+
+def test_judge_on_fireworks_asks_low_effort_and_the_writer_and_llama_server_are_sent_none():
+    import contextlib, io
+    fireworks, bodies = "https://api.fireworks.ai/inference/v1", []
+    old = pack.JUDGE_URL, pack.JUDGE_KEY, pack.LETTER_URL, pack.LETTER_KEY, openweights.post
+    openweights.post = lambda url, key, body: bodies.append(body) or {
+        "choices": [{"message": {"content": "{}"}, "finish_reason": "stop"}]}
+    try:
+        pack.JUDGE_KEY = pack.LETTER_KEY = "k"
+        with contextlib.redirect_stderr(io.StringIO()):
+            for url, judge in ((fireworks, True), (fireworks, False), ("http://127.0.0.1:8080/v1", True)):
+                pack.JUDGE_URL = pack.LETTER_URL = url
+                pack.open_model_reply("PROMPT", None, {"type": "object"}, judge=judge)
+    finally:
+        pack.JUDGE_URL, pack.JUDGE_KEY, pack.LETTER_URL, pack.LETTER_KEY, openweights.post = old
+    assert [b.get("reasoning_effort") for b in bodies] == ["low", None, None]
 
 
 def test_open_model_out_of_context_is_a_clear_error_not_an_empty_letter():

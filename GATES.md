@@ -707,6 +707,23 @@ verdicts, no key and no API call. "Real" false alarms are those not at a thresho
   The one loss is the clip 09 conflict at 7.9 s that crowd mode already lost to review. Speed vs native rate and
   SinD (`validate_sind.py data/sind`, output byte-identical) unchanged.
 
+## Spark Open judge effort (Sat 31 Oct 2026)
+
+Fireworks' workshop found Muse Spark Open scores best at `reasoning_effort=low` on short-answer tasks. Our Spark Open
+calls sent no effort, so Fireworks' default ran. We ran Spark Open as the `JUDGE_MODEL_URL` judge (`JUDGE_VOTES=1`,
+one run a letter) on a copy of `kaggle/judge-bench-public.json` (the 31 synthetic sample-only letters; the public file
+is unchanged), once at each effort. Wilson 95% bounds:
+
+| Effort | Lies caught | False alarms | Mean completion tokens | Cost (31 calls) |
+|---|---|---|---|---|
+| `low` | 22/23 (79-99%) | 0/8 (0-32%) | 739 | $0.14 |
+| Fireworks default (none sent) | 22/23 (79-99%) | 0/8 (0-32%) | 1,480 | $0.24 |
+
+Both missed the same letter (km/h written as mph, in Spark Open's own letter), with no unreadable reply and no
+truncation. Equal on this bench at about 60% of the cost, so the judge now sends `pack.JUDGE_EFFORT = "low"`, to
+Fireworks only (`openweights.reply`; llama-server is sent no effort). The letter writer still runs at Fireworks'
+default: its effort was not measured. Total spend $0.40, two one-call probes included.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no

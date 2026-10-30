@@ -45,12 +45,14 @@ def server_key(url, key):
     return key or (sam.env_value(FIREWORKS_KEY) if host(url) == FIREWORKS_HOST else "")
 
 
-def reply(url, model, key, content, schema):
+def reply(url, model, key, content, schema, effort=None):
     """One chat completion held to `schema`: the text, and its run record (llama-server's own timings, the usage, the
     request id, the wall seconds measured here from the first request, and the response_format that was answered).
     A server that rejects json_schema (HTTP 400) is asked once more for any JSON object; the code check and the
-    judges stay the backstop."""
-    ask = {"model": model, "messages": [{"role": "user", "content": content}]}
+    judges stay the backstop. `effort` (reasoning_effort) is sent to Fireworks' API only: llama-server was not
+    measured with it."""
+    ask = {"model": model, "messages": [{"role": "user", "content": content}],
+           **({"reasoning_effort": effort} if effort and host(url) == FIREWORKS_HOST else {})}
     started = time.monotonic()
     try:
         answer, used = post(url, key, {**ask, "response_format": {
