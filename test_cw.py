@@ -1013,7 +1013,7 @@ def test_footprints_only_at_an_angle_and_top_down_shapes_unchanged():
 
 def test_sind_oblique_table_compares_vehicle_shapes_with_the_truth():
     import validate_sind
-    person = {"7": {f: (0.0, 0.0) for f in range(40)}}  # standing in the road while a car passes 0.1 m away
+    person = {"7": {f: (-1.0 + 0.05 * f, 0.0) for f in range(40)}}  # walking along the road, a car passes 0.1 m away
     car = {"car#1": {f: road.rectangle((-16.0 + 0.8 * f, 1.0), 0.0, (4.6, 1.8)) for f in range(40)}}
     rows = validate_sind.oblique_rows(person, car, 10.0, 25.0)
     table = validate_sind.oblique_table(person, rows)
@@ -4592,6 +4592,16 @@ def test_crowd_tracker_keeps_a_walker_hidden_behind_a_car_for_1_4_s():
     assert len(tracks) == 1 and len(next(iter(tracks.values()))) == 16
     stranger = {**seen, 34: [box(600)]}  # someone else 400 px past the hidden walker: never stitched on
     assert len(crowd.associate({f: b for f, b in stranger.items() if f <= 34}, 10)) == 2
+
+
+def test_a_piece_that_never_moves_is_no_conflict_however_short():
+    fps, frames = 10, 40  # 4 s, far below STILL_RUN_S: the windowed rule alone would keep it
+    car = {"car#1": edges_along_x(8.0, fps, frames)}
+    pole = {"p/0": {f: (0.1 * (f % 3), 0.0) for f in range(frames)}}  # foot jitter within 0.2 m
+    assert road.conflicts(pole, car, fps) == []
+    walker = {"p/0": {f: (0.0, -1.0 + 0.05 * f) for f in range(frames)}}  # 2 m across the car's path
+    assert [e["person"] for e in road.conflicts(walker, car, fps)] == ["p/0"]
+
 
 if __name__ == "__main__":
     for name, check in list(globals().items()):

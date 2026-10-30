@@ -23,6 +23,7 @@ SPEED_WINDOW_S = 1.0
 STATIC_SPREAD_M = 0.75    # a "pedestrian" that stays this close to one spot is a pole, sign or someone waiting
 STATIC_WINDOW_S = 3.0     # stillness is judged per window of this length
 STILL_RUN_S = 15.0        # still this long in one spot: a pole, sign or someone waiting; those frames are dropped
+STILL_SHARE = 0.9         # "still": this share of the points stay within STATIC_SPREAD_M of their median spot
 MAX_GAP_FRAMES = 5        # across longer tracking gaps, judge a jump as if it happened within this many frames
 MAX_PLAUSIBLE_MPS = 120 / 3.6  # faster than this at a crossing is a tracking or geometry glitch, not a car
 ZONE_MARGIN_M = 10.0      # analyse only this far around the calibration points; far pixels blow up into huge metres
@@ -202,6 +203,13 @@ def median_point(points):
     return (statistics.median(p[0] for p in points), statistics.median(p[1] for p in points))
 
 
+def stays_put(points, spread_m=STATIC_SPREAD_M):
+    """True when STILL_SHARE of `points` stay within `spread_m` of their median spot."""
+    centre = median_point(points)
+    spread = sorted(math.dist(centre, p) for p in points)
+    return spread[int(STILL_SHARE * (len(spread) - 1))] < spread_m
+
+
 def moving_frames(feet, fps, spread_m=STATIC_SPREAD_M, window_s=STATIC_WINDOW_S, still_run_s=STILL_RUN_S):
     """The track minus its long still stretches: runs of consecutive windows, `still_run_s` or longer in total,
     where 90% of the points stay within `spread_m` of the window's median spot. SAM sometimes tracks a pole as a
@@ -214,11 +222,7 @@ def moving_frames(feet, fps, spread_m=STATIC_SPREAD_M, window_s=STATIC_WINDOW_S,
         windows.setdefault(f // size, []).append(f)
 
     def still(frames):
-        if len(frames) < size // 2:
-            return False
-        centre = median_point([feet[f] for f in frames])
-        spread = sorted(math.dist(centre, feet[f]) for f in frames)
-        return spread[int(0.9 * (len(spread) - 1))] < spread_m
+        return len(frames) >= size // 2 and stays_put([feet[f] for f in frames], spread_m)
 
     dropped, run = set(), []
     for w in sorted(windows) + [None]:  # None closes the last run
@@ -512,6 +516,8 @@ def conflicts(people, vehicles, fps, pet_max=CLOSE_PASS_S, radius=CONFLICT_RADIU
     index, speed_of = build_index(vehicles, fps, radius, bucket, min_speed)
     events = []
     for pid, feet in people.items():
+        if feet and stays_put(list(feet.values())):
+            continue  # never moved over its whole life, however short: a pole, sign, guard or vendor
         feet = moving_frames(feet, fps)
         for vid, hit in best_passes(feet, vehicles, index, speed_of, fps, bucket, radius, pet_max).items():
             tier = "serious" if hit["pet_s"] < PET_MAX_S else "close pass"
