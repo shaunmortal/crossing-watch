@@ -4583,6 +4583,16 @@ def test_hindi_copy_is_shown_under_the_letter_and_signed_with_it():
         pack.spark_reply = old
 
 
+def test_crowd_tracker_keeps_a_walker_hidden_behind_a_car_for_1_4_s():
+    import crowd
+    box = lambda x: [x, 100, x + 20, 160]  # 20x60 px walker, sampled every 2 frames at 10 fps
+    seen = {f: [box(10 * f)] for f in range(0, 22, 2)}  # walks at 10 px a frame, then stops behind a car
+    seen.update({f: [box(200)] for f in range(34, 44, 2)})  # out again 1.4 s later, 140 px short of the guess
+    tracks = crowd.associate(seen, 10)
+    assert len(tracks) == 1 and len(next(iter(tracks.values()))) == 16
+    stranger = {**seen, 34: [box(600)]}  # someone else 400 px past the hidden walker: never stitched on
+    assert len(crowd.associate({f: b for f, b in stranger.items() if f <= 34}, 10)) == 2
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):
