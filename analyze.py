@@ -534,6 +534,17 @@ def walking_kmh(feet):
     return round(statistics.median(mps) * 3.6, 1) if mps else None
 
 
+def motion(people, pid):
+    """review.gated's motion facts for piece `pid`: (median km/h, metres moved start to end, whether another piece
+    stays within review.SHADOW_M of it on most of its frames)."""
+    feet = people[pid]
+    frames = sorted(feet)
+    moved = math.dist(feet[frames[0]], feet[frames[-1]]) if frames else 0.0
+    near = max((sum(f in other and math.dist(p, other[f]) <= review.SHADOW_M for f, p in feet.items())
+                for o, other in people.items() if o != pid), default=0)
+    return walking_kmh(feet), moved, near > len(feet) / 2
+
+
 def review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, key, frame_size, top_down):
     """Spark looks once at each pedestrian piece involved in a conflict (most dangerous first, at most
     MAX_REVIEWS), and its verdict is attached to all that piece's events. A rider call stands only with a
@@ -554,7 +565,7 @@ def review_people(clip, out_dir, events, people, person_boxes, vehicle_boxes, ke
                 print(f"review of {pid} failed: {err}", flush=True)
                 verdict = None
             reused += verdict is not None and before is not None and saved_reply(crop) == before  # not asked again
-            verdicts[pid] = review.gated(verdict, boxes, rideables, walking_kmh(people[pid]))
+            verdicts[pid] = review.gated(verdict, boxes, rideables, *motion(people, pid))
             if line := review.said(pid, verdicts[pid]):  # a Meta model judging, on screen; never the crop's path
                 print(line, flush=True)
             if len(verdicts) % REVIEW_PROGRESS_EVERY == 0:  # main prints the total after the last

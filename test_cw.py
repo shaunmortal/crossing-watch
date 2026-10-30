@@ -3505,7 +3505,7 @@ def test_spark_removals_are_printed_without_digits_or_crop_paths():
     try:
         with contextlib.redirect_stdout(out):
             analyze.review_people(None, Path("."), [{"person": "7/0"}, {"person": "7/0"}],
-                                  {"7/0": {f: (0.14 * f, 0.0) for f in range(20)}}, {"7": {5: [100, 100, 110, 130]}},
+                                  {"7/0": {f: (0.0, 0.0) for f in range(20)}}, {"7": {5: [100, 100, 110, 130]}},
                                   {}, None, (640, 360), False)
     finally:
         review.review = original
@@ -4601,6 +4601,26 @@ def test_a_piece_that_never_moves_is_no_conflict_however_short():
     assert road.conflicts(pole, car, fps) == []
     walker = {"p/0": {f: (0.0, -1.0 + 0.05 * f) for f in range(frames)}}  # 2 m across the car's path
     assert [e["person"] for e in road.conflicts(walker, car, fps)] == ["p/0"]
+
+
+def test_walking_motion_overrules_sparks_not_a_person_and_a_fast_rider_needs_no_bike_box():
+    """A "not a person" piece walking 1.5-8 km/h over 2 m is kept (review_disputed) and named on the page, unless
+    another piece walks beside it (a shadow); a rider call over 8 km/h stands without a bike box."""
+    import analyze
+    walker = {f: (0.1 * f, 0.0) for f in range(100)}  # 3.6 km/h at analyze.FPS = 10, 9.9 m
+    shadow = {f: (0.1 * f, 0.6) for f in range(100)}
+    still = {f: (5.0, 5.0) for f in range(100)}
+    no = {"is_person": False, "road_user": "not a person", "reason": "a shadow"}
+    kmh, moved, beside = analyze.motion({"w/0": walker, "s/0": still}, "w/0")
+    assert review.WALK_KMH[0] <= kmh <= review.WALK_KMH[1] and moved >= review.WALK_MIN_M and not beside
+    kept = review.gated(no, {}, [], kmh, moved, beside)
+    assert kept["is_person"] and kept["review_disputed"] and "Spark thought not a person" in review.unconfirmed_rider(kept)
+    assert analyze.motion({"w/0": walker, "s/0": shadow}, "w/0")[2] is True
+    assert review.gated(no, {}, [], kmh, moved, True) == no  # side by side: the shadow rule stands
+    assert review.gated(no, {}, [], *analyze.motion({"s/0": still}, "s/0")) == no  # standing still: not overruled
+    rider = {"is_person": False, "road_user": "cyclist", "reason": "on a bike"}
+    assert review.gated(rider, {}, [], review.RIDE_KMH + 2) == rider
+    assert review.gated(rider, {}, [], kmh)["rider_unconfirmed"] is True
 
 
 if __name__ == "__main__":
