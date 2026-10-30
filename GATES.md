@@ -679,7 +679,7 @@ verdicts, no key and no API call. "Real" false alarms are those not at a thresho
   by half a box size per missed sample, so a walker hidden behind a car keeps one track. Alone: geometry 49 to 50
   (crowd) and 48 to 49 (vehicle crowd); after review 44 to 45 and 48 to 49; false alarms unchanged. The pieces are
   rebuilt, so Spark's stored verdicts no longer cover 14 and 10 more events: they stay in, as on the page, and the
-  worst case above falls. A real run sends those pieces to Spark (paid; not done here).
+  worst case above falls. A real run sends those pieces to Spark (paid; done the same day, below).
 - **A piece that never moves is dropped** (`road.py`, `stays_put`): 90% of its points within 0.75 m of its median
   spot over its whole life, however short (the 15 s still-run rule missed short clips). Alone: removes the person
   standing still at the road edge in clip 09 (one real false alarm in each mode); no conflict found or lost.
@@ -691,6 +691,21 @@ verdicts, no key and no API call. "Real" false alarms are those not at a thresho
 - Matched-event accuracy (crowd mode): speed within 1 km/h on 44 of 47 (was 42 of 44, which the README had as 41);
   PET within 1 s on 41 of 47 (was 38 of 44). The video-mode rows: whole frame unchanged; 2 x 2 tiles lose one real
   false alarm (7 to 6). No FPS, width, chunk, overlap or sampling constant changed, so every cached reply still holds.
+- **Paid Spark re-review of the unreviewed pieces** (same day, after 1a6a919): `validate_offline.py --spark N` sends
+  Spark only the crops with no stored verdict and no saved reply, and saves each reply beside its crop
+  (`review.review`), so later $0 runs read it; SAM is never called (a cache miss stops the run). 45 pieces (20 crowd,
+  25 vehicle crowd) needed a look; 19 vehicle-crowd crops were byte-identical to crowd ones and reuse their reply, so
+  Spark was called 26 times: 8,476 input and 7,912 output tokens, about $0.04 at the muse-spark-1.3 list price
+  ($1.25 / $4.25 per 1M). Verdicts on the 45: 1 "not a person" stands (a clip 09 walker in vehicle crowd mode), 16
+  rider calls are overruled for want of a bike box, the rest kept. Printed by `validate_offline.py` before and after:
+
+  | Run | Before | After |
+  |---|---|---|
+  | Crowd (`out/dut-15s`) | matched 47, missed 5 (3 by review), extra 3 (2 at threshold), unreviewed 22 | matched 47, missed 5 (3 by review), extra 3 (2 at threshold), unreviewed 0 |
+  | Vehicle crowd (`out/dut-vcrowd`) | matched 49, missed 3 (0 by review), extra 4 (2 at threshold), unreviewed 27 | matched 48, missed 4 (1 by review), extra 4 (2 at threshold), unreviewed 0 |
+
+  The one loss is the clip 09 conflict at 7.9 s that crowd mode already lost to review. Speed vs native rate and
+  SinD (`validate_sind.py data/sind`, output byte-identical) unchanged.
 
 ## Log
 

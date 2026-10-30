@@ -12,7 +12,7 @@ is code-checked, and the fix drawn onto the real street. Solo entry, all work fr
 
 **Six Meta models and what each did** (the DUT and bench numbers re-checked at $0: [GATES.md](GATES.md#the-readmes-first-screen-numbers-re-checked-at-0-thu-29-oct-2026)):
 - **SAM 3.1** tracks people and vehicles. Against DUT's top-down drone ground truth: 50 of 52 conflicts found (crowd mode); speed error 0.16 km/h mean, 0.55 km/h at the 95th percentile (vehicle crowd mode). [DUT](#end-to-end-against-ground-truth-dut), [30 Oct re-score](GATES.md#accuracy-fixes-merged-re-scored-at-0-fri-30-oct-2026)
-- **Muse Spark** reviews each person (after it: 49 of 52 in vehicle crowd mode, as the geometry's 49; 47 of 52 in crowd mode, 3 fewer than the geometry's 50; its "unclear keeps the person" and "a lone walker overrules not a person" rules were set after seeing DUT cases; 22 and 27 events come from pieces it has not seen yet), writes the fix and the letter, and as judge flagged 24 of 24 planted lies and 1 of 8 clean letters (code alone: 4 of 24); a Muse judge is not independent of Muse letters. It also runs the [case agent](#case-agent-it-stops-to-ask-for-a-tape-measure), which stops to ask for a tape measure; no live run yet. [bench](#checking-the-checks)
+- **Muse Spark** reviews each person (after it: 48 of 52 in vehicle crowd mode, 1 fewer than the geometry's 49; 47 of 52 in crowd mode, 3 fewer than the geometry's 50; its "unclear keeps the person" and "a lone walker overrules not a person" rules were set after seeing DUT cases), writes the fix and the letter, and as judge flagged 24 of 24 planted lies and 1 of 8 clean letters (code alone: 4 of 24); a Muse judge is not independent of Muse letters. It also runs the [case agent](#case-agent-it-stops-to-ask-for-a-tape-measure), which stops to ask for a tape measure; no live run yet. [bench](#checking-the-checks)
 - **Muse Image** draws the fix only inside the strip where people were measured crossing; every other pixel stays the real, blurred street (the whole photo when no path was measured). Nothing measured. [how](#how-it-works)
 - **Muse Wonder** listens around each near-miss for horns, brakes and shouts. On our college clip it heard brakes, which a spectrogram corroborates; not ground truth. [GATES](GATES.md#status-update-second-pass-written-before-the-first-commit-28-oct-1919-ist)
 - **Muse Glimmer 30B (open weights)**, self-hosted on Kaggle 2 x T4 from sha256-checked weights, wrote the synthetic sample's letter in 313 s (2 tries; every number passed the code check). As judge: 24 of 24 lies flagged, but 6 of 8 clean letters too. [record](<removed-run-record>)
@@ -37,7 +37,7 @@ open sample/index.html                    # macOS; elsewhere open the file in a 
 | Our crossing's headline and clips | open the evidence page | `docs/` (GitHub Pages), release zip | yes, read |
 | Every published file is unchanged | `shasum -a 256 -c SHA256SUMS` or `python3 pack.py --verify docs/GATE-TBD` | `docs/GATE-TBD/SHA256SUMS` | yes |
 | Near-miss maths: speed error 0.24 / 0.91 km/h, 37 of 63 crossings within 3 s (SinD) | `python3 validate_sind.py data/sind` | SinD public sample (download it; non-commercial) | yes, after the download |
-| SAM 3.1 end to end: 50 of 52, 49 and 47 of 52, speed 0.16 / 0.55 km/h (DUT, top-down) | `python3 validate_offline.py DUT_REPO out/dut-15s out/dut-vcrowd` | not public: DUT has no licence and `out/` is our paid cache; run recorded in [GATES.md](GATES.md#accuracy-fixes-merged-re-scored-at-0-fri-30-oct-2026) | no: read the record |
+| SAM 3.1 end to end: 50 of 52, 48 and 47 of 52, speed 0.16 / 0.55 km/h (DUT, top-down) | `python3 validate_offline.py DUT_REPO out/dut-15s out/dut-vcrowd` | not public: DUT has no licence and `out/` is our paid cache; run recorded in [GATES.md](GATES.md#accuracy-fixes-merged-re-scored-at-0-fri-30-oct-2026) | no: read the record |
 | Judge bench: code 4 of 24 and 0 of 8; Muse Spark 24 of 24 and 1 of 8 | `python3 judge_bench.py --out COPY` | the table only, in the release (the bench file holds a letter written from DUT footage) | partly: the code column with your own letters; the Spark column is paid |
 | Muse Glimmer 30B wrote the sample's letter on Kaggle 2 x T4 (313 s, 2 tries) and judged 24 of 24 / 6 of 8 | re-run the public notebook, GATE-TBD | `<removed-run-record>`, `<removed-run-record>`, `<removed-run-record>` | yes, on Kaggle's free GPUs; without our DUT-derived bench file it judges Glimmer's letter only (12 lies, 4 controls) |
 | Muse Spark Open wrote the sample's letter on Fireworks in 55.5 s, one try | `LETTER_MODEL_URL=https://api.fireworks.ai/inference/v1 LETTER_MODEL=accounts/fireworks/models/muse-spark-open python3 pack.py sample sample/site.json` | `provenance/spark-open-fireworks-sample.json` | yes, read; a re-run needs a Fireworks key |
@@ -504,8 +504,9 @@ one crowded frame). So **crowd mode** (`"person_mode": "crowd"`) has SAM detect 
 `crowd.py` then keeps their IDs with a small tracker: constant-velocity prediction, a match within one body size
 (half a body size wider per missed sample), and a 2 s grace period for people hidden behind others or a passing car.
 
-Every DUT number here was re-scored on 30 Oct with today's code, at $0, from the cached SAM replies and Spark's
-stored verdicts: `python3 validate_offline.py DUT_REPO out/dut-15s out/dut-vcrowd` (the video rows: the 28 Oct
+Every DUT number here was re-scored on 30 Oct with today's code from the cached SAM replies and Spark's stored
+verdicts, plus its saved replies on 45 new track pieces (26 paid calls, about $0.04; GATES.md, 30 Oct):
+`python3 validate_offline.py DUT_REPO out/dut-15s out/dut-vcrowd` (the video rows: the 28 Oct
 folder with `--site '{"person_mode": "video", "person_grid": 1}'`, or 2 for tiles). The speed fix below moved the
 ground truth too: the dataset's own tracks now give 52 conflicts, not 36 (GATES.md, 29 Oct, shows old and new side
 by side). Found by the geometry, before Spark's review:
@@ -525,16 +526,14 @@ to set it.
 - **Crowd mode over all 8 clips:** the geometry finds 50 of 52 conflicts, every miss a threshold case; 3 of its 5
   false alarms are not. After Spark's review: 47 of 52 found, 1 real false alarm. Spark's "not a person" costs 3 true
   conflicts (5 before 30 Oct): it is now overruled for a piece walking 1.5-8 km/h over 2 m with no other piece beside
-  it (marked `review_disputed`, named on the page). 22 events come from track pieces Spark has not seen yet (new with today's
-  tracker); they stay in, as unreviewed events do on the page. If Spark rejected all of them it would be 26 of 52.
+  it (marked `review_disputed`, named on the page). Spark has now seen every piece.
 - **Vehicles in crowd mode too** (`"vehicle_mode": "crowd"`, for dense traffic that fills SAM's 16 objects). Vehicles
   are detected on every frame (10 a second): at 5 a second a review showed motorcycles over ~36 km/h outran the
   tracker's one-body-size match and vanished. The geometry finds 48 of 52, all 4 misses at a threshold. After
-  Spark's review: 49 of 52 found and 2 real false alarms. Spark called 3 pedestrians in true conflicts "unclear";
-  "unclear" now keeps the person (only a sure "no" removes one), so here the review makes no net difference (49 with
-  or without it); in crowd mode it costs 3 real conflicts and removes 2 false alarms. That rule was set after seeing
-  these 3 DUT cases, with no held-out check (GATES.md, 29 Oct). 27 events come from pieces it has not seen (23 of 52
-  if it rejected them all).
+  Spark's review: 48 of 52 found and 2 real false alarms. Spark called 3 pedestrians in true conflicts "unclear";
+  "unclear" now keeps the person (only a sure "no" removes one); the review costs 1 true conflict here (a clip 09
+  walker it called "not a person", lost in crowd mode too) and 3 in crowd mode, and removes 2 false alarms there.
+  That rule was set after seeing these 3 DUT cases, with no held-out check (GATES.md, 29 Oct).
 - **Spark's rider calls:** Spark called walking students "rider" or "cyclist", though DUT tracks no bikes. In vehicle
   crowd mode that cost 17 true conflicts (28 of 52 found). So a rider call now stands only when SAM finds a
   motorcycle, bicycle, scooter or auto rickshaw box under the person (`review.gated`); otherwise they stay a
