@@ -659,6 +659,39 @@ On the merged build (commit 5083592), with no key in the environment and no API 
   the re-score never exercises the feet condition. The rule is covered by a unit test only
   (`test_spark_rider_call_needs_the_feet_no_lower_than_the_bike`) and is unchecked on real footage.
 
+## Accuracy fixes merged, re-scored at $0 (Fri 30 Oct 2026)
+
+Three fixes merged into `build` (merge commits f9f2cf6, c7131a4, d5d9a1b), each re-scored alone and together with
+`python3 validate_offline.py DUT_REPO out/dut-15s out/dut-vcrowd` on the cached SAM replies and Spark's stored
+verdicts, no key and no API call. "Real" false alarms are those not at a threshold.
+
+| Mode (DUT, 52 true conflicts) | Before (07b0777) | After (d5d9a1b) |
+|---|---|---|
+| Crowd: geometry / after review | 49 / 44 found; 5 false alarms (3 real) | 50 / 47 found; 3 false alarms (1 real) |
+| Vehicle crowd: geometry / after review | 48 / 48 found; 6 false alarms (4 real) | 49 / 49 found; 4 false alarms (2 real) |
+| Unreviewed events (crowd / vehicle crowd) | 8 / 17 | 22 / 27 |
+| If Spark rejected every unreviewed event | 37 / 33 of 52 | 26 / 23 of 52 |
+| Speed vs native rate (vehicle crowd) | 0.16 / 0.55 km/h | 0.16 / 0.55 km/h |
+| SinD (`validate_sind.py data/sind`) | 66 conflicts; speed 0.24 / 0.91 km/h | unchanged |
+| `test_cw.py` | 209 checks pass | 212 pass |
+
+- **Crowd tracker keeps a hidden walker** (`crowd.py`): a lost ID is kept for 2 s (was 1 s) and its match gate widens
+  by half a box size per missed sample, so a walker hidden behind a car keeps one track. Alone: geometry 49 to 50
+  (crowd) and 48 to 49 (vehicle crowd); after review 44 to 45 and 48 to 49; false alarms unchanged. The pieces are
+  rebuilt, so Spark's stored verdicts no longer cover 14 and 10 more events: they stay in, as on the page, and the
+  worst case above falls. A real run sends those pieces to Spark (paid; not done here).
+- **A piece that never moves is dropped** (`road.py`, `stays_put`): 90% of its points within 0.75 m of its median
+  spot over its whole life, however short (the 15 s still-run rule missed short clips). Alone: removes the person
+  standing still at the road edge in clip 09 (one real false alarm in each mode); no conflict found or lost.
+- **Walking motion overrules Spark** (`review.gated`, `analyze.motion`): a "not a person" piece walking 1.5-8 km/h
+  over at least 2 m with no other piece within 1.5 m on most frames is kept, marked `review_disputed` and named on the
+  page, never a blind-set decoy; a rider call over 8 km/h stands without a bike box. Alone: crowd after review 44 to
+  45, and the clip 10 close pass (a fast "rider") is removed. Set after seeing the DUT cases; its first held-out test
+  is new footage.
+- Matched-event accuracy (crowd mode): speed within 1 km/h on 44 of 47 (was 42 of 44, which the README had as 41);
+  PET within 1 s on 41 of 47 (was 38 of 44). The video-mode rows: whole frame unchanged; 2 x 2 tiles lose one real
+  false alarm (7 to 6). No FPS, width, chunk, overlap or sampling constant changed, so every cached reply still holds.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no

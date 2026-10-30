@@ -11,8 +11,8 @@ plate blurred, a map in road metres, each vehicle's speed and the adult death ri
 is code-checked, and the fix drawn onto the real street. Solo entry, all work from 28 Oct 2026 ([declarations](#declarations)).
 
 **Six Meta models and what each did** (the DUT and bench numbers re-checked at $0: [GATES.md](GATES.md#the-readmes-first-screen-numbers-re-checked-at-0-thu-29-oct-2026)):
-- **SAM 3.1** tracks people and vehicles. Against DUT's top-down drone ground truth: 49 of 52 conflicts found (crowd mode); speed error 0.16 km/h mean, 0.55 km/h at the 95th percentile (vehicle crowd mode). [DUT](#end-to-end-against-ground-truth-dut)
-- **Muse Spark** reviews each person (after it: 48 of 52 in vehicle crowd mode, no net change from the geometry's 48; 44 of 52 in crowd mode, 5 fewer than the geometry's 49; its "unclear keeps the person" rule was set after seeing those 3 DUT cases), writes the fix and the letter, and as judge flagged 24 of 24 planted lies and 1 of 8 clean letters (code alone: 4 of 24); a Muse judge is not independent of Muse letters. It also runs the [case agent](#case-agent-it-stops-to-ask-for-a-tape-measure), which stops to ask for a tape measure; no live run yet. [bench](#checking-the-checks)
+- **SAM 3.1** tracks people and vehicles. Against DUT's top-down drone ground truth: 50 of 52 conflicts found (crowd mode); speed error 0.16 km/h mean, 0.55 km/h at the 95th percentile (vehicle crowd mode). [DUT](#end-to-end-against-ground-truth-dut), [30 Oct re-score](GATES.md#accuracy-fixes-merged-re-scored-at-0-fri-30-oct-2026)
+- **Muse Spark** reviews each person (after it: 49 of 52 in vehicle crowd mode, as the geometry's 49; 47 of 52 in crowd mode, 3 fewer than the geometry's 50; its "unclear keeps the person" and "a lone walker overrules not a person" rules were set after seeing DUT cases; 22 and 27 events come from pieces it has not seen yet), writes the fix and the letter, and as judge flagged 24 of 24 planted lies and 1 of 8 clean letters (code alone: 4 of 24); a Muse judge is not independent of Muse letters. It also runs the [case agent](#case-agent-it-stops-to-ask-for-a-tape-measure), which stops to ask for a tape measure; no live run yet. [bench](#checking-the-checks)
 - **Muse Image** draws the fix only inside the strip where people were measured crossing; every other pixel stays the real, blurred street (the whole photo when no path was measured). Nothing measured. [how](#how-it-works)
 - **Muse Wonder** listens around each near-miss for horns, brakes and shouts. On our college clip it heard brakes, which a spectrogram corroborates; not ground truth. [GATES](GATES.md#status-update-second-pass-written-before-the-first-commit-28-oct-1919-ist)
 - **Muse Glimmer 30B (open weights)**, self-hosted on Kaggle 2 x T4 from sha256-checked weights, wrote the synthetic sample's letter in 313 s (2 tries; every number passed the code check). As judge: 24 of 24 lies flagged, but 6 of 8 clean letters too. [record](<removed-run-record>)
@@ -37,7 +37,7 @@ open sample/index.html                    # macOS; elsewhere open the file in a 
 | Our crossing's headline and clips | open the evidence page | `docs/` (GitHub Pages), release zip | yes, read |
 | Every published file is unchanged | `shasum -a 256 -c SHA256SUMS` or `python3 pack.py --verify docs/GATE-TBD` | `docs/GATE-TBD/SHA256SUMS` | yes |
 | Near-miss maths: speed error 0.24 / 0.91 km/h, 37 of 63 crossings within 3 s (SinD) | `python3 validate_sind.py data/sind` | SinD public sample (download it; non-commercial) | yes, after the download |
-| SAM 3.1 end to end: 49 of 52, 48 and 44 of 52, speed 0.16 / 0.55 km/h (DUT, top-down) | `python3 validate_offline.py DUT_REPO out/dut-15s out/dut-vcrowd` | not public: DUT has no licence and `out/` is our paid cache; run recorded in [GATES.md](GATES.md#the-readmes-first-screen-numbers-re-checked-at-0-thu-29-oct-2026) | no: read the record |
+| SAM 3.1 end to end: 50 of 52, 49 and 47 of 52, speed 0.16 / 0.55 km/h (DUT, top-down) | `python3 validate_offline.py DUT_REPO out/dut-15s out/dut-vcrowd` | not public: DUT has no licence and `out/` is our paid cache; run recorded in [GATES.md](GATES.md#accuracy-fixes-merged-re-scored-at-0-fri-30-oct-2026) | no: read the record |
 | Judge bench: code 4 of 24 and 0 of 8; Muse Spark 24 of 24 and 1 of 8 | `python3 judge_bench.py --out COPY` | the table only, in the release (the bench file holds a letter written from DUT footage) | partly: the code column with your own letters; the Spark column is paid |
 | Muse Glimmer 30B wrote the sample's letter on Kaggle 2 x T4 (313 s, 2 tries) and judged 24 of 24 / 6 of 8 | re-run the public notebook, GATE-TBD | `<removed-run-record>`, `<removed-run-record>`, `<removed-run-record>` | yes, on Kaggle's free GPUs; without our DUT-derived bench file it judges Glimmer's letter only (12 lies, 4 controls) |
 | Muse Spark Open wrote the sample's letter on Fireworks in 55.5 s, one try | `LETTER_MODEL_URL=https://api.fireworks.ai/inference/v1 LETTER_MODEL=accounts/fireworks/models/muse-spark-open python3 pack.py sample sample/site.json` | `provenance/spark-open-fireworks-sample.json` | yes, read; a re-run needs a Fireworks key |
@@ -501,10 +501,10 @@ conflicts to the dataset's own tracked people and cars by identity: same person,
 
 SAM 3.1 tracks at most 16 objects per video request, but on a single image it returns every match (71 people on
 one crowded frame). So **crowd mode** (`"person_mode": "crowd"`) has SAM detect people on images 5 times a second.
-`crowd.py` then keeps their IDs with a small tracker: constant-velocity prediction, a match within one body size,
-and a 1 s grace period for people hidden behind others.
+`crowd.py` then keeps their IDs with a small tracker: constant-velocity prediction, a match within one body size
+(half a body size wider per missed sample), and a 2 s grace period for people hidden behind others or a passing car.
 
-Every DUT number here was re-scored on 29 Oct with today's code, at $0, from the cached SAM replies and Spark's
+Every DUT number here was re-scored on 30 Oct with today's code, at $0, from the cached SAM replies and Spark's
 stored verdicts: `python3 validate_offline.py DUT_REPO out/dut-15s out/dut-vcrowd` (the video rows: the 28 Oct
 folder with `--site '{"person_mode": "video", "person_grid": 1}'`, or 2 for tiles). The speed fix below moved the
 ground truth too: the dataset's own tracks now give 52 conflicts, not 36 (GATES.md, 29 Oct, shows old and new side
@@ -513,8 +513,8 @@ by side). Found by the geometry, before Spark's review:
 | Clips | People per clip | Mode | True conflicts | Found | Missed (at a threshold) | False alarms (at a threshold) |
 |---|---|---|---|---|---|---|
 | 04 09 10 12 (crowded) | 24–113 | video, whole frame | 37 | 9 | 28 (1) | 1 (1) |
-| | | video, 2 x 2 tiles | 37 | 19 | 18 (1) | 7 (2) |
-| | | **crowd mode** | 37 | **34** | 3 (3) | 5 (1) |
+| | | video, 2 x 2 tiles | 37 | 19 | 18 (1) | 6 (2) |
+| | | **crowd mode** | 37 | **35** | 2 (2) | 4 (1) |
 | 15 01 03 16 (held out) | 11–21 | video, whole frame | 15 | 13 | 2 (0) | 0 (0) |
 | | | **crowd mode** | 15 | **15** | 0 (0) | 1 (1) |
 
@@ -522,23 +522,24 @@ The video rows are the 28 Oct runs, one SAM request per clip; Spark's verdicts f
 The crowd tracker rule was fixed once from walking speed versus body size. The four held-out clips were not used
 to set it.
 
-- **Crowd mode over all 8 clips:** the geometry finds 49 of 52 conflicts, every miss a threshold case; 4 of its 6
-  false alarms are not. After Spark's review: 44 of 52 found, 3 real false alarms. Spark called 5 pedestrians in
-  true conflicts "not a person". 8 events come from track pieces Spark has not seen yet (new with today's code); they
-  stay in, as unreviewed events do on the page. If Spark rejected all of them it would be 37 of 52.
+- **Crowd mode over all 8 clips:** the geometry finds 50 of 52 conflicts, every miss a threshold case; 3 of its 5
+  false alarms are not. After Spark's review: 47 of 52 found, 1 real false alarm. Spark's "not a person" costs 3 true
+  conflicts (5 before 30 Oct): it is now overruled for a piece walking 1.5-8 km/h over 2 m with no other piece beside
+  it (marked `review_disputed`, named on the page). 22 events come from track pieces Spark has not seen yet (new with today's
+  tracker); they stay in, as unreviewed events do on the page. If Spark rejected all of them it would be 26 of 52.
 - **Vehicles in crowd mode too** (`"vehicle_mode": "crowd"`, for dense traffic that fills SAM's 16 objects). Vehicles
   are detected on every frame (10 a second): at 5 a second a review showed motorcycles over ~36 km/h outran the
   tracker's one-body-size match and vanished. The geometry finds 48 of 52, all 4 misses at a threshold. After
-  Spark's review: 48 of 52 found and 4 real false alarms. Spark called 3 pedestrians in true conflicts "unclear";
-  "unclear" now keeps the person (only a sure "no" removes one), so here the review makes no net difference (48 with
-  or without it); in crowd mode it costs 5 real conflicts and removes one false alarm. That rule was set after seeing
-  these 3 DUT cases, with no held-out check (GATES.md, 29 Oct). 17 events come from pieces it has not seen (33 of 52
+  Spark's review: 49 of 52 found and 2 real false alarms. Spark called 3 pedestrians in true conflicts "unclear";
+  "unclear" now keeps the person (only a sure "no" removes one), so here the review makes no net difference (49 with
+  or without it); in crowd mode it costs 3 real conflicts and removes 2 false alarms. That rule was set after seeing
+  these 3 DUT cases, with no held-out check (GATES.md, 29 Oct). 27 events come from pieces it has not seen (23 of 52
   if it rejected them all).
 - **Spark's rider calls:** Spark called walking students "rider" or "cyclist", though DUT tracks no bikes. In vehicle
   crowd mode that cost 17 true conflicts (28 of 52 found). So a rider call now stands only when SAM finds a
   motorcycle, bicycle, scooter or auto rickshaw box under the person (`review.gated`); otherwise they stay a
   pedestrian, and the card says Spark thought "rider" and gives their measured walking speed. Pedestrian pieces
-  shorter than 1 s are also dropped.
+  shorter than 1 s are also dropped, and so is a piece that never moves (90% of its points within 0.75 m).
 - **Speed** against the dataset's positions at their own 23.976 fps (vehicle crowd mode, 2,079 frames): mean error
   0.16 km/h, 95th percentile 0.55 km/h. The old median of frame-to-frame steps read a 24 fps source slow (0.83 x in
   the self-check): 0.52 and 1.89 km/h. DUT's cars crawl at about 10 km/h, right on the "moving" bar, so this decides
@@ -553,20 +554,20 @@ to set it.
   mode 14.9 people and 20 vehicles. Its site file now says `"not_measurements"`, so pack.py and the case agent
   show the warning and ask for no letter whatever its events.json holds. The walking-pace guard below does not judge
   it: with the feet-hidden rule crowd mode keeps 7 walking pieces, and SAM video mode none.
-- **What the real false alarms are:** two are in clip 09 and were checked frame by frame on 28 Oct. One is a real
-  person in yellow whom the dataset stops tracking after 1.8 s while they keep walking along the kerb, so it may be a
-  gap in the ground truth. The other is a person standing still at the road edge for the whole clip; the dataset
-  does not label them. Dropping standing people would also drop a true conflict in clip 12, so they stay. The third,
-  a close pass in clip 10, is not checked yet. Vehicle crowd mode adds a fourth in clip 09: someone Spark called a
-  rider, kept by the rider gate because DUT tracks no bikes, so none can be found under anyone.
+- **What the real false alarms are:** one is in clip 09, checked frame by frame on 28 Oct: a real person in yellow
+  whom the dataset stops tracking after 1.8 s while they keep walking along the kerb, so it may be a gap in the
+  ground truth. Two earlier ones are gone (30 Oct): a person standing still at the road edge for the whole clip 09
+  (a piece that never moves is now dropped, however short), and a close pass in clip 10 (a rider call over 8 km/h now
+  stands without a bike box). Vehicle crowd mode adds a second in clip 09: someone Spark called a rider, kept by the
+  rider gate because DUT tracks no bikes, so none can be found under anyone.
 - **ID fragmentation:** across the 8 clips the dataset's 301 pedestrians are followed by our tracks for 296 of them,
   with a median of 1 track per pedestrian (at most 4).
 - **"At a threshold" defined:** a disagreement the other side also finds once each threshold is widened by
   validate_dut's at-a-threshold bands (speed ±1.5 km/h around the 10 km/h "moving" bar, gap +0.3 m, PET +0.3 s). PET
   +0.3 s is about our median matched PET error (0.2-0.25 s), not its spread: the 90th percentile is 1.0-1.1 s. For
   example, a car the dataset has at 10.1 km/h and we measured at 10.0 km/h.
-- **Accuracy on matched events** (crowd mode): speed within 1 km/h on 41 of 44 (2.0 km/h at worst); PET within 1 s
-  on 38 of 44 (2.5 s at worst).
+- **Accuracy on matched events** (crowd mode): speed within 1 km/h on 44 of 47 (2.0 km/h at worst); PET within 1 s
+  on 41 of 47 (2.5 s at worst).
 - **Spark review:** it judges a zoomed crop of each person's clearest frame. A full-frame snapshot had rejected real
   students who were a few pixels wide.
 - **Caveats:** this is still a small sample. The true conflicts assume a 4.6 x 1.8 m car (DUT gives only centre and
