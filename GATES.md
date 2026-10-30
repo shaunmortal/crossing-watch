@@ -724,6 +724,21 @@ truncation. Equal on this bench at about 60% of the cost, so the judge now sends
 Fireworks only (`openweights.reply`; llama-server is sent no effort). The letter writer still runs at Fireworks'
 default: its effort was not measured. Total spend $0.40, two one-call probes included.
 
+## Fine-tuned Glimmer judge v2: the sweep and how its winner is chosen (pre-registered Sat 31 Oct 2026, before any v2 run)
+
+v1 (rank 8, 1 epoch, learning rate 1e-4) is recorded in `kaggle/open-weights.md`. v2 adds training letters (Muse
+Spark via the Meta API as well as Spark Open) and "near-misses swapped" rows. Every v2 run uses the same file and
+split: train rows; a dev set of whole synthetic letters; all 31 public-bench prompts. Dev and public rows are held out
+of training in every run (checked by replaying the starter's shuffle).
+
+- **Configs, in this order:** A rank 8, 1 epoch, 1e-4. B rank 32, 1 epoch, 1e-4. C rank 8, 2 epochs, 1e-4.
+  D rank 32, 2 epochs, 5e-5. Seed 0, max sequence length 3,072, the starter's other defaults.
+- **Chosen on dev only:** the highest of (dev lies flagged) minus 2 x (dev clean letters flagged), replies read by
+  `pack.read_problems` (an unreadable reply counts as not flagged). A tie goes to the config earlier in the list.
+- **Public bench:** the public rows' replies are not read until the winner is named here. Then the winner's public
+  score is the reported result, and the other configs' public scores are listed after it, labelled as not chosen.
+- If no v2 config beats v1 on dev by this score, v1 stays the reported model.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
