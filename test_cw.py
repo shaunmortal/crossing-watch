@@ -4626,6 +4626,28 @@ def test_walking_motion_overrules_sparks_not_a_person_and_a_fast_rider_needs_no_
     assert review.gated(rider, {}, [], kmh)["rider_unconfirmed"] is True
 
 
+def test_monday_runner_spends_only_with_yes_and_a_budget():
+    import contextlib
+    import io
+    import monday
+    for bad in (["v.MOV", "s.json", "--yes"], ["v.MOV", "s.json", "--budget", "5"],
+                ["v.MOV", "s.json", "--budget", "-1", "--yes"], ["v.MOV", "s.json", "--from", "glimmer"]):
+        with contextlib.redirect_stderr(io.StringIO()):  # argparse's usage line
+            assert raises_system_exit(lambda: monday.parse(bad)), bad
+    free = monday.parse(["clips/CLIP.MOV", "sample/site.json"])
+    assert free.out == "out/CLIP" and not free.yes and free.start == "filmcheck"
+    site = {"window_s": [118.0, 1018.0]}
+    plan = monday.commands(free, site)
+    assert plan["filmcheck"][0][-3:] == ["clips/CLIP.MOV", "118", "1018"]
+    assert plan["analyze"][0][-2:] == ["--budget", "0"] and plan["g6"] == []
+    paid = monday.parse(["clips/CLIP.MOV", "sample/site.json", "--budget", "12.5", "--yes", "--trap", "T.csv"])
+    plan = monday.commands(paid, site)
+    assert plan["analyze"][0][-2:] == ["--budget", "12.5"]
+    assert plan["g6"][0][-3:] == ["sample/site.json", "out/CLIP", "T.csv"]
+    assert not any("--allow-cost" in c for cmds in plan.values() for c in cmds)
+    assert plan["pack"][0][:2] == ["cp", "-cR"] and plan["agent"][0][-2:] == ["--out", "out/CLIP-agent"]
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):
