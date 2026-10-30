@@ -516,8 +516,9 @@ def conflicts(people, vehicles, fps, pet_max=CLOSE_PASS_S, radius=CONFLICT_RADIU
     index, speed_of = build_index(vehicles, fps, radius, bucket, min_speed)
     events = []
     for pid, feet in people.items():
-        if feet and stays_put(list(feet.values())):
-            continue  # never moved over its whole life, however short: a pole, sign, guard or vendor
+        if feet and max(feet) - min(feet) >= STATIC_WINDOW_S * fps and stays_put(list(feet.values())):
+            continue  # never moved over a whole window or more: a pole, sign, guard or vendor; a shorter piece
+            # may be a walker glimpsed between cars, so the windowed rule judges it instead
         feet = moving_frames(feet, fps)
         for vid, hit in best_passes(feet, vehicles, index, speed_of, fps, bucket, radius, pet_max).items():
             tier = "serious" if hit["pet_s"] < PET_MAX_S else "close pass"

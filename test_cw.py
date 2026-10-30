@@ -4594,13 +4594,16 @@ def test_crowd_tracker_keeps_a_walker_hidden_behind_a_car_for_1_4_s():
     assert len(crowd.associate({f: b for f, b in stranger.items() if f <= 34}, 10)) == 2
 
 
-def test_a_piece_that_never_moves_is_no_conflict_however_short():
+def test_a_piece_that_never_moves_is_no_conflict_but_a_short_glimpse_still_counts():
     fps, frames = 10, 40  # 4 s, far below STILL_RUN_S: the windowed rule alone would keep it
     car = {"car#1": edges_along_x(8.0, fps, frames)}
     pole = {"p/0": {f: (0.1 * (f % 3), 0.0) for f in range(frames)}}  # foot jitter within 0.2 m
     assert road.conflicts(pole, car, fps) == []
     walker = {"p/0": {f: (0.0, -1.0 + 0.05 * f) for f in range(frames)}}  # 2 m across the car's path
     assert [e["person"] for e in road.conflicts(walker, car, fps)] == ["p/0"]
+    glimpse = {"p/0": {f: (0.0, -0.4 + 0.08 * f) for f in range(10)}}  # 1 s between cars, 0.7 m across the path
+    assert road.stays_put(list(glimpse["p/0"].values()))
+    assert [e["person"] for e in road.conflicts(glimpse, car, fps)] == ["p/0"]
 
 
 def test_walking_motion_overrules_sparks_not_a_person_and_a_fast_rider_needs_no_bike_box():
