@@ -2578,6 +2578,46 @@ def test_judge_bench_plants_one_lie_per_copy_and_the_code_check_misses_the_ones_
     assert "a car at 29.0 km/h with adult death risk if hit 3.0% and a car at 38.0 km/h" in swap
 
 
+def test_finetune_judge_rows_hold_the_judge_prompt_and_the_reply_pack_reads_and_never_copy_the_public_bench():
+    """Offline: a made-up pack and letter give 7 one-lie rows and 5 clean ones, each the exact JUDGE_PROMPT and a reply
+    read_problems reads (one problem, or none); the lies are not the public bench's words; a public letter is caught."""
+    import finetune_judge
+    import judge_bench
+    measured = next(m for m in map(finetune_judge.synthetic_pack, range(50)) if len(json.loads(m)["worst"]) >= 2)
+    assert finetune_judge.synthetic_pack(3) == finetune_judge.synthetic_pack(3) and "made-up tracks" in measured
+    facts = json.loads(measured)
+    a, b = facts["worst"][:2]
+    letter = (f"Dear Road Authority,\nWe counted {facts['observed']['crossings']} pedestrian crossings and "
+              f"{facts['observed']['vehicles']} moving vehicles. A {a['vehicle']} at {a['vehicle_kmh']} km/h with adult "
+              f"death risk if hit {a['adult_death_risk_if_hit_pct']}% and a {b['vehicle']} at {b['vehicle_kmh']} km/h "
+              f"with adult death risk if hit {b['adult_death_risk_if_hit_pct']}% came close to people. We ask for a "
+              "raised zebra crossing.\nThe Principal")
+    assert not judge_bench.code_flags(letter, measured)
+    rows = finetune_judge.letter_rows(letter, measured, "test")
+    assert rows == finetune_judge.letter_rows(letter, measured, "test") and len(rows) == 12
+    for row in rows:
+        user, assistant = row["messages"]
+        assert user == {"role": "user", "content": pack.JUDGE_PROMPT.format(facts=measured, letter=row["letter"])}
+        assert assistant["role"] == "assistant" and len(pack.read_problems(assistant["content"])) == row["planted"]
+        assert row["planted"] == (row["letter"] != letter and not row["kind"].startswith("clean"))
+        if not row["planted"] or row["kind"] in finetune_judge.LIES:  # what reaches the judge: code passed it
+            assert not judge_bench.code_flags(row["letter"], measured), row["kind"]
+    assert sum(not r["planted"] for r in rows) / len(rows) >= 0.35
+    ours = {s for wordings in finetune_judge.LIES.values() for s in wordings}
+    assert set(finetune_judge.LIES) == {k for k, _, _ in judge_bench.INSERTED} and len(ours) == 27
+    assert not ours & {s for _, _, s in judge_bench.INSERTED} and not any(c.isdigit() for s in ours for c in s)
+    public = finetune_judge.public_spans()
+    assert not finetune_judge.shared(letter, measured, public)
+    _, spark_letter, spark_facts = judge_bench.spark_open_base()
+    assert finetune_judge.shared(spark_letter, measured, public)  # a public letter is caught, even on other numbers
+    record = {"seed": 1, "measured": measured, "plan": {"letter": letter.replace("people", "our pupils"), "why": "x"}}
+    assert finetune_judge.rejection(record, public, {}).startswith("not reviewed yet")
+    assert finetune_judge.rejection(record, public, {"1": "keep: a school's own words"}) == ""
+    worst = json.loads(spark_facts)["worst"]  # 38.0 km/h with 3.0%, 29.0 km/h with 1.4%
+    assert finetune_judge.unpaired("A car at 38.0 km/h: adult death risk 1.4%.", worst) and not finetune_judge.unpaired(
+        spark_letter, worst)
+
+
 def test_judge_bench_counts_unreadable_replies_apart_and_asks_only_for_missing_runs():
     import judge_bench
     item = {"id": "x", "kind": "k", "named": True, "planted": True, "letter": "L", "measured": "{}", "code": [False]}
