@@ -27,6 +27,9 @@ guess.svg
 *.webm
 *.wav
 *.m4a
+*.opus
+*.ogg
+*.aac
 # the phone's photos (tape marks, boards, B-roll stills) and any frame or still at the top level, unblurred.
 # Only top-level pictures: docs/ keeps street.jpg and the strobe stills
 *.heic

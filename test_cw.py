@@ -4408,6 +4408,98 @@ def test_case_agent_on_open_weights_asks_for_a_tool_every_turn_and_falls_back_to
     assert [s.get("tool_choice") for s in log] == ["required", "auto", None]
     assert "HTTP Error 500" in log[-1]["summary"] and replies == []
 
+
+def fake_transcriber(transcript):
+    """A stand-in for Muse Voice Transcribe at voice.urllib.request.urlopen: keeps each request, answers `transcript`.
+    Returns (requests, restore)."""
+    import io
+    import voice
+    seen, old = [], voice.urllib.request.urlopen
+    voice.urllib.request.urlopen = lambda req, timeout: (seen.append(req), io.BytesIO(json.dumps(
+        {"sessionId": "s", "transcript": transcript, "audioDurationMs": 2000, "turns": []}).encode()))[1]
+    return seen, lambda: setattr(voice.urllib.request, "urlopen", old)
+
+
+def phone_audio(folder):
+    """Two seconds of tone as a phone's .m4a, outside the pack folder."""
+    import subprocess
+    from pathlib import Path
+    audio = Path(folder) / "principal.m4a"
+    subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=2", "-ac", "2",
+                    "-c:a", "aac", str(audio)], check=True)
+    return audio
+
+
+def test_voice_notes_are_transcribed_shown_and_revise_the_letter_as_typed_notes_would():
+    """--voice-notes: the phone's audio goes to api.meta.ai as the docs' WAV with a Hindi and English hint; the
+    transcript reaches the notes path labelled as stated by the principal, is saved as notes-<sha8>.txt with the
+    audio's sha256, and the page says the notes were spoken; the audio never lands in the pack or share/."""
+    import hashlib, io, tempfile, voice, wave
+    from email.parser import BytesParser
+    from pathlib import Path
+    spoken = "कृपया लिखिए कि हमारे 1,200 pupils हैं."
+    draft = {"fix": "speed table", "why": "w", "image_prompt": "i", "writer": pack.WRITER,
+             "letter": "Dear Sir. A car passed 0.5 s from a child. We ask for a speed table."}
+    revised = {**draft, "letter": "Dear Sir. A car passed 0.5 s from one of our 1,200 pupils. We ask for a speed table."}
+    seen, restore = fake_transcriber(spoken)
+    try:
+        with tempfile.TemporaryDirectory() as folder, tempfile.TemporaryDirectory() as phone:
+            audio = phone_audio(phone)
+            digest = hashlib.sha256(audio.read_bytes()).hexdigest()
+            out = pack_folder(folder)
+            run_pack(out, ask=lambda prompt: draft)
+            [(prompt, stated)] = run_pack(out, "--voice-notes", str(audio), key="meta-key", ask=lambda p: revised)
+            assert prompt.endswith(f"NOTES:\n{spoken}") and stated == [spoken]
+            assert (out / f"notes-{digest[:8]}.txt").read_text() == spoken + "\n"
+            saved = json.loads((out / "plan.json").read_text())
+            assert saved["notes"] == [spoken] and saved["spoken_notes"] == [{"audio_sha256": digest, "model": voice.MODEL}]
+            page = (out / "index.html").read_text()
+            assert "the principal's notes (spoken and transcribed by Muse Voice Transcribe). Read and approved by" in page
+            audio_files = [p for p in Path(folder).rglob("*") if p.suffix in (".m4a", ".wav", ".opus")]
+            assert audio_files == [] and audio.read_bytes() not in b"".join(
+                p.read_bytes() for p in (out / "share").iterdir())
+            assert len(run_pack(out, "--voice-notes", str(audio), key="meta-key", ask=lambda p: revised)) == 1
+            assert len(seen) == 1  # the same audio again: its saved transcript, no second call
+    finally:
+        restore()
+    [req] = seen
+    assert req.full_url == "https://api.meta.ai/v1/asr/transcribe" and req.get_header("Authorization") == "Bearer meta-key"
+    form = BytesParser().parsebytes(f"Content-Type: {req.get_header('Content-type')}\r\n\r\n".encode() + req.data)
+    parts = {p.get_param("name", header="content-disposition"): p for p in form.get_payload()}
+    request = json.loads(parts["request"].get_payload(decode=True))
+    assert request["model"] == "muse-voice-transcribe-1.0" and request["languageBias"] == ["Hindi", "English"]
+    assert parts["request"].get_content_type() == "application/json"
+    with wave.open(io.BytesIO(parts["audio"].get_payload(decode=True))) as wav:
+        assert (wav.getnchannels(), wav.getsampwidth(), wav.getframerate()) == (1, 2, 24000)
+    assert pack.spoken_line({"notes": ["a", "b"], "spoken_notes": [{}]}) == (
+        " (1 of 2 spoken and transcribed by Muse Voice Transcribe)")
+
+
+def test_an_empty_transcript_stops_with_a_clear_message_and_revises_nothing():
+    import contextlib, io, sys, tempfile, voice
+    draft = {"fix": "speed table", "why": "w", "image_prompt": "i", "writer": pack.WRITER, "letter": "Dear Sir. PET 0.5 s."}
+    seen, restore = fake_transcriber("  ")
+    try:
+        with tempfile.TemporaryDirectory() as folder, tempfile.TemporaryDirectory() as phone:
+            audio = phone_audio(phone)
+            out = pack_folder(folder)
+            run_pack(out, ask=lambda prompt: draft)
+            before = (out / "plan.json").read_text()
+            try:
+                run_pack(out, "--voice-notes", str(audio), key="meta-key", ask=lambda p: 1 / 0)
+                stopped = None
+            except SystemExit as stop:
+                stopped = str(stop)
+            assert stopped and "heard no words in principal.m4a: nothing was revised" in stopped
+            assert (out / "plan.json").read_text() == before and not list(out.glob("notes-*.txt")) and len(seen) == 1
+            assert exits(lambda: run_pack(out, "--voice-notes", str(audio), "--notes", str(audio)))
+            with contextlib.redirect_stderr(io.StringIO()):
+                assert raises_system_exit(lambda: voice.spoken_notes(audio, out, None))  # no key: nothing sent
+            assert len(seen) == 1
+    finally:
+        restore()
+
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):

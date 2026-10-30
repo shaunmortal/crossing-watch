@@ -105,6 +105,9 @@ letter (`signoff.json`) and asks for its own `--out` folder.
   the code check and the judge labelled "stated by the principal, not measured", so the school's own facts (say, its
   number of pupils) are not rejected, and the page then says the letter was drafted from the measurements and the
   principal's notes. Notes can be given more than once.
+- `--voice-notes AUDIO` takes the notes spoken into a phone (m4a, opus, wav; Hindi, English or both): Muse Voice
+  Transcribe writes them down, the text is shown and saved as `notes-<sha8>.txt`, and it goes on as `--notes`. The
+  audio is never copied; the sign-off line says the notes were spoken and transcribed.
 - `--approved-by` with `--school` writes `signoff.json`: the name, school, date and the sha256 of the exact letter.
   The page fills in "Read and approved by" with them and says how many sentences the notes changed, counted by
   difflib against the first AI draft ("N of M sentences changed after the principal's notes"). If the letter

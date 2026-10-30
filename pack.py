@@ -4,7 +4,8 @@ letter from the measured events only; Muse Image draws that fix onto the real st
 Run after analyze.py: python3 pack.py OUT_DIR SITE.json
 Writes OUT_DIR/index.html next to the clips (open it in a browser), and OUT_DIR/share/: the page and only the files it
 shows, the one folder to publish, with their SHA256SUMS. The letter is kept in OUT_DIR/plan.json, so a re-run pays
-nothing; --notes FILE revises it, and --approved-by NAME --school SCHOOL signs it (OUT_DIR/signoff.json).
+nothing; --notes FILE (or --voice-notes AUDIO, spoken) revises it, and --approved-by NAME --school SCHOOL signs it
+(OUT_DIR/signoff.json).
 A signed letter is replaced only with --new-letter, and kept as plan-<sha>.json.
 python3 pack.py --verify FOLDER checks a shared folder: MATCH, CHANGED or MISSING per file.
 """
@@ -45,6 +46,7 @@ import road
 import sam
 import seal
 import summary
+import voice
 
 IMAGE_EDIT_URL = "https://api.meta.ai/v1/images/edits"
 IMAGE_MODEL = "muse-image-1.0"
@@ -1067,13 +1069,23 @@ def disclosure(plan, signoff=None):
     """Written by code after both checks, never inside plan["letter"] (the number check would read it): the letter
     is an AI draft until a named person approves it, and Meta's AUP forbids passing outputs off as human-written.
     signoff.json fills in the blank only while its sha256 is still the letter's."""
-    source = "the measurements in this pack" + (" and the principal's notes" if plan.get("notes") else "")
+    source = ("the measurements in this pack" + (" and the principal's notes" if plan.get("notes") else "")
+              + spoken_line(plan))
     signed = is_signed(plan, signoff)
     by = (f"{signoff['approved_by']}, {signoff['school']}, {signoff['date']} ({edits(plan)})" if signed
           else "____ (name, role, date)")
     stale = stale_line(signoff) if signoff and not signed else ""
     return (f'{stale}<p class="disclosure">Drafted by {html.escape(plan.get("writer") or "an AI model")} from {source}. '
             f"Read and approved by: {html.escape(by)}.</p>")
+
+
+def spoken_line(plan):
+    """How many of the principal's notes were spoken (--voice-notes) and transcribed, for the sign-off line."""
+    spoken, notes = len(plan.get("spoken_notes", [])), len(plan.get("notes", []))
+    if not spoken:
+        return ""
+    which = "spoken" if spoken == notes else f"{spoken} of {notes} spoken"
+    return f" ({which} and transcribed by {voice.NAME})"
 
 
 def stale_line(signoff):
@@ -1274,15 +1286,19 @@ def saved_plan(out_dir, prompt):
     return None
 
 
-def new_plan(out_dir, prompt, measured, key, photo, revise=None, notes=""):
+def new_plan(out_dir, prompt, measured, key, photo, revise=None, notes="", spoken=""):
     """A new fix and letter, or `revise`'s letter revised by the principal's notes, saved to plan.json with the sha256
     of the prompt it came from. A revision also keeps every note so far (later checks read them as stated by the
-    principal) and the first AI draft, which the sign-off counts changed sentences against."""
+    principal) and the first AI draft, which the sign-off counts changed sentences against. `spoken`: the sha256 of
+    the audio `notes` were transcribed from (--voice-notes), kept in "spoken_notes" for the sign-off line."""
     stated = revise.get("notes", []) + [notes] if revise else []
     ask = prompt + REVISE.format(letter=revise["letter"], notes=notes) if revise else prompt
     plan = {**ask_plan(ask, measured, key, photo, stated=stated), "prompt_sha256": sha256(prompt)}
     if revise:
         plan = {**plan, "notes": stated, "draft_letter": revise.get("draft_letter", revise["letter"])}
+        voiced = revise.get("spoken_notes", []) + ([{"audio_sha256": spoken, "model": voice.MODEL}] if spoken else [])
+        if voiced:
+            plan = {**plan, "spoken_notes": voiced}
     write_plan(out_dir, plan)
     return plan
 
@@ -1369,6 +1385,8 @@ def parse_args():
                         "CHANGED or MISSING per file (alone, without out_dir and site)")
     parser.add_argument("--notes", metavar="FILE", help="the principal's notes on plan.json's letter: only the "
                         "sentences they ask about change")
+    parser.add_argument("--voice-notes", metavar="AUDIO", help="the principal's notes spoken into a phone (m4a, opus, "
+                        f"wav...): {voice.NAME} writes them down, and they revise the letter as --notes would")
     parser.add_argument("--approved-by", default="", metavar="NAME",
                         help='who read and approved plan.json\'s letter, e.g. "A. Rao, Principal" (with --school)')
     parser.add_argument("--school", default="", help="the school that sends the letter")
@@ -1376,14 +1394,17 @@ def parse_args():
                         f"(other measurements, another writer or a pace warning); the signed one is kept as "
                         f"{PLAN_BACKUP.format(sha8='<sha>')}")
     args = parser.parse_args()
-    if args.verify and (args.out_dir or args.notes or args.approved_by or args.school or args.new_letter):
+    if args.verify and (args.out_dir or args.notes or args.voice_notes or args.approved_by or args.school
+                        or args.new_letter):
         parser.error("--verify FOLDER goes alone")
     if not args.verify and not (args.out_dir and args.site):
         parser.error("give out_dir and site (or --verify FOLDER)")
     signer = (args.approved_by.strip(), args.school.strip())
     if any(signer) and not all(signer):
         parser.error("--approved-by and --school go together")
-    if all(signer) and args.notes:
+    if args.notes and args.voice_notes:
+        parser.error("give the notes once: --notes FILE or --voice-notes AUDIO")
+    if all(signer) and (args.notes or args.voice_notes):
         parser.error("sign after reading the revised letter: run --notes first, then --approved-by")
     try:
         notes = Path(args.notes).read_text().strip() if args.notes else ""
@@ -1438,11 +1459,16 @@ def main():
     signoff = read_signoff(out_dir)
     if not saved and (stop := kept_letter(out_dir, signoff, untrusted, args.new_letter)):
         sys.exit(f"pack.py: {stop}")  # before any paid call and before index.html is written
-    if (notes or all(signer)) and not saved:
+    if (notes or args.voice_notes or all(signer)) and not saved:
         sys.exit("pack.py: --notes and --approved-by work on plan.json's letter from these same measurements, and "
                  "there is none: run pack.py without them first, and have that letter read")
     if all(signer):
         check_signable(saved["letter"])  # before any paid picture
+    spoken = ""
+    if args.voice_notes:  # before any other paid call: an empty or failed transcript stops here
+        notes, spoken = voice.spoken_notes(args.voice_notes, out_dir, optional_key())
+        print(f"{voice.NAME} heard (saved as {voice.TRANSCRIPT.format(sha8=spoken[:8])}; if a word is wrong, "
+              f"correct that file and give it with --notes instead):\n{notes}\n", flush=True)
     plan, images, ground = saved, None, None  # saved stays if a revision fails
     if (events or paths) and not untrusted:
         try:
@@ -1455,7 +1481,7 @@ def main():
         try:
             key = optional_key()
             plan = (saved if saved and not notes else  # a re-run pays nothing
-                    new_plan(out_dir, prompt, measured, key, photo, saved if notes else None, notes))
+                    new_plan(out_dir, prompt, measured, key, photo, saved if notes else None, notes, spoken))
             drawn = out_dir / fixband.PICTURE
             if photo and saved and drawn.is_file() and fix_instruction(saved) == fix_instruction(plan):
                 muse = lambda image, words, path: drawn  # drawn for this same fix by an earlier run: no new call
