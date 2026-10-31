@@ -819,6 +819,12 @@ v3 vs Muse Spark Open 11 vs 3, p 0.057 (not significant at 0.05). With row 402 c
 discordant counts and p values (all three judges passed it). Replies average 94 characters. The unseen-kind ablation
 run was stopped at step 10 (the laptop had to close) and has not been run yet.
 
+**Unseen-kind ablation (run again from scratch as `judge-v3-unseen2`, same day):** trained without a single "deaths
+prevented" or "near-miss called a collision" row, it flagged all 30 held-out rows of those two kinds (30/30, as did
+the main run, Muse Spark and Spark Open, so these two kinds are easy for every judge) and got 411/417 test + natural
+rows right with 0/173 clean letters flagged. So the main result does not rest on having seen those kinds; a harder
+unseen-kind test would need kinds that the untuned judges miss. Replies: `provenance/glimmer-judge-lora-v3/unseen/`.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no

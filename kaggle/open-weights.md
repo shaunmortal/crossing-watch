@@ -172,7 +172,8 @@ labels were frozen (`provenance/glimmer-judge-lora-v3/labels-frozen.json`). Prot
 
 Exact McNemar on the pre-registered primary endpoint: against Muse Spark 19 vs 5, **p 0.0066**; against Spark Open
 11 vs 3, p 0.057 (not significant). On the 57 model-written rows: 56, 50 and 53 right. All three get 30/31 on the
-public bench. Training $0; every reply is committed.
+public bench. A second run trained without two lie kinds still caught all 30 rows of them (an easy pair: every judge
+did) and got 411/417. Training $0; every reply is committed.
 
 ## Spark-free mode
 
