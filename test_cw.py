@@ -2602,7 +2602,7 @@ def test_finetune_judge_rows_hold_the_judge_prompt_and_the_reply_pack_reads_and_
     import finetune_judge
     import judge_bench
     measured = next(m for m in map(finetune_judge.synthetic_pack, range(50)) if len(json.loads(m)["worst"]) >= 2)
-    assert finetune_judge.synthetic_pack(3) == finetune_judge.synthetic_pack(3) and "made-up tracks" in measured
+    assert finetune_judge.synthetic_pack(3) == finetune_judge.synthetic_pack(3)
     facts = json.loads(measured)
     a, b = facts["worst"][:2]
     letter = (f"Dear Road Authority,\nWe counted {facts['observed']['crossings']} pedestrian crossings and "
@@ -2634,6 +2634,32 @@ def test_finetune_judge_rows_hold_the_judge_prompt_and_the_reply_pack_reads_and_
     worst = json.loads(spark_facts)["worst"]  # 38.0 km/h with 3.0%, 29.0 km/h with 1.4%
     assert finetune_judge.unpaired("A car at 38.0 km/h: adult death risk 1.4%.", worst) and not finetune_judge.unpaired(
         spark_letter, worst)
+
+
+def test_finetune_judge_v3_site_reads_like_a_real_pack_and_old_letters_follow_it():
+    """Offline: a synthetic pack's site is "ROAD crossing", never synthetic, made up or without video (a letter
+    offering its video then contradicts nothing); a letter cached on the old site name is read on today's pack, its
+    site renamed and its no-video sentence dropped, every other measurement unchanged."""
+    import finetune_judge
+    for seed in range(30):
+        site = json.loads(finetune_judge.synthetic_pack(seed))["site"]
+        assert site.removesuffix(" crossing") in finetune_judge.ROADS and not finetune_judge.SYNTHETIC.search(site)
+    now = json.loads(finetune_judge.synthetic_pack(5))
+    road = now["site"].removesuffix(" crossing")
+    old_site = f"Synthetic crossing on {road} (made-up tracks, no video)"
+    letter = (f"Subject: the {old_site}\nWe write about the synthetic crossing on {road}. These are made-up tracks with "
+              "no video. A car came within 0.8 s of a person. We can share the video.")
+    record = {"seed": 5, "measured": json.dumps({**now, "site": old_site}), "plan": {"letter": letter, "why": "x"}}
+    real = finetune_judge.as_real_site(record)
+    assert real["measured"] == finetune_judge.synthetic_pack(5) and real["plan"]["letter"] == (
+        f"Subject: the {road} crossing\nWe write about the {road} crossing. A car came within 0.8 s of a person. "
+        "We can share the video.")
+    assert finetune_judge.as_real_site(real) == real and record["plan"]["letter"] == letter  # the cache is not changed
+    try:
+        finetune_judge.as_real_site({**record, "measured": json.dumps({**now, "site": old_site, "crossings": -1})})
+        raise AssertionError("measurements differing beyond the site were accepted")
+    except ValueError:
+        pass
 
 
 def test_finetune_judge_pair_sentence_swaps_each_speed_onto_the_other_near_miss_time_gap():
