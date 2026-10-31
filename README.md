@@ -738,7 +738,8 @@ from 28 Oct 2026; the one ported piece is the mask decoder below. The Kaggle not
 - **What runs.** Python standard library only, plus ffmpeg as a command-line tool (a GPL build with libx264, not
   bundled) and Chrome or any Chromium for the demo's hero shot (`video/split.py`). Inside the Kaggle notebook:
   llama.cpp `b11976` (MIT), huggingface_hub (Apache-2.0) and the Muse Glimmer 30B GGUF weights (Apache-2.0, Hugging
-  Face revision `b44f1072`). Muse Spark Open's open weights are used as served by Fireworks under Meta's licence for them. Models run as
+  Face revision `b44f1072`). Built with Muse Spark Open: its open weights are used as served by Fireworks under Meta's Muse Model License, and
+  our Glimmer judge adapter is trained partly on letters Spark Open wrote, so it follows that licence too. Models run as
   services: the Meta Model API, Fireworks for Muse Spark Open, Kaggle's
   2 x T4 for Glimmer.
 - **Datasets, none included.** SinD (github.com/SOTIF-AVLab/SinD; non-commercial, its public sample used only for
