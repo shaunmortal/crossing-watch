@@ -1158,23 +1158,38 @@ def sha256(text):
 
 
 STYLE = """
-:root { --bg: #fafaf7; --ink: #1d1d1b; --muted: #66665f; --line: #deded6; --accent: #c0392b; --ok: #2e7d32; --warn: #b26b00; }
-@media screen and (prefers-color-scheme: dark) { :root { --bg: #161614; --ink: #ececE6; --muted: #a3a39a; --line: #34342f; --accent: #ff6b5b; --ok: #7bd88f; --warn: #f0a830; } }
-body { margin: 0 auto; max-width: 880px; padding: 24px 16px 64px; background: var(--bg); color: var(--ink);
-       font: 16px/1.5 system-ui, sans-serif; }
-h1 { font-size: 1.8rem; margin: 0 0 4px; } h2 { margin-top: 40px; } .note { color: var(--muted); }
-.lead { font-size: 1.25rem; margin-bottom: 0; }
-.card { border-top: 1px solid var(--line); padding: 16px 0; } video, img { width: 100%; border-radius: 6px; }
-table { border-collapse: collapse; width: 100%; } td, th { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); }
+:root { --bg: #fafaf7; --ink: #1d1d1b; --muted: #5f5f58; --line: #deded6; --surface: #fff; --accent: #b8321f;
+        --ok: #2e7d32; --warn: #9a5c00; --tint: #fbeae7; color-scheme: light; }
+@media screen and (prefers-color-scheme: dark) { :root { --bg: #161614; --ink: #ececE6; --muted: #a8a89f; --line: #34342f;
+        --surface: #1f1f1c; --accent: #ff7b6b; --ok: #7bd88f; --warn: #f0a830; --tint: #3a1d19; color-scheme: dark; } }
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0 auto; max-width: 920px; padding: 24px 16px 80px; background: var(--bg); color: var(--ink);
+       font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-text-size-adjust: 100%; }
+h1, h2, h3 { line-height: 1.2; text-wrap: balance; } h1 { font-size: clamp(1.5rem, 4.5vw, 2.1rem); margin: 4px 0 8px; }
+h2 { font-size: 1.4rem; margin: 48px 0 12px; padding-top: 16px; border-top: 1px solid var(--line); }
+h2 + .card { border-top: 0; padding-top: 4px; }
+h3 { font-size: 1.1rem; margin: 12px 0 8px; } p { margin: 0 0 12px; } .note { color: var(--muted); }
+.lead { font-size: 1.25rem; font-weight: 600; margin: 4px 0 0; max-width: 40em; }
+.card { border-top: 1px solid var(--line); padding: 20px 0; } video, img { display: block; max-width: 100%; }
+video, img { width: 100%; border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; margin: 8px 0 12px; font-variant-numeric: tabular-nums; }
+td, th { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+th { font-size: 0.85rem; font-weight: 600; color: var(--muted); } td:first-child { font-weight: 500; }
 .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } @media (max-width: 600px) { .pair { grid-template-columns: 1fr; } }
-figure { margin: 0; position: relative; } .letter { border-left: 3px solid var(--line); padding-left: 16px; }
+figure { margin: 0; position: relative; } figcaption { margin-top: 6px; }
+.letter { border-left: 3px solid var(--line); padding-left: 16px; }
+.letter-sheet .letter { background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+                        padding: clamp(16px, 5vw, 40px); font: 1.02rem/1.6 Georgia, "Times New Roman", serif; }
 .ai-label { position: absolute; left: 8px; top: 8px; padding: 2px 8px; border-radius: 4px; background: #000c; color: #fff;
-            font-size: 0.8rem; } .disclosure { border: 1px dashed var(--muted); padding: 8px 12px; }
+            font-size: 0.8rem; }
+.disclosure { border: 1px dashed var(--muted); border-radius: 8px; padding: 12px 16px; background: var(--surface); }
 blockquote { margin: 16px 0; padding-left: 16px; border-left: 3px solid var(--accent); }
-cite { display: block; margin-top: 4px; font-style: normal; color: var(--muted); } a { color: inherit; }
+cite { display: block; margin-top: 4px; font-style: normal; color: var(--muted); } a { color: inherit; text-underline-offset: 2px; }
+a:focus-visible, .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .letter:focus { outline: 2px solid var(--line); outline-offset: 6px; } .note.ok { color: var(--ok); }
 .note.bad { color: var(--accent); } ::highlight(unmeasured) { text-decoration: underline wavy #e5372a 2px; }
-.filed { font-weight: 600; } code { overflow-wrap: anywhere; }
+.note.bad[role="alert"] { background: var(--tint); border-left: 4px solid var(--accent); padding: 10px 14px; border-radius: 4px; }
+.filed { font-weight: 600; } code { overflow-wrap: anywhere; } ul { padding-left: 1.2em; } li { margin-bottom: 6px; }
 .pyramid { display: grid; grid-template-columns: minmax(96px, 35%) 1fr; gap: 6px 12px; align-items: center; }
 .pyramid i { display: block; height: 28px; margin: 0 auto; background: var(--muted); print-color-adjust: exact; }
 .pyramid i.base { background: var(--line); } .pyramid i.serious { background: var(--accent); }
@@ -1221,13 +1236,15 @@ def banner(walking, site):
 
 def top(site, events, seen, plan, images, signoff, full, warning, lines):
     """The first screen (summary.header). Under the pace warning only the warning and the watched counts; else the
-    headline's first line (of `lines`), the first shown near-miss's clip, the counts and, with a letter, the ask."""
+    headline's first line (of `lines`), the first shown near-miss's clip (or, with no clip, card #1's title linked to
+    its card), the counts and, with a letter, the ask."""
     tiles, line = stats(events, seen, not warning)
     shown = None if warning else first_clip(events)
     video = summary.clip(*shown, card_title(*shown)) if shown else ""
+    worst = "" if warning or shown or not events else summary.worst(1, card_title(1, events[0]))  # no clip to caption
     asked = (summary.ask(plan, images, is_signed(plan, signoff), letter_status(site, plan, signoff))
              if plan and not warning else "")
-    return summary.header(site, seen, warning or lead(lines), video, tiles, line,
+    return summary.header(site, seen, warning or lead(lines) + worst, video, tiles, line,
                           limit_note(full), asked, "" if asked else filed_line(site))
 
 
@@ -1252,8 +1269,8 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None, privacy=No
               f"41(3):536-542, for adults hit by a car front; children are not covered by that study. Speed-limit rows "
               f"replay the same moment with the vehicle no faster than the limit, a {road.REACTION_S} s reaction and "
               f"{road.BRAKING_MPS2} m/s² braking. {site.get('calibration_note', '')}")
-    body = f"""{measured}
-{map_section(events, site, ground, paths, not warning)}<section id="clips"><h2>{moments}</h2>{cards}</section>{fix_section(plan, images)}{fixband.figure(images)}{legal_section(site)}
+    body = f"""<section id="clips"><h2>{moments}</h2>{cards}</section>
+{measured}{map_section(events, site, ground, paths, not warning)}{fix_section(plan, images)}{fixband.figure(images)}{legal_section(site)}
 {letter_section(plan, events[:SHOWN_EVENTS], facts(site, events, seen, paths), signoff)}{case}
 {tct_section("" if warning else passmark.after_mark(events, seen))}<section id="method"><h2>How this was measured</h2><p class="note">{html.escape(method)}</p>{privacy_note(privacy)}
 {f'<p class="note">{html.escape(receipt)}</p>' if receipt else ""}{f'<p class="note">{html.escape(removed)}</p>' if removed else ""}{hash_line(source_sha256, site, seen.get("window_s"), recording_s)}</section>"""
