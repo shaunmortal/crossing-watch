@@ -738,6 +738,10 @@ of training in every run (checked by replaying the starter's shuffle).
 - **Public bench:** the public rows' replies are not read until the winner is named here. Then the winner's public
   score is the reported result, and the other configs' public scores are listed after it, labelled as not chosen.
 - If no v2 config beats v1 on dev by this score, v1 stays the reported model.
+- **Dev result and winner (Sat 31 Oct 2026, 05:10 IST, written before any public reply was read):** A 101/105 lies,
+  0/75 clean flagged (score 101); B 104/105, 0/75 (104); C 104/105, 0/75 (104); D 104/105, 0/75 (104). B, C and D
+  tie; the rule gives **B** (rank 32, 1 epoch, 1e-4). No reply was unreadable. A's and D's promotions to the account
+  failed (A: an upper-case run id; D: Fireworks HTTP 500), after their evaluation; B's model was promoted.
 
 ## Log
 
