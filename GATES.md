@@ -849,6 +849,11 @@ as many rows that no earlier step has touched. v3's result above stays as record
   Open and 50109 for Spark, half each). Disclosed: the model-written edits' editor did not strictly alternate letter by
   letter, since RISKY review changed which letters made the cut; per writer the editors are near 50/50 (Spark Open's
   letters 50/50, Spark's 52/48). Edits already paid for were kept.
+- **Before any v4 tuned reply was read (Sat 31 Oct 2026, after labels froze in 4484029):** rows 23 and 941 carry the
+  same false sentence that adjudication found in their siblings 566 and 221, but no judge flagged them, so under the
+  protocol they stay clean; the primary result is reported that way and once more with both counted as planted. Row
+  785 is excluded: its "lie" is the editor's refusal text, so it plants nothing (a deviation from the written rule,
+  which only foresaw a planted sentence the measurements support).
 
 ## Log
 
