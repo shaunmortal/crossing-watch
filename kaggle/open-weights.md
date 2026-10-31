@@ -130,6 +130,26 @@ puts two near-misses in one sentence) and one "every school day". The in-session
 base replies ran out of the 4,096-token cap while reasoning, so the starter's base-vs-tuned delta is not a fair test.
 Serving the LoRA for $0 on Kaggle (`--lora` on the same Q4_K_M base) is not done yet.
 
+### v2: a pre-registered sweep, and the tuned judge passes Muse Spark
+
+Sat 31 Oct 2026. 150 training letters from two writers (Muse Spark Open, and Muse Spark through the Meta API), 62
+"near-misses swapped" rows (v1 had 2), split by whole letters into train (1,620 rows) and dev (180 rows from 15
+letters); the 31 public-bench prompts were held out of every run. Four configs, the winner rule and the order were
+written in GATES.md before any run; the winner was named there from dev alone before any public reply was read.
+Record: `provenance/glimmer-judge-lora-v2.json`, every reply in `provenance/glimmer-judge-lora-v2/`, data
+`glimmer-judge-train-v2.jsonl`. Training $0; evaluation sampling about $5.6 for the four runs.
+
+| Config | Dev: lies / clean flagged | Public bench: lies / clean flagged |
+|---|---|---|
+| A rank 8, 1 epoch | 101/105, 0/75 | 21/23, 0/8 (not chosen) |
+| **B rank 32, 1 epoch (chosen)** | **104/105, 0/75** | **23/23, 0/8** |
+| C rank 8, 2 epochs | 104/105, 0/75 | 20/23, 0/8 (not chosen) |
+| D rank 32, 2 epochs, 5e-5 | 104/105, 0/75 | 21/23, 0/8 (not chosen) |
+
+On the same public bench Muse Spark flags 21/23 lies and 0/8 clean letters, Muse Spark Open (effort low) 22/23 and
+0/8, and untuned Glimmer (2 votes) 23/23 and 5/8. One vote, temperature 0, and a small bench: 23/23 is 86-100% and
+0/8 is 0-32% (Wilson 95%). The configs that were not chosen show the spread a different pick would have given.
+
 ## Spark-free mode
 
 Each closed-model step and its open-weights substitute, measured against the closed one (DUT: numbers only, crops stay
@@ -139,7 +159,7 @@ the last 6 vehicle-crowd pieces for about $0.02).
 | Component | Closed | Open substitute | Measured result |
 |---|---|---|---|
 | Letter writer | Muse Spark (1 try) | Spark Open on Fireworks; Glimmer 30B on Kaggle | number check passed on try 1; Glimmer on try 2 (writers table) |
-| Letter judge | Muse Spark: public bench 21/23 lies, 0/8 false alarms | Spark Open, effort low; Glimmer + our LoRA | public bench 22/23 lies, 0/8 false alarms; 18/23 (21 with code), 0/8 |
+| Letter judge | Muse Spark: public bench 21/23 lies, 0/8 false alarms | Spark Open, effort low; Glimmer + our LoRA | public bench 22/23 lies, 0/8 false alarms; tuned Glimmer v2 **23/23, 0/8** (v1 18/23) |
 | Crop reviewer | Muse Spark: crowd 47/52, 3 extra; vehicle crowd 48/52, 4 extra | Spark Open (`REVIEW_MODEL_URL`, `validate_offline.py --reviewer open`) | crowd 49/52, 3 extra; vehicle crowd 48/52, 3 extra (none unreviewed); same keep/remove call as Spark on 51 of 53 and 45 of 46 pieces both judged |
 
 ## Runs still to come
