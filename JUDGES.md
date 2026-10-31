@@ -73,7 +73,7 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
 
 - The gate is not filmed yet (Mon 2 Nov). G2, G4, G5, G6 and G8 have not run; G7 has no verdict before submission.
 - All ground truth (DUT, SinD) is top-down drone footage: no one is hidden. Phone-angle numbers are simulations.
-- A Muse judge reading Muse letters is not independent. The v3 win over Spark Open is not significant, the v3
-  unseen-kind ablation has not run, and v3 has no one-command re-score script yet (the replies are committed).
+- A Muse judge reading Muse letters is not independent. The v3 win over Spark Open is not significant, and the
+  unseen-kind ablation used two kinds every judge catches. Re-score v3 at $0: `python3 judge_v3_score.py`.
 - No agent run against the Meta API yet; the Kaggle notebook is not public yet. Muse Image measures nothing, and
   Muse Wonder's sound check is not ground truth.

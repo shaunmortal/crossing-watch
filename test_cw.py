@@ -4897,6 +4897,17 @@ def test_judge_compare_mcnemar_and_wilson_match_hand_values():
     assert judge_compare.ci(23, 23) == "23/23 (86-100%)" and judge_compare.ci(0, 8) == "0/8 (0-32%)"
     assert judge_compare.flags(['{"problems": ["x"]}', '{"problems": []}', "not json"]) == [True, False, False]
 
+
+def test_judge_v3_score_reproduces_the_committed_primary_endpoint():
+    import judge_v3_score as v3
+    rows = [r for r in json.loads((v3.V3 / "labels-frozen.json").read_text())["rows"] if not r["excluded"]]
+    picked = [r for r in rows if r["set"] in ("test", "natural")]
+    flagged = v3.judges()
+    right = {n: [f[r["index"]] == r["final_planted"] for r in picked] for n, f in flagged.items()}
+    tuned, spark = right["Glimmer + LoRA v3"], right["Muse Spark"]
+    assert (sum(tuned), sum(spark), len(picked)) == (410, 396, 417)
+    assert (sum(t and not o for t, o in zip(tuned, spark)), sum(o and not t for t, o in zip(tuned, spark))) == (19, 5)
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):
