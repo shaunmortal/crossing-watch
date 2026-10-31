@@ -2693,6 +2693,33 @@ def test_natural_edit_kept_only_when_it_adds_one_sentence_and_a_clean_one_only_m
                                            ("spark", 30001): "spark"}
 
 
+def test_judge_v4_template_lies_spread_evenly_over_the_kinds_each_letter_can_carry():
+    """Offline: each v4 test letter gets one template-lie row, the kind fewest earlier letters took among those it can
+    carry, so the kinds it can carry are taken evenly and the others never; the rows are the judge prompt and a
+    one-problem reply, the same on every run; v4 seeds start past every earlier one."""
+    import random
+    import finetune_judge
+    import judge_v4
+    measured = next(m for m in map(finetune_judge.synthetic_pack, range(50)) if len(json.loads(m)["worst"]) >= 2)
+    facts = json.loads(measured)
+    a = facts["worst"][0]
+    letter = (f"Dear Road Authority,\nWe counted {facts['observed']['crossings']} pedestrian crossings. A {a['vehicle']} "
+              f"at {a['vehicle_kmh']} km/h came within {a['pet_s']} s of a person.\nThe Principal")
+    carried = {k for k, _, _ in finetune_judge.planted(letter, facts["worst"], random.Random(0))}
+    bases = [{"writer": "spark-open", "seed": judge_v4.FIRST + i, "measured": measured, "plan": {"letter": letter}}
+             for i in range(2 * len(carried) + 1)]
+    rows = judge_v4.template_rows(bases)
+    assert rows == judge_v4.template_rows(bases) and len(rows) == len(bases) and len(judge_v4.KINDS) == 12
+    kinds = [r["kind"] for r in rows]
+    assert {k: kinds.count(k) for k in carried} == {k: 2 + (k == judge_v4.KINDS[min(map(judge_v4.KINDS.index, carried))])
+                                                    for k in carried} and set(kinds) == carried
+    for r in rows:
+        assert r["set"] == "test-template" and r["planted"] and r["letter"] != letter
+        assert r["messages"][0]["content"] == pack.JUDGE_PROMPT.format(facts=measured, letter=r["letter"])
+        assert len(pack.read_problems(r["messages"][1]["content"])) == 1
+    assert judge_v4.v4_seed(40000) and judge_v4.v4_seed(50000) and not judge_v4.v4_seed(30068)
+
+
 def test_finetune_judge_unseen_ablation_drops_exactly_the_two_kinds_and_keeps_the_holdout():
     """Offline: the ablation's train rows are the main train less every row of UNSEEN_KINDS, nothing else, and both
     files hold out the same rows in the same order after the starter's shuffle."""
