@@ -796,6 +796,10 @@ hold out the same 448 prompts (starter shuffle replayed): 360 test, 57 natural, 
 - **Primary:** correct per row (`pack.read_problems`; unreadable = not flagged) on the 417 test + natural rows, exact
   McNemar of main vs Muse Spark and vs Spark Open. **Secondary:** natural rows alone; clean rows flagged; public bench;
   ablation vs main on the 30 rows of the two unseen kinds (26 test, 4 public); tokens per verdict. All reported.
+- **Row 402, decided before any tuned reply was read (Sat 31 Oct 2026):** spark/30007's natural clean row carries the
+  same false "closest serious event was 1.0 s" sentence that adjudication found in rows 259-263, but neither judge
+  flagged it, so under the protocol it was not adjudicated and stays clean. The primary result is reported that way,
+  and once more with row 402 counted as planted.
 
 ## Log
 
