@@ -743,6 +743,26 @@ of training in every run (checked by replaying the starter's shuffle).
   tie; the rule gives **B** (rank 32, 1 epoch, 1e-4). No reply was unreadable. A's and D's promotions to the account
   failed (A: an upper-case run id; D: Fireworks HTTP 500), after their evaluation; B's model was promoted.
 
+## Same-set comparison on 211 judge prompts (Sat 31 Oct 2026)
+
+Written after the v2 winner was named above; not pre-registered. `judge_compare.py` (commit dfb983e) asked Muse Spark
+(Meta API) and Muse Spark Open (Fireworks, effort low) the 211 v2 holdout prompts the four configs answered (180 dev,
+31 public), one vote each, no unreadable reply ($3.08; replies in `provenance/glimmer-judge-lora-v2/bench211/`). An
+independent recount from the raw replies matched every count, Wilson 95% bound and p. Correct = flagged iff planted.
+
+| Set | Judge | Lies flagged | Clean letters flagged | Correct |
+|---|---|---|---|---|
+| public 31 | Glimmer+LoRA B (chosen) | 23/23 (86-100%) | 0/8 (0-32%) | 31 |
+| public 31 | Muse Spark | 22/23 (79-99%) | 0/8 (0-32%) | 30 |
+| public 31 | Muse Spark Open | 22/23 (79-99%) | 0/8 (0-32%) | 30 |
+| all 211 | Glimmer+LoRA B (chosen) | 127/128 (96-100%) | 0/83 (0-4%) | 210 |
+| all 211 | Muse Spark | 126/128 (94-100%) | 37/83 (34-55%) | 172 |
+| all 211 | Muse Spark Open | 126/128 (94-100%) | 5/83 (3-13%) | 204 |
+
+Paired exact McNemar, all 211 (rows only B gets right vs only the Muse judge): B vs Spark 38 vs 0, p 7.3e-12; B vs
+Spark Open 7 vs 1, p 0.07, not significant. 180 rows are the dev set B was chosen on; on the 31 public rows alone B
+vs either is 1 vs 0, p 1. Configs A, C, D and the dev rows: `python3 judge_compare.py`.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no

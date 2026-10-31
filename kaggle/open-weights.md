@@ -150,6 +150,11 @@ On the same public bench Muse Spark flags 21/23 lies and 0/8 clean letters, Muse
 0/8, and untuned Glimmer (2 votes) 23/23 and 5/8. One vote, temperature 0, and a small bench: 23/23 is 86-100% and
 0/8 is 0-32% (Wilson 95%). The configs that were not chosen show the spread a different pick would have given.
 
+Paired on the same 211 holdout prompts (180 dev, 31 public; one vote each; `judge_compare.py`, GATES.md "Same-set
+comparison on 211 judge prompts"): B got 210 right, Muse Spark 172 (it flagged 37/83 clean letters), Muse Spark Open
+204 (5/83). Exact McNemar: B vs Spark 38 vs 0 discordant rows, p 7.3e-12; B vs Spark Open 7 vs 1, p 0.07, not
+significant. Dev chose B, so those rows favour it; on the 31 public rows alone each comparison is 1 vs 0, p 1.
+
 ## Spark-free mode
 
 Each closed-model step and its open-weights substitute, measured against the closed one (DUT: numbers only, crops stay
