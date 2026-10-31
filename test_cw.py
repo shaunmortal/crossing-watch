@@ -4908,6 +4908,17 @@ def test_judge_v3_score_reproduces_the_committed_primary_endpoint():
     assert (sum(tuned), sum(spark), len(picked)) == (410, 396, 417)
     assert (sum(t and not o for t, o in zip(tuned, spark)), sum(o and not t for t, o in zip(tuned, spark))) == (19, 5)
 
+
+def test_letter_pdf_sheet_keeps_the_letter_whole_adds_the_signature_block_and_no_second_subject():
+    import letter_pdf
+    plan = {"fix": "Raised zebra <crossing>", "letter": "Dear Sir/Madam,\nWe measured 3 near-misses."}
+    page = letter_pdf.sheet(plan, {"name": "Gate"})
+    assert "We measured 3 near-misses." in page and "Raised zebra &lt;crossing&gt;" in page
+    assert "Signature and seal" in page and pack.signed_sha(plan) in page and "To,</p>" in page
+    own = {**plan, "letter": "To the Road Authority\nSubject: A crossing\nDear Sir/Madam,\nText."}
+    page = letter_pdf.sheet(own, {"name": "Gate"})
+    assert "<b>Subject:</b>" not in page and "To,</p>" not in page
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):

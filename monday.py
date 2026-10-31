@@ -188,6 +188,8 @@ def main(argv=None):
     print(f"\nAgent: answer its tape question with the real taped distance, using the R id it printed:\n"
           f'  python3 agent.py {shlex.join([args.video, args.site, "--out", f"{args.out}-agent"])} --answer R1 "[taped] m"\n'
           "Stop at needs_review. Never --approve on Monday.")
+    print(f"\nLetter for the HOD to sign on Tuesday (A4 PDF, print it):\n"
+          f"  python3 letter_pdf.py {shlex.join([args.out, args.site])}")
     if not args.dry_run:
         by_eye(args)
     print(kaggle_steps(args))
