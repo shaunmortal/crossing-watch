@@ -9,8 +9,8 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
    sample/site.json`, then open `sample/index.html`: the measurements page built offline from a synthetic sample.
    Without a key it has no letter ("letter failed" is expected); the sample's letters are in
    `provenance/spark-open-sample-letter.txt` and `<removed-run-record>`.
-2. Read [kaggle/open-weights.md, v3](kaggle/open-weights.md#v3-a-blind-pre-registered-test-against-muse-spark):
-   our fine-tuned open-weights judge against Muse Spark on 417 blind rows.
+2. Read [kaggle/open-weights.md, v4](kaggle/open-weights.md#v4-1016-blind-rows-pre-registered-against-both-muse-judges):
+   our fine-tuned open-weights judge against both Muse judges on 1,016 blind rows.
 3. Read [GATES.md, Verdict now](GATES.md#verdict-now): what was pre-registered, what passed, what has not run.
 4. Read [README, Limits, stated](README.md#limits-stated) and the known limits below.
 5. Watch the demo: [PLACEHOLDER: demo video link]. Our gate's evidence page: [PLACEHOLDER: GitHub Pages link].
@@ -50,9 +50,10 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
 
 ## Open Weights bonus
 
-- Fine-tuned Muse Glimmer judge v3 (LoRA, training $0) on 417 blind, pre-registered rows: 410 right vs Muse Spark
-  396 (19 vs 5, p 0.0066); 0/173 clean letters flagged vs Spark 15/173; vs Muse Spark Open 402, p 0.057, **not
-  significant**. [GATES.md, v3 result](GATES.md#fine-tuned-glimmer-judge-v3-result-sat-31-oct-2026-read-after-the-labels-were-frozen-in-e21a283-and-91e81f6); replies and frozen labels: `provenance/glimmer-judge-lora-v3/`.
+- Fine-tuned Muse Glimmer judge (LoRA, training $0), pre-registered blind tests, labels frozen before any tuned reply
+  was read. **v4, 1,016 rows: 998 right vs Muse Spark 959 (p 7.2e-06) and Spark Open 980 (p 0.0051)**; 5/491 clean
+  letters flagged vs Spark 49/491. v3, 417 rows: 410 vs 396 (p 0.0066). [GATES.md v3 and v4 results](GATES.md);
+  replies and frozen labels: `provenance/glimmer-judge-lora-v3/` and `-v4/`; re-score: `python3 judge_v3_score.py v4`.
 - Muse Glimmer 30B self-hosted on Kaggle's free 2 x T4 from sha256-checked weights wrote the sample letter
   ([<removed-run-record>](<removed-run-record>)); writers table at $0: `python3 writers_table.py`.
 - Each closed-model step's open substitute, measured: [Spark-free mode](kaggle/open-weights.md#spark-free-mode).
@@ -75,7 +76,7 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
 
 - The gate is not filmed yet (Mon 2 Nov). G2, G4, G5, G6 and G8 have not run; G7 has no verdict before submission.
 - All ground truth (DUT, SinD) is top-down drone footage: no one is hidden. Phone-angle numbers are simulations.
-- A Muse judge reading Muse letters is not independent. The v3 win over Spark Open is not significant, and the
-  unseen-kind ablation used two kinds every judge catches. Re-score v3 at $0: `python3 judge_v3_score.py`.
+- A Muse judge reading Muse letters is not independent. The tuned judge missed all six real slips the letter writers
+  made themselves in v4 (Spark caught six), and v3's unseen-kind ablation used two kinds every judge catches.
 - No agent run against the Meta API yet; the Kaggle notebook is not public yet. Muse Image measures nothing, and
   Muse Wonder's sound check is not ground truth.

@@ -4931,9 +4931,13 @@ def test_judge_v3_score_reproduces_the_committed_primary_endpoint():
     picked = [r for r in rows if r["set"] in ("test", "natural")]
     flagged = v3.judges()
     right = {n: [f[r["index"]] == r["final_planted"] for r in picked] for n, f in flagged.items()}
-    tuned, spark = right["Glimmer + LoRA v3"], right["Muse Spark"]
+    tuned, spark = right["Glimmer + LoRA (tuned)"], right["Muse Spark"]
     assert (sum(tuned), sum(spark), len(picked)) == (410, 396, 417)
     assert (sum(t and not o for t, o in zip(tuned, spark)), sum(o and not t for t, o in zip(tuned, spark))) == (19, 5)
+    rows4 = [r for r in json.loads((v3.V4 / "labels-frozen.json").read_text())["rows"] if not r["excluded"]]
+    picked4 = [r for r in rows4 if r["set"] in v3.V4_TEST]
+    right4 = {n: [f[r["index"]] == r["final_planted"] for r in picked4] for n, f in v3.judges(v3.V4).items()}
+    assert (sum(right4["Glimmer + LoRA (tuned)"]), sum(right4["Muse Spark"]), sum(right4["Muse Spark Open"])) == (998, 959, 980)
 
 
 def test_letter_pdf_sheet_keeps_the_letter_whole_adds_the_signature_block_and_no_second_subject():

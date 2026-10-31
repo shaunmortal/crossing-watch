@@ -176,6 +176,21 @@ public bench. Built with Muse Spark Open: the training letters were written by M
 adapter follows the Muse Model License. A second run trained without two lie kinds still caught all 30 rows of them (an easy pair: every judge
 did) and got 411/417. Training $0; every reply is committed.
 
+### v4: 1,016 blind rows, pre-registered, against both Muse judges
+
+The v3 recipe retrained once and tested on 260 new letters (four rows each: as written, a template lie, a lie and a
+clean edit written by Muse Spark or Spark Open), labels frozen before any tuned reply was read (GATES.md "v4").
+
+| 1,016 rows | Correct | Lies flagged | Clean letters flagged |
+|---|---|---|---|
+| **Glimmer + our LoRA (v4)** | **998** | 512/525 | **5/491** |
+| Muse Spark | 959 | 517/525 | 49/491 |
+| Muse Spark Open | 980 | 493/525 | 4/491 |
+
+Exact McNemar: against Muse Spark 57 vs 18, **p 7.2e-06**; against Spark Open 28 vs 10, **p 0.0051**. Weaker spot: it
+missed all six real slips the letter writers made themselves (Spark caught six, Spark Open three), so the code
+checks and a second judge stay. Re-score at $0: `python3 judge_v3_score.py v4`.
+
 ## Spark-free mode
 
 Each closed-model step and its open-weights substitute, measured against the closed one (DUT: numbers only, crops stay

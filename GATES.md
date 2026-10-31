@@ -855,6 +855,26 @@ as many rows that no earlier step has touched. v3's result above stays as record
   785 is excluded: its "lie" is the editor's refusal text, so it plants nothing (a deviation from the written rule,
   which only foresaw a planted sentence the measurements support).
 
+## Fine-tuned Glimmer judge v4: result (Sat 31 Oct 2026, read after labels froze in 4484029 and 86ae306)
+
+Model `muse-starter-sl-judge-v4-main` (v3's recipe, retrained once), one vote, against
+`provenance/glimmer-judge-lora-v4/labels-frozen.json`; replies in `provenance/glimmer-judge-lora-v4/main/`;
+re-score: `python3 judge_v3_score.py v4`.
+
+| 1,016 new test rows (primary) | Correct | Lies flagged | Clean letters flagged |
+|---|---|---|---|
+| **Glimmer + LoRA (v4)** | **998** | 512/525 | **5/491** |
+| Muse Spark | 959 | 517/525 | 49/491 |
+| Muse Spark Open | 980 | 493/525 | 4/491 |
+
+**Primary endpoint met against both:** exact McNemar v4 vs Muse Spark 57 vs 18, **p 7.2e-06**; v4 vs Muse Spark Open
+28 vs 10, **p 0.0051**. With rows 23 and 941 counted as planted: the same counts and p. On the 496 model-written rows:
+487 vs 466 (p 0.0011) and vs 472 (p 0.0026). Public bench: 30/31 for all three. **Where it is weaker:** six letters
+as written carried a real error of their own writer (found by adjudication); v4 flagged none of them, Muse Spark all
+six and Spark Open three. On the 260 as-written letters v4 is ahead of Spark (251 vs 235, p 0.009) and level with
+Spark Open (251 vs 254, p 0.51). So the tuned judge is better at planted and model-written lies and at not crying
+wolf, and misses subtle slips a writer makes; the code checks and a second judge stay in the pipeline.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
