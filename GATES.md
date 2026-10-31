@@ -774,6 +774,29 @@ tokens against Spark's 2,153 and Spark Open's 877. Spark flagged 21/23 public li
 packs come from video, but B's behaviour on that contradiction is untested. A v3 would drop "no video" from the
 synthetic packs' measurements.
 
+## Fine-tuned Glimmer judge v3 (pre-registered Sat 31 Oct 2026, before any v3 run)
+
+**Flaw and fix.** v2's packs said "no video", so its clean labels were wrong (the Correction above), and its held-out
+lies reused the training wordings, which a judge could recognise. v3 names the site "ROAD crossing" (7c5d1c2), trains
+on v2's 150 letters (1,800 rows), tests on 30 fresh letters and model-written lies (`natural_edits.py`). Config fixed,
+no sweep: v2's B (rank 32, 1 epoch, 1e-4, seed 0, max_seq_len 3,072, max_eval_tokens 256). Two runs: **main**, and an
+**unseen-kind ablation** whose 1,612 train rows hold no "deaths prevented" or "near-miss called a collision" row. Both
+hold out the same 448 prompts (starter shuffle replayed): 360 test, 57 natural, 31 public. Longest row 2,189 tokens.
+- **Test letters:** 15 by Spark Open, 15 by Muse Spark (seeds 20000+, 30000+), RISKY words read by the existing policy;
+  none shares a 12-word span with the public bench, each under 15% of its 12-word spans with any train letter (max
+  13.9%). No shared span at all was tried first and is infeasible: 1 of the 150 train letters passes it against the
+  other 149 (145 pass 15%, median 6.4%).
+- **Natural lies:** Muse Spark (Meta API) and Spark Open (Fireworks) each edit 15 test letters, alternating, with one
+  fixed prompt (`EDIT_PROMPT`, effort low): add one plausible sentence the measurements do not support, any kind, with
+  why; separately, one restating only what they support. Code keeps an edit only if it adds exactly one sentence, a
+  clean one only if every number is measured: 57 of 60 kept (Spark 28, Spark Open 29), 29 planted, 28 clean.
+- **Labels:** before any tuned reply is read, Muse Spark and Spark Open (effort low, one vote) judge all 448 prompts; a
+  row where either disagrees with its label is adjudicated, blind to tuned replies, under the judge prompt's rules, and
+  changes only if the flag is a real problem there. Adjudicated labels are committed before tuned replies are read.
+- **Primary:** correct per row (`pack.read_problems`; unreadable = not flagged) on the 417 test + natural rows, exact
+  McNemar of main vs Muse Spark and vs Spark Open. **Secondary:** natural rows alone; clean rows flagged; public bench;
+  ablation vs main on the 30 rows of the two unseen kinds (26 test, 4 public); tokens per verdict. All reported.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
