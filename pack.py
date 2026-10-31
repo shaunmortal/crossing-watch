@@ -1170,8 +1170,7 @@ h2 { font-size: 1.4rem; margin: 48px 0 12px; padding-top: 16px; border-top: 1px 
 h2 + .card { border-top: 0; padding-top: 4px; }
 h3 { font-size: 1.1rem; margin: 12px 0 8px; } p { margin: 0 0 12px; } .note { color: var(--muted); }
 .lead { font-size: 1.25rem; font-weight: 600; margin: 4px 0 0; max-width: 40em; }
-.card { border-top: 1px solid var(--line); padding: 20px 0; } video, img { display: block; max-width: 100%; }
-video, img { width: 100%; border-radius: 6px; }
+.card { border-top: 1px solid var(--line); padding: 20px 0; } video, img {display: block; max-width: 100%; width: 100%; border-radius: 6px;}
 table { border-collapse: collapse; width: 100%; margin: 8px 0 12px; font-variant-numeric: tabular-nums; }
 td, th { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
 th { font-size: 0.85rem; font-weight: 600; color: var(--muted); } td:first-child { font-weight: 500; }
@@ -1269,8 +1268,8 @@ def page(site, events, seen, plan, images, fps, cost=None, full=None, privacy=No
               f"41(3):536-542, for adults hit by a car front; children are not covered by that study. Speed-limit rows "
               f"replay the same moment with the vehicle no faster than the limit, a {road.REACTION_S} s reaction and "
               f"{road.BRAKING_MPS2} m/s² braking. {site.get('calibration_note', '')}")
-    body = f"""<section id="clips"><h2>{moments}</h2>{cards}</section>
-{measured}{map_section(events, site, ground, paths, not warning)}{fix_section(plan, images)}{fixband.figure(images)}{legal_section(site)}
+    body = f"""{measured}
+{map_section(events, site, ground, paths, not warning)}<section id="clips"><h2>{moments}</h2>{cards}</section>{fix_section(plan, images)}{fixband.figure(images)}{legal_section(site)}
 {letter_section(plan, events[:SHOWN_EVENTS], facts(site, events, seen, paths), signoff)}{case}
 {tct_section("" if warning else passmark.after_mark(events, seen))}<section id="method"><h2>How this was measured</h2><p class="note">{html.escape(method)}</p>{privacy_note(privacy)}
 {f'<p class="note">{html.escape(receipt)}</p>' if receipt else ""}{f'<p class="note">{html.escape(removed)}</p>' if removed else ""}{hash_line(source_sha256, site, seen.get("window_s"), recording_s)}</section>"""
