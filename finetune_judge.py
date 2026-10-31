@@ -28,9 +28,13 @@ v2: python3 finetune_judge.py --dir DIR --writers spark-open=100,spark=50 --dev-
 v3 drops "synthetic", "made-up tracks" and "no video" from the site (synthetic_pack), which v2's clean letters
 contradicted by offering their video; a cached letter is read on today's pack (as_real_site). v1/v2's rows come from
 their commits' finetune_judge.py (v2: 99b04db). All of v2's letters are train; --test-writers asks fresh test letters
-on new seeds, which may share no span with a train letter either:
+on new seeds:
 v3: python3 finetune_judge.py --dir DIR --writers spark-open=100,spark=50 --test-writers spark-open=15,spark=15 \
         --out-dir DIR/v3 --name judge_v3 --cap CAP --yes
+A test letter may share no 12-word span with the public bench and under TRAIN_SHARE of its spans with the train
+letters. Each test letter also gets natural_edits' model-written lie and clean control (held out as set "natural"),
+and v3 writes a second file, NAME_unseen.jsonl (its split NAME_unseen.split.json), with the same holdout but no train
+row of UNSEEN_KINDS.
 """
 import argparse
 import hashlib
@@ -61,6 +65,10 @@ WORST_CALL_USD = 0.03  # budget guard per call: the sample's letter took 2,732 c
 FPS = 10  # PET is whole frames, as in sample/
 SERIOUS_SHARE = 0.6
 SPAN = 12  # words: a shared span this long is a near copy
+# v3 test rule (GATES.md, v3): a test letter shares under this share of its SPAN-word spans with the train letters. No
+# span at all was tried first: 1 of the 150 train letters passes it against the other 149, but 145 pass this
+TRAIN_SHARE = 0.15
+UNSEEN_KINDS = ("deaths prevented", "near-miss called a collision")  # v3 ablation: trained on no row of these kinds
 QUOTED = 4  # words: a run this long found in the measurements is quoted from them
 PLANTED_PER_LETTER, CLEAN_PER_LETTER = 7, 5  # 12 rows a letter, 5 of them clean (over 35%: false alarms are the weakness)
 ROADS = ("Lantern Road", "Orchard Lane", "Mill Street", "Canal Road", "Station Road", "Hill View Road", "Market Street",
@@ -230,9 +238,15 @@ def unpaired(letter, worst):
     return out
 
 
-def rejection(record, public, reviewed):
+def train_share(letter, measured, train):
+    """The share of the letter's SPAN-word spans that `shared` finds in `train` (the train letters' spans)."""
+    return len(shared(letter, measured, train)) / max(1, len(spans(letter)))
+
+
+def rejection(record, public, reviewed, train=None):
     """Why a cached letter is not used as a base, or "". A letter with RISKY words outside what it quotes is used
-    only once a person has read it and kept it in `reviewed` ({seed: "keep: why" or "drop: why"})."""
+    only once a person has read it and kept it in `reviewed` ({seed: "keep: why" or "drop: why"}). With `train` (a
+    test letter), TRAIN_SHARE or more of its spans found in a train letter rejects it too."""
     if "error" in record:
         return f"no letter: {record['error'][:80]}"
     letter, measured, why = record["plan"]["letter"], record["measured"], record["plan"]["why"]
@@ -243,7 +257,9 @@ def rejection(record, public, reviewed):
     return (f"code check: {flags[:3]}" if flags else verdict if verdict.startswith("drop")
             else f"not reviewed yet, may be unsupported: {risky}" if risky and not verdict
             else "no km/h to plant after" if "km/h" not in letter
-            else f"shares {len(copied)} spans with the public bench (or a test letter with a train letter), e.g. {' '.join(next(iter(copied)))!r}" if copied
+            else f"shares {len(copied)} spans with the public bench, e.g. {' '.join(next(iter(copied)))!r}" if copied
+            else f"{share:.0%} of its spans are in train letters" if train and (share := train_share(
+                letter, measured, train)) >= TRAIN_SHARE
             else "")
 
 
@@ -362,10 +378,10 @@ def cached_usd(cache):
     return sum(json.loads(p.read_text())["cost_usd"] for p in cache.glob("*.json"))
 
 
-def letters(cache, target, cap, pay, public, reviewed, writer="spark-open", spent=None, key=None, first=0):
+def letters(cache, target, cap, pay, public, reviewed, writer="spark-open", spent=None, key=None, first=0, train=None):
     """(base letters, rejected {seed: why}, USD spent) once `target` of `writer`'s letters pass, the cap would be
     passed, or (without `pay`) the cache runs out. `spent` is every writer's cached spend (default: this cache's).
-    Seeds start at the writer's first seed plus `first` (TEST_SEEDS for test letters)."""
+    Seeds start at the writer's first seed plus `first` (TEST_SEEDS for test letters); `train` as rejection's."""
     bases, rejected = [], {}
     spent = cached_usd(cache) if spent is None else spent
     seed = WRITERS[writer][1] + first
@@ -388,7 +404,7 @@ def letters(cache, target, cap, pay, public, reviewed, writer="spark-open", spen
                 break
             continue
         record = as_real_site({"writer": "spark-open", **json.loads(path.read_text())})
-        why = rejection(record, public, reviewed)
+        why = rejection(record, public, reviewed, train)
         if why:
             rejected[seed] = why
         else:
@@ -469,6 +485,11 @@ def rows_of(bases):
             for k, r in enumerate(letter_rows(b["plan"]["letter"], b["measured"], b["seed"]))]
 
 
+def without_kinds(rows, kinds=UNSEEN_KINDS):
+    """`rows` less every row of the planted `kinds`: v3's unseen-kind ablation trains on these."""
+    return [r for r in rows if r["kind"] not in kinds]
+
+
 def line(row):
     return json.dumps({"messages": row["messages"]}, ensure_ascii=False)
 
@@ -478,25 +499,29 @@ def counts(rows):
             "swapped": sum(r["kind"] == "near-misses swapped" for r in rows)}
 
 
-def write_starter(train, held, held_letters, out, name, held_set="dev"):
-    """OUT/NAME.jsonl in starter order and OUT/split.json: n_eval and the holdout's labels in post-shuffle order. The
-    holdout is `held` (the rows of `held_letters`, labelled `held_set`) and the public bench; `train` is trained on."""
+def write_starter(train, held, held_letters, out, name, held_set="dev", split_name="split.json"):
+    """OUT/NAME.jsonl in starter order and OUT/SPLIT_NAME: n_eval and the holdout's labels in post-shuffle order. The
+    holdout is `held` (the rows of `held_letters`, labelled `held_set` unless a row names its own set, as v3's
+    natural rows do with their editor) and the public bench; `train` is trained on."""
     public = public_rows()
     if {line(r) for r in public} & {line(r) for r in train + held}:
         raise SystemExit("finetune_judge: a public-bench prompt is among the synthetic rows, nothing written")
     hold = held + public
     jsonl = out / f"{name}.jsonl"
     jsonl.write_text("".join(x + "\n" for x in starter_order([line(r) for r in train], [line(r) for r in hold])))
-    labels = [{"set": held_set, "planted": r["planted"], "kind": r["kind"], "id": f"{r['writer']}/{r['seed']}/{r['k']}"}
+    labels = [{"set": r.get("set", held_set), "planted": r["planted"], "kind": r["kind"],
+               "id": f"{r['writer']}/{r['seed']}/{r['k']}", **({"editor": r["editor"]} if "editor" in r else {})}
               for r in held] + [{"set": "public", "planted": r["planted"], "kind": r["kind"], "id": r["id"]} for r in public]
     split = {"file": jsonl.name, "sha256": hashlib.sha256(jsonl.read_bytes()).hexdigest(), "starter_seed": STARTER_SEED,
              "n_eval": len(hold), "train_rows": len(train),
              f"{held_set}_letters": [{"seed": b["seed"], "writer": b["writer"]} for b in held_letters],
              "train_letters": len({(r["writer"], r["seed"]) for r in train}),
-             "sets": {"train": counts(train), held_set: counts(held), "public": counts(public)},
+             "sets": {"train": counts(train), **{s: counts([r for r in held if r.get("set", held_set) == s])
+                                                 for s in dict.fromkeys(r.get("set", held_set) for r in held)},
+                      "public": counts(public)},
              "how": "the starter's _prepare shuffles the file with random.Random(seed) and holds out the first n_eval "
                     "rows: these, in this order (replayed when the file was written)", "holdout": labels}
-    (out / "split.json").write_text(json.dumps(split, indent=1, ensure_ascii=False))
+    (out / split_name).write_text(json.dumps(split, indent=1, ensure_ascii=False))
     return jsonl, split
 
 
@@ -534,18 +559,20 @@ def main():
     reviewed = json.loads(review_file.read_text()) if review_file.is_file() else {}
     if args.test_writers and args.dev_letters:
         raise SystemExit("finetune_judge: give --dev-letters (v2) or --test-writers (v3), not both")
-    wants_spark = "spark" in {**args.writers, **(args.test_writers or {})}
+    wants_spark = "spark" in {**args.writers, **(args.test_writers or {})} or bool(args.test_writers)  # v3's editor
     key = pack.optional_key() if wants_spark else None
     if args.yes and wants_spark and not key:
         raise SystemExit("finetune_judge: spark letters need MODEL_API_KEY (environment or .env)")
     for folder, *_ in WRITERS.values():
         (cache / folder).mkdir(parents=True, exist_ok=True)
-    spent = sum(cached_usd(cache / folder) for folder, *_ in WRITERS.values())
-    def gather(wanted, spent, avoid, first=0):
+    natural_cache = cache / "natural"  # v3's natural edits (natural_edits.py), counted in the cap like the letters
+    spent = sum(cached_usd(cache / folder) for folder, *_ in WRITERS.values()) + cached_usd(natural_cache)
+    def gather(wanted, spent, avoid, first=0, train=None):
         bases, rejected = [], {}
         for writer, target in wanted.items():
             folder = cache / WRITERS[writer][0]
-            got, why, spent = letters(folder, target, args.cap, args.yes, avoid, reviewed, writer, spent, key, first)
+            got, why, spent = letters(folder, target, args.cap, args.yes, avoid, reviewed, writer, spent, key, first,
+                                      train)
             bases, rejected = bases + got, {**rejected, **why}
             for seed, reason in why.items():
                 if reason.startswith("not reviewed"):
@@ -558,15 +585,16 @@ def main():
     bases, rejected, spent = gather(args.writers, spent, public)
     if not bases:
         return
-    test, test_rejected = [], {}
-    if args.test_writers:  # a test letter may share no span with a train letter either (its measurements' left out)
+    test, test_rejected, test_share = [], {}, {}
+    if args.test_writers:  # a test letter shares under TRAIN_SHARE of its spans with the train letters (v3 rule)
         train_spans = set().union(*(spans(b["plan"]["letter"]) for b in bases)) - set().union(
             *(spans(b["measured"]) for b in bases))
-        test, test_rejected, spent = gather(args.test_writers, spent, public | train_spans, TEST_SEEDS)
-        near_train = [b["seed"] for b in test if shared(b["plan"]["letter"], b["measured"], train_spans)]
-        print(f"test letters sharing a 12-word span with a train letter: {len(near_train)} of {len(test)}")
-        if near_train or len(test) < sum(args.test_writers.values()):
-            raise SystemExit("finetune_judge: the test letters are short or overlap the train letters, nothing written")
+        test, test_rejected, spent = gather(args.test_writers, spent, public, TEST_SEEDS, train_spans)
+        test_share = {f"{b['writer']}/{b['seed']}": round(train_share(b["plan"]["letter"], b["measured"], train_spans), 3)
+                      for b in test}
+        print(f"test letters' share of spans in a train letter: max {max(test_share.values(), default=0):.3f}")
+        if len(test) < sum(args.test_writers.values()):
+            raise SystemExit("finetune_judge: too few test letters, nothing written")
     rows, test_rows = rows_of(bases), rows_of(test)
     public_letters = {i["letter"] for i in json.loads(judge_bench.PUBLIC.read_text())}
     near = [r["seed"] for r in rows + test_rows if shared(r["letter"], r["measured"], public)]
@@ -578,8 +606,17 @@ def main():
     print(f"public-bench overlap: {json.dumps(overlap)}")
     if overlap["exact_copies"] or near:
         raise SystemExit("finetune_judge: rows overlap the public bench, nothing written")
+    natural, natural_report = [], None
     if test:
-        jsonl, split = write_starter(rows, test_rows, test, out, args.name, "test")
+        import natural_edits  # imports this module: imported here, not at the top
+        records, spent = natural_edits.edits(natural_cache, test, args.yes, key, args.cap, spent)
+        if len(records) < len(test):
+            raise SystemExit(f"finetune_judge: {len(test) - len(records)} test letters have no natural edit cached "
+                             "(--yes asks for them), nothing written")
+        natural, natural_report = natural_edits.natural_rows(test, records)
+        jsonl, split = write_starter(rows, test_rows + natural, test, out, args.name, "test")
+        write_starter(without_kinds(rows), test_rows + natural, test, out, f"{args.name}_unseen", "test",
+                      f"{args.name}_unseen.split.json")
     elif args.dev_letters:
         train_letters, dev_letters = dev_split(bases, args.dev_letters)
         dev_seeds = {b["seed"] for b in dev_letters}
@@ -588,8 +625,10 @@ def main():
     else:
         jsonl, split = out / f"{args.name}.jsonl", None
         jsonl.write_text("".join(line(r) + "\n" for r in rows))
-    rows, bases, rejected = rows + test_rows, bases + test, {**rejected, **test_rejected}
-    summary = {**manifest(rows, bases, rejected, spent, overlap, jsonl), "reviewed": {
+    rows, bases, rejected = rows + test_rows + natural, bases + test, {**rejected, **test_rejected}
+    summary = {**manifest(rows, bases, rejected, spent, overlap, jsonl),
+               **({"test_train_share": test_share, "natural_edits": natural_report, "unseen_kinds": UNSEEN_KINDS}
+                  if test else {}), "reviewed": {
         str(b["seed"]): reviewed[str(b["seed"])] for b in bases if str(b["seed"]) in reviewed}}
     if split:  # the file's rows are in the starter's order, not by letter: split.json says which row is which
         held = "test" if test else "dev"

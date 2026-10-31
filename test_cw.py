@@ -2631,6 +2631,8 @@ def test_finetune_judge_rows_hold_the_judge_prompt_and_the_reply_pack_reads_and_
     record = {"seed": 1, "measured": measured, "plan": {"letter": letter.replace("people", "our pupils"), "why": "x"}}
     assert finetune_judge.rejection(record, public, {}).startswith("not reviewed yet")
     assert finetune_judge.rejection(record, public, {"1": "keep: a school's own words"}) == ""
+    as_train = finetune_judge.spans(record["plan"]["letter"])  # v3: a test letter copying a train letter is rejected
+    assert finetune_judge.rejection(record, public, {"1": "keep"}, as_train).endswith("of its spans are in train letters")
     worst = json.loads(spark_facts)["worst"]  # 38.0 km/h with 3.0%, 29.0 km/h with 1.4%
     assert finetune_judge.unpaired("A car at 38.0 km/h: adult death risk 1.4%.", worst) and not finetune_judge.unpaired(
         spark_letter, worst)
@@ -2660,6 +2662,51 @@ def test_finetune_judge_v3_site_reads_like_a_real_pack_and_old_letters_follow_it
         raise AssertionError("measurements differing beyond the site were accepted")
     except ValueError:
         pass
+
+
+def test_natural_edit_kept_only_when_it_adds_one_sentence_and_a_clean_one_only_measured_numbers():
+    """Offline: an editor's lie is inserted after the sentence it names and labelled "natural: KIND" with its reason;
+    an edit whose 'after' is not a letter sentence, or that adds two sentences, is dropped; a clean control with an
+    unmeasured number, a number in words or a RISKY word is dropped; editors alternate over the test letters."""
+    import finetune_judge
+    import natural_edits
+    measured = finetune_judge.synthetic_pack(3)
+    fast = json.loads(measured)["worst"][0]["vehicle_kmh"]
+    letter = f"Dear Sir,\nA car passed at {fast} km/h. We ask for a raised zebra crossing.\nThe Principal"
+    after = f"A car passed at {fast} km/h."
+    lie = {"sentence": "Drivers here are often on their phones.", "after": after, "kind": "Driver  Phones",
+           "why": "Nothing measured shows phones."}
+    edited, kind, problems = natural_edits.check(letter, measured, lie, clean=False)
+    assert edited == letter.replace(after, after + " " + lie["sentence"]) and kind == "natural: driver phones"
+    assert problems == ['"Drivers here are often on their phones.": Nothing measured shows phones.']
+    assert pack.read_problems(finetune_judge.reply(problems)) == problems
+    for bad in ({**lie, "after": "A car passed."}, {**lie, "sentence": "One. Two more."}, {**lie, "why": ""},
+                {**lie, "sentence": "We ask for a raised zebra crossing."}):
+        assert natural_edits.check(letter, measured, bad, clean=False)[0] is None, bad
+    ok = {"sentence": f"The fastest vehicle was at {fast} km/h.", "after": after}
+    assert natural_edits.check(letter, measured, ok, clean=True)[1:] == ("natural clean", [])
+    for bad in (f"The fastest vehicle was at {fast + 1000} km/h.", "Three vehicles were fast.",
+                "Children were nearly hit."):
+        assert natural_edits.check(letter, measured, {**ok, "sentence": bad}, clean=True)[0] is None, bad
+    test = [{"writer": w, "seed": s} for w, s in (("spark", 30001), ("spark-open", 20001), ("spark-open", 20000))]
+    assert natural_edits.editors(test) == {("spark-open", 20000): "spark", ("spark-open", 20001): "spark-open",
+                                           ("spark", 30001): "spark"}
+
+
+def test_finetune_judge_unseen_ablation_drops_exactly_the_two_kinds_and_keeps_the_holdout():
+    """Offline: the ablation's train rows are the main train less every row of UNSEEN_KINDS, nothing else, and both
+    files hold out the same rows in the same order after the starter's shuffle."""
+    import random
+    import finetune_judge
+    assert finetune_judge.UNSEEN_KINDS == ("deaths prevented", "near-miss called a collision")
+    rows = [{"kind": k, "n": i} for i, k in enumerate(("deaths prevented", "cause invented", "clean: as written",
+                                                       "near-miss called a collision", "natural: deaths prevented"))]
+    assert finetune_judge.without_kinds(rows) == [rows[1], rows[2], rows[4]]
+    hold = ["h1", "h2", "h3"]
+    for train in (["t1", "t2", "t3", "t4", "t5"], ["t2", "t3", "t5"]):
+        replay = finetune_judge.starter_order(train, hold)
+        random.Random(finetune_judge.STARTER_SEED).shuffle(replay)
+        assert replay[:3] == hold and sorted(replay[3:]) == train
 
 
 def test_finetune_judge_pair_sentence_swaps_each_speed_onto_the_other_near_miss_time_gap():
