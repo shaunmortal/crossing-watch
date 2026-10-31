@@ -156,6 +156,24 @@ clean dev letters cannot score false alarms: their synthetic measurements say "n
 video, which Spark rightly flagged (32 of its 37 flags), so the earlier 38-vs-0 claim is withdrawn (see GATES.md). B
 answers in about 26 output tokens against Spark's 2,153 and Spark Open's 877.
 
+### v3: a blind, pre-registered test against Muse Spark
+
+Sat 31 Oct 2026. v2's "clean" dev letters were not clean (their synthetic measurements said "no video"; see GATES.md),
+so v3 fixed the synthetic packs, kept v2's config B with no sweep, and tested on 30 new letters plus 57 lies and clean
+edits written by Muse Spark and Spark Open themselves (not our templates). Before any tuned reply was read, Spark and
+Spark Open judged every row, a reviewer blind to the tuned replies settled each disagreement (5 labels changed), and the
+labels were frozen (`provenance/glimmer-judge-lora-v3/labels-frozen.json`). Protocol and result: GATES.md "v3".
+
+| 417 blind rows (test + model-written) | Correct | Lies flagged | Clean letters flagged |
+|---|---|---|---|
+| **Glimmer + our LoRA (v3)** | **410** | 237/244 | **0/173** |
+| Muse Spark (Meta API) | 396 | 238/244 | 15/173 |
+| Muse Spark Open (Fireworks) | 402 | 230/244 | 1/173 |
+
+Exact McNemar on the pre-registered primary endpoint: against Muse Spark 19 vs 5, **p 0.0066**; against Spark Open
+11 vs 3, p 0.057 (not significant). On the 57 model-written rows: 56, 50 and 53 right. All three get 30/31 on the
+public bench. Training $0; every reply is committed.
+
 ## Spark-free mode
 
 Each closed-model step and its open-weights substitute, measured against the closed one (DUT: numbers only, crops stay
@@ -165,7 +183,7 @@ the last 6 vehicle-crowd pieces for about $0.02).
 | Component | Closed | Open substitute | Measured result |
 |---|---|---|---|
 | Letter writer | Muse Spark (1 try) | Spark Open on Fireworks; Glimmer 30B on Kaggle | number check passed on try 1; Glimmer on try 2 (writers table) |
-| Letter judge | Muse Spark: public bench 21/23 lies, 0/8 false alarms | Spark Open, effort low; Glimmer + our LoRA | public bench 22/23 lies, 0/8 false alarms; tuned Glimmer v2 **23/23, 0/8** (v1 18/23) |
+| Letter judge | Muse Spark: public bench 21/23 lies, 0/8 false alarms | Spark Open, effort low; Glimmer + our LoRA | tuned Glimmer v3 on 417 blind rows: **410 right, 0/173 false alarms** vs Spark 396 and 15/173 (p 0.007) |
 | Crop reviewer | Muse Spark: crowd 47/52, 3 extra; vehicle crowd 48/52, 4 extra | Spark Open (`REVIEW_MODEL_URL`, `validate_offline.py --reviewer open`) | crowd 49/52, 3 extra; vehicle crowd 48/52, 3 extra (none unreviewed); same keep/remove call as Spark on 51 of 53 and 45 of 46 pieces both judged |
 
 ## Runs still to come
