@@ -5,8 +5,10 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
 
 ## 5-minute path
 
-1. `python3 test_cw.py` (self-checks, about 30 s, no key, no video) and `python3 pack.py sample sample/site.json`,
-   then open `sample/index.html`: the evidence page built offline from a synthetic sample (made-up tracks).
+1. `python3 test_cw.py` (Python 3.11+ and ffmpeg; about 30 s, no key, no video) and `python3 pack.py sample
+   sample/site.json`, then open `sample/index.html`: the measurements page built offline from a synthetic sample.
+   Without a key it has no letter ("letter failed" is expected); the sample's letters are in
+   `provenance/spark-open-sample-letter.txt` and `<removed-run-record>`.
 2. Read [kaggle/open-weights.md, v3](kaggle/open-weights.md#v3-a-blind-pre-registered-test-against-muse-spark):
    our fine-tuned open-weights judge against Muse Spark on 417 blind rows.
 3. Read [GATES.md, Verdict now](GATES.md#verdict-now): what was pre-registered, what passed, what has not run.
@@ -44,7 +46,7 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
 - Six models, each with a job: SAM 3.1 (tracking), Muse Spark (review, letter, judge), Muse Image (the fix on the
   real street), Muse Wonder (sound), Muse Glimmer 30B and Muse Spark Open (open weights): [README](README.md) top.
 - Letter checks scored on planted lies: [README, Checking the checks](README.md#checking-the-checks). Public bench
-  at $0 (code column): `python3 judge_bench.py --public`.
+  at $0 (code column and Muse Spark's cached replies): `python3 judge_bench.py --public`.
 
 ## Open Weights bonus
 

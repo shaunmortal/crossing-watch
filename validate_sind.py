@@ -10,6 +10,7 @@ Data (non-commercial; not in this repo): https://github.com/SOTIF-AVLab/SinD, Da
 Run: python3 validate_sind.py data/sind [--oblique 10,25]
 """
 import argparse
+import sys
 import csv
 import json
 import math
@@ -199,6 +200,9 @@ def main():
     parser.add_argument("--oblique", type=camera_place, metavar="HEIGHT,BACK",
                         help="simulate a phone HEIGHT m up and BACK m back and compare vehicle shapes (prints only)")
     args = parser.parse_args()
+    if not (args.folder / "Ped_smoothed_tracks.csv").is_file():
+        sys.exit(f"validate_sind.py: no Ped_smoothed_tracks.csv in {args.folder}; download SinD's public sample from "
+                 "github.com/SOTIF-AVLab/SinD (non-commercial) into that folder")
     people, vehicles, true_speed = load(args.folder)
     if args.oblique:
         print(f"phone {args.oblique[0]:g} m up, {args.oblique[1]:g} m back:")

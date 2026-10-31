@@ -23,7 +23,7 @@ is code-checked, and the fix drawn onto the real street. Solo entry, all work fr
 
 **Try it, no key and no video** (Python 3.11+ and ffmpeg; the fix and the letter need `MODEL_API_KEY` or `LETTER_MODEL_URL`):
 ```
-python3 test_cw.py                        # self-checks, under a minute
+python3 test_cw.py                        # self-checks, under a minute (Python 3.11+, ffmpeg)
 python3 pack.py sample sample/site.json   # the synthetic sample (made-up tracks) -> sample/index.html
 open sample/index.html                    # macOS; elsewhere open the file in a browser
 ```
@@ -35,10 +35,10 @@ open sample/index.html                    # macOS; elsewhere open the file in a 
 | The self-checks pass | `python3 test_cw.py` | this repo | yes |
 | The page builds offline from a synthetic sample | `python3 pack.py sample sample/site.json` | `sample/` | yes |
 | Our crossing's headline and clips | open the evidence page | `docs/` (GitHub Pages), release zip | yes, read |
-| Every published file is unchanged | `shasum -a 256 -c SHA256SUMS` or `python3 pack.py --verify docs/GATE-TBD` | `docs/GATE-TBD/SHA256SUMS` | yes |
-| Near-miss maths: speed error 0.24 / 0.91 km/h, 37 of 63 crossings within 3 s (SinD) | `python3 validate_sind.py data/sind` | SinD public sample (download it; non-commercial) | yes, after the download |
+| Every published file is unchanged | `shasum -a 256 -c SHA256SUMS` or `python3 pack.py --verify sample/share` (the sample; the gate's folder after Mon 2 Nov) | `sample/share/SHA256SUMS` | yes |
+| Near-miss maths: speed error 0.24 / 0.91 km/h, 37 of 63 crossings within 3 s (SinD) | `python3 validate_sind.py data/sind` | SinD public sample (github.com/SOTIF-AVLab/SinD; download it; non-commercial) | yes, after the download |
 | SAM 3.1 end to end: 50 of 52, 48 and 47 of 52, speed 0.16 / 0.55 km/h (DUT, top-down) | `python3 validate_offline.py DUT_REPO out/dut-15s out/dut-vcrowd` | not public: DUT has no licence and `out/` is our paid cache; run recorded in [GATES.md](GATES.md#accuracy-fixes-merged-re-scored-at-0-fri-30-oct-2026) | no: read the record |
-| Judge bench: code 4 of 24 and 0 of 8; Muse Spark 24 of 24 and 1 of 8 | `python3 judge_bench.py --out COPY` | the table only, in the release (the bench file holds a letter written from DUT footage) | partly: the code column with your own letters; the Spark column is paid |
+| Public judge bench: code 4 of 23, Muse Spark 21 of 23 and 0 of 8 (its replies cached) | `python3 judge_bench.py --public` | `kaggle/judge-bench-public.json` | yes, $0 |
 | Muse Glimmer 30B wrote the sample's letter on Kaggle 2 x T4 (313 s, 2 tries) and judged 24 of 24 / 6 of 8 | re-run the public notebook, GATE-TBD | `<removed-run-record>`, `<removed-run-record>`, `<removed-run-record>` | yes, on Kaggle's free GPUs; without our DUT-derived bench file it judges Glimmer's letter only (12 lies, 4 controls) |
 | Muse Spark Open wrote the sample's letter on Fireworks in 55.5 s, one try | `LETTER_MODEL_URL=https://api.fireworks.ai/inference/v1 LETTER_MODEL=accounts/fireworks/models/muse-spark-open python3 pack.py sample sample/site.json` | `provenance/spark-open-fireworks-sample.json` | yes, read; a re-run needs a Fireworks key |
 
@@ -738,7 +738,8 @@ from 28 Oct 2026; the one ported piece is the mask decoder below. The Kaggle not
 - **What runs.** Python standard library only, plus ffmpeg as a command-line tool (a GPL build with libx264, not
   bundled) and Chrome or any Chromium for the demo's hero shot (`video/split.py`). Inside the Kaggle notebook:
   llama.cpp `b11976` (MIT), huggingface_hub (Apache-2.0) and the Muse Glimmer 30B GGUF weights (Apache-2.0, Hugging
-  Face revision `b44f1072`). Models run as services: the Meta Model API, Fireworks for Muse Spark Open, Kaggle's
+  Face revision `b44f1072`). Muse Spark Open's open weights are used as served by Fireworks under Meta's licence for them. Models run as
+  services: the Meta Model API, Fireworks for Muse Spark Open, Kaggle's
   2 x T4 for Glimmer.
 - **Datasets, none included.** SinD (github.com/SOTIF-AVLab/SinD; non-commercial, its public sample used only for
   validation; Xu Y. et al., IEEE ITSC 2022, doi:10.1109/ITSC55140.2022.9921959, v1). DUT
