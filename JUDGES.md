@@ -77,6 +77,7 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
 - The gate is not filmed yet (Mon 2 Nov). G2, G4, G5, G6 and G8 have not run; G7 has no verdict before submission.
 - All ground truth (DUT, SinD) is top-down drone footage: no one is hidden. Phone-angle numbers are simulations.
 - A Muse judge reading Muse letters is not independent. The tuned judge missed all six real slips the letter writers
-  made themselves in v4 (Spark caught six), and v3's unseen-kind ablation used two kinds every judge catches.
+  made themselves in v4 (Spark caught six); a code check added afterwards (`pack.slips`, GATES.md) now catches 11 of
+  the 12 slip rows with no false alarm, but it was built from those rows, so that is not a blind result.
 - No agent run against the Meta API yet; the Kaggle notebook is not public yet. Muse Image measures nothing, and
   Muse Wonder's sound check is not ground truth.

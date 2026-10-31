@@ -875,6 +875,18 @@ six and Spark Open three. On the 260 as-written letters v4 is ahead of Spark (25
 Spark Open (251 vs 254, p 0.51). So the tuned judge is better at planted and model-written lies and at not crying
 wolf, and misses subtle slips a writer makes; the code checks and a second judge stay in the pipeline.
 
+## A code check for the writer's own slips (Sun 1 Nov 2026; built after reading v4, not pre-registered)
+
+v4 showed the tuned judge misses slips a letter writer makes itself. `pack.slips` now checks three of them in code
+and sends the letter back for another try: a "closest" time gap larger than the smallest measured (in the tier the
+sentence names; "2nd closest" is left alone), "after the person"/"before the person" when the counts rule that order
+out (sentences that state the counts are left alone), and more than two gaps "cut short" (only a recording's first and
+last can be). It was written while looking at v4's adjudicated slips, so its catch rate on them is not a blind test:
+it flags 11 of v4's 12 (all but 566, the most borderline) and all five of v3's (259-263). False alarms: 0 on the 750
+clean train rows, 0 on the public bench's 8 clean letters, and on the v3 and v4 holdouts it flags only rows 402 and
+941, which carry the same false sentence as rows adjudication had already found (they stayed clean only because no
+judge flagged them). It changes no result above: the judges' scores are as recorded.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no

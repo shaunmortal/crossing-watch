@@ -4950,6 +4950,19 @@ def test_letter_pdf_sheet_keeps_the_letter_whole_adds_the_signature_block_and_no
     page = letter_pdf.sheet(own, {"name": "Gate"})
     assert "<b>Subject:</b>" not in page and "To,</p>" not in page
 
+
+def test_slips_catch_a_writers_own_closest_order_and_cut_short_slips_but_not_correct_counts():
+    facts = {"person_first": 0, "vehicle_first": 2, "worst": [{"tier": "serious", "pet_s": 0.1}, {"tier": "serious",
+                                                                                                   "pet_s": 0.6}]}
+    slipped = pack.slips("The closest serious event was 0.6 s apart. A bus passed 1.1 s after the person. "
+                         "There were 3 such gaps cut short by the video.", facts)
+    assert [why for _, why in slipped] == ["the closest measured was 0.1 s", "no measured event had the person there "
+                                           "first", "only the first and last gap can be cut short by the video"]
+    assert pack.slips("The closest serious event was 0.1 s apart. In 0 cases the person was first, 0 had the vehicle "
+                      "before the person. 12 gaps of 6 s or more, the first and last cut short by the video. The 2nd closest was 0.6 s.",
+                      facts) == []
+    assert "Say only what was measured" in pack.retry_note([], [], [], (), slipped)
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):

@@ -75,7 +75,7 @@ WRITER = writer_label(LETTER_URL)
 LETTER_HOST = sam.env_value("LETTER_MODEL_HOST")  # where it ran, e.g. "Kaggle 2 x T4" (the notebook reads nvidia-smi)
 PROVENANCE = "letter-provenance.json"  # beside plan.json: what the letter's model ran, measured; never a key
 RUN_KEYS = ("request_id", "usage", "wall_s", "timings", "response_format")  # openweights.reply's record
-CHECK_KEYS = ("unmeasured", "mixed", "unsupported")  # what ask_plan's checks left on a letter kept after the last try
+CHECK_KEYS = ("unmeasured", "mixed", "unsupported", "slips")  # what ask_plan's checks left on a letter kept after the last try
 JUDGE = "Muse Spark (a separate reviewer)"
 JUDGE_PROMPT = """You review a letter before a school sends it to its road authority. MEASUREMENTS are the only facts.
 List every problem: a claim or number the measurements do not support; a number above one written in words, not in
@@ -434,7 +434,40 @@ def accusing(text):
     return [s.strip() for s in SENTENCE.split(text) if ACCUSES.search(s)]
 
 
-def retry_note(bad, crossed, problems, accused=()):
+CLOSEST = re.compile(r"\b(?<!2nd )(?<!3rd )(?<!second )(?<!third )(?<!next )(?:closest|nearest|shortest|tightest|smallest)\b",
+                     re.I)  # the closest, not "the 2nd closest"
+PERSON_FIRST = re.compile(r"\bafter (?:the|a) (?:person|pedestrian|walker)\b", re.I)  # one event's order, not a count
+VEHICLE_FIRST = re.compile(r"\bbefore (?:the|a) (?:person|pedestrian|walker)\b", re.I)
+EDGES_NAMED = re.compile(r"\bfirst and (?:the )?last\b|\bedge", re.I)  # the sentence already says which gaps
+COUNTED = re.compile(r"\b\d+\s+(?:had|cases?|times?|events?|of them|were)\b", re.I)  # "0 had the vehicle before the person"
+CUT_SHORT = re.compile(rf"({NUMBER.pattern})\s+(?:such\s+)?gaps?\b[^.]*\bcut short", re.I)
+VIDEO_EDGES = 2  # only the first and the last gap of a recording can be cut short by its ends
+
+
+def slips(letter, facts):
+    """(sentence, why) for a writer's own slips that code can check against the measurements: a "closest" time gap
+    larger than the smallest measured (in the tier the sentence names), an order of arrival the counts rule out, and
+    more gaps "cut short" than a recording's two ends can cut."""
+    worst = facts.get("worst", [])
+    out = []
+    for sentence in SENTENCE.split(letter):
+        gaps = [float(m[1]) for m in WITH_UNIT.finditer(sentence) if m[2][0].lower() == "s"]
+        tier = "serious" if "serious" in sentence.lower() else "close pass" if "close pass" in sentence.lower() else None
+        pets = [e["pet_s"] for e in worst if e.get("pet_s") is not None and tier in (None, e.get("tier"))]
+        if CLOSEST.search(sentence) and gaps and pets and min(gaps) > min(pets):
+            out.append((sentence.strip(), f"the closest measured was {min(pets):g} s"))
+        counted = COUNTED.search(sentence)
+        if PERSON_FIRST.search(sentence) and facts.get("person_first") == 0 and not counted:
+            out.append((sentence.strip(), "no measured event had the person there first"))
+        if VEHICLE_FIRST.search(sentence) and facts.get("vehicle_first") == 0 and not counted:
+            out.append((sentence.strip(), "no measured event had the vehicle there first"))
+        if (m := CUT_SHORT.search(sentence)) and float(m[1].replace(",", "")) > VIDEO_EDGES \
+                and not EDGES_NAMED.search(sentence):
+            out.append((sentence.strip(), "only the first and last gap can be cut short by the video"))
+    return out
+
+
+def retry_note(bad, crossed, problems, accused=(), slipped=()):
     """Why the previous letter goes back, for the next try."""
     reasons = ([f"Your previous letter used numbers that are not in the measurements: {', '.join(bad)}. Use only "
                 "numbers given above, written in digits, with speeds in km/h."] if bad else [])
@@ -442,6 +475,7 @@ def retry_note(bad, crossed, problems, accused=()):
                 "each near-miss's numbers together." for s in crossed]
     reasons += [f'Your previous letter says someone broke a rule: "{s}". The video measures speeds and time gaps, '
                 "not whether a limit applied there: say what was measured." for s in accused]
+    reasons += [f'Your previous letter says "{s}", but {why}. Say only what was measured.' for s, why in slipped]
     reasons += ([f"A reviewer found claims in your previous letter that the measurements do not support: "
                  f"{' '.join(problems)} Fix them."] if problems else [])
     return "\n\n" + " ".join(reasons)
@@ -487,7 +521,8 @@ def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES, stated=(
     principal's notes, which both checks read labelled as stated by the principal, not measured. "tries" counts the
     model's replies, for the pack's receipt."""
     note, plan, bad, crossed, accused, problems = "", None, [], [], [], []
-    worst, measured = json.loads(measured).get("worst", []), measured + stated_text(stated)
+    facts = json.loads(measured)
+    worst, measured = facts.get("worst", []), measured + stated_text(stated)
     for attempt in range(tries):
         try:
             plan = model_plan(prompt + note, api_key, photo, measured)  # not the note: it quotes the bad numbers
@@ -505,17 +540,19 @@ def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES, stated=(
             continue
         bad = unmeasured(plan["letter"] + " " + plan["why"], measured)
         crossed, accused = mixed(plan["letter"], worst), accusing(plan["letter"] + "\n" + plan["why"])
+        slip_notes = slips(plan["letter"], facts)
+        slipped = [s for s, _ in slip_notes]
         judged = api_key or JUDGE_URL
-        coded = bad or crossed or accused  # code's objections first: the judge is asked only when code has none
+        coded = bad or crossed or accused or slipped  # code's objections first: the judge is asked only when code has none
         problems = [] if coded or not judged else judge_problems(plan["letter"], measured, api_key)
         if not coded and not problems:
             return {**plan, "writer": WRITER, "tries": attempt + 1, **({"judged_by": judges(api_key)} if judged else {})}
         if problems and set(problems) == {JUDGE_FAILED}:  # the judge failed, not the letter: keep this one, pay no more
             tries = attempt + 1
             break
-        note = retry_note(bad, crossed, [p for p in problems if p != JUDGE_FAILED], accused)
+        note = retry_note(bad, crossed, [p for p in problems if p != JUDGE_FAILED], accused, slip_notes)
     return {**plan, "writer": WRITER, "tries": tries, "unmeasured": bad, "mixed": crossed, "unsupported": problems,
-            "accuses": accused}
+            "accuses": accused, "slips": slipped}
 
 
 def stated_text(notes):
