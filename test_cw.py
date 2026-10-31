@@ -4814,6 +4814,16 @@ def test_open_reviewer_route_asks_the_open_server_and_saves_beside_sparks_reply(
          validate_offline.original_ask) = old
 
 
+
+def test_judge_compare_mcnemar_and_wilson_match_hand_values():
+    import judge_compare
+    assert judge_compare.mcnemar(0, 0) == 1.0  # no discordant rows: no evidence either way
+    assert judge_compare.mcnemar(0, 5) == judge_compare.mcnemar(5, 0) == 2 / 32  # 2 x 0.5^5
+    assert abs(judge_compare.mcnemar(1, 6) - 2 * 8 / 128) < 1e-12  # (C(7,0) + C(7,1)) / 2^7, two-sided
+    assert judge_compare.mcnemar(3, 3) == 1.0  # capped at 1
+    assert judge_compare.ci(23, 23) == "23/23 (86-100%)" and judge_compare.ci(0, 8) == "0/8 (0-32%)"
+    assert judge_compare.flags(['{"problems": ["x"]}', '{"problems": []}', "not json"]) == [True, False, False]
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):
