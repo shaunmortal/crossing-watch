@@ -763,6 +763,17 @@ Paired exact McNemar, all 211 (rows only B gets right vs only the Muse judge): B
 Spark Open 7 vs 1, p 0.07, not significant. 180 rows are the dev set B was chosen on; on the 31 public rows alone B
 vs either is 1 vs 0, p 1. Configs A, C, D and the dev rows: `python3 judge_compare.py`.
 
+**Correction, same day, after reading Spark's flags:** all 75 dev letters labelled clean mention video, while their
+measurements say "made-up tracks, no video" (the synthetic packs). 32 of Spark's 37 flags on them name only that
+contradiction, and under the judge prompt ("MEASUREMENTS are the only facts") they are right; so are all 5 of Spark
+Open's. The clean-letter column on these rows measures a flaw in our synthetic labels, not false alarms, so the
+"38 vs 0, p 7.3e-12" above is **withdrawn**. What stands: on the 128 planted rows B flags 127, Spark 126, Spark Open
+126 (level); on the 31 public rows B 31, Spark 30, Spark Open 30 (1 vs 0, p 1); a reply from B averages 26 output
+tokens against Spark's 2,153 and Spark Open's 877. Spark flagged 21/23 public lies in the earlier run and 22/23 here
+(one vote each). B was trained on the same labels, so it learned not to flag a video claim against "no video"; real
+packs come from video, but B's behaviour on that contradiction is untested. A v3 would drop "no video" from the
+synthetic packs' measurements.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no

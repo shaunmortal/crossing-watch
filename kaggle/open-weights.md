@@ -146,14 +146,15 @@ Record: `provenance/glimmer-judge-lora-v2.json`, every reply in `provenance/glim
 | C rank 8, 2 epochs | 104/105, 0/75 | 20/23, 0/8 (not chosen) |
 | D rank 32, 2 epochs, 5e-5 | 104/105, 0/75 | 21/23, 0/8 (not chosen) |
 
-On the same public bench Muse Spark flags 21/23 lies and 0/8 clean letters, Muse Spark Open (effort low) 22/23 and
+On the same public bench Muse Spark flags 21/23 lies (22/23 in a second run) and 0/8 clean letters, Muse Spark Open (effort low) 22/23 and
 0/8, and untuned Glimmer (2 votes) 23/23 and 5/8. One vote, temperature 0, and a small bench: 23/23 is 86-100% and
 0/8 is 0-32% (Wilson 95%). The configs that were not chosen show the spread a different pick would have given.
 
 Paired on the same 211 holdout prompts (180 dev, 31 public; one vote each; `judge_compare.py`, GATES.md "Same-set
-comparison on 211 judge prompts"): B got 210 right, Muse Spark 172 (it flagged 37/83 clean letters), Muse Spark Open
-204 (5/83). Exact McNemar: B vs Spark 38 vs 0 discordant rows, p 7.3e-12; B vs Spark Open 7 vs 1, p 0.07, not
-significant. Dev chose B, so those rows favour it; on the 31 public rows alone each comparison is 1 vs 0, p 1.
+comparison on 211 judge prompts"): on the 128 planted rows B flags 127, Muse Spark 126, Spark Open 126, a tie. The
+clean dev letters cannot score false alarms: their synthetic measurements say "no video" and the letters mention
+video, which Spark rightly flagged (32 of its 37 flags), so the earlier 38-vs-0 claim is withdrawn (see GATES.md). B
+answers in about 26 output tokens against Spark's 2,153 and Spark Open's 877.
 
 ## Spark-free mode
 
