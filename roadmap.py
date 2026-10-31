@@ -263,7 +263,8 @@ def gap_strip(timeline, events, shown=5, full=None):
 
 
 STYLE = """
-.map { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; }
+.map { display: block; width: 100%; max-width: 640px; height: auto; margin: 0 auto; border: 1px solid var(--line);
+       border-radius: 6px; }
 .map .ground { opacity: 0.85; }
 .map .grid line { stroke: var(--line); stroke-width: 1; }
 .map .area { fill: none; stroke: var(--muted); stroke-dasharray: 6 4; }

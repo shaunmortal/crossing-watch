@@ -5,14 +5,30 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Crossing Watch calibration</title>
 <style>
-:root { --bg: #fafaf7; --ink: #1d1d1b; --muted: #66665f; --line: #deded6; --accent: #c0392b; }
-@media (prefers-color-scheme: dark) { :root { --bg: #161614; --ink: #ecece6; --muted: #a3a39a; --line: #34342f; --accent: #ff6b5b; } }
-body { margin: 0 auto; max-width: 900px; padding: 24px 16px 64px; background: var(--bg); color: var(--ink); font: 16px/1.5 system-ui, sans-serif; }
-canvas { width: 100%; border-radius: 6px; cursor: crosshair; touch-action: manipulation; }
-label { display: block; margin: 12px 0 4px; } input[type=number], input[type=text] { font: inherit; padding: 6px; width: 10em; }
-textarea { width: 100%; height: 14em; font: 13px ui-monospace, monospace; }
-.muted { color: var(--muted); } button { font: inherit; padding: 8px 14px; margin-right: 8px; }
-fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 16px 0; } [hidden] { display: none; }
+*, *::before, *::after { box-sizing: border-box; }
+:root { --bg: #fafaf7; --ink: #1d1d1b; --muted: #5f5f58; --line: #d4d4cb; --surface: #fff; --accent: #b8321f; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root { --bg: #161614; --ink: #ecece6; --muted: #a8a89f; --line: #3a3a34;
+  --surface: #1f1f1c; --accent: #ff7b6b; color-scheme: dark; } }
+body { margin: 0 auto; max-width: 900px; padding: 24px 16px 80px; background: var(--bg); color: var(--ink);
+       font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+h1 { font-size: clamp(1.5rem, 4.5vw, 2rem); line-height: 1.2; margin: 0 0 8px; }
+h2 { font-size: 1.25rem; margin: 40px 0 8px; padding-top: 16px; border-top: 1px solid var(--line); }
+canvas { display: block; width: 100%; margin: 8px 0; border: 1px solid var(--line); border-radius: 6px; background: var(--surface);
+         cursor: crosshair; touch-action: manipulation; }
+label { display: block; margin: 12px 0 4px; }
+input[type=number], input[type=text] { font: inherit; padding: 6px 8px; width: 10em; max-width: 100%; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+input[type=radio], input[type=checkbox] { accent-color: var(--accent); margin-right: 6px; }
+textarea { width: 100%; height: 14em; padding: 10px; font: 13px/1.45 ui-monospace, monospace; color: var(--ink);
+           background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+code { overflow-wrap: anywhere; }
+.muted { color: var(--muted); }
+button { font: inherit; font-weight: 600; padding: 8px 14px; margin: 4px 8px 4px 0; color: var(--ink); background: var(--surface);
+         border: 1px solid var(--line); border-radius: 6px; cursor: pointer; } button:hover { border-color: var(--ink); }
+#save { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 16px 0; padding: 8px 16px 12px; background: var(--surface); }
+legend { font-weight: 600; padding: 0 6px; } [hidden] { display: none; }
 </style>
 </head>
 <body>

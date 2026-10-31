@@ -14,22 +14,36 @@ BLURRED = "Faces and number plates blurred"  # render.py blurs both in every cli
 THUMB_MAX_PX = 80  # the fix picture's height, so the ask box's status line stays on a 1280x720 first screen
 
 STYLE = """
-.kicker { margin: 0; color: var(--muted); font-size: 0.9rem; } @media (max-width: 480px) { h1 { font-size: 1.4rem; } }
-.hero { display: grid; gap: 20px; margin-top: 14px; align-items: start; }
+header > .hero > div > .note:last-child { margin-bottom: 0; font-size: 0.85rem; }
+.kicker { margin: 0; color: var(--muted); font-size: 0.8rem; font-weight: 600; text-transform: uppercase;
+          letter-spacing: 0.06em; } @media (max-width: 480px) { h1 { font-size: 1.4rem; } }
+.worst { margin: 10px 0 0; padding: 10px 14px; border-left: 4px solid var(--accent); background: var(--tint);
+         border-radius: 4px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.worst a { text-decoration-color: var(--accent); }
+.hero { display: grid; gap: 20px; margin-top: 18px; align-items: start; }
 .hero.two { grid-template-columns: 1.35fr 1fr; } @media (max-width: 700px) { .hero.two { grid-template-columns: 1fr; } }
 .hero figcaption { font-size: 0.9rem; margin-top: 6px; }
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 8px; font-size: 0.8rem; }
-.stats b { display: block; font-size: 2rem; line-height: 1.1; color: var(--ink); }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 10px; font-size: 0.8rem;
+         line-height: 1.3; }
+.stats > div { padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
+               color: var(--muted); }
+.stats b { display: block; margin-bottom: 4px; font-size: 2.2rem; line-height: 1; color: var(--ink);
+           font-variant-numeric: tabular-nums; }
+.stats .serious { border-color: var(--accent); background: var(--tint); }
 .stats .serious b { color: var(--accent); } .stats .close b { color: var(--warn); }
-.ask { border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; margin: 8px 0; }
-.ask .label { margin: 0; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
-.ask .fix { font-size: 1.15rem; font-weight: 600; margin: 2px 0 8px; } .ask p { margin-bottom: 0; }
+@media (max-width: 480px) { .stats { gap: 6px; font-size: 0.75rem; } .stats > div { padding: 8px; } .stats b { font-size: 1.8rem; } }
+.ask { border: 1px solid var(--line); border-radius: 8px; padding: 12px 16px; margin: 10px 0; background: var(--surface); }
+.ask .label { margin: 0; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+              color: var(--muted); }
+.ask .fix { font-size: 1.2rem; font-weight: 700; line-height: 1.3; margin: 4px 0 8px; } .ask p { margin-bottom: 0; }
 .ask img { width: auto; max-width: 100%%; max-height: %dpx; display: block; }
-.btn { display: inline-block; margin-top: 8px; padding: 6px 12px; border-radius: 6px; background: var(--ink);
+.btn { display: inline-block; margin: 4px 0 8px; padding: 8px 16px; border-radius: 6px; background: var(--ink);
        color: var(--bg); text-decoration: none; font-weight: 600; }
-nav.jump { position: sticky; top: 0; z-index: 2; display: flex; gap: 14px; overflow-x: auto; margin-top: 16px;
-           padding: 8px 0; background: var(--bg); border-bottom: 1px solid var(--line); font-size: 0.9rem; }
-nav.jump a { white-space: nowrap; } @media print { .hero video, nav.jump { display: none; } }
+nav.jump { position: sticky; top: 0; z-index: 2; display: flex; gap: 6px; overflow-x: auto; margin: 16px -16px 0;
+           padding: 8px 16px; background: var(--bg); border-bottom: 1px solid var(--line); font-size: 0.9rem; }
+nav.jump a { white-space: nowrap; padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px;
+             text-decoration: none; } nav.jump a:hover { border-color: var(--ink); }
+@media print { .hero video, nav.jump { display: none; } }
 """ % THUMB_MAX_PX
 
 
@@ -71,6 +85,11 @@ def header(site, seen, lead, video, tiles, line, limit, asked, filed):
             f'video{once}</p><h1>{html.escape(site.get("name") or "This crossing")}</h1>{filed}{lead}'
             f'<div class="hero{" two" if video else ""}">{video}<div><div class="stats">{tiles}</div>{counts}{limit}'
             f'{asked}<p class="note">{BLURRED}</p></div></div></header>')
+
+
+def worst(i, title):
+    """Card #i's `title` (pack.card_title), linked to its card: the first screen's worst near-miss when it has no clip."""
+    return f'<p class="worst"><a href="#event-{i}">{title}</a></p>'
 
 
 def minutes(seen):
