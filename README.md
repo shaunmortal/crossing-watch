@@ -2,7 +2,7 @@
 
 Near-miss evidence for a dangerous crossing, from one phone video.
 
-**Demo (3 min):** GATE-TBD · **Evidence page:** GATE-TBD · **Release:** GATE-TBD · **X post:** GATE-TBD
+**For judges:** [5-minute map](JUDGES.md) · **Demo (3 min):** GATE-TBD · **Evidence page:** GATE-TBD · **Release:** GATE-TBD · **X post:** GATE-TBD
 
 GATE-TBD: one blurred StroMotion still from Monday's run (`event1-strobe.jpg`), checked by eye.
 
