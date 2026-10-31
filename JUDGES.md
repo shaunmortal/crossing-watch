@@ -28,10 +28,6 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
 - Today, at $0: `python3 pack.py sample sample/site.json` builds the page offline (no key, no video).
 - **Pending:** [PLACEHOLDER: 3-minute demo video], [PLACEHOLDER: evidence page and release zip], from Monday's footage.
 
-- **Prior work:** near-miss (PET) measurement from video is an established field (the safety pyramid of Laureshyn,
-  Svensson & Hydén 2010) with paid tools such as Transoft's TrafxSAFE. What is new here: one phone video and a tape
-  instead of a fixed camera and an engineer, no model training, and the output is a code-checked letter a school files.
-
 ## Depth
 
 - Near-miss maths on drone ground truth (SinD, public sample): 66 conflicts, speed error 0.24 km/h mean, 0.91 km/h
