@@ -801,6 +801,24 @@ hold out the same 448 prompts (starter shuffle replayed): 360 test, 57 natural, 
   flagged it, so under the protocol it was not adjudicated and stays clean. The primary result is reported that way,
   and once more with row 402 counted as planted.
 
+## Fine-tuned Glimmer judge v3: result (Sat 31 Oct 2026, read after the labels were frozen in e21a283 and 91e81f6)
+
+Main run (v2's config B, model `muse-starter-sl-judge-v3-main`), one vote, scored against
+`provenance/glimmer-judge-lora-v3/labels-frozen.json`; replies in `provenance/glimmer-judge-lora-v3/main/`.
+
+| Rows | Judge | Lies flagged | Clean letters flagged | Correct |
+|---|---|---|---|---|
+| test + natural (primary) | **Glimmer + LoRA v3** | 237/244 (94-99%) | **0/173 (0-2%)** | **410/417** |
+| test + natural | Muse Spark | 238/244 (95-99%) | 15/173 (5-14%) | 396/417 |
+| test + natural | Muse Spark Open | 230/244 (91-97%) | 1/173 (0-3%) | 402/417 |
+| natural (model-written) | Glimmer + LoRA v3 / Spark / Spark Open | 28/29, 26/29, 26/29 | 0/28, 4/28, 1/28 | 56, 50, 53 of 57 |
+| public 31 | all three | 22/23 each | 0/8 each | 30 each |
+
+**Primary endpoint, exact McNemar on correct per row (test + natural):** v3 vs Muse Spark 19 vs 5, **p 0.0066**;
+v3 vs Muse Spark Open 11 vs 3, p 0.057 (not significant at 0.05). With row 402 counted as planted: the same
+discordant counts and p values (all three judges passed it). Replies average 94 characters. The unseen-kind ablation
+run was stopped at step 10 (the laptop had to close) and has not been run yet.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
