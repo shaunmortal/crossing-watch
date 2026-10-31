@@ -825,6 +825,26 @@ the main run, Muse Spark and Spark Open, so these two kinds are easy for every j
 rows right with 0/173 clean letters flagged. So the main result does not rest on having seen those kinds; a harder
 unseen-kind test would need kinds that the untuned judges miss. Replies: `provenance/glimmer-judge-lora-v3/unseen/`.
 
+## Fine-tuned Glimmer judge v4: a large replication (pre-registered Sat 31 Oct 2026, 21:25 IST, before any v4 letter is written)
+
+**One confirmatory test, reported whatever it shows.** v3 won on 417 rows; v4 asks whether that holds on about twice
+as many rows that no earlier step has touched. v3's result above stays as recorded.
+- **Recipe unchanged:** v3's training rows (the 1,800 TRAIN rows of `judge_v3.jsonl`, same "ROAD crossing" site fix)
+  and v2's config B (rank 32, 1 epoch, 1e-4, seed 0, max_seq_len 3,072, max_eval_tokens 256), retrained once with the
+  v4 holdout. No sweep, no second try.
+- **Test:** 200 new letters (100 by Muse Spark Open, 100 by Muse Spark via the Meta API), seeds disjoint from every
+  earlier seed, same rejection rules (0 shared 12-word spans with the public bench, under 15% of a letter's 12-word
+  spans in any train letter, the code check, RISKY words read by the existing policy). Four rows per letter: the letter
+  as written (clean); one template lie (kind drawn evenly across the planted kinds); one model-written lie and one
+  model-written clean edit (`natural_edits.py`, editor alternating Muse Spark / Spark Open). About 800 rows, plus the
+  31 public prompts.
+- **Labels:** as in v3. Muse Spark and Spark Open judge every row once; every disagreement with the generator's label
+  is adjudicated, blind to tuned replies, under the judge prompt's rules; labels are frozen and committed before any
+  tuned reply is read.
+- **Primary:** correct per row (`pack.read_problems`; unreadable = not flagged) on the ~800 new rows, exact McNemar of
+  v4 vs Muse Spark and vs Muse Spark Open, two-sided, alpha 0.05 each. **Secondary:** model-written rows alone; clean
+  rows flagged; public bench; tokens per verdict. Every number is reported, including a loss or a tie.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
