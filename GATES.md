@@ -844,6 +844,11 @@ as many rows that no earlier step has touched. v3's result above stays as record
 - **Primary:** correct per row (`pack.read_problems`; unreadable = not flagged) on the ~800 new rows, exact McNemar of
   v4 vs Muse Spark and vs Muse Spark Open, two-sided, alpha 0.05 each. **Secondary:** model-written rows alone; clean
   rows flagged; public bench; tokens per verdict. Every number is reported, including a loss or a tie.
+- **Amendment (Sat 31 Oct 2026, 22:22 IST, before any v4 training, label or tuned reply exists):** the test is enlarged
+  to at least 1,000 new rows by adding letters with the same procedure and rules (seeds continuing from 40128 for Spark
+  Open and 50109 for Spark, half each). Disclosed: the model-written edits' editor did not strictly alternate letter by
+  letter, since RISKY review changed which letters made the cut; per writer the editors are near 50/50 (Spark Open's
+  letters 50/50, Spark's 52/48). Edits already paid for were kept.
 
 ## Log
 
