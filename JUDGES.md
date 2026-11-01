@@ -9,8 +9,9 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
   signed in support); the filing with the road authority is **pending** (Tue 3 Nov).
 - **Measured against ground truth:** drone-tracked DUT clips, 47 of 52 near-misses found after Muse Spark's review
   (50 of 52 by geometry alone); SinD, speed error 0.24 km/h mean, 37 of 63 crossings within 3 s.
-- **Our open-weights judge beats Muse Spark Open and matches Muse Spark:** a LoRA on Muse Glimmer, tested blind on
-  1,016 rows by a protocol written down first, 998 right vs Spark Open 980 (p 0.005), at a quarter of Spark's cost.
+- **Our open-weights judge beats Muse Spark Open in two blind tests:** a LoRA on Muse Glimmer, protocols written down
+  first: 998 vs 980 of 1,016 rows (p 0.005) and 1,260 vs 1,247 of 1,278 (p 0.029), at a quarter of Spark's cost.
+  Muse Spark is still ahead on slips the letter writers make themselves (v5: 1,271 right).
 - **Checked by people, not only models:** teachers rate the clips blind against the measurements (**pending**, Tue).
 - **Built for India:** a Hindi copy of the letter, the HOD's spoken notes, Supreme Court and IRC references.
 
@@ -65,7 +66,8 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
 - Fine-tuned Muse Glimmer judge (LoRA, training $0), pre-registered blind tests, labels frozen before any tuned reply
   was read. **v4, 1,016 rows from 260 synthetic letters: 998 right vs Muse Spark Open 980 (28 vs 10, p 0.0051)**,
   mostly lies Spark Open missed; clean rows flagged 5/491 vs Spark Open 4/491. In-distribution letters only.
-- Against Muse Spark: level (why, and the full record: [open-weights.md](kaggle/open-weights.md)). Labels were
+- Against Muse Spark: ahead of it in v4 only through a prompt ambiguity; in v5, with the prompt fixed for every
+  judge, Muse Spark wins (1,271 vs 1,260, p 0.043). Full record: [open-weights.md](kaggle/open-weights.md). Labels were
   adjudicated by an AI agent, blind to the tuned replies. [GATES.md v3 and v4 results](GATES.md); replies and frozen labels: `provenance/glimmer-judge-lora-v3/` and `-v4/`;
   re-score: `python3 judge_v3_score.py v4`.
 - Muse Glimmer 30B self-hosted on Kaggle's free 2 x T4 from sha256-checked weights wrote the sample letter

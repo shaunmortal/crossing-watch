@@ -210,6 +210,15 @@ What one verdict costs, from the v4 replies' own token counts (1,048 rows each):
 | Muse Spark Open | 1,502 / 891 | about $5.66 ($1.25 / $4.25 per 1M) |
 | Muse Spark | 1,366 / 2,030 | about $10.33 ($1.25 / $4.25 per 1M) |
 
+### v5: the prompt fixed for every judge, a fresh blind test
+
+Sun 1 Nov 2026. The judge prompt now says ordinals and method descriptions are not problems, for all three judges and
+in every training row; training added 534 code-planted writer-slip lies and model-written edits; 2 epochs; a fresh
+test of 260 new letters, 1,278 rows (GATES.md "v5"). **Muse Spark wins the pre-registered comparison** (1,271 vs 1,260
+right, 7 vs 18, p 0.043); **v5 beats Muse Spark Open** (1,247; 22 vs 9, p 0.029). v5 is level with or ahead of Spark on
+template lies (259 vs 258 of 260), model-written lies (249 vs 248 of 249) and code-planted slips (260 vs 260), and
+behind on the 20 real slips the writers made themselves (8 vs 20). Re-score: `python3 judge_v3_score.py v5`.
+
 ## Spark-free mode
 
 Each closed-model step and its open-weights substitute, measured against the closed one (DUT: numbers only, crops stay

@@ -1,5 +1,5 @@
 """Re-score the fine-tuned Glimmer judge at $0 from committed files: the frozen labels, the tuned replies and Muse
-Spark's and Spark Open's replies. Default: v3 (with its unseen-kind ablation); `v4`: the 1,016-row replication.
+Spark's and Spark Open's replies. Default: v3 (with its unseen-kind ablation); `v4`: the 1,016-row replication; `v5`: the fixed-prompt test.
 Prints the GATES.md result tables and the pre-registered primary endpoint (exact McNemar on correct per row).
 Run: python3 judge_v3_score.py [v4]
 """
@@ -11,11 +11,13 @@ from judge_compare import ci, flags, load_jsonl, mcnemar
 
 V3 = Path(__file__).parent / "provenance" / "glimmer-judge-lora-v3"
 V4 = Path(__file__).parent / "provenance" / "glimmer-judge-lora-v4"
+V5 = Path(__file__).parent / "provenance" / "glimmer-judge-lora-v5"
 SETS = (("test + natural (primary)", ("test", "natural")), ("natural (model-written)", ("natural",)),
         ("public bench", ("public",)))
 V4_TEST = ("test-asis", "test-template", "test-natural-lie", "test-natural-clean")
 V4_SETS = (("all new test rows (primary)", V4_TEST), ("model-written rows", ("test-natural-lie", "test-natural-clean")),
            ("letters as written", ("test-asis",)), ("public bench", ("public",)))
+V5_SETS = (("all new test rows (primary)", V4_TEST + ("test-slip",)),) + V4_SETS[1:] + (("writer slips", ("test-slip",)),)
 
 
 def replies(path, key):
@@ -33,7 +35,7 @@ def judges(folder=V3):
 
 
 def main():
-    folder, sets_list = (V4, V4_SETS) if sys.argv[1:] == ["v4"] else (V3, SETS)
+    folder, sets_list = {"v4": (V4, V4_SETS), "v5": (V5, V5_SETS)}.get((sys.argv[1:] or [""])[0], (V3, SETS))
     rows = [r for r in json.loads((folder / "labels-frozen.json").read_text())["rows"] if not r["excluded"]]
     flagged = judges(folder)
     for title, sets in sets_list:

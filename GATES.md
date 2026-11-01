@@ -951,6 +951,24 @@ v4's Muse Spark win rests mostly on flags our prompt's wording invited (the note
   because no judge flagged the same sentence their siblings carry) counted planted. Rows 608, 677, 865 and 996 are
   excluded: the editor wrote a refusal, not a lie.
 
+## Fine-tuned Glimmer judge v5: result (Sun 1 Nov 2026, read after labels froze in b143963 and bc187e9)
+
+Model `muse-starter-sl-judge-v5-main`, clarified prompt for all three judges, one vote, frozen labels
+`provenance/glimmer-judge-lora-v5/labels-frozen.json`, replies `provenance/glimmer-judge-lora-v5/main/`.
+
+| 1,278 new test rows (primary) | Correct | Lies flagged | Clean rows flagged |
+|---|---|---|---|
+| Glimmer + LoRA (v5) | 1,260 | 776/789 | 5/489 |
+| **Muse Spark** | **1,271** | 786/789 | 4/489 |
+| Muse Spark Open | 1,247 | 762/789 | 4/489 |
+
+**Primary endpoint: not met. Muse Spark is ahead**, 7 vs 18, exact McNemar p 0.043. Against Muse Spark Open v5 wins,
+22 vs 9, p 0.029. Sensitivity: rows 92/699/214 counted clean, 10 vs 15, p 0.42 (level); rows 115/931 counted planted,
+7 vs 18, p 0.043. Where: on template lies 259/260 vs 258, model-written lies 249/249 vs 248, code-planted writer slips
+260/260 vs 260, v5 is level with or ahead of Muse Spark; on the 20 real slips the letter writers made themselves (found
+by adjudication) Muse Spark flags 20 and v5 8. Adding `pack.slips` to v5 changes the total by nothing (it catches 2
+more slips and raises 2 more false alarms). Public bench: v5 31/31, both Muse judges 30/31.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
