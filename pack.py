@@ -439,32 +439,118 @@ CLOSEST = re.compile(r"\b(?<!2nd )(?<!3rd )(?<!second )(?<!third )(?<!next )(?:c
                      re.I)  # the closest, not "the 2nd closest"
 PERSON_FIRST = re.compile(r"\bafter (?:the|a) (?:person|pedestrian|walker)\b", re.I)  # one event's order, not a count
 VEHICLE_FIRST = re.compile(r"\bbefore (?:the|a) (?:person|pedestrian|walker)\b", re.I)
-EDGES_NAMED = re.compile(r"\bfirst and (?:the )?last\b|\bedge", re.I)  # the sentence already says which gaps
+EDGES_NAMED = re.compile(r"\bfirst and (?:the )?last\b|\bedge|\b(?:start|beginning) and (?:the )?end\b|\bboth ends\b",
+                         re.I)  # the sentence already says which gaps
 COUNTED = re.compile(r"\b\d+\s+(?:had|cases?|times?|events?|of them|were)\b", re.I)  # "0 had the vehicle before the person"
 CUT_SHORT = re.compile(rf"({NUMBER.pattern})\s+(?:such\s+)?gaps?\b[^.]*\bcut short", re.I)
 VIDEO_EDGES = 2  # only the first and the last gap of a recording can be cut short by its ends
+LARGEST = re.compile(r"\b(?<!2nd )(?<!second )(?:largest|longest|biggest|widest)\b", re.I)
+FASTEST = re.compile(r"\b(?<!2nd )(?<!second )(?:fastest|quickest|highest speed)\b", re.I)
+PERSON = r"(?:person|persons|pedestrians?|walkers?)"
+VEHICLE = r"(?:vehicles?|cars?|bus(?:es)?|vans?|motorcycles?|auto-rickshaws?|trucks?|lorr(?:y|ies))"
+
+
+def _arrived_first(a, b):
+    """A pattern for "`a` reached the spot before `b`" as letters word it: "a-first", "a arriving first", "a before
+    b", "b after a" ("the car passed 0.4 s after the person": the person was first)."""
+    return re.compile(rf"\b{a}[- ](?:(?!{b})\w+ ){{0,3}}?first\b|\b{a}\b[^,;]*?\bbefore (?:the |a )?{b}|"
+                      rf"\b{b}\b[^,;]*?\bafter (?:the |a )?{a}|\bafter (?:the|a) {a}", re.I)
+
+
+ARRIVAL = {"person_first": _arrived_first(PERSON, VEHICLE), "vehicle_first": _arrived_first(VEHICLE, PERSON),
+           "both_at_once": re.compile(r"\bboth\b[^,;]*\bonce\b|\bat once\b|\bsimultaneous|\bsame (?:moment|time)\b", re.I)}
+CLAUSE = re.compile(r"[,;:]|\band\b")
+TIER_COUNT = re.compile(r"\b(\d+)\s+(?:(serious) (?:near[- ]miss(?:es)?|events?|cases?|conflicts?)|(close pass)(?:es)?)\b"
+                        r"(?!\s+(?:had|involved|with|where|at|came|took)\b)", re.I)  # "2 serious near-misses", not
+# "2 serious near-misses had 0.2 s" (some of 3) nor "1 of the 2 serious"
+IN_ALL = re.compile(r"\bin (?:all|total)\b|\btotal of\b|\bonly\b", re.I)
+
+
+def _tier(sentence):
+    """The one tier a sentence speaks of ("serious" or "close pass"), or None when it names both or neither."""
+    low = sentence.lower()
+    named = [t for t in ("serious", "close pass") if t in low]
+    return named[0] if len(named) == 1 else None
+
+
+def _order_counts(sentence):
+    """(order key, n) for each clause that states one count of one order of arrival ("3 with vehicle before person",
+    "after the person in 2 cases", "0 at once"). Numbers with a unit (a speed, a time gap) are not counts."""
+    out = []
+    for clause in CLAUSE.split(WITH_UNIT.sub(" ", sentence)):
+        kinds = [k for k, pattern in ARRIVAL.items() if pattern.search(clause)]
+        counts = re.findall(r"(?<![\d.])\d{1,3}(?![\d.])", clause)  # "Rosén & Sander 2009" is no count
+        if len(kinds) == len(counts) == 1:
+            out.append((kinds[0], int(counts[0])))
+    return out
+
+
+def _order_slips(sentence, facts):
+    """Why a sentence's order of arrival is not what was measured: counts that differ (or, for one tier only, exceed
+    or add up to more than the tier's events), or one event's order the counts rule out."""
+    facts = {"both_at_once": 0, **facts}  # older facts count only person- and vehicle-first
+    if facts.get("person_first") is None or facts.get("vehicle_first") is None:
+        return []
+    total, stated, tier = sum(facts[k] for k in ARRIVAL), _order_counts(sentence), _tier(sentence)
+    tier_n = {"serious": facts.get("serious_near_misses"), "close pass": facts.get("close_passes")}.get(tier)
+    if stated and tier_n and tier_n < total:  # counts for one tier, which the measurements do not split
+        if sum(n for _, n in stated) > tier_n or any(n > facts[k] for k, n in stated):
+            return [f"the measurements count {tier_n} {tier} events and orders over all {total} events"]
+        return []
+    if wrong := dict.fromkeys(f"{facts[k]} {k.replace('_', '-')}" for k, n in stated if n != facts[k]):
+        return [f"the measurements count {', '.join(wrong)}"]
+    if stated or COUNTED.search(sentence):
+        return []
+    # ponytail: "passing 0.4 s after the person" when the counts mix orders (1 of 2 person-first) is unsupported too
+    # (adjudication said so for v4 566, v5 92/214/699), but train letters labelled clean say it, so it is left alone
+    return [f"no measured event had the {side} there first" for key, pattern, side in
+            (("person_first", PERSON_FIRST, "person"), ("vehicle_first", VEHICLE_FIRST, "vehicle"))
+            if pattern.search(sentence) and facts[key] == 0]
+
+
+def _extreme_slips(sentence, facts):
+    """A "closest" time gap above the smallest measured, a "largest" one below the largest near-miss gap (a sentence
+    with the longest gap between vehicles is about those gaps), a "fastest" speed below the fastest measured: each in
+    the tier the sentence names."""
+    worst, tier, out = facts.get("worst", []), _tier(sentence), []
+    shown = [e for e in worst if tier in (None, e.get("tier"))]
+    found = [(float(m[1].replace(",", "")), m[2][0].lower()) for m in WITH_UNIT.finditer(sentence)]
+    gaps, speeds = [n for n, u in found if u == "s"], [n for n, u in found if u == "k"]
+    pets = [e["pet_s"] for e in shown if e.get("pet_s") is not None]
+    kmh = [e["vehicle_kmh"] for e in shown if e.get("vehicle_kmh") is not None]
+    if CLOSEST.search(sentence) and gaps and pets and min(gaps) > min(pets):
+        out.append(f"the closest measured was {min(pets):g} s")
+    longest = facts.get("observed", {}).get("longest_gap_s")
+    if LARGEST.search(sentence) and gaps and pets and max(gaps) < max(pets) and longest not in gaps:
+        out.append(f"a near-miss measured {max(pets):g} s")
+    if FASTEST.search(sentence) and speeds and kmh and max(speeds) < max(kmh):
+        out.append(f"the fastest measured was {max(kmh):g} km/h")
+    return out
+
+
+def _count_slips(sentence, facts):
+    """A count of serious near-misses or close passes that is not the measured count. "1 serious event had a car at
+    28.4 km/h" may be one of several, so a count of 1 counts only when the sentence says it is all ("in total")."""
+    out = []
+    for m in TIER_COUNT.finditer(sentence):
+        key = "serious_near_misses" if m[2] else "close_passes"
+        if facts.get(key) is not None and int(m[1]) != facts[key] and (int(m[1]) != 1 or IN_ALL.search(sentence)):
+            out.append(f"the measurements count {facts[key]} {'serious near-misses' if m[2] else 'close passes'}")
+    return out
 
 
 def slips(letter, facts):
-    """(sentence, why) for a writer's own slips that code can check against the measurements: a "closest" time gap
-    larger than the smallest measured (in the tier the sentence names), an order of arrival the counts rule out, and
+    """(sentence, why) for a writer's own slips that code can check against the measurements: a "closest",
+    "largest" or "fastest" event that is not (in the tier the sentence names), counts of serious near-misses, close
+    passes or orders of arrival that differ from those measured, one event's order the counts rule out, and
     more gaps "cut short" than a recording's two ends can cut."""
-    worst = facts.get("worst", [])
     out = []
     for sentence in SENTENCE.split(letter):
-        gaps = [float(m[1]) for m in WITH_UNIT.finditer(sentence) if m[2][0].lower() == "s"]
-        tier = "serious" if "serious" in sentence.lower() else "close pass" if "close pass" in sentence.lower() else None
-        pets = [e["pet_s"] for e in worst if e.get("pet_s") is not None and tier in (None, e.get("tier"))]
-        if CLOSEST.search(sentence) and gaps and pets and min(gaps) > min(pets):
-            out.append((sentence.strip(), f"the closest measured was {min(pets):g} s"))
-        counted = COUNTED.search(sentence)
-        if PERSON_FIRST.search(sentence) and facts.get("person_first") == 0 and not counted:
-            out.append((sentence.strip(), "no measured event had the person there first"))
-        if VEHICLE_FIRST.search(sentence) and facts.get("vehicle_first") == 0 and not counted:
-            out.append((sentence.strip(), "no measured event had the vehicle there first"))
+        why = _extreme_slips(sentence, facts) + _count_slips(sentence, facts) + _order_slips(sentence, facts)
         if (m := CUT_SHORT.search(sentence)) and float(m[1].replace(",", "")) > VIDEO_EDGES \
                 and not EDGES_NAMED.search(sentence):
-            out.append((sentence.strip(), "only the first and last gap can be cut short by the video"))
+            why.append("only the first and last gap can be cut short by the video")
+        out += [(sentence.strip(), w) for w in why]
     return out
 
 

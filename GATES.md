@@ -969,6 +969,21 @@ Model `muse-starter-sl-judge-v5-main`, clarified prompt for all three judges, on
 by adjudication) Muse Spark flags 20 and v5 8. Adding `pack.slips` to v5 changes the total by nothing (it catches 2
 more slips and raises 2 more false alarms). Public bench: v5 31/31, both Muse judges 30/31.
 
+## The writer-slip code check, widened (Sun 1 Nov 2026, 16:40 IST; built after reading v4's and v5's slips, not pre-registered)
+
+`pack.slips` now also checks a "largest" near-miss gap below the largest measured (a sentence quoting the longest
+gap between vehicles is left alone), a "fastest" speed below the fastest measured, a count of serious near-misses or
+close passes that is not the measured one ("2 serious near-misses had 0.2 s" and a lone "1 serious event had" are left
+alone), counts of person-first, vehicle-first and both-at-once that differ from those measured, and order counts said
+of one tier that exceed or add up to more than that tier's events (the measurements count orders over all events); a
+gap "cut short" at the start and end is no longer flagged. Built while looking at the slips, so this is not a blind
+test. On the 32 real writer slips adjudication found (v4 12, v5 20) it flags 28 (was 19); the 4 it misses (v4 566, v5
+92, 214, 699) give one event's order when the counts mix orders, a check left out because train letters labelled clean
+say the same. False alarms: 0 on the 750 v4 and 1,556 v5 clean train rows and on every clean holdout row of v3, v4 and
+v5, except v3 402, v4 941 and v5 115, which carry the same false sentence as rows adjudication called slips. Of v5's
+260 code-planted test slips it flags 208 (was 156; gap counts and shares are still left to the judge). No result
+above changes.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no

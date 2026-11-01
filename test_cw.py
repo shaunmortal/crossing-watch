@@ -2724,7 +2724,7 @@ def test_judge_v4_template_lies_spread_evenly_over_the_kinds_each_letter_can_car
 def test_judge_v5_each_writer_slip_is_false_by_the_measurements_and_each_control_true():
     """Offline, on 300 synthetic packs: every slip kind's lie reads false and its control true when checked back
     against the measurements, every number in either is measured, a control passes code's checks, and pack.slips
-    catches the closest, order and cut-short lies; a pack that cannot carry a kind gets none."""
+    catches every lie but a gap count or share; a pack that cannot carry a kind gets none."""
     import random
     import finetune_judge
     import judge_v5
@@ -2743,7 +2743,7 @@ def test_judge_v5_each_writer_slip_is_false_by_the_measurements_and_each_control
             text, sentence, why = lie
             assert not judge_v5.holds(kind, sentence, facts) and pack.unmeasured(sentence, measured) == [] and why
             assert sentence in text and text.replace(" " + sentence, "") == letter
-            assert bool(pack.slips(sentence, facts)) == (kind in ("closest gap", "order of arrival", "gaps cut short"))
+            assert bool(pack.slips(sentence, facts)) == (kind != "gap count or share")
     assert all(planted.values()) and planted["near-miss count"] == 300, planted
     lone = {"person_first": 1, "vehicle_first": 1, "serious_near_misses": 1, "close_passes": 0,
             "worst": [{"pet_s": 0.4, "vehicle": "car"}], "observed": {"gaps_6s": 2, "gaps_12s": 2, "crossings": 2,
@@ -5023,10 +5023,40 @@ def test_slips_catch_a_writers_own_closest_order_and_cut_short_slips_but_not_cor
                          "There were 3 such gaps cut short by the video.", facts)
     assert [why for _, why in slipped] == ["the closest measured was 0.1 s", "no measured event had the person there "
                                            "first", "only the first and last gap can be cut short by the video"]
-    assert pack.slips("The closest serious event was 0.1 s apart. In 0 cases the person was first, 0 had the vehicle "
+    assert pack.slips("The closest serious event was 0.1 s apart. In 0 cases the person was first, 2 had the vehicle "
                       "before the person. 12 gaps of 6 s or more, the first and last cut short by the video. The 2nd closest was 0.6 s.",
                       facts) == []
     assert "Say only what was measured" in pack.retry_note([], [], [], (), slipped)
+
+
+def test_slips_catch_largest_fastest_tier_and_order_count_slips_but_not_true_or_partial_statements():
+    """The writer slips adjudication found in v4/v5 (v5 rows 234, 230, 249, 11, 743) and their clean neighbours."""
+    facts = {"serious_near_misses": 2, "close_passes": 2, "person_first": 1, "vehicle_first": 3, "both_at_once": 0,
+             "observed": {"longest_gap_s": 11.4},
+             "worst": [{"tier": "serious", "pet_s": 1.4, "vehicle_kmh": 44.9}, {"tier": "serious", "pet_s": 1.0,
+                       "vehicle_kmh": 26.8}, {"tier": "close pass", "pet_s": 2.0, "vehicle_kmh": 21.3}]}
+    why = lambda text: [w for _, w in pack.slips(text, facts)]
+    assert why("The largest gap was 1.0 s between a person and a bus.") == ["a near-miss measured 2 s"]
+    assert why("The largest serious gap was 1.0 s.") == ["a near-miss measured 1.4 s"]
+    assert why("The fastest vehicle was a bus at 26.8 km/h.") == ["the fastest measured was 44.9 km/h"]
+    assert why("We recorded 3 serious near-misses and 2 close passes.") == ["the measurements count 2 serious near-misses"]
+    assert why("The recording showed 1 close pass in all.") == ["the measurements count 2 close passes"]
+    assert why("In all, 0 vehicle-first and 3 vehicle-first and 0 at once.") == ["the measurements count 3 vehicle-first"]
+    assert why("The vehicle went after the person in 3 cases, with 1 case person after vehicle.") == [
+        "the measurements count 1 person-first, 3 vehicle-first"]
+    assert why("There was 1 serious near-miss where the person was first, 3 where the vehicle was first.") == [
+        "the measurements count 2 serious events and orders over all 4 events"]
+    clean = ("The largest gap was 2.0 s. The longest gap was 11.4 s. The fastest was a motorcycle at 44.9 km/h. "
+             "2 serious near-misses had 1.0 s or more between users. 1 serious near-miss involved a bus at 26.8 km/h. "
+             "There were 2 serious near-misses and 2 close passes, with 1 person crossing first and 3 vehicle first. "
+             "Counts were 3 with vehicle before person, 1 with person before vehicle, and 0 at the same moment. "
+             "Of the 2 serious near-misses, 1 had the person first. "
+             "A van passed 1.0 s after the person at 26.8 km/h per Rosén & Sander 2009, adults 15+. "
+             "The 3 gaps at the start and end are cut short by the video.")
+    assert pack.slips(clean, facts) == []
+    none_close = {**facts, "close_passes": 0, "person_first": 0, "vehicle_first": 2,
+                  "worst": facts["worst"][:2]}
+    assert pack.slips("0 close passes were seen and 2 events had the vehicle go first.", none_close) == []
 
 if __name__ == "__main__":
     for name, check in list(globals().items()):
