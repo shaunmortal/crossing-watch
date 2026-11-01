@@ -1039,6 +1039,29 @@ agreed on. It agreed with every label: 0 of 72 changed (`provenance/symmetric-au
 stand; the tuned judge's v6 misses are real (19 of them a child death risk worded by a model, which it catches when
 the wording is the template's).
 
+## Judge v7: the open ensemble against Muse Spark (pre-registered Sun 1 Nov 2026, 23:40 IST, before any v7 letter, label or run)
+
+- **Why:** v6 had been declared the last judge run before submission; it lost to Muse Spark (1,445 vs 1,467). After
+  v6, a post-hoc look at its saved replies found the system below (with tuned v6) 1,479 right, ahead of Muse Spark (33
+  vs 21 discordant, p 0.13): not a result, it motivates one more confirmatory test. All runs v3-v7 stay reported.
+- **System:** a row is flagged if tuned Glimmer v7 flags it OR Muse Spark Open (Fireworks, effort low, the clarified
+  `pack.JUDGE_PROMPT`) flags it OR `pack.slips` flags it, `pack.slips` frozen as committed in 9c4573b (as a270d6d).
+- **Tuned v7:** v6's training rows unchanged, plus about 600 model-written lie edits and about 600 model-written clean
+  edits on v6's train letters (one inserted sentence each, diverse wording; the lies include a death risk for a child,
+  invented outside facts such as a driver on a phone or reports from parents, a standard said to be met, one recording
+  stretched to every day; Muse Spark and Spark Open edit alternately); no v6 test letter is used. Rank 32, 2 epochs,
+  learning rate 1e-4, seed 0, max_seq_len 3,072, max_eval_tokens 256; one run.
+- **Test:** 300 new letters (150 Spark Open, 150 Muse Spark), seeds disjoint from all earlier, v4's rejection rules;
+  per letter v6's six rows (edits asked with v6's prompts) plus the 31 public prompts. Every model-written edit is
+  checked by code as before (a clean one keeps only measured numbers); refusals are dropped.
+- **Labels:** as v6 (both Muse judges once on every row, clarified prompt; disagreements with the generator label
+  adjudicated blind by an AI agent, Claude). Symmetric this time: rows where only tuned v7 disagrees get the same blind
+  check, mixed with as many all-agree controls, after the tuned replies exist but shown no judge reply. Labels frozen
+  and committed before any score is read.
+- **Primary:** correct per row (`pack.read_problems`) on all new test rows (public excluded), exact McNemar, the system
+  vs Muse Spark, two-sided, alpha 0.05. **Secondary:** (system vs Spark Open is not meaningful: it is part of it) tuned
+  v7 alone vs Muse Spark and vs Spark Open; clean rows flagged; $ per verdict. Every result is reported, even a loss.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
