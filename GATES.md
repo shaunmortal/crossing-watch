@@ -1030,6 +1030,15 @@ Sensitivity: (A) 36 vs 50, p 0.16 vs Spark; (B) and (C) unchanged. Where: model-
 (p 0.027, a win), template lies 259/260 vs 255; but model-written lies 214/245 vs Spark 243 (v5 had 249/249: training
 on slip edits cost lie recall). As pre-registered, v6 is the last judge run before submission.
 
+## A symmetric label audit of v5 and v6 (Sun 1 Nov 2026, post hoc)
+
+Adjudication in v3-v6 looked only at rows where a Muse judge disagreed with the generator, so a wrong label on a row
+only the tuned judge disagreed with was never checked: that could only count against the tuned judge. An AI agent
+(Claude), shown no judge reply, re-checked all 46 such rows (v5 6, v6 40) mixed blind with 26 rows all three judges
+agreed on. It agreed with every label: 0 of 72 changed (`provenance/symmetric-audit/`). The Muse Spark wins in v5 and v6
+stand; the tuned judge's v6 misses are real (19 of them a child death risk worded by a model, which it catches when
+the wording is the template's).
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
