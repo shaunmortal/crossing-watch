@@ -942,6 +942,9 @@ v4's Muse Spark win rests mostly on flags our prompt's wording invited (the note
   exact McNemar, tuned v5 vs Muse Spark, two-sided, alpha 0.05. **Secondary:** vs Muse Spark Open; the system (v5 OR
   `pack.slips` flags) vs Muse Spark; writer-slip rows alone; clean rows flagged; tokens and $ per verdict.
 - Every result is reported, including a loss; v3's and v4's results stay as recorded.
+- **Data-build note (Sun 1 Nov 2026, before any v5 label or run):** a new TRAIN letter that `pack.slips` flags is
+  rejected (4 letters), so no train letter carrying a writer slip is labelled clean; test letters follow v4's rules.
+  Model-written edits exist for all 260 test letters, the 60 new train letters and 29 of v3's 150 train letters.
 
 ## Log
 
