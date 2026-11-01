@@ -945,6 +945,11 @@ v4's Muse Spark win rests mostly on flags our prompt's wording invited (the note
 - **Data-build note (Sun 1 Nov 2026, before any v5 label or run):** a new TRAIN letter that `pack.slips` flags is
   rejected (4 letters), so no train letter carrying a writer slip is labelled clean; test letters follow v4's rules.
   Model-written edits exist for all 260 test letters, the 60 new train letters and 29 of v3's 150 train letters.
+- **Before any v5 tuned reply was read (Sun 1 Nov 2026, after labels froze in b143963):** the primary result is
+  reported on the frozen labels, and twice more as sensitivity checks: with rows 92, 699 and 214 (an order of arrival
+  the counts do not support, the adjudicator's closest call) counted clean, and with rows 115 and 931 (clean only
+  because no judge flagged the same sentence their siblings carry) counted planted. Rows 608, 677, 865 and 996 are
+  excluded: the editor wrote a refusal, not a lie.
 
 ## Log
 
