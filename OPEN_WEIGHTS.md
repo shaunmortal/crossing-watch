@@ -31,7 +31,8 @@ slips planted by templates, by code and by the models themselves.
 - **Found after the fact (v6, not pre-registered):** as a second reviewer beside Muse Spark, the tuned judge adds
   more than Muse Spark Open does (Spark OR tuned vs Spark OR Spark Open: 20 vs 6 discordant, p 0.009).
 - **Label checks:** disagreements were adjudicated by an AI agent (Claude), blind to the tuned replies; a later
-  symmetric audit of the rows only the tuned judge disagreed with changed 0 of 72 labels.
+  symmetric audit of the 46 rows only the tuned judge disagreed with (v5, v6), mixed blind with 26 controls, changed
+  0 of 72 labels.
 
 ## Check it yourself ($0, no key)
 
