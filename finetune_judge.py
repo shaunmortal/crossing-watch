@@ -510,7 +510,7 @@ def write_starter(train, held, held_letters, out, name, held_set="dev", split_na
     jsonl = out / f"{name}.jsonl"
     jsonl.write_text("".join(x + "\n" for x in starter_order([line(r) for r in train], [line(r) for r in hold])))
     labels = [{"set": r.get("set", held_set), "planted": r["planted"], "kind": r["kind"],
-               "id": f"{r['writer']}/{r['seed']}/{r['k']}", **({"editor": r["editor"]} if "editor" in r else {})}
+               "id": f"{r['writer']}/{r['seed']}/{r['k']}", **{k: r[k] for k in ("editor", "slip_kind") if k in r}}
               for r in held] + [{"set": "public", "planted": r["planted"], "kind": r["kind"], "id": r["id"]} for r in public]
     split = {"file": jsonl.name, "sha256": hashlib.sha256(jsonl.read_bytes()).hexdigest(), "starter_seed": STARTER_SEED,
              "n_eval": len(hold), "train_rows": len(train),

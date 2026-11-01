@@ -2721,6 +2721,70 @@ def test_judge_v4_template_lies_spread_evenly_over_the_kinds_each_letter_can_car
     assert judge_v4.v4_seed(40000) and judge_v4.v4_seed(50000) and not judge_v4.v4_seed(30068)
 
 
+def test_judge_v5_each_writer_slip_is_false_by_the_measurements_and_each_control_true():
+    """Offline, on 300 synthetic packs: every slip kind's lie reads false and its control true when checked back
+    against the measurements, every number in either is measured, a control passes code's checks, and pack.slips
+    catches the closest, order and cut-short lies; a pack that cannot carry a kind gets none."""
+    import random
+    import finetune_judge
+    import judge_v5
+    planted = dict.fromkeys(judge_v5.SLIP_KINDS, 0)
+    for seed in range(300):
+        measured = finetune_judge.synthetic_pack(seed)
+        facts = json.loads(measured)
+        letter = f"Dear Sir,\nA car passed at {facts['worst'][0]['vehicle_kmh']} km/h. Please act.\nThe Principal"
+        for kind in judge_v5.SLIP_KINDS:
+            lie = judge_v5.plant(kind, letter, measured, random.Random(seed), True)
+            control = judge_v5.plant(kind, letter, measured, random.Random(seed), False)
+            assert control and judge_v5.holds(kind, control[1], facts) and pack.unmeasured(control[1], measured) == []
+            if not lie:
+                continue
+            planted[kind] += 1
+            text, sentence, why = lie
+            assert not judge_v5.holds(kind, sentence, facts) and pack.unmeasured(sentence, measured) == [] and why
+            assert sentence in text and text.replace(" " + sentence, "") == letter
+            assert bool(pack.slips(sentence, facts)) == (kind in ("closest gap", "order of arrival", "gaps cut short"))
+    assert all(planted.values()) and planted["near-miss count"] == 300, planted
+    lone = {"person_first": 1, "vehicle_first": 1, "serious_near_misses": 1, "close_passes": 0,
+            "worst": [{"pet_s": 0.4, "vehicle": "car"}], "observed": {"gaps_6s": 2, "gaps_12s": 2, "crossings": 2,
+                                                                     "gap_6s_share_pct": 50.0}}
+    for kind in ("closest gap", "order of arrival", "gaps cut short"):
+        assert judge_v5.SLIPS[kind](lone, random.Random(0), True) is None, kind
+    assert not judge_v5.holds("closest gap", "The closest near-miss measured had a time gap of 0.9 s.", lone)
+    assert not judge_v5.holds("gap count or share", "50.0% of the time was inside gaps of 12 s or more.",
+                              {**lone, "observed": {**lone["observed"], "gaps_12s": 1}})
+
+
+def test_judge_v5_rows_give_each_train_letter_slips_with_controls_and_spread_test_slips_over_the_kinds():
+    """Offline: a train letter gets 2-3 slip lies, each a one-problem reply, and true controls of the first two of
+    their kinds; a test letter gets one slip lie, the kind fewest earlier letters took of those it can carry; every row
+    is the judge prompt and is the same on every run; v5 records are told from earlier ones by seed."""
+    import finetune_judge
+    import judge_v5
+    bases = []
+    for seed in range(40):
+        measured = finetune_judge.synthetic_pack(seed)
+        kmh = json.loads(measured)["worst"][0]["vehicle_kmh"]
+        bases.append({"writer": "spark-open", "seed": judge_v5.TRAIN_FIRST + seed, "measured": measured,
+                      "plan": {"letter": f"Dear Sir,\nA car passed at {kmh} km/h. Please act.\nThe Principal"}})
+    rows = judge_v5.train_rows(bases, {})
+    assert rows == judge_v5.train_rows(bases, {})
+    for b in bases:
+        slips = [r for r in rows if r["seed"] == b["seed"] and "slip_kind" in r]
+        lies, controls = [r for r in slips if r["planted"]], [r for r in slips if not r["planted"]]
+        assert 2 <= len(lies) <= 3 and [r["slip_kind"] for r in controls] == [r["slip_kind"] for r in lies[:2]]
+        assert all(len(pack.read_problems(r["messages"][1]["content"])) == 1 for r in lies)
+        assert all(pack.read_problems(r["messages"][1]["content"]) == [] for r in controls)
+    for r in rows:
+        assert r["messages"][0]["content"] == pack.JUDGE_PROMPT.format(facts=r["measured"], letter=r["letter"])
+    test = judge_v5.test_slip_rows(bases)
+    assert test == judge_v5.test_slip_rows(bases) and all(r["set"] == "test-slip" and r["planted"] for r in test)
+    kinds = [r["slip_kind"] for r in test]
+    assert len(test) == len(bases) and set(kinds) == set(judge_v5.SLIP_KINDS)
+    assert judge_v5.v5_record(False, 60000) and judge_v5.v5_record(True, 12) and not judge_v5.v5_record(True, 40000)
+    assert not judge_v5.v5_record(False, 12)
+
+
 def test_finetune_judge_unseen_ablation_drops_exactly_the_two_kinds_and_keeps_the_holdout():
     """Offline: the ablation's train rows are the main train less every row of UNSEEN_KINDS, nothing else, and both
     files hold out the same rows in the same order after the starter's shuffle."""
