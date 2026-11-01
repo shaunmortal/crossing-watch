@@ -920,6 +920,29 @@ clean train rows, 0 on the public bench's 8 clean letters, and on the v3 and v4 
 941, which carry the same false sentence as rows adjudication had already found (they stayed clean only because no
 judge flagged them). It changes no result above: the judges' scores are as recorded.
 
+## Fine-tuned Glimmer judge v5: a fair test against Muse Spark (pre-registered Sun 1 Nov 2026, 11:28 IST, before any v5 letter, label or run)
+
+v4's Muse Spark win rests mostly on flags our prompt's wording invited (the note above); here every judge reads the fix.
+- **Prompt:** `pack.JUDGE_PROMPT` from b3b1fbe, which adds: "Ordinals ("first", "second", "third") and descriptions of
+  how the measurement was made (tracking, road-plane geometry, the definitions) are not problems either." All three
+  judges get it, and so does every v5 training and test row.
+- **Training data:** v4's 260 test letters are not reused. Train = rows rebuilt with the new prompt from all earlier
+  TRAIN letters (v3's 150) plus new train letters, in three families: template lies (as before); model-written lies
+  and clean edits (`natural_edits.py`); writer-slip lies made by code (a wrong "closest" time gap, an order of arrival
+  the counts rule out, a wrong count of serious near-misses or close passes, a wrong share or count of gaps, more than
+  two gaps "cut short"), each with matching true restatements as clean controls.
+- **Config:** rank 32, 2 epochs, learning rate 1e-4, seed 0, max_seq_len 3,072, max_eval_tokens 256; one run, no sweep.
+- **Test:** 260 new letters (130 by Muse Spark Open, 130 by Muse Spark via the Meta API), seeds disjoint from every
+  earlier seed, v4's rejection rules. Per letter v4's four rows (as written, template lie, model-written lie,
+  model-written clean edit) plus one writer-slip row where code can plant one (kinds drawn round-robin); plus the 31
+  public prompts rebuilt with the new prompt.
+- **Labels:** as v4: Muse Spark and Spark Open judge every row once with the new prompt; disagreements are adjudicated
+  blind by an AI agent (Claude, Anthropic) under its rules; frozen and committed before any tuned reply is read.
+- **Primary:** correct per row (`pack.read_problems`; unreadable = not flagged) on the new test rows (public excluded),
+  exact McNemar, tuned v5 vs Muse Spark, two-sided, alpha 0.05. **Secondary:** vs Muse Spark Open; the system (v5 OR
+  `pack.slips` flags) vs Muse Spark; writer-slip rows alone; clean rows flagged; tokens and $ per verdict.
+- Every result is reported, including a loss; v3's and v4's results stay as recorded.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
