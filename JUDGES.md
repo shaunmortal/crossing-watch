@@ -63,6 +63,8 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
 
 ## Open Weights bonus
 
+- One page for the review, with $0 checks: [OPEN_WEIGHTS.md](OPEN_WEIGHTS.md).
+
 - Fine-tuned Muse Glimmer judge (LoRA, training $0), pre-registered blind tests, labels frozen before any tuned reply
   was read. **v4, 1,016 rows from 260 synthetic letters: 998 right vs Muse Spark Open 980 (28 vs 10, p 0.0051)**,
   mostly lies Spark Open missed; clean rows flagged 5/491 vs Spark Open 4/491. In-distribution letters only.

@@ -1067,6 +1067,15 @@ the wording is the template's).
   Spark Open the third). The starter's base-model evaluation is skipped (never used; its replies were cut short), so
   only the tuned model is sampled. Nothing else changes.
 
+## Judge v7 cancelled before any letter (Sun 1 Nov 2026)
+
+v7 was pre-registered (7290b31, 89f466d) and then cancelled before any v7 letter, edit, label or run (two trial calls,
+about $0.02). A pre-run review found: (1) the code check alone, given to Muse Spark too, ties the open ensemble on v6
+(19 vs 19); (2) at the planned size the test had about 30-54% power, and 80% needs about 4,500 rows, beyond the
+credit left; (3) v6's edge came almost entirely from a row family we created and trained on (slip edits, 16 vs 0); on
+all other rows Muse Spark led 21 vs 17. Running it could only produce a weak or misleading claim, so v6 stays the
+last judge run, as first pre-registered.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
