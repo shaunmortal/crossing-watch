@@ -10,7 +10,7 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
 - **Measured against ground truth:** drone-tracked DUT clips, 47 of 52 near-misses found after Muse Spark's review
   (50 of 52 by geometry alone); SinD, speed error 0.24 km/h mean, 37 of 63 crossings within 3 s.
 - **Our open-weights judge beats Muse Spark Open in three blind tests:** a LoRA on Muse Glimmer, protocols written
-  down first: p 0.005 (1,016 rows), 0.029 (1,278), 0.0002 (1,501), at a quarter of Spark's cost. Muse Spark is still
+  down first: p 0.005 (1,016 rows), 0.029 (1,278), 0.0006 (1,501), at a quarter of Spark's cost. Muse Spark is still
   ahead overall (v6: 1,467 vs 1,445 right).
 - **Checked by people, not only models:** teachers rate the clips blind against the measurements (**pending**, Tue).
 - **Built for India:** a Hindi copy of the letter, the HOD's spoken notes, Supreme Court and IRC references.
