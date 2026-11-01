@@ -1061,6 +1061,11 @@ the wording is the template's).
 - **Primary:** correct per row (`pack.read_problems`) on all new test rows (public excluded), exact McNemar, the system
   vs Muse Spark, two-sided, alpha 0.05. **Secondary:** (system vs Spark Open is not meaningful: it is part of it) tuned
   v7 alone vs Muse Spark and vs Spark Open; clean rows flagged; $ per verdict. Every result is reported, even a loss.
+- **Amended Sun 1 Nov 2026, 23:45 IST, before any v7 letter, label or run (the user approved):** for power (v6's
+  post-hoc 33 vs 21 discordant would need about 2,700 rows to reach p < 0.05), the test is 450 new letters, 200 by
+  Spark Open and 250 by Muse Spark; to save Fireworks credit, Muse Spark edits 2 of every 3 letters (test and train,
+  Spark Open the third). The starter's base-model evaluation is skipped (never used; its replies were cut short), so
+  only the tuned model is sampled. Nothing else changes.
 
 ## Log
 
