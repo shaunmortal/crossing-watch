@@ -1006,6 +1006,12 @@ above changes.
   edit rows alone; real writer slips found by adjudication; clean rows flagged; tokens and $ per verdict.
 - Every result is reported, including a loss; v3's, v4's and v5's results stay as recorded. v6 is the last judge run
   before submission.
+- **Before any v6 tuned reply was read (Sun 1 Nov 2026, after labels froze in d2dbb29):** the primary results are
+  reported on the frozen labels and three sensitivity checks: (A) rows 18, 556, 752, 782 (one event's order the counts
+  do not support, the closest calls) counted clean; (B) rows 125 and 140 (clean only because no judge flagged the
+  sentence their siblings carry) counted planted; (C) rows 1326, 1337, 1439, 1490 (slip edits of the same kind as the
+  six excluded ones, left planted because both judges flagged them) excluded. The system uses `pack.slips` exactly as
+  committed in a270d6d.
 
 ## Log
 
