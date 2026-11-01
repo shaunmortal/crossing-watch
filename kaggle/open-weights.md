@@ -219,6 +219,13 @@ right, 7 vs 18, p 0.043); **v5 beats Muse Spark Open** (1,247; 22 vs 9, p 0.029)
 template lies (259 vs 258 of 260), model-written lies (249 vs 248 of 249) and code-planted slips (260 vs 260), and
 behind on the 20 real slips the writers made themselves (8 vs 20). Re-score: `python3 judge_v3_score.py v5`.
 
+### v6: the open system (tuned Glimmer + code checks), the last run
+
+Training added model-written slip edits and 32 real writer slips; `pack.slips` widened (a270d6d) and frozen; fresh
+test of 260 letters, 1,501 rows (GATES.md "v6"). **Beats Muse Spark Open** (1,445 vs 1,403 right, p 0.00023) and
+beats Muse Spark on model-written slips (225 vs 214 of 230, p 0.027); **Muse Spark is ahead overall** (1,467, p 0.023),
+mainly on model-written lies (243 vs 214 of 245). Pre-registered as the last judge run before submission.
+
 ## Spark-free mode
 
 Each closed-model step and its open-weights substitute, measured against the closed one (DUT: numbers only, crops stay

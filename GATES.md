@@ -1013,6 +1013,23 @@ above changes.
   six excluded ones, left planted because both judges flagged them) excluded. The system uses `pack.slips` exactly as
   committed in a270d6d.
 
+## Fine-tuned Glimmer judge v6: result (Sun 1 Nov 2026, read after labels froze in d2dbb29 and 881dbf0)
+
+System = tuned v6 OR `pack.slips` (a270d6d); one vote; labels `provenance/glimmer-judge-lora-v6/labels-frozen.json`.
+
+| 1,501 new test rows (primary) | Correct | Lies flagged | Clean rows flagged |
+|---|---|---|---|
+| System (v6 + code) | 1,445 | 959/1,006 | 9/495 |
+| Glimmer + LoRA v6 alone | 1,442 | 954/1,006 | 7/495 |
+| **Muse Spark** | **1,467** | 983/1,006 | 11/495 |
+| Muse Spark Open | 1,403 | 911/1,006 | 3/495 |
+
+**"Beats both" not met.** System vs Muse Spark Open: 84 vs 42, **p 0.00023 (win)**. System vs Muse Spark: 32 vs 54,
+p 0.023 (**Muse Spark ahead**). Tuned alone: vs Spark Open 82 vs 43 (p 0.00062), vs Spark 32 vs 57 (p 0.011).
+Sensitivity: (A) 36 vs 50, p 0.16 vs Spark; (B) and (C) unchanged. Where: model-written slip edits 225/230 vs Spark 214
+(p 0.027, a win), template lies 259/260 vs 255; but model-written lies 214/245 vs Spark 243 (v5 had 249/249: training
+on slip edits cost lie recall). As pre-registered, v6 is the last judge run before submission.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
