@@ -984,6 +984,29 @@ v5, except v3 402, v4 941 and v5 115, which carry the same false sentence as row
 260 code-planted test slips it flags 208 (was 156; gap counts and shares are still left to the judge). No result
 above changes.
 
+## Fine-tuned Glimmer judge v6: the open system against both Muse judges (pre-registered Sun 1 Nov 2026, 16:34 IST, before any v6 letter, label or run)
+
+- **System:** a row is flagged if tuned Glimmer v6 flags it OR `pack.slips` flags it, with `pack.slips` frozen as
+  committed in a270d6d (any later change to it is not part of this test). The tuned model alone is reported too.
+- **Prompt:** v5's clarified `pack.JUDGE_PROMPT`, unchanged, for all three judges and every v6 training and test row.
+- **Training data:** v5's training rows; plus model-written slip edits: for every train letter where affordable, a
+  model rewrites one sentence to carry one subtle factual slip about the measurements (a wrong superlative, count,
+  order, total or share), with a clean paraphrase of the same sentence as its control; plus the 32 real writer slips
+  adjudicated in v4's and v5's test rows (usable now, since v6 tests on new letters). The other rows of v5's test
+  letters are not added.
+- **Config:** as v5: rank 32, 2 epochs, learning rate 1e-4, seed 0, max_seq_len 3,072, max_eval_tokens 256; one run.
+- **Test:** 260 new letters (130 by Muse Spark Open, 130 by Muse Spark via the Meta API), seeds disjoint from every
+  earlier seed, v4's rejection rules. Per letter: as written, template lie, model-written lie, model-written clean
+  edit, code-planted writer slip (where code can plant one), model-written slip edit; plus the 31 public prompts.
+- **Labels:** as v5: Muse Spark and Spark Open judge every row once with the clarified prompt; disagreements are
+  adjudicated blind by an AI agent (Claude, Anthropic); frozen and committed before any tuned reply is read.
+- **Primary (both must hold for "beats both"):** correct per row (`pack.read_problems`; unreadable = not flagged) on
+  all new test rows (public excluded), exact McNemar, the system vs Muse Spark and the system vs Muse Spark Open, each
+  two-sided at alpha 0.05 with the system ahead. **Secondary:** tuned v6 alone vs each Muse judge; model-written slip
+  edit rows alone; real writer slips found by adjudication; clean rows flagged; tokens and $ per verdict.
+- Every result is reported, including a loss; v3's, v4's and v5's results stay as recorded. v6 is the last judge run
+  before submission.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
