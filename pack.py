@@ -80,7 +80,8 @@ JUDGE = "Muse Spark (a separate reviewer)"
 JUDGE_PROMPT = """You review a letter before a school sends it to its road authority. MEASUREMENTS are the only facts.
 List every problem: a claim or number the measurements do not support; a number above one written in words, not in
 digits; saying a standard or warrant is met; a death risk stated for a child; blaming a named person. Tone, wording
-and the choice of fix are not problems.
+and the choice of fix are not problems. Ordinals ("first", "second", "third") and descriptions of how the measurement
+was made (tracking, road-plane geometry, the definitions) are not problems either.
 Reply JSON only: {{"problems": ["<one short sentence each>"]}}, with [] if there are none.
 
 MEASUREMENTS:

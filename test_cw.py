@@ -1336,6 +1336,7 @@ def test_number_check_flags_words_and_mph_and_reads_the_measurements_only():
         pack.model_plan = old
     assert "3.1" not in pack.LETTER_PROMPT and "every number in digits" in pack.LETTER_PROMPT
     assert "in words, not in\ndigits" in pack.JUDGE_PROMPT
+    assert 'Ordinals ("first", "second", "third") and descriptions of how the measurement\nwas made' in pack.JUDGE_PROMPT
 
 
 def test_a_sentence_never_puts_one_near_miss_speed_beside_another_ones_gap():
