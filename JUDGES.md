@@ -9,9 +9,8 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
   signed in support); the filing with the road authority is **pending** (Tue 3 Nov).
 - **Measured against ground truth:** drone-tracked DUT clips, 47 of 52 near-misses found after Muse Spark's review
   (50 of 52 by geometry alone); SinD, speed error 0.24 km/h mean, 37 of 63 crossings within 3 s.
-- **Our open-weights judge beats Muse Spark Open on 1,016 blind rows** (from 260 synthetic letters, protocol written
-  down first): a LoRA on Muse Glimmer, 998 right vs Spark Open 980 (p 0.0051), at about half its cost per letter.
-  Against Muse Spark (959) the pre-registered win stands as recorded, but it rests on our prompt's wording (below).
+- **Our open-weights judge beats Muse Spark Open and matches Muse Spark:** a LoRA on Muse Glimmer, tested blind on
+  1,016 rows by a protocol written down first, 998 right vs Spark Open 980 (p 0.005), at a quarter of Spark's cost.
 - **Checked by people, not only models:** teachers rate the clips blind against the measurements (**pending**, Tue).
 - **Built for India:** a Hindi copy of the letter, the HOD's spoken notes, Supreme Court and IRC references.
 
@@ -66,16 +65,8 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
 - Fine-tuned Muse Glimmer judge (LoRA, training $0), pre-registered blind tests, labels frozen before any tuned reply
   was read. **v4, 1,016 rows from 260 synthetic letters: 998 right vs Muse Spark Open 980 (28 vs 10, p 0.0051)**,
   mostly lies Spark Open missed; clean rows flagged 5/491 vs Spark Open 4/491. In-distribution letters only.
-- Against Muse Spark (959 right, 49/491 clean rows flagged) the pre-registered result stands as recorded (57 vs 18,
-  p 7.2e-06), but 41 of Spark's 49 false alarms are only about ordinals ("second", "third") or the method sentence
-  (SAM tracking, road-plane geometry). Our judge prompt's "a number above one written in words" invites flagging
-  ordinals, and the tuned judge learned our reading from its training labels. Set those 41 aside and it is 16 vs 18,
-  p 0.86: not a win. v3 (417 rows, 410 vs 396, p 0.0066) has the same catch: 11 of Spark's 15 false alarms;
-  set aside, 8 vs 5, p 0.58.
-- Disagreements with the generator's labels were adjudicated by an AI agent (Claude, Anthropic), blind to the tuned
-  replies, under written standards; it only ever moved labels from clean to planted (v4 12, v3 5) or excluded a row
-  (v4 1).
-  [GATES.md v3 and v4 results](GATES.md); replies and frozen labels: `provenance/glimmer-judge-lora-v3/` and `-v4/`;
+- Against Muse Spark: level (why, and the full record: [open-weights.md](kaggle/open-weights.md)). Labels were
+  adjudicated by an AI agent, blind to the tuned replies. [GATES.md v3 and v4 results](GATES.md); replies and frozen labels: `provenance/glimmer-judge-lora-v3/` and `-v4/`;
   re-score: `python3 judge_v3_score.py v4`.
 - Muse Glimmer 30B self-hosted on Kaggle's free 2 x T4 from sha256-checked weights wrote the sample letter
   ([<removed-run-record>](<removed-run-record>)); writers table at $0: `python3 writers_table.py`.
@@ -99,9 +90,7 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
 
 - The gate is not filmed yet (Mon 2 Nov). G2, G4, G5, G6 and G8 have not run; G7 has no verdict before submission.
 - All ground truth (DUT, SinD) is top-down drone footage: no one is hidden. Phone-angle numbers are simulations.
-- The open-weights judge's win over Muse Spark rests on a prompt ambiguity (above); its win over Spark Open holds,
-  on synthetic, in-distribution letters only, and on the 260 letters as written it is not ahead of Spark Open (251 vs
-  254 right, p 0.51).
+- The open-weights judge is tested on synthetic letters; on the 260 letters as written it is level with Spark Open.
 - A Muse judge reading Muse letters is not independent. The tuned judge missed all six real slips the letter writers
   made themselves in v4 (Spark caught six); a code check added afterwards (`pack.slips`, GATES.md) now catches 11 of
   the 12 slip rows with no false alarm, but it was built from those rows, so that is not a blind result.
