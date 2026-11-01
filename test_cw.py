@@ -5058,6 +5058,50 @@ def test_slips_catch_largest_fastest_tier_and_order_count_slips_but_not_true_or_
                   "worst": facts["worst"][:2]}
     assert pack.slips("0 close passes were seen and 2 events had the vehicle go first.", none_close) == []
 
+
+def test_judge_v6_slip_edit_kept_only_when_one_sentence_changes_into_a_checked_slip_or_a_true_paraphrase():
+    """Offline: a slip edit replaces exactly its original sentence and is labelled with code's check (the quantity's
+    measured value against the stated one); a slip whose stated value is the measured one, is not in the sentence, names
+    no listed quantity, lacks the quantity's word or changes two sentences is dropped; a control keeps the original's
+    numbers and passes natural_edits and pack.slips, else it is dropped; rows carry editor and quantity."""
+    import finetune_judge
+    import judge_v6
+    measured = next(m for m in map(finetune_judge.synthetic_pack, range(50)) if len(json.loads(m)["worst"]) >= 2)
+    facts = json.loads(measured)
+    pets = sorted(e["pet_s"] for e in facts["worst"])
+    original = f"One near-miss had {pets[1]} s between the person and the vehicle."
+    letter = f"Dear Sir,\nWe counted {facts['observed']['crossings']} crossings. {original} Please act.\nThe Principal"
+    slip = {"sentence": f"The closest near-miss had {pets[1]} s between the person and the vehicle.",
+            "quantity": "closest near-miss time gap (s)", "stated": pets[1], "why": "A closer one was measured."}
+    edited, kind, problems = judge_v6.check_slip(letter, measured, original, slip)
+    assert edited == letter.replace(original, slip["sentence"]) and kind == "slip edit: closest near-miss time gap (s)"
+    assert problems == [f'"{slip["sentence"]}": the measurements give closest near-miss time gap (s) {pets[0]}, '
+                        f'not {pets[1]}.'] and pack.read_problems(finetune_judge.reply(problems)) == problems
+    for bad in ({**slip, "stated": pets[0], "sentence": f"The closest near-miss had {pets[0]} s."},
+                {**slip, "stated": 99.9}, {**slip, "stated": 77.7, "sentence": "The closest near-miss had 77.7 s."}, {**slip, "quantity": "closest gap"}, {**slip, "stated": True},
+                {**slip, "sentence": f"One near-miss had {pets[1]} s."}, {**slip, "sentence": "The closest. Two more."},
+                {**slip, "sentence": original}):
+        assert judge_v6.check_slip(letter, measured, original, bad)[0] is None, bad
+    assert judge_v6.check_slip(letter, measured, "Not in the letter.", slip)[0] is None
+    control = {"sentence": f"A near-miss left {pets[1]} s between vehicle and person."}
+    assert judge_v6.check_control(letter, measured, original, control) == (
+        letter.replace(original, control["sentence"]), "clean: slip-edit control", [])
+    for bad in (f"A near-miss left {pets[0]} s between vehicle and person.", "A near-miss left seconds between them.",
+                f"A child was nearly hit with {pets[1]} s to spare.", f"The largest gap was {pets[1]} s."):
+        assert judge_v6.check_control(letter, measured, original, {"sentence": bad})[0] is None, bad
+    assert judge_v6.numbers("The 85th percentile was 45.5 km/h over 1,074 s.") == [45.5, 1074.0]
+    b = {"writer": "spark", "seed": judge_v6.FIRST, "measured": measured, "plan": {"letter": letter}}
+    raw = json.dumps({"original": original, "slip": slip, "control": control})
+    rows, report = judge_v6.slip_edit_rows([b], {("spark", judge_v6.FIRST): {"editor": "spark", "raw": raw}}, "train",
+                                           True)
+    assert [(r["planted"], r.get("slip_kind"), r["editor"], r["set"]) for r in rows] == [
+        (True, slip["quantity"], "spark", "train"), (False, None, "spark", "train")] and report["spark"]["kept"] == 2
+    assert all(r["messages"][0]["content"] == pack.JUDGE_PROMPT.format(facts=measured, letter=r["letter"]) for r in rows)
+    assert len(judge_v6.slip_edit_rows([b], {("spark", judge_v6.FIRST): {"editor": "spark", "raw": raw}}, "t", False)[0]) == 1
+    assert "{facts}" in judge_v6.SLIP_PROMPT and all(q in judge_v6.SLIP_PROMPT for q in judge_v6.QUANTITIES)
+    for q, (value, word) in judge_v6.QUANTITIES.items():
+        assert value(facts) is not None, q
+
 if __name__ == "__main__":
     for name, check in list(globals().items()):
         if name.startswith("test_"):

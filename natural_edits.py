@@ -113,10 +113,10 @@ def parse(text):
     return found if isinstance(found, dict) else {}
 
 
-def ask(base, editor, key):
+def ask(base, editor, key, template=EDIT_PROMPT, schema=EDIT_SCHEMA):
     """The editor's cached-to-be record for one test letter: prompt, raw reply, run record and cost; None when the
-    request failed (nothing cached)."""
-    prompt = EDIT_PROMPT.format(facts=base["measured"], letter=base["plan"]["letter"])
+    request failed (nothing cached). judge_v6 passes its slip-edit `template` and `schema`."""
+    prompt = template.format(facts=base["measured"], letter=base["plan"]["letter"])
     model = EDITOR_MODEL[editor]
     try:
         if editor == "spark":
@@ -124,7 +124,7 @@ def ask(base, editor, key):
         else:
             url = fj.FIREWORKS_URL
             text, run = openweights.reply(url, model, openweights.server_key(url, ""),
-                                          [{"type": "text", "text": prompt}], EDIT_SCHEMA, EFFORT)
+                                          [{"type": "text", "text": prompt}], schema, EFFORT)
     except (OSError, http.client.HTTPException, ValueError, KeyError, IndexError, TypeError) as err:
         print(f"natural_edits: {editor} failed on {base['writer']} {base['seed']}, nothing cached: {err}",
               file=sys.stderr)
@@ -134,17 +134,17 @@ def ask(base, editor, key):
             **{k: run.get(k) for k in ("usage", "request_id", "wall_s", "response_format")}}
 
 
-def edits(cache, test, pay, key, cap, spent):
+def edits(cache, test, pay, key, cap, spent, template=EDIT_PROMPT, schema=EDIT_SCHEMA, call_usd=EDIT_CALL_USD):
     """(records by (writer, seed), USD spent): every test letter's cached edit, the missing ones asked when `pay`
-    while the cap holds (each call held to EDIT_CALL_USD before it is sent)."""
+    while the cap holds (each call held to `call_usd` before it is sent)."""
     cache.mkdir(parents=True, exist_ok=True)
     path = lambda b: cache / f"{b['writer']}-{b['seed']}.json"
     who = editors(test)
     missing = [b for b in test if not path(b).is_file()]
-    room = int((cap - spent) // EDIT_CALL_USD) if pay else 0
+    room = int((cap - spent) // call_usd) if pay else 0
     if missing[:room]:
         with ThreadPoolExecutor(fj.WORKERS) as pool:
-            made = list(pool.map(lambda b: ask(b, who[(b["writer"], b["seed"])], key), missing[:room]))
+            made = list(pool.map(lambda b: ask(b, who[(b["writer"], b["seed"])], key, template, schema), missing[:room]))
         for record in filter(None, made):
             path(record).write_text(json.dumps(record, indent=1, ensure_ascii=False))
             spent += record["cost_usd"]
