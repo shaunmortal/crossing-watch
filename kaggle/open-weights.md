@@ -199,7 +199,7 @@ about ordinals ("second", "third", ...) or the method sentence (SAM tracking, ro
 and the comparison with Spark is 16 vs 18, p 0.86 (not a win). Rule and rows: GATES.md, v4 note of Sun 1 Nov.
 
 Weaker spot: it missed all six real slips the letter writers made themselves (Spark caught six, Spark Open three),
-and on the 260 letters as written it is level with Spark Open (251 vs 254, p 0.51), so the code checks and a second
+and on the 260 letters as written it is not ahead of Spark Open (251 vs 254 right, p 0.51), so the code checks and a second
 judge stay. Re-score at $0: `python3 judge_v3_score.py v4`.
 
 What one verdict costs, from the v4 replies' own token counts (1,048 rows each):

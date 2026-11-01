@@ -529,7 +529,7 @@ to set it.
   it (marked `review_disputed`, named on the page). Spark has now seen every piece.
 - **Vehicles in crowd mode too** (`"vehicle_mode": "crowd"`, for dense traffic that fills SAM's 16 objects). Vehicles
   are detected on every frame (10 a second): at 5 a second a review showed motorcycles over ~36 km/h outran the
-  tracker's one-body-size match and vanished. The geometry finds 48 of 52, all 4 misses at a threshold. After
+  tracker's one-body-size match and vanished. The geometry finds 49 of 52, all 3 misses at a threshold. After
   Spark's review: 48 of 52 found and 2 real false alarms. Spark called 3 pedestrians in true conflicts "unclear";
   "unclear" now keeps the person (only a sure "no" removes one); the review costs 1 true conflict here (a clip 09
   walker it called "not a person", lost in crowd mode too) and 3 in crowd mode, and removes 2 false alarms there.

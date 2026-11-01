@@ -902,6 +902,11 @@ replies in `provenance/glimmer-judge-lora-v4/labels/`.
   none from planted to clean.
 - A fair re-test would add "ordinals and method descriptions are fine" to the prompt and re-run both Muse judges; not
   done.
+- **Two phrases in the result above overstate (added 11:13 IST; the result's text is left as recorded):** "better at
+  planted and model-written lies and at not crying wolf" holds against both judges only for correct per row (998 vs 959
+  and 980): Muse Spark flagged more lies (517 vs 512 of 525; 253 vs 252 of 259 model-written) and Spark Open fewer
+  clean rows (4 vs 5 of 491). "Level with Spark Open" on the 260 letters as written means not significantly
+  different: v4 got 3 fewer right (251 vs 254, 3 vs 6, p 0.51).
 
 ## A code check for the writer's own slips (Sun 1 Nov 2026; built after reading v4, not pre-registered)
 
