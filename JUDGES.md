@@ -4,12 +4,14 @@ Solo Indie entry: one phone video of a dangerous crossing becomes near-miss evid
 Each claim links to its proof. **Pending** = not done yet; what needs the gate recording (Mon 2 Nov) is `[PLACEHOLDER]`.
 
 ## Only in Crossing Watch
-- **The whole loop, end to end:** a phone video becomes measured near-misses, a code-checked letter, the college's
-  signature and seal (Principal and HOD signed the project application on 31 Oct; 19 teachers signed in support), and
-  a filing with the road authority (**pending**, Tue 3 Nov).
-- **Measured against ground truth:** drone-tracked DUT clips, 47 of 52 near-misses found; SinD, 66 conflicts.
-- **Our own open-weights judge beats Meta's:** a LoRA on Muse Glimmer, tested blind on 1,016 letters by a protocol
-  written down first: 998 right vs Muse Spark 959 and Spark Open 980, at about a quarter of Spark's cost per letter.
+- **The loop up to filing; filing pending Tue 3 Nov:** a phone video becomes measured near-misses and a code-checked
+  letter for the college to sign and seal (Principal and HOD signed the project application on 31 Oct; 19 teachers
+  signed in support); the filing with the road authority is **pending** (Tue 3 Nov).
+- **Measured against ground truth:** drone-tracked DUT clips, 47 of 52 near-misses found after Muse Spark's review
+  (50 of 52 by geometry alone); SinD, speed error 0.24 km/h mean, 37 of 63 crossings within 3 s.
+- **Our open-weights judge beats Muse Spark Open on 1,016 blind rows** (from 260 synthetic letters, protocol written
+  down first): a LoRA on Muse Glimmer, 998 right vs Spark Open 980 (p 0.0051), at about half its cost per letter.
+  Against Muse Spark (959) the pre-registered win stands as recorded, but it rests on our prompt's wording (below).
 - **Checked by people, not only models:** teachers rate the clips blind against the measurements (**pending**, Tue).
 - **Built for India:** a Hindi copy of the letter, the HOD's spoken notes, Supreme Court and IRC references.
 
@@ -42,11 +44,12 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
 
 ## Depth
 
-- Near-miss maths on drone ground truth (SinD, public sample): 66 conflicts, speed error 0.24 km/h mean, 0.91 km/h
-  at the 95th percentile ([README, SinD](README.md#validation-on-ground-truth-trajectories)). At $0 after downloading
-  SinD: `python3 validate_sind.py data/sind`.
-- SAM 3.1 end to end against DUT drone ground truth, after Muse Spark's review: 47 of 52 conflicts (crowd mode),
-  48 of 52 (vehicle crowd mode). [README, DUT](README.md#end-to-end-against-ground-truth-dut),
+- Near-miss maths on drone ground truth (SinD, public sample): 37 of 63 crossings within 3 s, speed error 0.24 km/h
+  mean, 0.91 km/h at the 95th percentile ([README, SinD](README.md#validation-on-ground-truth-trajectories)). At $0
+  after downloading SinD: `python3 validate_sind.py data/sind`.
+- SAM 3.1 end to end against DUT drone ground truth: 47 of 52 conflicts after Muse Spark's review (50 of 52 by
+  geometry alone; crowd mode), 48 of 52 (vehicle crowd mode).
+  [README, DUT](README.md#end-to-end-against-ground-truth-dut),
   [GATES.md, 30 Oct re-score](GATES.md#accuracy-fixes-merged-re-scored-at-0-fri-30-oct-2026). Not re-runnable by a
   judge: DUT has no licence, so its footage and our cache stay private; read the record.
 - Gates written before results ([GATES.md](GATES.md)): G1 passed; G3 passed on DUT only; the rest are pending.
@@ -61,9 +64,19 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
 ## Open Weights bonus
 
 - Fine-tuned Muse Glimmer judge (LoRA, training $0), pre-registered blind tests, labels frozen before any tuned reply
-  was read. **v4, 1,016 rows: 998 right vs Muse Spark 959 (p 7.2e-06) and Spark Open 980 (p 0.0051)**; 5/491 clean
-  letters flagged vs Spark 49/491. v3, 417 rows: 410 vs 396 (p 0.0066). [GATES.md v3 and v4 results](GATES.md);
-  replies and frozen labels: `provenance/glimmer-judge-lora-v3/` and `-v4/`; re-score: `python3 judge_v3_score.py v4`.
+  was read. **v4, 1,016 rows from 260 synthetic letters: 998 right vs Muse Spark Open 980 (28 vs 10, p 0.0051)**,
+  mostly lies Spark Open missed; clean rows flagged 5/491 vs Spark Open 4/491. In-distribution letters only.
+- Against Muse Spark (959 right, 49/491 clean rows flagged) the pre-registered result stands as recorded (57 vs 18,
+  p 7.2e-06), but 41 of Spark's 49 false alarms are only about ordinals ("second", "third") or the method sentence
+  (SAM tracking, road-plane geometry). Our judge prompt's "a number above one written in words" invites flagging
+  ordinals, and the tuned judge learned our reading from its training labels. Set those 41 aside and it is 16 vs 18,
+  p 0.86: not a win. v3 (417 rows, 410 vs 396, p 0.0066) has the same catch: 11 of Spark's 15 false alarms;
+  set aside, 8 vs 5, p 0.58.
+- Disagreements with the generator's labels were adjudicated by an AI agent (Claude, Anthropic), blind to the tuned
+  replies, under written standards; it only ever moved labels from clean to planted (v4 12, v3 5) or excluded a row
+  (v4 1).
+  [GATES.md v3 and v4 results](GATES.md); replies and frozen labels: `provenance/glimmer-judge-lora-v3/` and `-v4/`;
+  re-score: `python3 judge_v3_score.py v4`.
 - Muse Glimmer 30B self-hosted on Kaggle's free 2 x T4 from sha256-checked weights wrote the sample letter
   ([<removed-run-record>](<removed-run-record>)); writers table at $0: `python3 writers_table.py`.
 - Each closed-model step's open substitute, measured: [Spark-free mode](kaggle/open-weights.md#spark-free-mode).
@@ -86,6 +99,9 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
 
 - The gate is not filmed yet (Mon 2 Nov). G2, G4, G5, G6 and G8 have not run; G7 has no verdict before submission.
 - All ground truth (DUT, SinD) is top-down drone footage: no one is hidden. Phone-angle numbers are simulations.
+- The open-weights judge's win over Muse Spark rests on a prompt ambiguity (above); its win over Spark Open holds,
+  on synthetic, in-distribution letters only, and on the 260 letters as written it is level with Spark Open (251 vs
+  254, p 0.51).
 - A Muse judge reading Muse letters is not independent. The tuned judge missed all six real slips the letter writers
   made themselves in v4 (Spark caught six); a code check added afterwards (`pack.slips`, GATES.md) now catches 11 of
   the 12 slip rows with no false alarm, but it was built from those rows, so that is not a blind result.

@@ -178,8 +178,10 @@ did) and got 411/417. Training $0; every reply is committed.
 
 ### v4: 1,016 blind rows, pre-registered, against both Muse judges
 
-The v3 recipe retrained once and tested on 260 new letters (four rows each: as written, a template lie, a lie and a
-clean edit written by Muse Spark or Spark Open), labels frozen before any tuned reply was read (GATES.md "v4").
+The v3 recipe retrained once and tested on 1,016 rows from 260 new synthetic letters (four rows each: as written, a
+template lie, a lie and a clean edit written by Muse Spark or Spark Open), labels frozen before any tuned reply was read
+(GATES.md "v4"). Disagreements were adjudicated by an AI agent (Claude, Anthropic), blind to the tuned replies, under
+written standards; it only moved labels from clean to planted (12) or excluded a row (1).
 
 | 1,016 rows | Correct | Lies flagged | Clean letters flagged |
 |---|---|---|---|
@@ -187,9 +189,18 @@ clean edit written by Muse Spark or Spark Open), labels frozen before any tuned 
 | Muse Spark | 959 | 517/525 | 49/491 |
 | Muse Spark Open | 980 | 493/525 | 4/491 |
 
-Exact McNemar: against Muse Spark 57 vs 18, **p 7.2e-06**; against Spark Open 28 vs 10, **p 0.0051**. Weaker spot: it
-missed all six real slips the letter writers made themselves (Spark caught six, Spark Open three), so the code
-checks and a second judge stay. Re-score at $0: `python3 judge_v3_score.py v4`.
+Exact McNemar against Muse Spark Open: 28 vs 10, **p 0.0051**; 24 of the 28 are lies Spark Open missed (18
+model-written, 6 template), and it flags 5/491 clean rows to Spark Open's 4/491. On synthetic, in-distribution letters.
+
+Against Muse Spark the pre-registered result stands as recorded (57 vs 18, p 7.2e-06), but most of Spark's false
+alarms come from an ambiguity in our judge prompt: "a number above one written in words" invites flagging ordinals,
+and the tuned judge learned to read it our way from the training labels. 41 of Spark's 49 clean-row flags are only
+about ordinals ("second", "third", ...) or the method sentence (SAM tracking, road-plane geometry); set those aside
+and the comparison with Spark is 16 vs 18, p 0.86 (not a win). Rule and rows: GATES.md, v4 note of Sun 1 Nov.
+
+Weaker spot: it missed all six real slips the letter writers made themselves (Spark caught six, Spark Open three),
+and on the 260 letters as written it is level with Spark Open (251 vs 254, p 0.51), so the code checks and a second
+judge stay. Re-score at $0: `python3 judge_v3_score.py v4`.
 
 What one verdict costs, from the v4 replies' own token counts (1,048 rows each):
 
@@ -208,7 +219,7 @@ the last 6 vehicle-crowd pieces for about $0.02).
 | Component | Closed | Open substitute | Measured result |
 |---|---|---|---|
 | Letter writer | Muse Spark (1 try) | Spark Open on Fireworks; Glimmer 30B on Kaggle | number check passed on try 1; Glimmer on try 2 (writers table) |
-| Letter judge | Muse Spark: public bench 21/23 lies, 0/8 false alarms | Spark Open, effort low; Glimmer + our LoRA | tuned Glimmer v3 on 417 blind rows: **410 right, 0/173 false alarms** vs Spark 396 and 15/173 (p 0.007) |
+| Letter judge | Muse Spark: public bench 21/23 lies, 0/8 false alarms | Spark Open, effort low; Glimmer + our LoRA | tuned Glimmer v4 on 1,016 blind rows from 260 letters: **998 right, 5/491 false alarms** vs Spark Open 980 and 4/491 (p 0.0051); vs Spark 959 and 49/491 (p 7.2e-06 as pre-registered; 16 vs 18, p 0.86, with its ordinal and method-sentence flags set aside) |
 | Crop reviewer | Muse Spark: crowd 47/52, 3 extra; vehicle crowd 48/52, 4 extra | Spark Open (`REVIEW_MODEL_URL`, `validate_offline.py --reviewer open`) | crowd 49/52, 3 extra; vehicle crowd 48/52, 3 extra (none unreviewed); same keep/remove call as Spark on 51 of 53 and 45 of 46 pieces both judged |
 
 ## Runs still to come

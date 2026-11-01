@@ -19,7 +19,7 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 
 ## Verdict now
 
-The table above does not change; this one is updated as gates run. Last updated Thu 29 Oct 2026, before the
+The table above does not change; this one is updated as gates run. Last updated Sun 1 Nov 2026, 11:05 IST, before the
 rehearsal or the main recording was filmed.
 
 | Gate | Verdict now | Evidence |
@@ -27,11 +27,16 @@ rehearsal or the main recording was filmed.
 | G1 Tracks | passed 28 Oct (news CCTV) | the table above; 'Status (Wed 28 Oct, evening)' below |
 | G2 Metres | not tested on the pre-registered clip (assumed lengths) | waits for our footage: the case agent's tape check and `validate_gate.py`'s line distance |
 | G3 Conflicts | not tested on its own footage; passed on DUT drone ground truth (29 Oct); phone angle pending | 'Status update, third pass' below |
-| G4 Own footage | not run | due Sun 1 Nov |
+| G4 Own footage | not run | due date moves to Mon 2 Nov (note below) |
 | G5 Blind check | not run | no rater has labelled; rules in 'G5 Blind check, pre-registered' below |
 | G6 Speed | not run | no taped lines filmed yet; rules in 'G6 pre-registration' below |
 | G7 After the fix | no verdict before submission | the mark is written here on Mon 2 Nov night; rules in 'G7 After-fix pass mark' below |
 | G8 Second operator | not run | after G6's log and Monday's run; rules in 'G8 Second operator' below |
+
+**Due dates passed without a run (note added Sun 1 Nov 2026, 11:05 IST; the pre-registered table is unchanged).**
+G2's due date (Wed 28 Oct 22:00) passed without a run, and G4's and G6's (Sun 1 Nov 22:00) will too. All three move to
+Mon 2 Nov, because the gate recording moved to Mon 2 Nov: the college asked for Monday. Their pass conditions do not
+change. G5 and G8 keep Tue 3 Nov 22:00; G7's mark is still written on Mon 2 Nov night.
 
 ## G6 pre-registration (written Thu 29 Oct 2026, before the taped lines are filmed)
 
@@ -875,6 +880,29 @@ six and Spark Open three. On the 260 as-written letters v4 is ahead of Spark (25
 Spark Open (251 vs 254, p 0.51). So the tuned judge is better at planted and model-written lies and at not crying
 wolf, and misses subtle slips a writer makes; the code checks and a second judge stay in the pipeline.
 
+## Fine-tuned Glimmer judge v4: what the Muse Spark comparison rests on (Sun 1 Nov 2026; read after the result, not pre-registered)
+
+The result above stands as recorded. This note says what it rests on, at $0 from `labels-frozen.json` and the committed
+replies in `provenance/glimmer-judge-lora-v4/labels/`.
+- **Most of Muse Spark's false alarms come from our prompt's wording.** `pack.JUDGE_PROMPT` asks for "a number above
+  one written in words", which invites flagging ordinals; the training labels taught the tuned judge to read it our way
+  (ordinals are fine), and the adjudication followed the same reading. Of Spark's 49 flags on clean rows, 41 list only
+  ordinals ("second", "third", "fourth", "fifth"; 30 rows), only the method sentence ("SAM tracking", "road-plane
+  geometry"; 9 rows), or both (2 rows). Rule: a flag counts when every problem it lists names one of those ordinals
+  (and not "twice") or one of those two method phrases. The 8 that do not: rows 50, 74, 129, 531, 578, 739, 822, 848.
+  The tuned judge flagged none of the 41.
+- **Counterfactual, those 41 counted as not flagged:** tuned vs Muse Spark 16 vs 18, exact McNemar p 0.86 (998 vs
+  1,000 right; Spark's clean rows flagged 8/491). Not a win. The same rule on v3: 11 of Spark's 15 clean-row flags,
+  and 19 vs 5 becomes 8 vs 5, p 0.58.
+- **What holds:** the win over Muse Spark Open (28 vs 10, p 0.0051), where 24 of the 28 are lies Spark Open missed (18
+  model-written, 6 template); clean rows flagged 5/491 vs Spark Open's 4/491. All rows are synthetic and
+  in-distribution: 1,016 rows from 260 letters.
+- **Who adjudicated:** an AI agent (Claude, Anthropic), blind to the tuned replies, under written standards (the judge
+  prompt's rules and v3's standards). It only moved labels from clean to planted (v4 12, v3 5) or excluded a row (v4 1);
+  none from planted to clean.
+- A fair re-test would add "ordinals and method descriptions are fine" to the prompt and re-run both Muse judges; not
+  done.
+
 ## A code check for the writer's own slips (Sun 1 Nov 2026; built after reading v4, not pre-registered)
 
 v4 showed the tuned judge misses slips a letter writer makes itself. `pack.slips` now checks three of them in code
@@ -899,3 +927,6 @@ judge flagged them). It changes no result above: the judges' scores are as recor
 - Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: a "Verdict now" table added under the
   pre-registered one, and the README's first screen links to it. No pre-registered text changed.
 - Thu 29 Oct 2026, night: the three status sections were headed by times of day (evening, late night, early 29 Oct), but git shows all three arrived in the first commit, 91b8c9b, at 19:19 IST on Wed 28 Oct, so they are now headed first, second and third pass, written before that commit. Their text is unchanged.
+- Sun 1 Nov 2026, 11:05 IST: "Verdict now" got a new last-updated date, G4's evidence cell and a dated note on the due
+  dates that move to Mon 2 Nov; a dated note on what v4's Muse Spark comparison rests on was added after the v4 result.
+  No pre-registered text changed.
