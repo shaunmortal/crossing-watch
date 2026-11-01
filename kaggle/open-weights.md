@@ -191,6 +191,14 @@ Exact McNemar: against Muse Spark 57 vs 18, **p 7.2e-06**; against Spark Open 28
 missed all six real slips the letter writers made themselves (Spark caught six, Spark Open three), so the code
 checks and a second judge stay. Re-score at $0: `python3 judge_v3_score.py v4`.
 
+What one verdict costs, from the v4 replies' own token counts (1,048 rows each):
+
+| Judge | Tokens in / out per verdict | Per 1,000 letters checked |
+|---|---|---|
+| **Glimmer + our LoRA (v4)** | 1,414 / **26** | **about $2.90** at Fireworks' Glimmer sampling price ($1.96 / $4.88 per 1M); $0 on Kaggle's free T4s once the adapter can be served there |
+| Muse Spark Open | 1,502 / 891 | about $5.66 ($1.25 / $4.25 per 1M) |
+| Muse Spark | 1,366 / 2,030 | about $10.33 ($1.25 / $4.25 per 1M) |
+
 ## Spark-free mode
 
 Each closed-model step and its open-weights substitute, measured against the closed one (DUT: numbers only, crops stay
