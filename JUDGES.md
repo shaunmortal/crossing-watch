@@ -3,6 +3,16 @@
 Solo Indie entry: one phone video of a dangerous crossing becomes near-miss evidence and a letter the school signs.
 Each claim links to its proof. **Pending** = not done yet; what needs the gate recording (Mon 2 Nov) is `[PLACEHOLDER]`.
 
+## Only in Crossing Watch
+- **The whole loop, end to end:** a phone video becomes measured near-misses, a code-checked letter, the college's
+  signature and seal (Principal and HOD signed the project application on 31 Oct; 19 teachers signed in support), and
+  a filing with the road authority (**pending**, Tue 3 Nov).
+- **Measured against ground truth:** drone-tracked DUT clips, 47 of 52 near-misses found; SinD, 66 conflicts.
+- **Our own open-weights judge beats Meta's:** a LoRA on Muse Glimmer, tested blind on 1,016 letters by a protocol
+  written down first: 998 right vs Muse Spark 959 and Spark Open 980, at about a quarter of Spark's cost per letter.
+- **Checked by people, not only models:** teachers rate the clips blind against the measurements (**pending**, Tue).
+- **Built for India:** a Hindi copy of the letter, the HOD's spoken notes, Supreme Court and IRC references.
+
 ## 5-minute path
 
 1. `python3 test_cw.py` (Python 3.11+ and ffmpeg; about 30 s, no key, no video) and `python3 pack.py sample
