@@ -1,0 +1,90 @@
+{
+ "team": "Run by the author on the author's own Kaggle account (free 2 x T4).",
+ "notebook": "kaggle/glimmer-letter.ipynb, version 3, on our gate (cw-gate)",
+ "code": {
+  "git_sha": "394a79729e3e469c5a4d405fbe252d850cc8b8b5",
+  "pack_py_sha256": "cbed9c14cdad6f1ca776449aa77847b05fccf0153e0f1c988901054ecea7123b"
+ },
+ "nvidia_smi": "Mon Nov  2 13:34:38 2026       \n+-----------------------------------------------------------------------------------------+\n| NVIDIA-SMI 580.178.04             Driver Version: 580.178.04     CUDA Version: 13.0     |\n+-----------------------------------------+------------------------+----------------------+\n| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |\n| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |\n|                                         |                        |               MIG M. |\n|=========================================+========================+======================|\n|   0  Tesla T4                       Off |   00000000:00:04.0 Off |                    0 |\n| N/A   57C    P8             14W /   70W |       0MiB /  15360MiB |      0%      Default |\n|                                         |                        |                  N/A |\n+-----------------------------------------+------------------------+----------------------+\n|   1  Tesla T4                       Off |   00000000:00:05.0 Off |                    0 |\n| N/A   62C    P8             13W /   70W |       0MiB /  15360MiB |      0%      Default |\n|                                         |                        |                  N/A |\n+-----------------------------------------+------------------------+----------------------+\n\n+-----------------------------------------------------------------------------------------+\n| Processes:                                                                              |\n|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |\n|        ID   ID                                                               Usage      |\n|=========================================================================================|\n|  No running processes found                                                             |\n+-----------------------------------------------------------------------------------------+\n",
+ "llama_cpp": {
+  "build_info": "b1-2e0d86b",
+  "args": [
+   "-m",
+   "/tmp/glimmer/Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf",
+   "--mmproj",
+   "/tmp/glimmer/mmproj-Muse-Glimmer-30B-Q4_K_M.gguf",
+   "-ngl",
+   "99",
+   "--split-mode",
+   "layer",
+   "--jinja",
+   "--port",
+   "8080",
+   "-np",
+   "1",
+   "--chat-template-kwargs",
+   "{\"reasoning_strength\": \"medium\"}",
+   "--temp",
+   "1.0",
+   "--top-p",
+   "0.95",
+   "--top-k",
+   "64",
+   "--min-p",
+   "0",
+   "-c",
+   "32768"
+  ],
+  "n_ctx_slot": 32768,
+  "sampling": {
+   "temperature": 1.0,
+   "top_k": 64,
+   "top_p": 0.949999988079071,
+   "min_p": 0.0
+  }
+ },
+ "model": {
+  "repo": "meta-models/Muse-Glimmer-30B-GGUF",
+  "revision": "b44f1072cf75e918a1b82a3a17b45c4389b076e7",
+  "sha256_checked": {
+   "Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf": "4cc57c0f51040a226e5a72cc47b7613f7772950e460a665f7083de89f183f60e",
+   "mmproj-Muse-Glimmer-30B-Q4_K_M.gguf": "f48b452316f9b213758e8659444029b961a24a07f99a1abb2a9f88b06f7c00c6"
+  }
+ },
+ "elapsed_s": {
+  "built": 1679,
+  "downloaded": 1852,
+  "server_ready": 1932,
+  "letter_written": 2238
+ },
+ "pack_py_s": 276,
+ "street_photo_sent": false,
+ "letter": {
+  "writer": "Muse Glimmer 30B (open weights, self-hosted)",
+  "fix": "raised zebra crossing with guardrails leading to the crossing",
+  "sha256": "a49a4c70e4049fe5a811ee016a1ed0f5388be2861d954bd61c94c10b335aed69",
+  "timings": {
+   "cache_n": 0,
+   "prompt_n": 1572,
+   "prompt_ms": 4272.494,
+   "prompt_per_token_ms": 2.7178715012722643,
+   "prompt_per_second": 367.93498130131957,
+   "predicted_n": 3672,
+   "predicted_ms": 271085.952,
+   "predicted_per_token_ms": 73.84526069190956,
+   "predicted_per_second": 13.541830452357784
+  },
+  "usage": {
+   "completion_tokens": 3672,
+   "prompt_tokens": 1572,
+   "total_tokens": 5244,
+   "prompt_tokens_details": {
+    "cached_tokens": 0
+   }
+  },
+  "judged_by": null,
+  "tries": 1,
+  "unmeasured": [],
+  "unsupported": []
+ }
+}
