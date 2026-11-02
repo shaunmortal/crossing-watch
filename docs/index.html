@@ -28,11 +28,23 @@ body { color: var(--ink); font-family: var(--sans); line-height: 1.5; -webkit-fo
 a { color: inherit; }
 ::selection { background: var(--ink); color: var(--paper); }
 
-/* ── the film: fixed, looping, never scrolls away ── */
-.film { position: fixed; z-index: 1; top: 50%; right: max(3vw, calc(50% - 640px)); width: min(44vw, 760px); aspect-ratio: 16 / 9; translate: 0 -50%;
-  border-radius: 18px; overflow: hidden; background: #0b0b0d; box-shadow: 0 30px 80px rgba(23, 24, 28, .28), 0 0 0 1px rgba(23, 24, 28, .08); }
-.film video { display: block; width: 100%; height: 100%; object-fit: cover; }
-.film .label { position: absolute; left: 12px; bottom: 12px; padding: 6px 9px; border-radius: 6px; background: rgba(23, 24, 28, .62); color: #fff; font: 500 9.5px / 1 var(--mono); letter-spacing: .18em; text-transform: uppercase; backdrop-filter: blur(6px); }
+/* ── the film: the first screen, full-bleed, looping; the title sits on it ── */
+.hero { position: relative; height: 100svh; min-height: 560px; overflow: hidden; background: #0b0b0d; color: #fff; }
+.hero video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.hero::after { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(11, 11, 13, .35), rgba(11, 11, 13, 0) 30%, rgba(11, 11, 13, .25) 60%, rgba(11, 11, 13, .88) 100%); content: ""; }
+.hero-text { position: absolute; z-index: 2; right: 28px; bottom: 56px; left: 28px; max-width: 980px; margin: 0 auto; }
+.hero-text .kicker { color: rgba(255, 255, 255, .78); }
+.hero-text .kicker::before { background: #fff; }
+.hero-text h1 { margin: 16px 0 14px; max-width: 900px; color: #fff; font: 500 clamp(38px, 5.6vw, 74px) / 1.02 var(--display); letter-spacing: -.025em; text-shadow: 0 2px 30px rgba(0, 0, 0, .5); }
+.hero-text h1 em { color: #ff9a86; }
+.hero-text .dek { max-width: 620px; color: rgba(255, 255, 255, .86); font-size: 17px; text-shadow: 0 1px 14px rgba(0, 0, 0, .6); }
+.hero-text .dek b { color: #fff; }
+.hero-text .btn { border-color: rgba(255, 255, 255, .7); color: #fff; }
+.hero-text .btn.fill { background: #fff; color: var(--ink); border-color: #fff; }
+.hero-text .btn:hover { background: #fff; color: var(--ink); }
+.hero .label { position: absolute; z-index: 2; top: 80px; right: 28px; padding: 6px 9px; border-radius: 6px; background: rgba(11, 11, 13, .55); color: #fff; font: 500 9.5px / 1 var(--mono); letter-spacing: .18em; text-transform: uppercase; backdrop-filter: blur(6px); }
+.hero .cue { position: absolute; z-index: 2; left: 50%; bottom: 18px; translate: -50% 0; color: rgba(255, 255, 255, .7); font: 400 10px / 1 var(--mono); letter-spacing: .24em; text-transform: uppercase; animation: cue 2.4s ease-in-out infinite; }
+@keyframes cue { 0%, 100% { opacity: .5; translate: -50% 0; } 50% { opacity: 1; translate: -50% 5px; } }
 
 /* ── the bot: in the corner, awake ── */
 .bot { position: fixed; z-index: 40; left: -12px; bottom: -8px; width: 150px; pointer-events: none; animation: bob 5s ease-in-out infinite; filter: drop-shadow(0 12px 18px rgba(23, 24, 28, .25)); }
@@ -45,15 +57,17 @@ a { color: inherit; }
 @media (prefers-reduced-motion: reduce) { .bot { animation: none; } .bot .lid { animation: none; } }
 
 /* ── the page ── */
-.top { position: sticky; z-index: 30; top: 0; display: flex; align-items: center; justify-content: space-between; height: 64px; padding: 0 28px; background: rgba(247, 244, 238, .82); border-bottom: 1px solid var(--rule); backdrop-filter: blur(10px); }
+.top { position: fixed; z-index: 30; top: 0; right: 0; left: 0; display: flex; align-items: center; justify-content: space-between; height: 64px; padding: 0 28px; color: #fff; mix-blend-mode: difference; }
+.top .mark, .top .nav a { color: #fff; }
+.top .nav .gh { border-color: #fff; }
 .mark { font: 600 20px / 1 var(--display); letter-spacing: -.01em; text-decoration: none; }
-.mark i { font-style: normal; color: var(--red); }
+.mark i { font-style: normal; color: #ff9a86; }
 .nav { display: flex; gap: 22px; align-items: center; }
 .nav a { color: var(--muted); font: 500 11px / 1 var(--mono); letter-spacing: .14em; text-decoration: none; text-transform: uppercase; }
 .nav a:hover { color: var(--ink); }
 .nav .gh { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--ink); border-radius: 999px; color: var(--ink); }
 .nav .gh svg { width: 14px; height: 14px; fill: currentColor; }
-.col { position: relative; z-index: 2; width: min(600px, calc(50% - 60px)); margin: 0 auto 0 max(170px, calc(50% - 640px)); padding: 60px 0 120px; }
+.col { position: relative; z-index: 2; width: min(720px, calc(100% - 56px)); margin: 0 auto; padding: 24px 0 140px; }
 .kicker { display: flex; gap: 12px; align-items: center; color: var(--muted); font: 500 11px / 1 var(--mono); letter-spacing: .18em; text-transform: uppercase; }
 .kicker::before { width: 26px; height: 1px; background: var(--ink); content: ""; }
 h1 { margin: 22px 0 18px; font: 500 clamp(40px, 5.2vw, 70px) / 1.02 var(--display); letter-spacing: -.025em; font-variation-settings: "opsz" 144; }
@@ -102,14 +116,10 @@ code { padding: 2px 6px; border-radius: 4px; background: var(--paper-2); font: 5
 .r.in { opacity: 1; translate: 0 0; }
 .foot { margin-top: 70px; padding-top: 22px; border-top: 1px solid var(--rule); color: var(--muted); font: 400 12px / 1.7 var(--mono); }
 .foot a { color: var(--ink); }
-@media (max-width: 1080px) {
-  .film { right: 3vw; width: 46vw; }
-  .col { width: calc(50% - 50px); margin-left: 4vw; }
-}
 @media (max-width: 860px) {
-  .film { position: sticky; top: 64px; right: auto; left: 0; width: 100%; translate: 0 0; border-radius: 0; box-shadow: none; z-index: 1; }
-  .film .label { font-size: 8.5px; }
-  .col { width: 100%; margin: 0; padding: 28px 20px 150px; background: var(--paper); border-radius: 18px 18px 0 0; box-shadow: 0 -10px 30px rgba(23, 24, 28, .12); }
+  .hero-text { right: 20px; bottom: 44px; left: 20px; }
+  .hero .label { top: 72px; right: 16px; }
+  .col { width: calc(100% - 40px); padding-bottom: 150px; }
   .top { padding: 0 20px; }
   .nav a:not(.gh) { display: none; }
   .bot { width: 92px; left: auto; right: -6px; bottom: -4px; }
@@ -123,18 +133,21 @@ code { padding: 2px 6px; border-radius: 4px; background: var(--paper-2); font: 5
   <nav class="nav"><a href="#c04">The near-miss</a><a href="#c06">The evidence</a><a href="#c09">Open weights</a>
     <a class="gh" href="https://github.com/shaunmortal/crossing-watch"><svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a></nav></header>
 
-<aside class="film" aria-label="Illustrated film: the student, the crossing, the near-miss, the phone, the report, the college, the fix">
-  <video id="film" src="film/story.mp4" poster="film/poster.jpg" autoplay muted loop playsinline preload="metadata"></video>
+<section class="hero" id="top" aria-label="Illustrated film: before, the complaint, the fix, after">
+  <video id="film" src="film/story.mp4" poster="film/poster.jpg" autoplay muted loop playsinline preload="auto"></video>
   <span class="label">Illustrated film · not footage</span>
-</aside>
+  <div class="hero-text">
+    <div class="kicker">Bhopal · LNCT Excellence gate · 2 November 2026</div>
+    <h1>Sadak ka khatra, <em>naap ke,</em> saboot ke saath.</h1>
+    <p class="dek">Outside every school and college in India, people cross a road where vehicles pass close and fast. <b>Crossing Watch turns one phone video into the evidence a college can sign and a government can act on.</b></p>
+    <div class="ctas"><a class="btn fill" href="#c04">See the near-miss ↓</a><a class="btn" href="https://github.com/shaunmortal/crossing-watch">Read the code</a></div>
+  </div>
+  <div class="cue">Scroll ↓</div>
+</section>
 <div class="bot" aria-hidden="true"><img src="bot.png" alt=""><span class="lid l"></span><span class="lid r"></span></div>
 
-<main class="col" id="top">
-  <div class="kicker">Bhopal · LNCT Excellence gate · 2 November 2026</div>
-  <h1>Sadak ka khatra, <em>naap ke,</em> saboot ke saath.</h1>
-  <p class="dek">Outside every school and college in India, people cross a road where vehicles pass close and fast. The school wants a crossing; the road belongs to the government; permission needs evidence. <b>Crossing Watch turns one phone video into that evidence</b>: measured near-misses, a map in metres, and a letter whose every number is checked by code.</p>
-  <div class="ctas"><a class="btn fill" href="#c04">See the near-miss ↓</a><a class="btn" href="https://github.com/shaunmortal/crossing-watch">Read the code</a></div>
-  <div class="facts r">
+<main class="col">
+  <div class="facts r" style="margin-top:36px">
     <div><b>80</b><span>people crossed in 8.6 min</span></div>
     <div><b>55</b><span>moving vehicles</span></div>
     <div><b class="hot">2</b><span>serious near-misses</span></div>
