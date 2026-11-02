@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="350" height="84" viewBox="0 0 350 84" role="img" aria-label="DRONE GROUND TRUTH · DUT: 47 of 52 near-misses found">
+  <rect x="1" y="1" width="348" height="82" rx="10" fill="#fbf8f2" stroke="#e3dccd" stroke-width="2"/>
+  <rect x="5" y="5" width="340" height="74" rx="7" fill="none" stroke="#efe9dd"/>
+  <g transform="translate(18 18)"><rect x="0" y="4" width="48" height="40" rx="6" fill="#121314"/><rect x="6" y="10" width="5" height="28" fill="#f6f3ec"/><rect x="15" y="10" width="5" height="28" fill="#f6f3ec"/><rect x="24" y="10" width="5" height="28" fill="#f6f3ec"/><rect x="33" y="10" width="5" height="28" fill="#f6f3ec"/><rect x="42" y="10" width="5" height="28" fill="#f6f3ec"/><circle cx="40" cy="10" r="6" fill="#e5482f"/></g>
+  <text x="76" y="35" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="9.5" font-weight="700" letter-spacing="0.9" fill="#e5482f">DRONE GROUND TRUTH · DUT</text>
+  <text x="76" y="57" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="16" font-weight="600" fill="#17181c">47 of 52 near-misses found</text>
+</svg>

@@ -1,16 +1,121 @@
-# Crossing Watch
+<div align="center">
 
-Near-miss evidence for a dangerous crossing, from one phone video.
+<sub><b>META GLOBAL AI DEVELOPER HACKATHON 2026 · INDIE TRACK · SOLO ENTRY · BHOPAL, INDIA</b></sub>
 
-**For judges:** [5-minute map](JUDGES.md) · **Demo (3 min):** GATE-TBD · **Evidence page:** GATE-TBD · **Release:** GATE-TBD · **X post:** GATE-TBD
+# 🚸 Crossing Watch
 
-GATE-TBD: one blurred StroMotion still from Monday's run (`event1-strobe.jpg`), checked by eye.
+### One phone video in. Proof the road authority can act on, out.
+**सड़क का ख़तरा · नाप के · सबूत के साथ**
 
-**For** a college principal who knows the gate is dangerous and has no data. **Out:** clips with every tracked head and number
-plate blurred, a map in road metres, each vehicle's speed and the adult death risk at it, a letter whose every number
-is code-checked, and the fix drawn onto the real street. Solo entry, all work from 28 Oct 2026 ([declarations](#declarations)).
+<img src="docs/readme/card-hackathon.svg" height="76" alt="Meta Global AI Developer Hackathon 2026, Indie track entry"> <a href="OPEN_WEIGHTS.md"><img src="docs/readme/card-openweights.svg" height="76" alt="Open weights: Muse Glimmer 30B fine-tuned, served, 3 of 3 blind tests"></a> <a href="#end-to-end-against-ground-truth-dut"><img src="docs/readme/card-truth.svg" height="76" alt="Drone ground truth: 47 of 52 near-misses found"></a>
 
-**Six Meta models and what each did** (the DUT and bench numbers re-checked at $0: [GATES.md](GATES.md#the-readmes-first-screen-numbers-re-checked-at-0-thu-29-oct-2026)):
+**English** · [हिंदी (website)](https://crossingwatch.xyz/?lang=hi)
+
+<a href="https://crossingwatch.xyz"><img src="https://img.shields.io/badge/Website-crossingwatch.xyz-f5a623?style=for-the-badge&labelColor=121314&logo=googlechrome&logoColor=white" alt="Website: crossingwatch.xyz"></a> <a href="#-demo"><img src="https://img.shields.io/badge/Demo-video-e5482f?style=for-the-badge&labelColor=121314&logo=youtube&logoColor=white" alt="Demo: video"></a> <a href="JUDGES.md"><img src="https://img.shields.io/badge/Judges-5--minute%20map-2fa36b?style=for-the-badge&labelColor=121314&logo=readthedocs&logoColor=white" alt="Judges: 5-minute map"></a> <a href="OPEN_WEIGHTS.md"><img src="https://img.shields.io/badge/Open%20weights-one%20page-2fa36b?style=for-the-badge&labelColor=121314&logo=huggingface&logoColor=white" alt="Open weights: one page"></a>
+
+<img src="https://img.shields.io/badge/Built%20with%20Meta-SAM%203.1-f5a623?style=for-the-badge&labelColor=121314&logo=meta&logoColor=white" alt="Built with Meta: SAM 3.1"> <img src="https://img.shields.io/badge/Meta-Muse%20Spark-f5a623?style=for-the-badge&labelColor=121314&logo=meta&logoColor=white" alt="Meta: Muse Spark"> <img src="https://img.shields.io/badge/Meta-Muse%20Image-f5a623?style=for-the-badge&labelColor=121314&logo=meta&logoColor=white" alt="Meta: Muse Image"> <img src="https://img.shields.io/badge/Meta-Muse%20Wonder-f5a623?style=for-the-badge&labelColor=121314&logo=meta&logoColor=white" alt="Meta: Muse Wonder">
+
+<img src="https://img.shields.io/badge/Open%20weights-Muse%20Glimmer%2030B%20%C2%B7%20fine--tuned-2fa36b?style=for-the-badge&labelColor=121314&logo=meta&logoColor=white" alt="Open weights: Muse Glimmer 30B · fine-tuned"> <img src="https://img.shields.io/badge/Open%20weights-Muse%20Spark%20Open-2fa36b?style=for-the-badge&labelColor=121314&logo=meta&logoColor=white" alt="Open weights: Muse Spark Open">
+
+<img src="https://img.shields.io/badge/Python-3.11%2B-3a3d40?style=for-the-badge&labelColor=121314&logo=python&logoColor=white" alt="Python: 3.11+"> <img src="https://img.shields.io/badge/ffmpeg-video-3a3d40?style=for-the-badge&labelColor=121314&logo=ffmpeg&logoColor=white" alt="ffmpeg: video"> <img src="https://img.shields.io/badge/Kaggle-2%20%C3%97%20T4-3a3d40?style=for-the-badge&labelColor=121314&logo=kaggle&logoColor=white" alt="Kaggle: 2 × T4"> <img src="https://img.shields.io/badge/Fireworks-H200%20serving-3a3d40?style=for-the-badge&labelColor=121314&logo=fireworksai&logoColor=white" alt="Fireworks: H200 serving"> <img src="https://img.shields.io/badge/Three.js-website-3a3d40?style=for-the-badge&labelColor=121314&logo=threedotjs&logoColor=white" alt="Three.js: website"> <img src="https://img.shields.io/badge/GSAP-motion-3a3d40?style=for-the-badge&labelColor=121314&logo=greensock&logoColor=white" alt="GSAP: motion">
+
+Near-miss evidence for a dangerous school or college crossing. **Meta SAM 3.1** tracks every person and vehicle,<br>
+code measures each near-miss in road metres, and **Muse Spark** writes a letter whose every number is checked.
+
+<table>
+<tr>
+<td align="center" width="33%">
+
+### 📱 1. Film
+One phone over the road, a tape measure and 8 sheets of A4.
+
+</td>
+<td align="center" width="33%">
+
+### 📏 2. Measure
+SAM 3.1 tracks everyone; code turns pixels into road metres and finds every near-miss.
+
+</td>
+<td align="center" width="33%">
+
+### 📄 3. Prove
+Muse Spark writes the letter; code and two judges check it; the college sends it.
+
+</td>
+</tr>
+</table>
+
+<img src="docs/story/03-nearmiss.jpg" width="100%" alt="Real footage from our college gate, faces blurred: a person and a motorcycle reach the same spot, post-encroachment time 0.0 s">
+<p><sub><b>Real footage from our college gate, faces blurred.</b> A person (cyan) and a motorcycle (red) reach the same spot at the same instant: post-encroachment time <b>0.0 s</b>, motorcycle at <b>18.7 km/h</b>.</sub></p>
+
+<br><br>
+
+<sub>Every line of code, every measurement and every image here was made during the hackathon, from 28 Oct 2026 ([declarations](#declarations)).</sub>
+
+</div>
+
+---
+
+## 📑 Contents
+
+[The problem](#-the-problem) · [Results on our gate](#-results-on-our-gate) · [Demo](#-demo) · [Pipeline](#-pipeline) · [Six Meta models](#-six-meta-models-each-doing-real-work) · [Screens](#-screens) · [Try it in one minute](#-try-it-in-one-minute) · [Check it yourself](#check-it-yourself) · [How it works](#how-it-works) · [Open weights](#open-weights-muse-glimmer-writes-the-letter) · [Case agent](#case-agent-it-stops-to-ask-for-a-tape-measure) · [Checking the checks](#checking-the-checks) · [Ground truth](#validation-on-ground-truth-trajectories) · [Limits](#limits-stated) · [Declarations](#declarations)
+
+## 🚨 The problem
+
+Outside schools and colleges everywhere, students cross between bikes, cars and buses every day. Road crashes kill about
+**1.19 million people a year** and are the **leading cause of death for people aged 5 to 29** ([WHO, Global status report
+on road safety 2023](https://www.who.int/publications/i/item/9789240086517)). Every school wants a speed breaker or a zebra
+crossing at its gate, and only the road authority can build one. The authority asks for proof. **Crossing Watch turns one
+phone video into that proof:** measured near-misses, blurred clips, and a letter the head of the college can sign.
+
+## 📊 Results on our gate
+
+<sub>LNCT Excellence main gate, Bhopal · Mon 2 Nov 2026, afternoon dismissal · one phone, 8.3 m up, over the highway</sub>
+
+| Measured | Value |
+|---|---|
+| ⏱️ Video | **8.6 minutes** on a taped 15 m stretch |
+| 🚶 Pedestrian crossings | **80** |
+| 🏍️ Moving vehicles | **55** · 85th-percentile speed **23.2 km/h** |
+| 🔴 Serious near-misses (PET < 1.5 s) | **2**: 0.0 s at 18.7 km/h, 0.9 s at 18.3 km/h |
+| 🟠 Close passes (1.5 to 3.0 s) | **3** |
+| 📏 Tape check (never used to calibrate) | video **15.0 m** · tape **15 m** |
+| 🛰️ Drone ground truth (DUT) | **47 of 52** near-misses found after Muse Spark's review |
+| 📄 The ask | a **painted zebra crossing** (no hump: college buses use this road) and **"College Zone 20 km/h"** signs |
+
+## 🎬 Demo
+
+GATE-TBD: the demo video link (2:40) and its thumbnail.
+
+## 🧭 Pipeline
+
+```mermaid
+flowchart LR
+  A["📱 One phone video<br/>+ 8 A4 sheets, taped"] --> B["SAM 3.1<br/>tracks people and vehicles"]
+  B --> C["Muse Spark<br/>reviews each person"]
+  C --> D["Road metres<br/>homography from the tape"]
+  D --> E["Near-misses<br/>PET · speed · death risk"]
+  E --> F["Case agent<br/>asks for the tape check"]
+  F --> G["Letter<br/>Muse Spark or Muse Glimmer"]
+  G --> H{"Code check<br/>+ two judges"}
+  H --> I["📄 Letter · evidence page<br/>· Muse Image fix"]
+  I --> J["🏛️ Head of department<br/>→ road authority"]
+```
+
+## 🧠 Six Meta models, each doing real work
+
+| Model | Job in Crossing Watch | Proof |
+|---|---|---|
+| **SAM 3.1** | Tracks every person and vehicle, frame by frame | 47 of 52 near-misses vs drone truth; speed error 0.16 km/h mean ([DUT](#end-to-end-against-ground-truth-dut)) |
+| **Muse Spark** | Reviews each person, runs the case agent, writes the letter, judges it | flagged 24 of 24 planted lies ([bench](#checking-the-checks)) |
+| **Muse Image** | Draws the fix onto the real, blurred street, only where people crossed | [how](#how-it-works) |
+| **Muse Wonder** | Listens around each near-miss for horns, brakes and shouts | heard brakes on our college clip, spectrogram agrees |
+| **Muse Glimmer 30B** · open weights | Wrote our real gate's letter on a free Kaggle GPU; our LoRA fine-tune judges letters | letter in **276 s, first try**; tuned judge **wins 3 of 3 pre-registered blind tests** vs Muse Spark Open ([one page](OPEN_WEIGHTS.md)) |
+| **Muse Spark Open** · open weights | Second judge of our real letter | no unsupported claim ([record](provenance/spark-open-fireworks-sample.json)) |
+
+<details>
+<summary><b>Every model's numbers in full</b></summary>
+
 - **SAM 3.1** tracks people and vehicles. Against DUT's top-down drone ground truth: 47 of 52 conflicts found after Muse Spark's review (50 of 52 by geometry alone; crowd mode); speed error 0.16 km/h mean, 0.55 km/h at the 95th percentile (vehicle crowd mode). [DUT](#end-to-end-against-ground-truth-dut), [30 Oct re-score](GATES.md#accuracy-fixes-merged-re-scored-at-0-fri-30-oct-2026)
 - **Muse Spark** reviews each person (after it: 48 of 52 in vehicle crowd mode, 1 fewer than the geometry's 49; 47 of 52 in crowd mode, 3 fewer than the geometry's 50; its "unclear keeps the person" and "a lone walker overrules not a person" rules were set after seeing DUT cases), writes the fix and the letter, and as judge flagged 24 of 24 planted lies and 1 of 8 clean letters (code alone: 4 of 24); a Muse judge is not independent of Muse letters. It also runs the [case agent](#case-agent-it-stops-to-ask-for-a-tape-measure), which stops to ask for a tape measure; one recorded run, on Spark Open with the sample. [bench](#checking-the-checks)
 - **Muse Image** draws the fix only inside the strip where people were measured crossing; every other pixel stays the real, blurred street (the whole photo when no path was measured). Nothing measured. [how](#how-it-works)
@@ -18,10 +123,26 @@ is code-checked, and the fix drawn onto the real street. Solo entry, all work fr
 - **Muse Glimmer 30B (open weights)**, self-hosted on Kaggle 2 x T4 from sha256-checked weights, wrote **our real gate's letter in 276 s on the first try**, every number passing the code check ([letter](kaggle/glimmer-gate-letter.txt)). Our free LoRA fine-tune of Glimmer **beats Muse Spark Open in three pre-registered blind tests** (p 0.005, 0.029, 0.0006) and, with our code check, beats Muse Spark on model-written slips (p 0.027); served on a Fireworks H200 it gives the same verdict on 1,499 of 1,501 rows; overall Muse Spark stays ahead; about a quarter of Spark's cost. [record](<removed-run-record>), [open weights, one page](OPEN_WEIGHTS.md)
 - **Muse Spark Open (open weights)** on Fireworks wrote the synthetic sample's letter in one try, 55.5 s, and is the second judge of our crossing's letter. [record](provenance/spark-open-fireworks-sample.json)
 
+
 **Our crossing** (LNCT Excellence main gate, Bhopal, Mon 2 Nov 2026 dismissal, filmed 8.3 m up from the highway): in 8.6 minutes on the taped 15 m stretch, 80 people crossed among 55 moving vehicles; 2 serious near-misses, one with a person and a motorcycle on the same spot at the same instant, and 3 close passes. The video read the held-out tape line as 15.0 m; the tape says 15 m. Letter by Muse Spark, checked by Muse Spark and Muse Spark Open; the head of department signs it Tue 3 Nov. **Filed:** only "filed, reference X" is ever written here.
 **Gates**, [pre-registered](GATES.md#verdict-now): G1 passed (news CCTV); G2 passed on our gate (15.0 m vs 15 m taped); G3 passed on DUT ground truth; G4 passed (our footage, end to end); G5, G6 and G8 not run yet; G7's mark is written.
 
-**Try it, no key and no video** (Python 3.11+ and ffmpeg; the fix and the letter need `MODEL_API_KEY` or `LETTER_MODEL_URL`):
+
+</details>
+
+## 🖼️ Screens
+
+<table>
+<tr>
+<td width="33%"><img src="docs/story/02-gate.jpg" alt="Our college gate, real photo"><br><sub><b>The gate.</b> Real photo, the road we measured.</sub></td>
+<td width="33%"><a href="docs/story/06-letter.jpg"><img src="docs/story/06-letter-top.jpg" alt="The letter for the head of department"></a><br><sub><b>The letter.</b> Every number code-checked, ready to sign.</sub></td>
+<td width="33%"><img src="docs/story/09-fix.jpg" alt="Muse Image draws the requested zebra crossing on the gate"><br><sub><b>The fix.</b> Muse Image draws what the letter asks for.</sub></td>
+</tr>
+</table>
+
+## ▶️ Try it in one minute
+
+No key and no video needed (Python 3.11+ and ffmpeg; the fix and the letter need `MODEL_API_KEY` or `LETTER_MODEL_URL`):
 ```
 python3 test_cw.py                        # self-checks, under a minute (Python 3.11+, ffmpeg)
 python3 pack.py sample sample/site.json   # the synthetic sample (made-up tracks) -> sample/index.html
