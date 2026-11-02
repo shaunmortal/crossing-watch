@@ -12,13 +12,13 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,700;1,9..144,300;1,9..144,500&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,700;1,9..144,300;1,9..144,500&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Devanagari:wght@400;500;600&family=Noto+Serif+Devanagari:wght@400;600&display=swap" rel="stylesheet">
 <style>
 /* Crossing Watch: asphalt, zebra white, saffron, signal red. The road's own colours. */
 :root {
   --asphalt: #121314; --asphalt-2: #1b1d1f; --kerb: #2a2d30; --zebra: #f6f3ec; --paper: #efe9dd;
   --saffron: #f5a623; --signal: #e5482f; --go: #2fa36b; --muted: #8a8f96; --ink: #121314;
-  --display: Fraunces, "Iowan Old Style", Georgia, serif; --sans: Inter, system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --display: Fraunces, "Noto Serif Devanagari", Georgia, serif; --sans: Inter, "Noto Sans Devanagari", system-ui, sans-serif; --mono: "IBM Plex Mono", "Noto Sans Devanagari", ui-monospace, monospace;
 }
 *, *::before, *::after { box-sizing: border-box; }
 html, body { min-width: 320px; margin: 0; background: var(--asphalt); color: var(--zebra); }
@@ -37,6 +37,8 @@ img { max-width: 100%; }
 .nav { display: flex; gap: 24px; align-items: center; }
 .nav a { font: 500 11px / 1 var(--mono); letter-spacing: .16em; text-decoration: none; text-transform: uppercase; }
 .nav .gh { padding: 9px 15px; border: 1px solid #fff; border-radius: 999px; }
+.nav .lang { background: none; color: #fff; font: 500 11px / 1 var(--mono); letter-spacing: .1em; cursor: pointer; }
+@media (max-width: 900px) { .nav .lang { display: inline-block !important; } }
 .cursor { position: fixed; z-index: 70; top: 0; left: 0; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: var(--saffron); pointer-events: none; transition: width .25s, height .25s, margin .25s, background .25s; mix-blend-mode: difference; }
 .cursor.big { width: 46px; height: 46px; margin: -23px 0 0 -23px; background: #fff; }
 @media (pointer: coarse) { .cursor { display: none; } }
@@ -194,33 +196,33 @@ footer a { color: var(--zebra); }
 <div class="progress" id="progress"></div>
 <div class="cursor" id="cursor" aria-hidden="true"></div>
 <header class="top"><a class="mark" href="#top">Crossing<b>.</b>Watch</a>
-  <nav class="nav"><a href="#nearmiss">The near-miss</a><a href="#how">How it works</a><a href="#open">Open weights</a><a class="gh" href="https://github.com/shaunmortal/crossing-watch">GitHub</a></nav></header>
+  <nav class="nav"><a href="#nearmiss" data-hi="बाल-बाल बचाव">The near-miss</a><a href="#how" data-hi="कैसे काम करता है">How it works</a><a href="#open" data-hi="ओपन वेट्स">Open weights</a><button class="gh lang" id="lang" type="button" aria-label="Switch language">हिंदी</button><a class="gh" href="https://github.com/shaunmortal/crossing-watch">GitHub</a></nav></header>
 
 <section class="hero" id="top" aria-label="Illustrated film: before, the complaint, the fix, after">
   <video src="film/story.mp4" poster="film/poster.jpg" autoplay muted loop playsinline preload="metadata"></video>
-  <span class="illus">Illustrated film · not footage</span>
+  <span class="illus" data-hi="चित्रित फ़िल्म · असली फ़ुटेज नहीं">Illustrated film · not footage</span>
   <div class="hero-text">
-    <span class="kick"><i></i>Bhopal · LNCT Excellence gate · 2 November 2026</span>
+    <span class="kick" data-hi="&lt;i&gt;&lt;/i&gt;भोपाल · LNCT एक्सीलेंस गेट · 2 नवंबर 2026"><i></i>Bhopal · LNCT Excellence gate · 2 November 2026</span>
     <h1 id="title"><span class="w"><span>Sadak</span></span> <span class="w"><span>ka</span></span> <span class="w"><span>khatra,</span></span> <span class="w"><span><em>naap</em></span></span> <span class="w"><span><em>ke,</em></span></span> <span class="w"><span>saboot</span></span> <span class="w"><span>ke</span></span> <span class="w"><span>saath.</span></span></h1>
-    <p class="dek rv">Outside every school and college in India, people cross a road where vehicles pass close and fast. <b>Crossing Watch turns one phone video into the evidence a college can sign and a government can act on.</b></p>
-    <div class="ctas rv"><a class="btn solid mag" href="#nearmiss">See the near-miss ↓</a><a class="btn mag" href="https://github.com/shaunmortal/crossing-watch">Read the code</a></div>
+    <p class="dek rv" data-hi="भारत के हर स्कूल और कॉलेज के बाहर लोग ऐसी सड़क पार करते हैं जहाँ गाड़ियाँ पास से और तेज़ निकलती हैं। &lt;b&gt;Crossing Watch एक फ़ोन वीडियो को ऐसे सबूत में बदलता है जिस पर कॉलेज हस्ताक्षर कर सके और सरकार कार्रवाई कर सके।&lt;/b&gt;">Outside every school and college in India, people cross a road where vehicles pass close and fast. <b>Crossing Watch turns one phone video into the evidence a college can sign and a government can act on.</b></p>
+    <div class="ctas rv"><a class="btn solid mag" href="#nearmiss" data-hi="बाल-बाल बचाव देखें ↓">See the near-miss ↓</a><a class="btn mag" href="https://github.com/shaunmortal/crossing-watch" data-hi="कोड देखें">Read the code</a></div>
   </div>
   <span class="cue" aria-hidden="true"></span>
 </section>
 
 <div class="marquee" aria-hidden="true"><div class="marquee-track">
-  <span>80 people crossed</span><span>55 moving vehicles</span><span><b>PET</b> 0.0 s</span><span>2 serious near-misses</span><span>15.0 m vs 15 m of tape</span><span>47 / 52 on drone truth</span><span>24 / 24 lies caught</span>
-  <span>80 people crossed</span><span>55 moving vehicles</span><span><b>PET</b> 0.0 s</span><span>2 serious near-misses</span><span>15.0 m vs 15 m of tape</span><span>47 / 52 on drone truth</span><span>24 / 24 lies caught</span>
+  <span data-hi="80 लोगों ने सड़क पार की">80 people crossed</span><span data-hi="55 चलती गाड़ियाँ">55 moving vehicles</span><span><b>PET</b> 0.0 s</span><span data-hi="2 गंभीर बाल-बाल बचाव">2 serious near-misses</span><span data-hi="15.0 मी. बनाम 15 मी. टेप">15.0 m vs 15 m of tape</span><span data-hi="ड्रोन सच पर 47 / 52">47 / 52 on drone truth</span><span data-hi="24 / 24 झूठ पकड़े">24 / 24 lies caught</span>
+  <span data-hi="80 लोगों ने सड़क पार की">80 people crossed</span><span data-hi="55 चलती गाड़ियाँ">55 moving vehicles</span><span><b>PET</b> 0.0 s</span><span data-hi="2 गंभीर बाल-बाल बचाव">2 serious near-misses</span><span data-hi="15.0 मी. बनाम 15 मी. टेप">15.0 m vs 15 m of tape</span><span data-hi="ड्रोन सच पर 47 / 52">47 / 52 on drone truth</span><span data-hi="24 / 24 झूठ पकड़े">24 / 24 lies caught</span>
 </div></div>
 
 <section class="light pad" id="gate">
   <span class="big-n" aria-hidden="true">01</span>
   <div class="wrap split">
     <div>
-      <div class="eyebrow rv">The gate</div>
-      <h2 class="rv">Every afternoon, <em>the same crossing.</em></h2>
-      <p class="lede rv">A service road under the highway. No zebra, no signal. At dismissal, students pour out of the gate into motorcycles, autos and buses. Everyone knows it is dangerous. <b>Nobody had a number.</b></p>
-      <div class="chips rv"><span>One phone</span><span>One tape measure</span><span>Twenty minutes</span></div>
+      <div class="eyebrow rv" data-hi="गेट">The gate</div>
+      <h2 class="rv" data-hi="हर दोपहर, &lt;em&gt;वही क्रॉसिंग।&lt;/em&gt;">Every afternoon, <em>the same crossing.</em></h2>
+      <p class="lede rv" data-hi="हाईवे के नीचे सर्विस रोड। न ज़ेबरा, न सिग्नल। छुट्टी के समय छात्र गेट से निकलकर सीधे बाइक, ऑटो और बसों के बीच आ जाते हैं। सब जानते हैं कि यह ख़तरनाक है। &lt;b&gt;किसी के पास आँकड़ा नहीं था।&lt;/b&gt;">A service road under the highway. No zebra, no signal. At dismissal, students pour out of the gate into motorcycles, autos and buses. Everyone knows it is dangerous. <b>Nobody had a number.</b></p>
+      <div class="chips rv"><span data-hi="एक फ़ोन">One phone</span><span data-hi="एक इंचटेप">One tape measure</span><span data-hi="बीस मिनट">Twenty minutes</span></div>
     </div>
     <figure class="shot" style="margin:0"><img data-src="story/02-gate.jpg" alt="Our college gate and the road in front of it, seen from the highway above" loading="lazy" decoding="async" width="1280" height="960"></figure>
   </div>
@@ -231,60 +233,60 @@ footer a { color: var(--zebra); }
 <section class="dark pad" id="nearmiss">
   <span class="big-n" aria-hidden="true">02</span>
   <div class="wrap">
-    <div class="eyebrow rv">The near-miss</div>
-    <h2 class="rv">A person and a motorcycle, <em>on the same spot, at the same instant.</em></h2>
+    <div class="eyebrow rv" data-hi="बाल-बाल बचाव">The near-miss</div>
+    <h2 class="rv" data-hi="एक व्यक्ति और एक मोटरसाइकिल, &lt;em&gt;एक ही जगह, एक ही पल में।&lt;/em&gt;">A person and a motorcycle, <em>on the same spot, at the same instant.</em></h2>
     <div class="pet" id="pet"><div class="pet-n"><span id="petN">3.0</span><small> s</small></div>
-      <p class="pet-meta">Post-encroachment time: the gap between a person and a vehicle reaching the same spot. Under 1.5 s is serious. This one had none. Motorcycle at 18.7 km/h.</p></div>
-    <figure class="shot" style="margin:46px 0 0"><span class="tagx">Near-miss · PET 0.0 s</span><img data-src="story/03-nearmiss.jpg" alt="StroMotion still of the near-miss from the real video" loading="lazy" decoding="async" width="1280" height="720"></figure>
-    <p class="cap">StroMotion still from the real video: the motorcycle every half second, then the person. Wider spacing means faster.</p>
+      <p class="pet-meta" data-hi="पोस्ट-एन्क्रोचमेंट टाइम (PET): किसी व्यक्ति और गाड़ी के एक ही जगह पहुँचने के बीच का अंतर। 1.5 सेकंड से कम गंभीर है। इसमें अंतर था ही नहीं। मोटरसाइकिल 18.7 किमी/घंटा पर।">Post-encroachment time: the gap between a person and a vehicle reaching the same spot. Under 1.5 s is serious. This one had none. Motorcycle at 18.7 km/h.</p></div>
+    <figure class="shot" style="margin:46px 0 0"><span class="tagx" data-hi="बाल-बाल बचाव · PET 0.0 s">Near-miss · PET 0.0 s</span><img data-src="story/03-nearmiss.jpg" alt="StroMotion still of the near-miss from the real video" loading="lazy" decoding="async" width="1280" height="720"></figure>
+    <p class="cap" data-hi="असली वीडियो से StroMotion तस्वीर: हर आधे सेकंड पर मोटरसाइकिल, फिर व्यक्ति। ज़्यादा दूरी यानी ज़्यादा रफ़्तार।">StroMotion still from the real video: the motorcycle every half second, then the person. Wider spacing means faster.</p>
   </div>
 </section>
 
 <section class="dark hs" id="how">
-  <div class="wrap hs-head"><div class="eyebrow rv">How it works</div><h2 class="rv">From a phone on the road <em>to a letter on the right desk.</em></h2></div>
+  <div class="wrap hs-head"><div class="eyebrow rv" data-hi="कैसे काम करता है">How it works</div><h2 class="rv" data-hi="सड़क पर एक फ़ोन से &lt;em&gt;सही मेज़ तक पहुँचे पत्र तक।&lt;/em&gt;">From a phone on the road <em>to a letter on the right desk.</em></h2></div>
   <div class="road-line" id="roadLine"></div>
   <div class="hs-track" id="track" style="margin-top:40px">
-    <article class="step tilt"><div class="n">01</div><h3>Film</h3><p>One phone, high up, and a tape measure. Eight sheets of A4 on the road turn pixels into metres. Two more lines 15 m apart are the check.</p><span class="chip">8 m × 7 m taped · 15 m held out</span></article>
-    <article class="step tilt"><div class="n">02</div><h3>Track</h3><p>Every person, motorcycle, auto, car and bus, followed frame by frame, asked for by name.</p><span class="chip">Meta SAM 3.1</span></article>
-    <article class="step tilt"><div class="n">03</div><h3>Measure</h3><p>Who reached the same spot, how many seconds apart, at what speed. A second model looks at each person and throws out riders and shadows.</p><span class="chip">Muse Spark · Muse Wonder</span></article>
-    <article class="step tilt"><div class="n">04</div><h3>Write</h3><p>A letter to the road authority from the measurements only. Code checks every number; legal quotes come from code; two judges read it.</p><span class="chip">Muse Spark · Muse Glimmer</span></article>
-    <article class="step tilt"><div class="n">05</div><h3>Sign &amp; file</h3><p>The Head of Department signs it for the college; it goes to the road's owner through CPGRAMS, with the evidence page and blurred clips.</p><span class="chip">3 November</span></article>
+    <article class="step tilt"><div class="n">01</div><h3 data-hi="फ़िल्माएँ">Film</h3><p data-hi="एक फ़ोन, ऊँचाई पर, और एक इंचटेप। सड़क पर चिपके आठ A4 काग़ज़ पिक्सेल को मीटर में बदलते हैं। 15 मी. दूर की दो और लाइनें जाँच के लिए हैं।">One phone, high up, and a tape measure. Eight sheets of A4 on the road turn pixels into metres. Two more lines 15 m apart are the check.</p><span class="chip" data-hi="8 मी. × 7 मी. टेप · 15 मी. जाँच के लिए अलग">8 m × 7 m taped · 15 m held out</span></article>
+    <article class="step tilt"><div class="n">02</div><h3 data-hi="ट्रैक करें">Track</h3><p data-hi="हर व्यक्ति, मोटरसाइकिल, ऑटो, कार और बस, फ़्रेम-दर-फ़्रेम, नाम लेकर।">Every person, motorcycle, auto, car and bus, followed frame by frame, asked for by name.</p><span class="chip">Meta SAM 3.1</span></article>
+    <article class="step tilt"><div class="n">03</div><h3 data-hi="नापें">Measure</h3><p data-hi="कौन किस जगह कितने सेकंड के अंतर से पहुँचा, किस रफ़्तार से। दूसरा मॉडल हर व्यक्ति को देखकर सवारों और परछाइयों को हटाता है।">Who reached the same spot, how many seconds apart, at what speed. A second model looks at each person and throws out riders and shadows.</p><span class="chip">Muse Spark · Muse Wonder</span></article>
+    <article class="step tilt"><div class="n">04</div><h3 data-hi="लिखें">Write</h3><p data-hi="सड़क प्राधिकरण को पत्र, सिर्फ़ नापे गए आँकड़ों से। कोड हर संख्या जाँचता है; क़ानूनी उद्धरण कोड से आते हैं; दो जज इसे पढ़ते हैं।">A letter to the road authority from the measurements only. Code checks every number; legal quotes come from code; two judges read it.</p><span class="chip">Muse Spark · Muse Glimmer</span></article>
+    <article class="step tilt"><div class="n">05</div><h3 data-hi="हस्ताक्षर और शिकायत">Sign &amp; file</h3><p data-hi="विभागाध्यक्ष कॉलेज की ओर से हस्ताक्षर करते हैं; पत्र सबूत पेज और धुंधली क्लिप के साथ CPGRAMS से सड़क के मालिक तक जाता है।">The Head of Department signs it for the college; it goes to the road's owner through CPGRAMS, with the evidence page and blurred clips.</p><span class="chip" data-hi="3 नवंबर">3 November</span></article>
   </div>
 </section>
 
 <section class="light pad" id="numbers">
   <span class="big-n" aria-hidden="true">03</span>
   <div class="wrap">
-    <div class="eyebrow rv">Measured, not guessed</div>
-    <h2 class="rv">8.6 minutes. <em>One dismissal.</em></h2>
+    <div class="eyebrow rv" data-hi="नापा हुआ, अंदाज़ा नहीं">Measured, not guessed</div>
+    <h2 class="rv" data-hi="8.6 मिनट। &lt;em&gt;एक छुट्टी।&lt;/em&gt;">8.6 minutes. <em>One dismissal.</em></h2>
     <div class="stats">
-      <div class="stat rv"><b data-to="80">0</b><span>people crossed the taped stretch</span></div>
-      <div class="stat rv"><b data-to="55">0</b><span>moving vehicles passed</span></div>
-      <div class="stat rv"><b class="hot" data-to="2">0</b><span>serious near-misses, plus 3 close passes</span></div>
-      <div class="stat rv"><b data-to="15.0" data-dec="1" data-suf=" m">0</b><span>read from the video, against 15 m of tape on a line never used to calibrate</span></div>
-      <div class="stat rv"><b data-to="47" data-suf=" / 52">0</b><span>near-misses found on top-down drone footage</span></div>
-      <div class="stat rv"><b data-to="24" data-suf=" / 24">0</b><span>planted lies caught by the letter judge</span></div>
+      <div class="stat rv"><b data-to="80">0</b><span data-hi="लोगों ने नापे गए हिस्से में सड़क पार की">people crossed the taped stretch</span></div>
+      <div class="stat rv"><b data-to="55">0</b><span data-hi="चलती गाड़ियाँ गुज़रीं">moving vehicles passed</span></div>
+      <div class="stat rv"><b class="hot" data-to="2">0</b><span data-hi="गंभीर बाल-बाल बचाव, और 3 करीबी पास">serious near-misses, plus 3 close passes</span></div>
+      <div class="stat rv"><b data-to="15.0" data-dec="1" data-suf=" m">0</b><span data-hi="वीडियो से पढ़ा, 15 मी. टेप के मुक़ाबले, उस लाइन पर जो कैलिब्रेशन में कभी नहीं ली गई">read from the video, against 15 m of tape on a line never used to calibrate</span></div>
+      <div class="stat rv"><b data-to="47" data-suf=" / 52">0</b><span data-hi="ड्रोन फ़ुटेज पर पकड़े गए बाल-बाल बचाव">near-misses found on top-down drone footage</span></div>
+      <div class="stat rv"><b data-to="24" data-suf=" / 24">0</b><span data-hi="पत्र-जज ने डाले गए झूठ पकड़े">planted lies caught by the letter judge</span></div>
     </div>
   </div>
 </section>
 
 <section class="dark pad" id="letter">
   <div class="wrap">
-    <div class="eyebrow rv">The letter</div>
+    <div class="eyebrow rv" data-hi="पत्र">The letter</div>
     <p class="quote" id="quote">"3 of 51 crossings had a moving vehicle through the same spot within 3 s of the person. 1 of 51 had a vehicle within 1.5 s. I request a raised zebra crossing with 20 km/h zone signs at this gate."</p>
-    <p class="quote-cap rv">Written by Muse Spark from the measurements only · every number checked by code · signed by the Head of Department for the college on 3 November · only "filed, reference X" is ever written here.</p>
+    <p class="quote-cap rv" data-hi="Muse Spark ने सिर्फ़ नापे गए आँकड़ों से लिखा · हर संख्या कोड से जाँची · 3 नवंबर को कॉलेज की ओर से विभागाध्यक्ष के हस्ताक्षर · यहाँ सिर्फ़ &quot;दर्ज, संदर्भ X&quot; ही लिखा जाएगा।">Written by Muse Spark from the measurements only · every number checked by code · signed by the Head of Department for the college on 3 November · only "filed, reference X" is ever written here.</p>
   </div>
 </section>
 
 <section class="light pad" id="fix">
   <span class="big-n" aria-hidden="true">04</span>
   <div class="wrap split">
-    <figure class="shot" style="margin:0"><span class="tagx" style="background:var(--go)">The fix · AI-drawn</span><img data-src="story/09-fix.jpg" alt="The gate road with a zebra crossing and speed breakers on both sides, drawn by Muse Image" loading="lazy" decoding="async" width="1448" height="1086"></figure>
+    <figure class="shot" style="margin:0"><span class="tagx" style="background:var(--go)" data-hi="समाधान · AI से बना">The fix · AI-drawn</span><img data-src="story/09-fix.jpg" alt="The gate road with a zebra crossing and speed breakers on both sides, drawn by Muse Image" loading="lazy" decoding="async" width="1448" height="1086"></figure>
     <div>
-      <div class="eyebrow rv">The fix</div>
-      <h2 class="rv">The crossing <em>we are asking for.</em></h2>
-      <p class="lede rv">A zebra crossing in front of the gate, a speed breaker on each side and 20 km/h zone signs, drawn by Muse Image so the college and the road authority can see what is asked for.</p>
-      <p class="lede rv" style="margin-top:14px">Then we film the same gate again. The pass mark is written before any fix exists: the drop counts only if a one-sided Fisher exact test finds both counts fell.</p>
+      <div class="eyebrow rv" data-hi="समाधान">The fix</div>
+      <h2 class="rv" data-hi="वो क्रॉसिंग &lt;em&gt;जो हम माँग रहे हैं।&lt;/em&gt;">The crossing <em>we are asking for.</em></h2>
+      <p class="lede rv" data-hi="गेट के सामने ज़ेबरा क्रॉसिंग, दोनों ओर स्पीड ब्रेकर और 20 किमी/घंटा ज़ोन के बोर्ड, Muse Image से बनाए गए ताकि कॉलेज और सड़क प्राधिकरण देख सकें कि क्या माँगा जा रहा है।">A zebra crossing in front of the gate, a speed breaker on each side and 20 km/h zone signs, drawn by Muse Image so the college and the road authority can see what is asked for.</p>
+      <p class="lede rv" style="margin-top:14px" data-hi="फिर हम उसी गेट को दोबारा फ़िल्माएँगे। पास-मार्क किसी भी बदलाव से पहले लिखा गया है: गिरावट तभी मानी जाएगी जब एकतरफ़ा फ़िशर टेस्ट में दोनों गिनतियाँ कम हों।">Then we film the same gate again. The pass mark is written before any fix exists: the drop counts only if a one-sided Fisher exact test finds both counts fell.</p>
     </div>
   </div>
 </section>
@@ -292,14 +294,14 @@ footer a { color: var(--zebra); }
 <section class="dark pad" id="open">
   <span class="big-n" aria-hidden="true">05</span>
   <div class="wrap">
-    <div class="eyebrow rv">Open weights</div>
-    <h2 class="rv">Meta's open models, <em>doing the real work.</em></h2>
-    <p class="lede rv">Muse Glimmer 30B wrote our real gate's letter on Kaggle's free T4s, first try. Our fine-tuned Glimmer judge beats Muse Spark Open in three pre-registered blind tests and was served live on Fireworks.</p>
+    <div class="eyebrow rv" data-hi="ओपन वेट्स">Open weights</div>
+    <h2 class="rv" data-hi="Meta के ओपन मॉडल, &lt;em&gt;असली काम करते हुए।&lt;/em&gt;">Meta's open models, <em>doing the real work.</em></h2>
+    <p class="lede rv" data-hi="Muse Glimmer 30B ने Kaggle के मुफ़्त T4 पर हमारे असली गेट का पत्र पहली ही बार में लिखा। हमारा फ़ाइन-ट्यून किया Glimmer जज तीन पहले से दर्ज ब्लाइंड टेस्ट में Muse Spark Open से आगे है, और Fireworks पर लाइव चलाया गया।">Muse Glimmer 30B wrote our real gate's letter on Kaggle's free T4s, first try. Our fine-tuned Glimmer judge beats Muse Spark Open in three pre-registered blind tests and was served live on Fireworks.</p>
     <div class="tiles">
-      <div class="tile tilt rv"><b>276 s</b><span>our gate's letter by Glimmer 30B, on 2 × T4</span></div>
-      <div class="tile tilt rv"><b>3 / 3</b><span>blind tests won against Muse Spark Open</span></div>
-      <div class="tile tilt rv"><b>1,499</b><span>of 1,501 verdicts the same, served live</span></div>
-      <div class="tile tilt rv"><b>¼</b><span>of Muse Spark's cost per letter</span></div>
+      <div class="tile tilt rv"><b>276 s</b><span data-hi="Glimmer 30B से हमारे गेट का पत्र, 2 × T4 पर">our gate's letter by Glimmer 30B, on 2 × T4</span></div>
+      <div class="tile tilt rv"><b>3 / 3</b><span data-hi="Muse Spark Open के ख़िलाफ़ जीते ब्लाइंड टेस्ट">blind tests won against Muse Spark Open</span></div>
+      <div class="tile tilt rv"><b>1,499</b><span data-hi="1,501 में से एक जैसे फ़ैसले, लाइव">of 1,501 verdicts the same, served live</span></div>
+      <div class="tile tilt rv"><b>¼</b><span data-hi="प्रति पत्र Muse Spark की लागत का">of Muse Spark's cost per letter</span></div>
     </div>
     <div class="chips rv"><span>Meta SAM 3.1</span><span>Muse Spark</span><span>Muse Wonder</span><span>Muse Image</span><span>Muse Glimmer</span><span>Muse Spark Open</span></div>
   </div>
@@ -307,12 +309,12 @@ footer a { color: var(--zebra); }
 
 <section class="end" id="try">
   <div class="wrap">
-    <h2 class="rv">One phone. One tape.<br><em>One afternoon.</em></h2>
-    <p class="lede rv" style="margin:18px auto 0">Any school or college in India can do this. Every number on this page re-checks from the repository at $0.</p>
-    <a class="btn mag rv" href="https://github.com/shaunmortal/crossing-watch">Try Crossing Watch →</a>
+    <h2 class="rv" data-hi="एक फ़ोन। एक टेप।&lt;br&gt;&lt;em&gt;एक दोपहर।&lt;/em&gt;">One phone. One tape.<br><em>One afternoon.</em></h2>
+    <p class="lede rv" style="margin:18px auto 0" data-hi="भारत का कोई भी स्कूल या कॉलेज यह कर सकता है। इस पेज की हर संख्या रिपॉज़िटरी से $0 में दोबारा जाँची जा सकती है।">Any school or college in India can do this. Every number on this page re-checks from the repository at $0.</p>
+    <a class="btn mag rv" href="https://github.com/shaunmortal/crossing-watch" data-hi="Crossing Watch आज़माएँ →">Try Crossing Watch →</a>
   </div>
 </section>
-<footer><span>Crossing Watch · solo entry, Meta Global AI Developer Hackathon 2026 · built 28 Oct to 4 Nov</span><a href="emblem.html">The measured moment, in 3D →</a></footer>
+<footer><span data-hi="Crossing Watch · Meta Global AI Developer Hackathon 2026 में एकल प्रविष्टि · 28 अक्टूबर से 4 नवंबर तक बना">Crossing Watch · solo entry, Meta Global AI Developer Hackathon 2026 · built 28 Oct to 4 Nov</span><a href="emblem.html" data-hi="नापा हुआ पल, 3D में →">The measured moment, in 3D →</a></footer>
 
 <div class="bot" aria-hidden="true"><img src="bot.png" alt=""><span class="lid l"></span><span class="lid r"></span></div>
 
@@ -324,6 +326,17 @@ footer a { color: var(--zebra); }
   const qa = new URLSearchParams(location.search).has("qa");
   const still = qa || matchMedia("(prefers-reduced-motion: reduce)").matches;
   const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  // English by default; हिंदी on request, remembered
+  const langBtn = $("#lang");
+  const setLang = (l) => {
+    $$("[data-hi]").forEach((el) => { if (el.dataset.en === undefined) el.dataset.en = el.innerHTML; el.innerHTML = l === "hi" ? el.dataset.hi : el.dataset.en; });
+    document.documentElement.lang = l; langBtn.textContent = l === "hi" ? "EN" : "हिंदी";
+    try { localStorage.setItem("cw-lang", l); } catch {}
+    if (window.ScrollTrigger) ScrollTrigger.refresh();
+  };
+  langBtn.addEventListener("click", () => setLang(document.documentElement.lang === "hi" ? "en" : "hi"));
+  let saved = new URLSearchParams(location.search).get("lang"); try { saved = saved || localStorage.getItem("cw-lang"); } catch {}
+  if (saved === "hi") setLang("hi");
 
   // lazy images: load as they near the screen, then un-blur
   const loadImg = (img) => { if (img.getAttribute("src")) return; img.onload = () => img.classList.add("loaded"); img.src = img.dataset.src; if (img.complete) img.classList.add("loaded"); };
