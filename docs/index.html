@@ -157,11 +157,11 @@ footer { padding: 32px 28px 40px 160px; color: var(--muted); font: 400 12px / 1.
 footer a { color: var(--zebra); }
 
 /* the bot, in the corner, awake */
-.bot { position: fixed; z-index: 45; left: -12px; bottom: -8px; width: 140px; pointer-events: none; animation: bob 5s ease-in-out infinite; filter: drop-shadow(0 12px 18px rgba(0, 0, 0, .35)); }
+.bot { position: fixed; z-index: 45; left: 0; bottom: -8px; width: 140px; pointer-events: none; animation: bob 5s ease-in-out infinite; filter: drop-shadow(0 12px 18px rgba(0, 0, 0, .35)); }
 .bot img { display: block; width: 100%; height: auto; }
 .bot .lid { position: absolute; background: #0d0d10; border-radius: 50%; scale: 1 0; animation: blink 4.6s ease-in-out infinite; }
-.bot .lid.l { left: 20%; top: 56%; width: 15%; height: 11%; rotate: -14deg; }
-.bot .lid.r { left: 54%; top: 63%; width: 16%; height: 9%; rotate: 14deg; animation-delay: .04s; }
+.bot .lid.l { left: -1%; top: 34.5%; width: 17.5%; height: 11.5%; }
+.bot .lid.r { left: 38%; top: 42.3%; width: 18.5%; height: 10.5%; animation-delay: .04s; }
 @keyframes blink { 0%, 90%, 100% { scale: 1 0; } 92%, 95% { scale: 1 1; } 93.5% { scale: 1 .2; } }
 @keyframes bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -6px; } }
 
@@ -186,7 +186,7 @@ footer a { color: var(--zebra); }
   .stat, .stat:nth-child(3n+2), .stat:nth-child(3n) { padding: 26px 14px; border-right: 0; }
   .stat:nth-child(odd) { border-right: 1px solid rgba(18, 19, 20, .15); }
   .tiles { grid-template-columns: 1fr 1fr; }
-  .bot { width: 92px; left: auto; right: -6px; }
+  .bot { width: 70px; }
   .big-n { right: 14px; }
   footer { padding-left: 20px; padding-bottom: 110px; }
 }
