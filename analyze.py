@@ -752,6 +752,13 @@ def main():
                                      top_down)
     if reviewed:  # same footage, same numbers: delete person-*.json for a fresh look
         print(f"Spark verdicts reused: {reused} of {reviewed}", flush=True)
+    by_eye = set(site.get("by_eye_not_pedestrians", ()))  # pieces a person ruled out on the evidence clips (GATES.md)
+    for e in events:
+        if e["person"] in by_eye:
+            e["review"] = {**(e.get("review") or {}), "is_person": False, "road_user": "not a pedestrian",
+                           "by_eye": True}
+    if by_eye:
+        print(f"checked by eye, not pedestrians: {', '.join(sorted(by_eye))}", flush=True)
     everyone, privacy, searched = list(person_boxes.values()), None, []
     # with no events this searches frame 0 only (one image): the street photo is still shown for the desire lines
     if person_concept not in crowded + list(switched) and full_requests(pieces, [(person_concept, grid)], frame_size)[0]:
