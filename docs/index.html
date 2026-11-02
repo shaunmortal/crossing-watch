@@ -5,277 +5,203 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Crossing Watch</title>
 <meta name="description" content="One phone video of a college gate in. Measured near-misses and a code-checked letter to the road authority out. Built on Meta SAM 3.1, Muse Spark and open-weights Muse Glimmer.">
-<meta name="theme-color" content="#050506">
+<meta name="theme-color" content="#f7f4ee">
 <meta property="og:title" content="Crossing Watch">
 <meta property="og:description" content="Sadak ka khatra, naap ke, saboot ke saath. One phone video. Measured near-misses. A letter the college signed.">
 <meta property="og:image" content="https://crossingwatch.xyz/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Space+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;0,9..144,600;1,9..144,300;1,9..144,500&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-/* Crossing Watch: silver on black. A film you scroll through, then the evidence it stands on. */
+/* Crossing Watch, day: paper and ink. The film loops in its own frame; the story reads beside it. */
 :root {
-  --void: #050506; --paper: #eef0f3; --silver: #c6cad1; --dim: #8d93a6; --line: rgba(238, 240, 243, .14);
-  --red: #ef4444; --amber: #f5b301;
-  --sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif; --serif: Cinzel, "Trajan Pro", Georgia, serif; --mono: "IBM Plex Mono", ui-monospace, monospace;
-  color-scheme: dark;
+  --paper: #f7f4ee; --paper-2: #efeae1; --ink: #17181c; --muted: #5d6068; --rule: #e1dbd0; --card: #fffdf9;
+  --red: #d6452c; --saffron: #e0a200; --green: #2f8f5b;
+  --display: Fraunces, "Iowan Old Style", Georgia, serif; --sans: Inter, system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, monospace;
+  color-scheme: light;
 }
 *, *::before, *::after { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-html, body { min-width: 320px; margin: 0; background: var(--void); }
-body { color: var(--paper); font-family: var(--sans); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
-::selection { background: var(--paper); color: #0b0c0d; }
+html, body { min-width: 320px; margin: 0; background: var(--paper); }
+body { color: var(--ink); font-family: var(--sans); line-height: 1.5; -webkit-font-smoothing: antialiased; }
 a { color: inherit; }
+::selection { background: var(--ink); color: var(--paper); }
 
-/* ── top bar and corner ── */
-.top { position: fixed; z-index: 30; top: 0; right: 0; left: 0; display: flex; align-items: center; justify-content: space-between; height: 64px; padding: 0 28px; }
-.mark { color: var(--paper); font: 700 14px / 1 var(--serif); letter-spacing: .3em; text-decoration: none; text-transform: uppercase; text-shadow: 0 1px 12px rgba(0, 0, 0, .6); }
-.nav { display: flex; gap: 24px; align-items: center; }
-.nav a { color: rgba(238, 240, 243, .78); font: 500 11px / 1 var(--mono); letter-spacing: .18em; text-decoration: none; text-transform: uppercase; text-shadow: 0 1px 10px rgba(0, 0, 0, .6); }
-.nav a:hover { color: #fff; }
-.gh { display: inline-flex; align-items: center; justify-content: center; width: 2.4rem; height: 2.4rem; border: 1px solid rgba(238, 240, 243, .35); border-radius: 50%; background: rgba(5, 5, 6, .35); color: rgba(238, 240, 243, .85); }
-.gh svg { width: 1rem; height: 1rem; fill: currentColor; }
-.progress { position: fixed; z-index: 31; top: 0; left: 0; height: 2px; width: 0; background: linear-gradient(90deg, var(--silver), #fff); box-shadow: 0 0 10px #fff; transition: width .1s linear; }
+/* ── the film: fixed, looping, never scrolls away ── */
+.film { position: fixed; z-index: 1; top: 50%; right: max(4vw, calc(50% - 600px)); height: min(86svh, 780px); aspect-ratio: 9 / 16; translate: 0 -50%;
+  border-radius: 18px; overflow: hidden; background: #0b0b0d; box-shadow: 0 30px 80px rgba(23, 24, 28, .28), 0 0 0 1px rgba(23, 24, 28, .08); }
+.film video { display: block; width: 100%; height: 100%; object-fit: cover; }
+.film .label { position: absolute; left: 12px; bottom: 12px; padding: 6px 9px; border-radius: 6px; background: rgba(23, 24, 28, .62); color: #fff; font: 500 9.5px / 1 var(--mono); letter-spacing: .18em; text-transform: uppercase; backdrop-filter: blur(6px); }
 
-/* ── the film: a tall scroll track with a sticky stage; the frame follows the scroll ── */
-.film { position: relative; height: 1100svh; }
-.stage { position: sticky; top: 0; height: 100svh; overflow: hidden; background: var(--void); }
-.bg, .fg { position: absolute; display: block; }
-.bg { inset: -8%; width: 116%; height: 116%; object-fit: cover; filter: blur(28px) saturate(1.1) brightness(.55); transform: translateZ(0); }
-.fg { top: 0; right: max(4vw, calc(50% - 560px)); height: 100%; aspect-ratio: 9 / 16; width: auto; object-fit: cover; box-shadow: 0 0 0 1px rgba(255, 255, 255, .06), 0 40px 120px rgba(0, 0, 0, .7); }
-.stage::after { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(5, 5, 6, .92) 0%, rgba(5, 5, 6, .55) 38%, rgba(5, 5, 6, 0) 62%), linear-gradient(180deg, rgba(5, 5, 6, .5), transparent 25%, transparent 70%, rgba(5, 5, 6, .75)); content: ""; pointer-events: none; }
-.grain { position: absolute; inset: 0; z-index: 3; opacity: .06; mix-blend-mode: soft-light; pointer-events: none;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") 0 0 / 160px 160px; }
-.illus { position: absolute; z-index: 4; right: max(4vw, calc(50% - 560px)); bottom: 22px; color: rgba(238, 240, 243, .6); font: 500 9.5px / 1 var(--mono); letter-spacing: .22em; text-transform: uppercase; }
-.hint { position: absolute; z-index: 4; left: 50%; bottom: 22px; translate: -50% 0; color: var(--dim); font: 400 10px / 1 var(--mono); letter-spacing: .24em; text-transform: uppercase; animation: hint 2.4s ease-in-out infinite; }
-@keyframes hint { 0%, 100% { opacity: .5; translate: -50% 0; } 50% { opacity: 1; translate: -50% 5px; } }
-.beats { position: absolute; z-index: 5; inset: 0; pointer-events: none; }
-.beat { position: absolute; top: 50%; left: max(5vw, calc(50% - 560px)); width: min(520px, 48vw); translate: 0 -50%; opacity: 0; transition: opacity .35s ease, transform .5s cubic-bezier(.16, 1, .3, 1); transform: translateY(14px); pointer-events: none; }
-.beat.on { opacity: 1; transform: translateY(0); pointer-events: auto; }
-.beat .num { display: flex; gap: 12px; align-items: baseline; margin-bottom: 14px; }
-.beat .num b { font: 700 22px / 1 var(--serif); }
-.beat .num span { color: var(--silver); font: 500 11px / 1 var(--mono); letter-spacing: .28em; text-transform: uppercase; }
-.beat h2 { margin: 0 0 12px; font: 400 clamp(28px, 3.6vw, 50px) / 1.08 var(--serif); letter-spacing: .01em; text-shadow: 0 2px 24px rgba(0, 0, 0, .6); }
-.beat h2 em { font-style: normal; color: var(--silver); }
-.beat p { margin: 0; max-width: 460px; color: rgba(238, 240, 243, .86); font: 400 15px / 1.65 var(--mono); text-shadow: 0 1px 12px rgba(0, 0, 0, .7); }
-.beat.hero { width: min(700px, 52vw); }
-.beat.hero h1, .beat.hero .rule, .beat.hero p.tag, .beat.hero p.sub { text-align: left; margin-left: 0; }
-.beat.hero h1 { margin: 0 0 12px; font: 700 clamp(28px, 4.6vw, 62px) / 1 var(--serif); letter-spacing: .22em; text-transform: uppercase; text-shadow: 0 0 30px rgba(232, 238, 248, .25), 0 2px 24px rgba(0, 0, 0, .7); }
-.beat.hero .rule { display: flex; gap: 10px; align-items: center; width: min(420px, 70vw); margin: 4px 0 14px; }
-.beat.hero .rule::before, .beat.hero .rule::after { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, rgba(238, 240, 243, .5) 35%, rgba(255, 255, 255, .85)); content: ""; }
-.beat.hero .rule::after { scale: -1 1; }
-.beat.hero .rule svg { width: 12px; height: 12px; fill: #fff; filter: drop-shadow(0 0 5px #fff); }
-.beat.hero p.tag { margin: 0 auto; color: var(--paper); font: 400 12px / 1.6 var(--mono); letter-spacing: .36em; text-transform: uppercase; word-spacing: .6em; }
-.beat.hero p.sub { margin: 14px auto 0; max-width: 520px; color: rgba(238, 240, 243, .8); font: 400 14px / 1.6 var(--mono); letter-spacing: 0; text-transform: none; }
-.card { margin-top: 18px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: rgba(8, 9, 12, .62); backdrop-filter: blur(14px); max-width: 440px; }
-.card.alert { border-color: rgba(239, 68, 68, .6); box-shadow: 0 0 44px rgba(239, 68, 68, .2); }
-.card.ok { border-color: rgba(34, 197, 94, .5); }
-.card .k { display: block; margin-bottom: 8px; color: var(--silver); font: 500 10px / 1 var(--mono); letter-spacing: .24em; text-transform: uppercase; }
-.card.alert .k { color: #ff8a8a; }
-.card b.n { display: block; margin: 0 0 4px; font: 400 36px / 1 var(--serif); }
-.card p { margin: 0; color: var(--dim); font: 400 12.5px / 1.55 var(--mono); }
-.card ul { margin: 2px 0 0; padding: 0; list-style: none; }
-.card li { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--line); color: var(--paper); font: 400 12.5px / 1.4 var(--mono); }
-.card li::before { flex: none; width: 15px; height: 15px; border-radius: 50%; border: 1px solid rgba(34, 197, 94, .8); color: #22c55e; font-size: 9.5px; line-height: 15px; text-align: center; content: "✓"; translate: 0 2px; }
-.card li.wait::before { border-color: rgba(245, 179, 1, .8); color: var(--amber); content: "·"; font-size: 18px; line-height: 13px; }
-.mini { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.mini div { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
-.mini b { display: block; font: 400 26px / 1 var(--serif); }
-.mini b.hot { color: #ff8a8a; }
-.mini span { color: var(--dim); font: 400 10.5px / 1.4 var(--mono); }
-.chip { display: inline-block; margin: 10px 6px 0 0; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; color: var(--silver); font: 500 10px / 1 var(--mono); letter-spacing: .1em; background: rgba(5, 5, 6, .4); }
-.btn { display: inline-flex; gap: 12px; align-items: center; margin-top: 22px; padding: 15px 26px; border: 1px solid rgba(226, 232, 245, .55); border-radius: 999px; color: #fff; font: 500 11px / 1 var(--mono); letter-spacing: .3em; text-decoration: none; text-transform: uppercase; background: rgba(255, 255, 255, .04); box-shadow: 0 0 22px rgba(226, 232, 245, .14); pointer-events: auto; }
-.btn:hover { border-color: #fff; background: rgba(255, 255, 255, .08); }
-.loader { position: absolute; z-index: 6; inset: 0; display: grid; place-items: center; background: var(--void); transition: opacity .6s; }
-.loader.off { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .6s, visibility 0s .6s; }
-.loader div { width: 160px; height: 1px; background: rgba(238, 240, 243, .2); overflow: hidden; }
-.loader i { display: block; height: 100%; width: 0; background: #fff; box-shadow: 0 0 10px #fff; }
+/* ── the bot: in the corner, awake ── */
+.bot { position: fixed; z-index: 40; left: -12px; bottom: -8px; width: 150px; pointer-events: none; animation: bob 5s ease-in-out infinite; filter: drop-shadow(0 12px 18px rgba(23, 24, 28, .25)); }
+.bot img { display: block; width: 100%; height: auto; }
+.bot .lid { position: absolute; background: #0d0d10; border-radius: 50%; transform-origin: 50% 50%; scale: 1 0; animation: blink 4.6s ease-in-out infinite; }
+.bot .lid.l { left: 20%; top: 56%; width: 15%; height: 11%; rotate: -14deg; }
+.bot .lid.r { left: 54%; top: 63%; width: 16%; height: 9%; rotate: 14deg; animation-delay: .04s; }
+@keyframes blink { 0%, 90%, 100% { scale: 1 0; } 92%, 95% { scale: 1 1; } 93.5% { scale: 1 .2; } }
+@keyframes bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -6px; } }
+@media (prefers-reduced-motion: reduce) { .bot { animation: none; } .bot .lid { animation: none; } }
 
-/* ── the evidence: what the film stands on. Real, blurred frames. ── */
-.ch { position: relative; display: grid; align-items: end; min-height: 100svh; overflow: hidden; border-top: 1px solid var(--line); }
-.ch-bg { position: absolute; inset: 0; z-index: 0; background: radial-gradient(ellipse 70% 60% at 60% 40%, #15171c, var(--void) 70%); }
-.ch-bg img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: .9; filter: saturate(.8) contrast(1.05); transform: scale(1.04); transition: transform 2.4s cubic-bezier(.16, 1, .3, 1); }
-.ch.is-in .ch-bg img { transform: scale(1); }
-.ch-bg::after { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(5, 5, 6, .6), rgba(5, 5, 6, .12) 35%, rgba(5, 5, 6, .9) 100%), linear-gradient(90deg, rgba(5, 5, 6, .78), rgba(5, 5, 6, .2) 55%, rgba(5, 5, 6, .3)); content: ""; }
-.ch-num { position: absolute; z-index: 2; top: 84px; left: 28px; display: flex; gap: 14px; align-items: baseline; }
-.ch-num b { font: 700 26px / 1 var(--serif); }
-.ch-num span { color: var(--silver); font: 500 11.5px / 1 var(--mono); letter-spacing: .28em; text-transform: uppercase; }
-.ch-body { position: relative; z-index: 2; display: grid; grid-template-columns: 1.1fr .9fr; gap: 40px; align-items: end; width: 100%; max-width: 1180px; margin: 0 auto; padding: 150px 28px 72px; }
-.ch h2 { margin: 0 0 14px; font: 400 clamp(30px, 4.2vw, 56px) / 1.08 var(--serif); }
-.ch h2 em { font-style: normal; color: var(--silver); }
-.ch .lede { max-width: 560px; margin: 0; color: rgba(238, 240, 243, .82); font: 400 16px / 1.7 var(--mono); }
-.ch .lede + .lede { margin-top: 12px; }
-.ch .card { justify-self: end; width: min(440px, 100%); margin-top: 0; padding: 22px 24px; background: rgba(8, 9, 12, .74); }
-.ch .card b.n { font-size: 40px; }
-.quote { margin: 22px 0 0; color: var(--paper); font: 400 clamp(17px, 1.8vw, 21px) / 1.5 var(--serif); }
-.ch-foot { position: absolute; z-index: 2; right: 28px; bottom: 18px; color: var(--dim); font: 400 10.5px / 1 var(--mono); letter-spacing: .12em; text-transform: uppercase; }
-.ch.end .ch-body { grid-template-columns: 1fr; justify-items: center; text-align: center; padding-bottom: 110px; }
-.ch.end .lede { max-width: 640px; }
-.reveal { opacity: 0; translate: 0 18px; transition: opacity .9s cubic-bezier(.16, 1, .3, 1), translate .9s cubic-bezier(.16, 1, .3, 1); }
-.ch.is-in .reveal { opacity: 1; translate: 0 0; }
-.foot { padding: 34px 28px 48px; color: var(--dim); font: 400 12px / 1.7 var(--mono); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; border-top: 1px solid var(--line); }
-.foot a { color: var(--silver); text-decoration: none; border-bottom: 1px solid var(--line); }
-
-@media (max-width: 900px) {
-  .fg { right: 0; left: 0; width: 100%; height: 100%; aspect-ratio: auto; box-shadow: none; }
-  .stage::after { background: linear-gradient(180deg, rgba(5, 5, 6, .55), rgba(5, 5, 6, 0) 30%, rgba(5, 5, 6, .35) 55%, rgba(5, 5, 6, .95) 100%); }
-  .beat { top: auto; bottom: 56px; left: 20px; right: 20px; width: auto; translate: 0 0; }
-  .beat.hero { top: auto; bottom: 90px; left: 20px; right: 20px; width: auto; translate: 0 0; text-align: center; }
-  .beat.hero h1, .beat.hero p.tag, .beat.hero p.sub { text-align: center; margin-left: auto; margin-right: auto; }
-  .beat.hero .rule { margin: 4px auto 14px; }
-  .beat h2 { font-size: clamp(26px, 7vw, 36px); }
-  .beat p { font-size: 13.5px; }
-  .card { padding: 12px 14px; }
-  .illus { right: 20px; bottom: 16px; }
-  .hint, .nav a:not(.gh) { display: none; }
-  .ch-body { grid-template-columns: 1fr; gap: 24px; padding: 130px 20px 60px; }
-  .ch .card { justify-self: start; }
+/* ── the page ── */
+.top { position: sticky; z-index: 30; top: 0; display: flex; align-items: center; justify-content: space-between; height: 64px; padding: 0 28px; background: rgba(247, 244, 238, .82); border-bottom: 1px solid var(--rule); backdrop-filter: blur(10px); }
+.mark { font: 600 20px / 1 var(--display); letter-spacing: -.01em; text-decoration: none; }
+.mark i { font-style: normal; color: var(--red); }
+.nav { display: flex; gap: 22px; align-items: center; }
+.nav a { color: var(--muted); font: 500 11px / 1 var(--mono); letter-spacing: .14em; text-decoration: none; text-transform: uppercase; }
+.nav a:hover { color: var(--ink); }
+.nav .gh { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--ink); border-radius: 999px; color: var(--ink); }
+.nav .gh svg { width: 14px; height: 14px; fill: currentColor; }
+.col { position: relative; z-index: 2; width: min(640px, calc(100% - 56px)); margin: 0 auto 0 max(170px, calc(50% - 600px)); padding: 60px 0 120px; }
+.kicker { display: flex; gap: 12px; align-items: center; color: var(--muted); font: 500 11px / 1 var(--mono); letter-spacing: .18em; text-transform: uppercase; }
+.kicker::before { width: 26px; height: 1px; background: var(--ink); content: ""; }
+h1 { margin: 22px 0 18px; font: 500 clamp(40px, 5.2vw, 70px) / 1.02 var(--display); letter-spacing: -.025em; font-variation-settings: "opsz" 144; }
+h1 em { font-style: italic; font-weight: 300; color: var(--red); }
+.dek { max-width: 540px; margin: 0; color: var(--muted); font: 400 18px / 1.6 var(--sans); }
+.dek b { color: var(--ink); font-weight: 600; }
+.ctas { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
+.btn { display: inline-flex; gap: 10px; align-items: center; padding: 13px 22px; border: 1px solid var(--ink); border-radius: 999px; color: var(--ink); font: 500 12px / 1 var(--mono); letter-spacing: .14em; text-decoration: none; text-transform: uppercase; background: transparent; }
+.btn.fill { color: var(--paper); background: var(--ink); }
+.btn:hover { background: var(--ink); color: var(--paper); }
+.facts { display: flex; gap: 26px; flex-wrap: wrap; margin-top: 40px; padding-top: 22px; border-top: 1px solid var(--rule); }
+.facts div b { display: block; font: 500 34px / 1 var(--display); letter-spacing: -.02em; }
+.facts div b.hot { color: var(--red); }
+.facts div span { color: var(--muted); font: 400 12px / 1.4 var(--sans); }
+.ch { position: relative; padding: 72px 0 0; margin-top: 56px; border-top: 1px solid var(--rule); }
+.ch .n { position: absolute; top: 20px; right: 0; color: var(--rule); font: 300 64px / 1 var(--display); letter-spacing: -.03em; }
+.ch h2 { max-width: 560px; margin: 16px 0 14px; font: 500 clamp(28px, 3.3vw, 42px) / 1.1 var(--display); letter-spacing: -.02em; }
+.ch h2 em { font-style: italic; font-weight: 300; }
+.ch p { max-width: 540px; margin: 0 0 14px; color: var(--muted); font-size: 16.5px; line-height: 1.65; }
+.ch p strong { color: var(--ink); font-weight: 600; }
+figure { margin: 22px 0 0; }
+figure img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--rule); }
+figcaption { margin-top: 8px; color: var(--muted); font: 400 12px / 1.5 var(--mono); }
+figcaption i { color: var(--red); font-style: normal; }
+.card { margin-top: 22px; padding: 18px 20px; border: 1px solid var(--rule); border-radius: 14px; background: var(--card); box-shadow: 0 10px 30px rgba(23, 24, 28, .06); }
+.card.alert { border-color: rgba(214, 69, 44, .5); }
+.card .k { display: block; margin-bottom: 8px; color: var(--muted); font: 500 10px / 1 var(--mono); letter-spacing: .2em; text-transform: uppercase; }
+.card.alert .k { color: var(--red); }
+.card b.big { display: block; font: 500 38px / 1 var(--display); letter-spacing: -.02em; }
+.card p { margin: 6px 0 0; color: var(--muted); font-size: 13.5px; line-height: 1.55; }
+.card ul { margin: 4px 0 0; padding: 0; list-style: none; }
+.card li { display: flex; gap: 10px; align-items: baseline; padding: 8px 0; border-top: 1px solid var(--rule); font-size: 14px; }
+.card li::before { flex: none; width: 16px; height: 16px; border-radius: 50%; background: var(--green); color: #fff; font-size: 10px; line-height: 16px; text-align: center; content: "✓"; translate: 0 2px; }
+.card li.wait::before { background: var(--saffron); content: "·"; font-size: 18px; line-height: 14px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.grid div { padding: 12px 14px; border: 1px solid var(--rule); border-radius: 10px; background: var(--paper-2); }
+.grid b { display: block; font: 500 26px / 1 var(--display); letter-spacing: -.02em; }
+.grid b.hot { color: var(--red); }
+.grid span { color: var(--muted); font: 400 11.5px / 1.4 var(--sans); }
+.chips { margin-top: 10px; }
+.chip { display: inline-block; margin: 6px 6px 0 0; padding: 5px 9px; border: 1px solid var(--rule); border-radius: 6px; background: var(--card); color: var(--ink); font: 500 10.5px / 1 var(--mono); letter-spacing: .08em; }
+blockquote { margin: 22px 0 0; padding: 0 0 0 18px; border-left: 3px solid var(--red); font: 500 clamp(18px, 2vw, 22px) / 1.45 var(--display); letter-spacing: -.01em; }
+blockquote small { display: block; margin-top: 10px; color: var(--muted); font: 400 12px / 1.5 var(--mono); }
+code { padding: 2px 6px; border-radius: 4px; background: var(--paper-2); font: 500 13px var(--mono); }
+.r { opacity: 0; translate: 0 14px; transition: opacity .8s cubic-bezier(.16, 1, .3, 1), translate .8s cubic-bezier(.16, 1, .3, 1); }
+.r.in { opacity: 1; translate: 0 0; }
+.foot { margin-top: 70px; padding-top: 22px; border-top: 1px solid var(--rule); color: var(--muted); font: 400 12px / 1.7 var(--mono); }
+.foot a { color: var(--ink); }
+@media (max-width: 1080px) {
+  .film { right: 3vw; height: 72svh; }
+  .col { width: min(560px, calc(100% - 44px)); margin-left: 4vw; }
 }
-@media (prefers-reduced-motion: reduce) { .hint { animation: none; } }
+@media (max-width: 860px) {
+  .film { top: 0; right: 0; left: 0; height: 100svh; width: 100%; aspect-ratio: auto; translate: 0 0; border-radius: 0; box-shadow: none; }
+  .film::after { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(247, 244, 238, .35), rgba(247, 244, 238, .9) 55%, rgba(247, 244, 238, .97)); content: ""; }
+  .film .label { display: none; }
+  .col { width: calc(100% - 40px); margin: 0 auto; padding-top: 44svh; }
+  .top { padding: 0 20px; }
+  .nav a:not(.gh) { display: none; }
+  .bot { width: 92px; left: auto; right: -6px; bottom: -4px; }
+  .col { padding-bottom: 150px; }
+  .ch .n { font-size: 44px; top: 24px; }
+}
 </style>
 </head>
 <body>
-<div class="progress" id="progress"></div>
-<header class="top"><a class="mark" href="#top">Crossing Watch</a>
-  <nav class="nav"><a href="#e01">The evidence</a><a href="#e04">Open weights</a><a href="emblem.html">The emblem</a>
-    <a class="gh" href="https://github.com/shaunmortal/crossing-watch" aria-label="GitHub"><svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a></nav></header>
+<header class="top"><a class="mark" href="#top">Crossing<i>.</i>Watch</a>
+  <nav class="nav"><a href="#c04">The near-miss</a><a href="#c06">The evidence</a><a href="#c09">Open weights</a>
+    <a class="gh" href="https://github.com/shaunmortal/crossing-watch"><svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>GitHub</a></nav></header>
 
-<section class="film" id="top" aria-label="The story">
-  <div class="stage">
-    <canvas class="bg" id="bg" aria-hidden="true"></canvas>
-    <canvas class="fg" id="fg" aria-label="Illustrated film: a student, the crossing, the near-miss, the phone, the report, the college, the fix"></canvas>
-    <div class="grain" aria-hidden="true"></div>
-    <div class="illus">Illustrated film · not footage</div>
-    <div class="hint" id="hint">Scroll to play ↓</div>
-    <div class="beats" id="beats">
-      <div class="beat hero" data-from="0" data-to="0.075">
-        <h1>Crossing Watch</h1>
-        <div class="rule"><svg viewBox="0 0 10 10"><path d="M5 0 L6 4 L10 5 L6 6 L5 10 L4 6 L0 5 L4 4 Z"/></svg></div>
-        <p class="tag">Sadak ka khatra · naap ke · saboot ke saath</p>
-        <p class="sub">One phone video of a college gate in. Measured near-misses and a letter the college can sign, out.</p>
-      </div>
-      <div class="beat" data-from="0.085" data-to="0.19"><div class="num"><b>02</b><span>The student</span></div>
-        <h2>Every afternoon, <em>the same crossing.</em></h2>
-        <p>LNCT Excellence, Bhopal. A service road under the highway: no zebra, no signal. At dismissal, students pour out of the gate into motorcycles, autos and buses.</p></div>
-      <div class="beat" data-from="0.2" data-to="0.29"><div class="num"><b>03</b><span>Crossing the road</span></div>
-        <h2>Everyone knows it is dangerous. <em>Nobody had a number.</em></h2>
-        <div class="card"><span class="k">One dismissal · 8.6 minutes</span><div class="mini"><div><b>80</b><span>people crossed</span></div><div><b>55</b><span>moving vehicles</span></div></div></div></div>
-      <div class="beat" data-from="0.3" data-to="0.39"><div class="num"><b>04</b><span>The near-miss</span></div>
-        <h2>A person and a motorcycle, <em>on the same spot, at the same instant.</em></h2>
-        <div class="card alert"><span class="k">Near-miss detected</span><b class="n">PET 0.0 s</b><p>Post-encroachment time: the gap between the person and the vehicle reaching the same spot. Motorcycle at 18.7 km/h. Serious is under 1.5 s; this one had none.</p></div></div>
-      <div class="beat" data-from="0.4" data-to="0.49"><div class="num"><b>05</b><span>Captured on a phone</span></div>
-        <h2>One phone. <em>One tape measure.</em></h2>
-        <p>Filmed from the highway above the gate, 8.3 m up. Eight sheets of A4 taped to the road turn pixels into metres. Meta's SAM 3.1 follows every person and vehicle by name; Muse Spark reviews each one.</p>
-        <span class="chip">Meta SAM 3.1</span><span class="chip">Muse Spark</span><span class="chip">Muse Wonder</span><span class="chip">Muse Glimmer</span></div>
-      <div class="beat" data-from="0.5" data-to="0.59"><div class="num"><b>06</b><span>From data to evidence</span></div>
-        <h2>Measured, <em>not guessed.</em></h2>
-        <div class="card"><span class="k">Evidence report</span><div class="mini"><div><b class="hot">2</b><span>serious near-misses, 3 close passes</span></div><div><b>15.0 m</b><span>video's reading of the 15 m tape line</span></div><div><b>47 / 52</b><span>near-misses found on drone ground truth</span></div><div><b>24 / 24</b><span>planted lies caught by the letter judge</span></div></div></div></div>
-      <div class="beat" data-from="0.6" data-to="0.69"><div class="num"><b>07</b><span>To the college</span></div>
-        <h2>A letter the college <em>can sign.</em></h2>
-        <p>Muse Spark writes it from the measurements only; code checks every number; two judges read it. The Head of Department signs it for the college on 3 November, then it goes to the road authority through CPGRAMS.</p></div>
-      <div class="beat" data-from="0.7" data-to="0.79"><div class="num"><b>08</b><span>The fix</span></div>
-        <h2>The crossing <em>we are asking for.</em></h2>
-        <div class="card"><span class="k">Recommended fix</span><ul><li>Raised zebra crossing at the measured band</li><li>20 km/h zone signs</li><li>Guard-rails leading to it (IRC:103-2012)</li></ul></div></div>
-      <div class="beat" data-from="0.8" data-to="0.89"><div class="num"><b>09</b><span>A safer crossing</span></div>
-        <h2>Then we film <em>the same gate again.</em></h2>
-        <div class="card ok"><span class="k">The pass mark, written before any fix</span><ul><li>Fewer people with a vehicle on their spot within 3 s</li><li>Fewer distinct vehicles doing it</li><li class="wait">Measured the same way, by anyone, for $0</li></ul></div></div>
-      <div class="beat" data-from="0.9" data-to="1.01"><div class="num"><b>10</b><span>The impact</span></div>
-        <h2>From a near-miss <em>to a safer road.</em></h2>
-        <p>Any school or college in India can do this: one phone, one tape measure, one afternoon. Below: the real evidence this film stands on.</p>
-        <a class="btn" href="#e01">See the real evidence <b>↓</b></a></div>
-    </div>
-    <div class="loader" id="loader"><div><i id="bar"></i></div></div>
+<aside class="film" aria-label="Illustrated film: the student, the crossing, the near-miss, the phone, the report, the college, the fix">
+  <video id="film" src="film/story.mp4" poster="film/poster.jpg" autoplay muted loop playsinline preload="metadata"></video>
+  <span class="label">Illustrated film · not footage</span>
+</aside>
+<div class="bot" aria-hidden="true"><img src="bot.png" alt=""><span class="lid l"></span><span class="lid r"></span></div>
+
+<main class="col" id="top">
+  <div class="kicker">Bhopal · LNCT Excellence gate · 2 November 2026</div>
+  <h1>Sadak ka khatra, <em>naap ke,</em> saboot ke saath.</h1>
+  <p class="dek">Outside every school and college in India, people cross a road where vehicles pass close and fast. The school wants a crossing; the road belongs to the government; permission needs evidence. <b>Crossing Watch turns one phone video into that evidence</b>: measured near-misses, a map in metres, and a letter whose every number is checked by code.</p>
+  <div class="ctas"><a class="btn fill" href="#c04">See the near-miss ↓</a><a class="btn" href="https://github.com/shaunmortal/crossing-watch">Read the code</a></div>
+  <div class="facts r">
+    <div><b>80</b><span>people crossed in 8.6 min</span></div>
+    <div><b>55</b><span>moving vehicles</span></div>
+    <div><b class="hot">2</b><span>serious near-misses</span></div>
+    <div><b>15.0 m</b><span>video vs 15 m of tape</span></div>
   </div>
-</section>
 
-<section class="ch" id="e01"><div class="ch-bg"><img src="story/03-nearmiss.jpg" alt="" onerror="this.remove()"></div>
-  <div class="ch-num"><b>E1</b><span>The real near-miss</span></div>
-  <div class="ch-body"><div class="reveal"><h2>This one is real. <em>Every face blurred.</em></h2>
-    <p class="lede">A StroMotion still from our gate on 2 November: copies of the motorcycle every half second, then the person, drawn from the actual tracks. Wider spacing means faster.</p></div>
-    <div class="card alert reveal"><span class="k">Event 1 of the run</span><b class="n">PET 0.0 s</b><p>Person and motorcycle on the same spot at the same instant. Motorcycle at 18.7 km/h.</p></div></div>
-  <div class="ch-foot">Real frame · StroMotion</div></section>
+  <section class="ch r" id="c02"><span class="n">01</span><div class="kicker">The gate</div>
+    <h2>Every afternoon, <em>the same crossing.</em></h2>
+    <p>A service road under the highway. No zebra, no signal. At dismissal, students pour out of the gate into motorcycles, autos and buses. <strong>Everyone knows it is dangerous. Nobody had a number.</strong></p>
+    <figure><img src="story/02-street.jpg" alt="The road outside the gate, seen from above; every face blurred" loading="lazy"><figcaption>The real road, 2 November, from 8.3 m up. <i>Every face blurred.</i></figcaption></figure></section>
 
-<section class="ch" id="e02"><div class="ch-bg"><img src="story/06-map.jpg" alt="" onerror="this.remove()"></div>
-  <div class="ch-num"><b>E2</b><span>The letter</span></div>
-  <div class="ch-body"><div class="reveal"><h2>Every number <em>links to its clip.</em></h2>
-    <p class="quote">"3 of 51 crossings had a moving vehicle through the same spot within 3 s of the person. 1 of 51 had a vehicle within 1.5 s. I request a raised zebra crossing with 20 km/h zone signs at this gate. I offer to share the video for review."</p>
-    <p class="lede" style="margin-top:10px;font-size:12.5px">From the letter. Written by Muse Spark from the measurements; checked by code; judged by Muse Spark and Muse Spark Open. Ready for the Head of Department's signature on 3 November. Only "filed, reference X" is ever written here.</p></div>
-    <div class="card reveal"><span class="k">Checked against truth</span><div class="mini"><div><b>47 / 52</b><span>near-misses found on top-down drone footage (DUT)</span></div><div><b>15.0 m</b><span>our reading of a 15 m line never used to calibrate</span></div><div><b>24 / 24</b><span>planted lies caught on the public bench</span></div><div><b>0</b><span>numbers in the letter the code could not verify</span></div></div></div></div>
-  <div class="ch-foot">Map in road metres · from the run</div></section>
+  <section class="ch r" id="c03"><span class="n">02</span><div class="kicker">One phone, one tape</div>
+    <h2>Filmed from the highway, <em>measured on the road.</em></h2>
+    <p>Eight sheets of A4 taped on the road, 8 m by 7 m, turn pixels into metres. Two more lines 15 m apart are never used for the maths: they are the check. The video read them as <strong>15.0 m</strong>.</p>
+    <div class="card"><span class="k">What it takes</span><ul><li>A phone, held high</li><li>A tape measure and eight sheets of paper</li><li>Twenty minutes at dismissal</li></ul></div></section>
 
-<section class="ch" id="e03"><div class="ch-bg"><img src="story/09-fix.webp" alt="" onerror="this.remove()"></div>
-  <div class="ch-num"><b>E3</b><span>The fix, drawn on the real street</span></div>
-  <div class="ch-body"><div class="reveal"><h2>Muse Image draws it <em>only where people crossed.</em></h2>
-    <p class="lede">A raised zebra crossing with 20 km/h zone signs, drawn onto the real, blurred street, only inside the band where people were measured crossing. Every other pixel is the real road. Labelled AI-drawn.</p></div>
-    <div class="card reveal"><span class="k">After the fix</span><ul><li>Film two dismissals again from the same spot</li><li>One-sided Fisher exact test at 5%</li><li class="wait">The drop counts only if both counts fall</li></ul></div></div>
-  <div class="ch-foot">AI-drawn inside the band · labelled as such</div></section>
+  <section class="ch r" id="c04"><span class="n">03</span><div class="kicker">The near-miss</div>
+    <h2>A person and a motorcycle, <em>on the same spot, at the same instant.</em></h2>
+    <p>Post-encroachment time is the gap between a person and a vehicle reaching the same spot. Under 1.5 s is serious. This one had none.</p>
+    <figure><img src="story/03-nearmiss.jpg" alt="StroMotion still of the near-miss: copies of the motorcycle every half second, then the person" loading="lazy"><figcaption>StroMotion still from the real video: the motorcycle every half second, then the person. Wider spacing means faster.</figcaption></figure>
+    <div class="card alert"><span class="k">Near-miss detected</span><b class="big">PET 0.0 s</b><p>Motorcycle at 18.7 km/h. Two serious near-misses and three close passes in 8.6 minutes, on the taped 15 m stretch alone.</p></div></section>
 
-<section class="ch" id="e04"><div class="ch-bg"></div>
-  <div class="ch-num"><b>E4</b><span>Open weights</span></div>
-  <div class="ch-body"><div class="reveal"><h2>Meta's open models, <em>doing the real work.</em></h2>
-    <p class="lede">Muse Glimmer 30B wrote our real gate's letter on Kaggle's free T4s, first try. Our fine-tuned Glimmer judge beats Muse Spark Open in three pre-registered blind tests, at a quarter of Muse Spark's cost, and was served live on Fireworks.</p>
-    <p class="lede" style="font-size:12.5px">Every number on this page re-checks from the repository at $0: JUDGES.md · OPEN_WEIGHTS.md · GATES.md</p></div>
-    <div class="card reveal"><span class="k">Glimmer, measured</span><div class="mini"><div><b>276 s</b><span>our gate's letter, on 2 × T4</span></div><div><b>3 of 3</b><span>blind tests won vs Muse Spark Open</span></div><div><b>1,499 / 1,501</b><span>same verdicts served live</span></div><div><b>¼</b><span>of Muse Spark's cost</span></div></div></div></div></section>
+  <section class="ch r" id="c05"><span class="n">04</span><div class="kicker">AI analysis</div>
+    <h2>Meta's models do the seeing. <em>Code does the checking.</em></h2>
+    <p><strong>SAM 3.1</strong> follows every person, motorcycle, auto and bus by name. The road plane turns their paths into metres and seconds. <strong>Muse Spark</strong> looks at each person in a near-miss and throws out riders and shadows. <strong>Muse Wonder</strong> listens around each event for horns and brakes.</p>
+    <div class="chips"><span class="chip">Meta SAM 3.1</span><span class="chip">Muse Spark</span><span class="chip">Muse Wonder</span><span class="chip">Muse Image</span><span class="chip">Muse Glimmer (open weights)</span><span class="chip">Muse Spark Open (open weights)</span></div>
+    <div class="card"><span class="k">Checked against truth</span><div class="grid"><div><b>47 / 52</b><span>near-misses found on top-down drone footage (DUT)</span></div><div><b>15.0 m</b><span>our reading of a line never used to calibrate</span></div><div><b>24 / 24</b><span>planted lies caught by the letter judge</span></div><div><b>0</b><span>numbers in the letter code could not verify</span></div></div></div></section>
 
-<section class="ch end" id="e05"><div class="ch-bg"><img src="story/02-street.jpg" alt="" onerror="this.remove()"></div>
-  <div class="ch-num"><b>E5</b><span>Try it</span></div>
-  <div class="ch-body"><div class="reveal"><h2>One phone. One tape. <em>One afternoon.</em></h2>
-    <p class="lede">Python 3.11 and ffmpeg. No key and no video needed to build the sample page: <code>python3 pack.py sample sample/site.json</code></p>
-    <a class="btn" href="https://github.com/shaunmortal/crossing-watch">Try Crossing Watch <b>→</b></a></div></div>
-  <div class="ch-foot">Real frame · every face blurred</div></section>
+  <section class="ch r" id="c06"><span class="n">05</span><div class="kicker">From data to evidence</div>
+    <h2>A letter the college <em>can sign.</em></h2>
+    <p>Muse Spark writes it from the measurements only. Code checks every number against the data; legal quotes are added by code, never by a model; two judges read it for any claim the measurements do not support.</p>
+    <blockquote>"3 of 51 crossings had a moving vehicle through the same spot within 3 s of the person. 1 of 51 had a vehicle within 1.5 s. I request a raised zebra crossing with 20 km/h zone signs at this gate. I offer to share the video for review."<small>From the letter. The Head of Department signs it for the college on 3 November. Only "filed, reference X" is ever written here.</small></blockquote>
+    <figure><img src="story/06-map.jpg" alt="The map in road metres from the run" loading="lazy"><figcaption>The map in road metres, from the run. Every number in the letter links to its clip.</figcaption></figure></section>
 
-<footer class="foot"><span>Crossing Watch · solo entry, Meta Global AI Developer Hackathon 2026 · built 28 Oct to 4 Nov</span><a href="https://github.com/shaunmortal/crossing-watch">github.com/shaunmortal/crossing-watch</a></footer>
+  <section class="ch r" id="c07"><span class="n">06</span><div class="kicker">To the government</div>
+    <h2>From a gate <em>to the road authority.</em></h2>
+    <p>The signed letter and the evidence page go to the road's owner through the national grievance portal, CPGRAMS. The letter's sha256 is printed on the page, so the paper matches the proof.</p>
+    <div class="card"><span class="k">Filing</span><ul><li>Evidence page and blurred clips enclosed</li><li>Every number re-checkable at $0 from the repository</li><li class="wait">CPGRAMS · Ministry of Road Transport & Highways · 3 November</li></ul></div></section>
+
+  <section class="ch r" id="c08"><span class="n">07</span><div class="kicker">The fix</div>
+    <h2>The crossing <em>we are asking for.</em></h2>
+    <p>A raised zebra crossing with 20 km/h zone signs, drawn by Muse Image onto the real, blurred street, only inside the band where people were measured crossing. Every other pixel is the real road.</p>
+    <figure><img src="story/09-fix.webp" alt="Muse Image's raised zebra crossing drawn onto the real street" loading="lazy"><figcaption>AI-drawn inside the measured band only; labelled as such.</figcaption></figure>
+    <div class="card"><span class="k">After the fix</span><ul><li>Film two dismissals again from the same spot</li><li>One-sided Fisher exact test at 5%, written before any fix exists</li><li class="wait">The drop counts only if both counts fall</li></ul></div></section>
+
+  <section class="ch r" id="c09"><span class="n">08</span><div class="kicker">Open weights</div>
+    <h2>Meta's open models, <em>doing the real work.</em></h2>
+    <p><strong>Muse Glimmer 30B</strong> wrote our real gate's letter on Kaggle's free T4s, first try. Our fine-tuned Glimmer judge beats Muse Spark Open in three pre-registered blind tests, at a quarter of Muse Spark's cost, and was served live on Fireworks.</p>
+    <div class="card"><span class="k">Glimmer, measured</span><div class="grid"><div><b>276 s</b><span>our gate's letter, on 2 × T4</span></div><div><b>3 of 3</b><span>blind tests won vs Muse Spark Open</span></div><div><b>1,499 / 1,501</b><span>same verdicts served live</span></div><div><b>¼</b><span>of Muse Spark's cost</span></div></div></div>
+    <p style="margin-top:14px;font-size:13px">Every number re-checks from the repository: <a href="https://github.com/shaunmortal/crossing-watch/blob/main/OPEN_WEIGHTS.md">OPEN_WEIGHTS.md</a> · <a href="https://github.com/shaunmortal/crossing-watch/blob/main/JUDGES.md">JUDGES.md</a> · <a href="https://github.com/shaunmortal/crossing-watch/blob/main/GATES.md">GATES.md</a></p></section>
+
+  <section class="ch r" id="c10"><span class="n">09</span><div class="kicker">Try it</div>
+    <h2>One phone. One tape. <em>One afternoon.</em></h2>
+    <p>Any school or college in India can do this. Python 3.11 and ffmpeg; no key and no video needed to build the sample page: <code>python3 pack.py sample sample/site.json</code></p>
+    <div class="ctas"><a class="btn fill" href="https://github.com/shaunmortal/crossing-watch">Try Crossing Watch →</a><a class="btn" href="emblem.html">The measured moment, in 3D</a></div></section>
+
+  <footer class="foot">Crossing Watch · solo entry, Meta Global AI Developer Hackathon 2026 · built 28 Oct to 4 Nov · <a href="https://github.com/shaunmortal/crossing-watch">github.com/shaunmortal/crossing-watch</a></footer>
+</main>
 
 <script>
-(() => {
-  // The film: 120 frames at 12 fps (film/f001.jpg ...), drawn to two canvases as the page scrolls through .film.
-  const FRAMES = 120, fg = document.getElementById("fg"), bg = document.getElementById("bg"), fx = fg.getContext("2d"), bx = bg.getContext("2d");
-  const film = document.querySelector(".film"), beats = [...document.querySelectorAll(".beat")], bar = document.getElementById("bar"), loader = document.getElementById("loader");
-  const progress = document.getElementById("progress"), hint = document.getElementById("hint");
-  const frames = new Array(FRAMES);
-  const qa = new URLSearchParams(location.search).get("p");  // QA: ?p=0.35 parks the film there (headless screenshots start at the top)
-  let loaded = 0, current = -1, ready = false;
-  const size = () => {
-    const dpr = Math.min(devicePixelRatio || 1, 2);
-    for (const c of [fg, bg]) { const r = c.getBoundingClientRect(); c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr); }
-  };
-  const cover = (ctx, img, w, h) => { const s = Math.max(w / img.width, h / img.height), dw = img.width * s, dh = img.height * s; ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh); };
-  const okAt = (i) => frames[i] && frames[i].complete && frames[i].naturalWidth > 0;
-  const draw = (want) => { let i = want; while (i >= 0 && !okAt(i)) i--; if (i < 0) return; current = want; const img = frames[i]; cover(fx, img, fg.width, fg.height); cover(bx, img, bg.width, bg.height); };
-  const at = () => {
-    if (qa !== null) return Math.min(1, Math.max(0, Number(qa)));
-    const r = film.getBoundingClientRect(), span = film.offsetHeight - innerHeight;
-    return Math.min(1, Math.max(0, -r.top / span));
-  };
-  const update = () => {
-    const p = at(), i = Math.min(FRAMES - 1, Math.floor(p * (FRAMES - 1)));
-    if (i !== current) draw(i);
-    for (const b of beats) b.classList.toggle("on", p >= +b.dataset.from && p < +b.dataset.to);
-    progress.style.width = `${p * 100}%`;
-    hint.style.opacity = p > .03 ? 0 : "";
-  };
-  let raf = 0;
-  const onScroll = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; update(); }); };
-  addEventListener("scroll", onScroll, { passive: true });
-  addEventListener("resize", () => { size(); current = -1; update(); });
-  size();
-  for (let i = 0; i < FRAMES; i++) {
-    const img = new Image();
-    img.onload = img.onerror = () => {
-      loaded++; bar.style.width = `${(loaded / FRAMES) * 100}%`;
-      if (i === 0) { loader.classList.add("off"); }
-      current = -1; update();
-      if (loaded === FRAMES) ready = true;
-    };
-    img.src = `film/f${String(i + 1).padStart(3, "0")}.jpg`;
-    frames[i] = img;
-  }
-  // the evidence chapters reveal as they come into view
-  const seen = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("is-in"); seen.unobserve(e.target); } }), { threshold: .25 });
-  document.querySelectorAll(".ch").forEach((c) => seen.observe(c));
-  if (qa !== null) document.querySelectorAll(".ch").forEach((c) => c.classList.add("is-in"));
-})();
+  const seen = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add("in"); seen.unobserve(e.target); } }), { threshold: .12 });
+  document.querySelectorAll(".r").forEach((el) => seen.observe(el));
+  if (new URLSearchParams(location.search).has("qa")) document.querySelectorAll(".r").forEach((el) => el.classList.add("in"));
+  const film = document.getElementById("film");
+  film.play().catch(() => {});  // autoplay is muted; a tap anywhere starts it where a browser still blocks it
+  addEventListener("pointerdown", () => film.play().catch(() => {}), { once: true });
 </script>
 </body>
 </html>
