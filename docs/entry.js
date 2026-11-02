@@ -1,6 +1,13 @@
-// The entry: one WebGL road scene and one clock. Every pose is a PURE function of the clock (seconds), so ?t=<s>
-// seeks to any frame: the beats below, then the type, then the CTA; the CTA runs the exit and opens the platform.
+// The entry: one WebGL emblem and one clock. Every pose is a PURE function of the clock (seconds), so ?t=<s> seeks to
+// any frame: the beats below, then the type, then the CTA; the CTA runs the exit and opens the platform.
+// The emblem is the measured moment itself: two luminous paths (the real tracks) meeting on a ring, over a dark
+// polished floor, lit by a studio environment and bloomed.
 import * as THREE from "three";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 
 const SEQ = { START: 0, ATTRACT: 1.2, EMERGE: 2.6, BUILD: 3.5, ALMOST: 4.3, MERGED: 5.0, REST: 6.4, EXIT_START: 10, EXIT_END: 11.4 };
 const CAPTION_AT = [SEQ.START, SEQ.ATTRACT, SEQ.EMERGE, SEQ.BUILD, SEQ.ALMOST, SEQ.MERGED];
@@ -18,116 +25,117 @@ const seq = { value: reduced ? SEQ.REST : 0 };
 let stage = "boot";
 const go = (next) => { stage = next; entry.className = `entry entry--${next}`; cta.disabled = next !== "ready"; };
 
-/* ── data: the real near-miss, in road metres (x along the road 0..15, y across 0..7, wall side 0) ── */
+/* ── data: the real near-miss, in road metres (x along the road 0..15, y across 0..7) ── */
 const T = window.CW_TRACKS;
 const toScene = ([x, y]) => [x - 7.5, y - 3.5];
-const W2 = T.hero.where, W = new THREE.Vector3(W2[0] - 7.5, 0.2, W2[1] - 3.5);
+const W2 = T.hero.where, W = new THREE.Vector3(W2[0] - 7.5, 0.06, W2[1] - 3.5);
 const upTo = (path) => { let best = 0, bd = 1e9; path.forEach((p, i) => { const d = Math.hypot(p[0] - W2[0], p[1] - W2[1]); if (d < bd) { bd = d; best = i; } }); return [...path.slice(0, best + 1), W2]; };
 const PERSON = upTo(T.hero.person).map(toScene), BIKE = upTo(T.hero.vehicle).map(toScene);
 
-/* ── renderer, camera, lights ── */
+/* ── renderer, studio, camera ── */
 const canvas = $("#scene");
-let renderer = null;
-try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: "high-performance" }); } catch { canvas.hidden = true; }
+let renderer = null, composer = null, bloom = null;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: "high-performance" });
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+  renderer.setClearColor(0x050506, 1);
+} catch { canvas.hidden = true; }
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 300);
-const TARGET = new THREE.Vector3(0.8, 0.2, 0.6), BASE = new THREE.Vector3(15, 15.5, 18), Y = new THREE.Vector3(0, 1, 0);
-scene.add(new THREE.HemisphereLight(0xffffff, 0x1b1e26, 1.1));
-const key = new THREE.DirectionalLight(0xffffff, 1.0); key.position.set(10, 20, 8); scene.add(key);
-const flash = new THREE.PointLight(0xdfe8ff, 0, 30, 1.6); flash.position.copy(W).add(new THREE.Vector3(0, 1.5, 0)); scene.add(flash);
+scene.fog = new THREE.FogExp2(0x050506, 0.062);
+if (renderer) { const pmrem = new THREE.PMREMGenerator(renderer); scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture; pmrem.dispose(); }
+const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 200);
+const TARGET = new THREE.Vector3(0.4, -0.7, 0.4), BASE = new THREE.Vector3(10.5, 6.6, 12.5), Y = new THREE.Vector3(0, 1, 0);
+const key = new THREE.DirectionalLight(0xe8ecf5, 1.2); key.position.set(-6, 14, 6); scene.add(key);
+const rim = new THREE.DirectionalLight(0x9fb4ff, .6); rim.position.set(8, 6, -10); scene.add(rim);
+scene.add(new THREE.AmbientLight(0x30343f, .5));
+const flash = new THREE.PointLight(0xffd0d0, 0, 26, 1.5); flash.position.copy(W).add(new THREE.Vector3(0, 2, 0)); scene.add(flash);
 
-/* ── materials whose opacity follows the lights ── */
-const lit = [];
+/* ── materials whose intensity follows the lights ── */
+const lit = [];                                     // [material, baseOpacity]
+const glow = [];                                    // [material, baseEmissive]
 const litMat = (m, base) => { m.transparent = true; m.opacity = 0; lit.push([m, base]); return m; };
+const glowMat = (m, base) => { m.emissiveIntensity = 0; glow.push([m, base]); return m; };
 const add = (m, x, y, z) => { m.position.set(x, y, z); scene.add(m); return m; };
-function block(w, h, d, color, opacity, edge) {
-  const g = new THREE.BoxGeometry(w, h, d);
-  const m = new THREE.Mesh(g, litMat(new THREE.MeshStandardMaterial({ color, roughness: .4, metalness: .25, depthWrite: false }), opacity));
-  if (edge) m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g), litMat(new THREE.LineBasicMaterial({ color: 0xc6cad1 }), edge)));
-  return m;
-}
-add(block(24, .18, 7, 0x1a1d24, .96, .22), 0, 0, 0);                                   // the road
-for (let x = -11; x < 12; x += 2.6) add(block(1.3, .02, .1, 0xffffff, .45, 0), x, .11, 0);
-add(block(24, 4.4, .8, 0x262a33, .28, .35), 0, 2.2, -4.0);                             // retaining wall
-add(block(24, .3, 4, 0x30343f, .28, .3), 0, 4.55, -6.6);                               // highway deck
-add(new THREE.Mesh(new THREE.BoxGeometry(.45, .8, .2), litMat(new THREE.MeshBasicMaterial({ color: 0xf2f4f8 }), 1)), 2.5, 5.3, -5.4); // the phone
-const PHONE = new THREE.Vector3(2.5, 5.3, -5.4);
-const cone = [];
-for (const [x, z] of [[-7.5, 3.5], [7.5, 3.5], [7.5, -3.5], [-7.5, -3.5]]) cone.push(PHONE.clone(), new THREE.Vector3(x, .15, z));
-scene.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(cone), litMat(new THREE.LineBasicMaterial({ color: 0x9aa3b8 }), .22)));
 
-// the taped rectangle (8 x 7 m), the dashed outline, and lines A and B 15 m apart
+// the floor: dark, polished, the studio and the glow reflect in it
+const floor = add(new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshStandardMaterial({ color: 0x0b0c10, roughness: .22, metalness: .85, envMapIntensity: 1.1 })), 0, 0, 0);
+floor.rotation.x = -Math.PI / 2;
+// the taped rectangle (8 x 7 m) as four marks and a hairline, and lines A and B 15 m apart
 const CORNERS = [[-4, 3.5], [4, 3.5], [4, -3.5], [-4, -3.5]];
-const marks = CORNERS.map(([x, z]) => add(new THREE.Mesh(new THREE.BoxGeometry(.6, .05, .6), litMat(new THREE.MeshBasicMaterial({ color: 0xf4f6f9 }), 1)), x, .13, z));
-const rect = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([...CORNERS, CORNERS[0]].map(([x, z]) => new THREE.Vector3(x, .14, z))),
-  new THREE.LineDashedMaterial({ color: 0xef4444, dashSize: .45, gapSize: .25, transparent: true, opacity: 0 }));
-rect.computeLineDistances(); scene.add(rect);
-const abLines = [-7.5, 7.5].map((x) => add(block(.1, .04, 7, 0x5b9dff, .9, 0), x, .13, 0));
+const markMat = glowMat(new THREE.MeshStandardMaterial({ color: 0xf4f6f9, emissive: 0xf4f6f9, roughness: .3, metalness: .1 }), .55);
+const marks = CORNERS.map(([x, z]) => add(new THREE.Mesh(new THREE.BoxGeometry(.55, .05, .55), markMat), x, .03, z));
+const hairline = (points, color, base) => { const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), litMat(new THREE.LineBasicMaterial({ color }), base)); scene.add(l); return l; };
+const rect = hairline([...CORNERS, CORNERS[0]].map(([x, z]) => new THREE.Vector3(x, .04, z)), 0xff8a8a, .55);
+const abLines = [-7.5, 7.5].map((x) => hairline([new THREE.Vector3(x, .04, -3.5), new THREE.Vector3(x, .04, 3.5)], 0x8db4ff, .7));
+const bottleMat = glowMat(new THREE.MeshStandardMaterial({ color: 0x5b9dff, emissive: 0x3b7dff, roughness: .35 }), 1.6);
 const bottles = [];
-for (const x of [-7.5, 7.5]) for (const z of [-3.6, 3.6]) bottles.push(add(new THREE.Mesh(new THREE.CylinderGeometry(.16, .16, .7, 14), litMat(new THREE.MeshStandardMaterial({ color: 0x5b9dff, roughness: .5 }), 1)), x, .5, z));
+for (const x of [-7.5, 7.5]) for (const z of [-3.6, 3.6]) bottles.push(add(new THREE.Mesh(new THREE.SphereGeometry(.11, 16, 16), bottleMat), x, .11, z));
 
-/* ── the track cloud: every point scatters in from the dark and lands on a measured path ── */
+// the track cloud: points scatter in from the dark and settle on the floor where the dismissal's traffic ran
 function dotTexture() {
   const c = document.createElement("canvas"); c.width = c.height = 64;
   const g = c.getContext("2d"), r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-  r.addColorStop(0, "rgba(255,255,255,1)"); r.addColorStop(.3, "rgba(255,255,255,.75)"); r.addColorStop(1, "rgba(255,255,255,0)");
+  r.addColorStop(0, "rgba(255,255,255,1)"); r.addColorStop(.3, "rgba(255,255,255,.7)"); r.addColorStop(1, "rgba(255,255,255,0)");
   g.fillStyle = r; g.fillRect(0, 0, 64, 64);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
-const homes = [], tint = [], kind = [];  // kind 0 silver, 1 person (cyan), 2 bike (red)
-for (const path of T.others) for (const p of path) { const [x, z] = toScene(p); homes.push(x, .16, z); tint.push(.78, .8, .85); kind.push(0); }
-for (let i = 0; i < 820; i++) {                                                          // the rest of the dismissal's traffic, along the lanes
-  const lane = [-2.3, -.9, .8, 2.3][i % 4] + (hash(i, 1) - .5) * .9, x = (hash(i, 2) - .5) * 22;
-  homes.push(x, .16, lane); tint.push(.7, .72, .78); kind.push(0);
-}
-for (const [x, z] of PERSON) { homes.push(x, .2, z); tint.push(.5, .95, 1); kind.push(1); }
-for (const [x, z] of BIKE) { homes.push(x, .2, z); tint.push(1, .45, .45); kind.push(2); }
-const N = kind.length, pos = new Float32Array(N * 3), scatter = new Float32Array(N * 3), stagger = new Float32Array(N);
+const homes = [];
+for (const path of T.others) for (const p of path) { const [x, z] = toScene(p); homes.push(x, .05, z); }
+for (let i = 0; i < 520; i++) { const lane = [-2.3, -.9, .8, 2.3][i % 4] + (hash(i, 1) - .5) * .9; homes.push((hash(i, 2) - .5) * 24, .05, lane); }
+const N = homes.length / 3, pos = new Float32Array(N * 3), scatter = new Float32Array(N * 3), stagger = new Float32Array(N);
 for (let i = 0; i < N; i++) {
-  const r = 9 + 7 * hash(i, 4), a = hash(i, 5) * 6.283, b = (hash(i, 6) - .5) * 2.4;
-  scatter.set([Math.cos(a) * r * Math.cos(b), 3 + Math.sin(b) * r * .6, Math.sin(a) * r * Math.cos(b) * .8], i * 3);
+  const r = 8 + 8 * hash(i, 4), a = hash(i, 5) * 6.283, b = (hash(i, 6) - .5) * 2.2;
+  scatter.set([Math.cos(a) * r * Math.cos(b), 2.5 + Math.sin(b) * r * .5, Math.sin(a) * r * Math.cos(b) * .8], i * 3);
   stagger[i] = hash(i, 3);
 }
 const cloud = new THREE.BufferGeometry();
 cloud.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-cloud.setAttribute("color", new THREE.BufferAttribute(Float32Array.from(tint), 3));
-const cloudMat = new THREE.PointsMaterial({ size: .2, map: dotTexture(), vertexColors: true, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true });
+const cloudMat = new THREE.PointsMaterial({ size: .16, map: dotTexture(), color: 0xc9ced8, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true });
 scene.add(new THREE.Points(cloud, cloudMat));
 
-// the two paths that met: drawn in from BUILD to ALMOST, ending on the same spot
-function trail(points, color) {
-  const geo = new THREE.BufferGeometry().setFromPoints(points.map(([x, z]) => new THREE.Vector3(x, .2, z)));
+// the two paths that met, as luminous ribbons drawn in from BUILD to ALMOST, ending on the same spot
+const SEGS = 120, RADIAL = 10;
+function ribbon(points, color) {
+  const curve = new THREE.CatmullRomCurve3(points.map(([x, z]) => new THREE.Vector3(x, .14, z)), false, "catmullrom", .3);
+  const geo = new THREE.TubeGeometry(curve, SEGS, .075, RADIAL, false);
   geo.setDrawRange(0, 0);
-  const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0 }));
-  scene.add(line); return line;
+  const mat = glowMat(new THREE.MeshStandardMaterial({ color, emissive: color, roughness: .3, metalness: .2 }), 2.6);
+  const mesh = new THREE.Mesh(geo, mat); scene.add(mesh);
+  return { mesh, curve };
 }
-const personLine = trail(PERSON, 0x7ee8f5), bikeLine = trail(BIKE, 0xff6b6b);
-const personHead = add(new THREE.Mesh(new THREE.CapsuleGeometry(.22, .5, 4, 10), new THREE.MeshStandardMaterial({ color: 0x7ee8f5, emissive: 0x2bb5c6, emissiveIntensity: .6, roughness: .4 })), 0, .6, 0);
-const bikeHead = add(new THREE.Mesh(new THREE.BoxGeometry(1.7, .7, .6), new THREE.MeshStandardMaterial({ color: 0xff6b6b, emissive: 0xc0392b, emissiveIntensity: .5, roughness: .4 })), 0, .5, 0);
-const ring = add(new THREE.Mesh(new THREE.RingGeometry(.55, .72, 56), new THREE.MeshBasicMaterial({ color: 0xff5a5a, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false })), W.x, .22, W.z);
+const person = ribbon(PERSON, 0x6fe3f2), bike = ribbon(BIKE, 0xff5c5c);
+const headMat = (c) => glowMat(new THREE.MeshStandardMaterial({ color: c, emissive: c, roughness: .25 }), 3.2);
+const personHead = add(new THREE.Mesh(new THREE.SphereGeometry(.16, 24, 24), headMat(0x9ff1fb)), 0, .14, 0);
+const bikeHead = add(new THREE.Mesh(new THREE.SphereGeometry(.2, 24, 24), headMat(0xff8a8a)), 0, .14, 0);
+const ringMat = glowMat(new THREE.MeshStandardMaterial({ color: 0xff6b6b, emissive: 0xff3b3b, roughness: .3, metalness: .3, transparent: true, opacity: 0 }), 3.5);
+const ring = add(new THREE.Mesh(new THREE.TorusGeometry(.8, .05, 16, 96), ringMat), W.x, .1, W.z);
 ring.rotation.x = -Math.PI / 2;
+const haloMat = new THREE.SpriteMaterial({ map: dotTexture(), color: 0xff4040, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+const halo = add(new THREE.Sprite(haloMat), W.x, .25, W.z);
 
-/* ── per-frame pose, a pure function of t (plus a damped pointer and the wall clock for idle) ── */
-const look = new THREE.Vector3(), camPos = new THREE.Vector3(), dive = new THREE.Vector3(W.x, 1.1, W.z), proj = new THREE.Vector3();
+/* ── per-frame pose: a pure function of t, plus a damped pointer and the wall clock for the idle breath ── */
+const look = new THREE.Vector3(), camPos = new THREE.Vector3(), dive = new THREE.Vector3(W.x, .9, W.z), proj = new THREE.Vector3();
 let px = 0, py = 0, tx = 0, ty = 0;
 addEventListener("pointermove", (e) => { if (e.pointerType !== "touch") { tx = e.clientX / innerWidth - .5; ty = e.clientY / innerHeight - .5; } }, { passive: true });
-const centre = { x: 0, y: 0 };  // the ring, in canvas px: the dust and the strike aim at it
+const centre = { x: 0, y: 0 };  // the ring in canvas px: the dust and the strike aim at it
 
 function pose(t, now) {
-  const light = lightAt(t), e = smooth(SEQ.EXIT_START, SEQ.EXIT_END, t), ee = e ** 1.7;
-  for (const [m, base] of lit) m.opacity = base * light * (1 - e);
-  // marks snap in one by one, the outline draws, then the 15 m lines rise
+  const light = lightAt(t), e = smooth(SEQ.EXIT_START, SEQ.EXIT_END, t), ee = e ** 1.7, fade = light * (1 - e);
+  floor.material.envMapIntensity = 1.1 * fade;
+  key.intensity = 1.2 * fade; rim.intensity = .6 * fade;
+  for (const [m, base] of lit) m.opacity = base * fade;
+  // marks snap in one by one, the outline draws, then the 15 m lines and their markers rise
   marks.forEach((m, k) => { const s = smooth(SEQ.EMERGE + k * .16, SEQ.EMERGE + .4 + k * .16, t); m.scale.setScalar(Math.max(.001, s * (1 + .35 * Math.sin(s * Math.PI)))); });
-  rect.material.opacity = smooth(SEQ.EMERGE + .55, SEQ.BUILD, t) * light * (1 - e);
+  markMat.emissiveIntensity = .55 * fade;
+  rect.material.opacity = .55 * smooth(SEQ.EMERGE + .55, SEQ.BUILD, t) * fade;
   const ab = smooth(SEQ.EMERGE + .85, SEQ.BUILD + .25, t);
-  abLines.forEach((m) => m.scale.z = Math.max(.001, ab));
-  bottles.forEach((m, k) => m.scale.y = Math.max(.001, smooth(SEQ.BUILD - .1 + k * .06, SEQ.BUILD + .3 + k * .06, t)));
-  // the cloud
+  abLines.forEach((l) => { l.scale.z = Math.max(.001, ab); l.material.opacity = .7 * ab * fade; });
+  bottles.forEach((m, k) => m.scale.setScalar(Math.max(.001, smooth(SEQ.BUILD - .1 + k * .06, SEQ.BUILD + .3 + k * .06, t))));
+  bottleMat.emissiveIntensity = 1.6 * fade;
+  // the cloud settles
   const p = cloud.attributes.position.array;
   for (let i = 0; i < N; i++) {
-    const s = stagger[i], hero = kind[i] > 0;
-    const u = hero ? smooth(SEQ.ATTRACT + s * .5, SEQ.BUILD - .25 + s * .3, t) : smooth(SEQ.ATTRACT + s * 1.1, SEQ.EMERGE + .5 + s * 1.0, t);
-    const lift = Math.sin(u * Math.PI) * (1.2 + 1.6 * hash(i, 7));
+    const s = stagger[i], u = smooth(SEQ.ATTRACT + s * 1.1, SEQ.EMERGE + .5 + s * 1.0, t), lift = Math.sin(u * Math.PI) * (1 + 1.4 * hash(i, 7));
     for (let c = 0; c < 3; c++) {
       let v = scatter[i * 3 + c] + (homes[i * 3 + c] - scatter[i * 3 + c]) * u + (c === 1 ? lift : 0);
       if (e > 0) v += (v - (c === 0 ? W.x : c === 1 ? W.y : W.z)) * ee * 2.6;
@@ -135,36 +143,38 @@ function pose(t, now) {
     }
   }
   cloud.attributes.position.needsUpdate = true;
-  cloudMat.opacity = (.55 + .45 * smooth(SEQ.ATTRACT, SEQ.EMERGE, t)) * light * (1 - e);
-  // the two paths meet
-  const draw = smooth(SEQ.BUILD, SEQ.ALMOST, t), trailOpacity = draw * (1 - e);
-  for (const [line, pts, head, h] of [[personLine, PERSON, personHead, .6], [bikeLine, BIKE, bikeHead, .5]]) {
-    const n = Math.round(pts.length * draw);
-    line.geometry.setDrawRange(0, n);
-    line.material.opacity = .9 * trailOpacity;
-    const tip = pts[Math.max(0, Math.min(pts.length - 1, n - 1))];
-    head.visible = n > 0 && e < .6;
-    head.position.set(tip[0], h, tip[1]);
-    if (head === bikeHead && n > 1) { const prev = pts[Math.max(0, n - 2)]; head.rotation.y = -Math.atan2(tip[1] - prev[1], tip[0] - prev[0]); }
+  cloudMat.opacity = (.45 + .35 * smooth(SEQ.ATTRACT, SEQ.EMERGE, t)) * fade;
+  // the ribbons meet
+  const draw = smooth(SEQ.BUILD, SEQ.ALMOST, t);
+  for (const [r, head] of [[person, personHead], [bike, bikeHead]]) {
+    const n = Math.floor(SEGS * draw);
+    r.mesh.geometry.setDrawRange(0, n * RADIAL * 6);
+    r.mesh.material.emissiveIntensity = 2.6 * fade;
+    head.visible = draw > 0 && e < .6;
+    head.material.emissiveIntensity = 3.2 * fade;
+    const tip = r.curve.getPointAt(Math.min(1, Math.max(0, draw)));
+    head.position.copy(tip);
   }
   // the ring: a pulse as they meet, the shock as it is measured, a slow breath at rest
   const a = t - SEQ.ALMOST, m = t - SEQ.MERGED, idle = smooth(SEQ.REST - .4, SEQ.REST + .6, t);
   let scale = .001, opacity = 0;
-  if (a >= 0 && a < .9) { scale = 1 + 2.4 * a; opacity = (1 - a / .9) ** 2 * .9; }
-  if (m >= 0 && m < 1.2) { scale = 1 + 7 * m; opacity = Math.max(opacity, (1 - m / 1.2) ** 2); }
-  if (idle > 0 && !(m >= 0 && m < 1.2)) { scale = 1 + .18 * Math.sin(now * .0025); opacity = Math.max(opacity, .38 * idle); }
-  ring.scale.setScalar(scale); ring.material.opacity = opacity * (1 - e);
-  flash.intensity = m >= 0 && m < .7 ? 60 * (1 - m / .7) ** 2 : 0;
+  if (a >= 0 && a < .9) { scale = 1 + 2.2 * a; opacity = (1 - a / .9) ** 2; }
+  if (m >= 0 && m < 1.3) { scale = 1 + 6 * m; opacity = Math.max(opacity, (1 - m / 1.3) ** 2); }
+  if (idle > 0 && !(m >= 0 && m < 1.3)) { scale = 1 + .12 * Math.sin(now * .0022); opacity = Math.max(opacity, .9 * idle); }
+  ring.scale.setScalar(scale); ringMat.opacity = opacity * (1 - e); ringMat.emissiveIntensity = 3.5 * fade * opacity;
+  haloMat.opacity = (t >= SEQ.ALMOST ? .55 * (idle > 0 ? idle : 1) : 0) * (1 - e); halo.scale.setScalar(2.4 + .3 * Math.sin(now * .0022));
+  flash.intensity = m >= 0 && m < .7 ? 90 * (1 - m / .7) ** 2 : 0;
+  if (bloom) bloom.strength = .85 + .9 * (m >= 0 && m < .7 ? (1 - m / .7) : 0);
   // camera: a slow dolly in, idle parallax from REST, the dive on exit
   px += (tx - px) * .06; py += (ty - py) * .06;
-  const k = 1.32 - .32 * smooth(0, SEQ.REST, t), ease = smooth(SEQ.MERGED, SEQ.REST, t);
-  camPos.copy(BASE).multiplyScalar(k * (canvas.clientWidth < 600 ? 1.3 : 1)).applyAxisAngle(Y, ease * (Math.sin(now * .00013) * .1 + px * .22));
-  camPos.y -= ease * py * 5;
+  const k = 1.3 - .3 * smooth(0, SEQ.REST, t), ease = smooth(SEQ.MERGED, SEQ.REST, t);
+  camPos.copy(BASE).multiplyScalar(k * (canvas.clientWidth < 600 ? 1.35 : 1)).applyAxisAngle(Y, ease * (Math.sin(now * .00013) * .12 + px * .25));
+  camPos.y -= ease * py * 2.5;
   camera.position.lerpVectors(camPos, dive, ee);
-  camera.fov = 30 + 50 * e; camera.updateProjectionMatrix();
+  camera.fov = 32 + 48 * e; camera.updateProjectionMatrix();
   camera.lookAt(look.lerpVectors(TARGET, dive, e));
   // the tag and the shared centre, in screen space
-  proj.copy(W).add(new THREE.Vector3(0, .9, 0)).project(camera);
+  proj.copy(W).add(new THREE.Vector3(0, .7, 0)).project(camera);
   const r = canvas.getBoundingClientRect();
   centre.x = (proj.x + 1) / 2 * r.width; centre.y = (1 - proj.y) / 2 * r.height;
   tag.style.left = `${centre.x}px`; tag.style.top = `${centre.y}px`;
@@ -172,7 +182,17 @@ function pose(t, now) {
 }
 
 /* ── loop ── */
-function resize() { const w = canvas.clientWidth, h = canvas.clientHeight; renderer?.setPixelRatio(Math.min(devicePixelRatio, 1.5)); renderer?.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight, dpr = Math.min(devicePixelRatio, 1.5);
+  renderer?.setPixelRatio(dpr); renderer?.setSize(w, h, false); composer?.setPixelRatio(dpr); composer?.setSize(w, h);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+if (renderer) {
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .85, .55, .72);
+  composer.addPass(bloom); composer.addPass(new OutputPass());
+}
 addEventListener("resize", resize); resize();
 let running = true, firstFrame = false;
 const field = window.CWField ? window.CWField($("#field"), () => seq.value, centre) : null;
@@ -180,7 +200,7 @@ const strike = window.CWStrike ? window.CWStrike($("#strike"), centre) : null;
 function frame(now) {
   if (!running) return;
   pose(seq.value, now);
-  renderer?.render(scene, camera);
+  composer?.render();
   field?.draw(now);
   if (!firstFrame) { firstFrame = true; launch(); }
   requestAnimationFrame(frame);
