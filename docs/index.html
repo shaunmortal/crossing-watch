@@ -32,12 +32,12 @@ a { color: inherit; }
 .hero { position: relative; height: 100svh; min-height: 560px; overflow: hidden; background: #0b0b0d; color: #fff; }
 .hero video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .hero::after { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(11, 11, 13, .35), rgba(11, 11, 13, 0) 30%, rgba(11, 11, 13, .25) 60%, rgba(11, 11, 13, .88) 100%); content: ""; }
-.hero-text { position: absolute; z-index: 2; right: 28px; bottom: 56px; left: 28px; max-width: 980px; margin: 0 auto; }
+.hero-text { position: absolute; z-index: 2; right: 28px; bottom: 44px; left: 28px; max-width: 980px; margin: 0 auto; }
 .hero-text .kicker { color: rgba(255, 255, 255, .78); }
 .hero-text .kicker::before { background: #fff; }
-.hero-text h1 { margin: 16px 0 14px; max-width: 900px; color: #fff; font: 500 clamp(38px, 5.6vw, 74px) / 1.02 var(--display); letter-spacing: -.025em; text-shadow: 0 2px 30px rgba(0, 0, 0, .5); }
+.hero-text h1 { margin: 12px 0 10px; max-width: 720px; color: #fff; font: 500 clamp(30px, 3.6vw, 48px) / 1.04 var(--display); letter-spacing: -.025em; text-shadow: 0 2px 30px rgba(0, 0, 0, .5); }
 .hero-text h1 em { color: #ff9a86; }
-.hero-text .dek { max-width: 620px; color: rgba(255, 255, 255, .86); font-size: 17px; text-shadow: 0 1px 14px rgba(0, 0, 0, .6); }
+.hero-text .dek { max-width: 560px; color: rgba(255, 255, 255, .86); font-size: 15px; text-shadow: 0 1px 14px rgba(0, 0, 0, .6); }
 .hero-text .dek b { color: #fff; }
 .hero-text .btn { border-color: rgba(255, 255, 255, .7); color: #fff; }
 .hero-text .btn.fill { background: #fff; color: var(--ink); border-color: #fff; }
@@ -180,7 +180,7 @@ code { padding: 2px 6px; border-radius: 4px; background: var(--paper-2); font: 5
     <h2>A letter the college <em>can sign.</em></h2>
     <p>Muse Spark writes it from the measurements only. Code checks every number against the data; legal quotes are added by code, never by a model; two judges read it for any claim the measurements do not support.</p>
     <blockquote>"3 of 51 crossings had a moving vehicle through the same spot within 3 s of the person. 1 of 51 had a vehicle within 1.5 s. I request a raised zebra crossing with 20 km/h zone signs at this gate. I offer to share the video for review."<small>From the letter. The Head of Department signs it for the college on 3 November. Only "filed, reference X" is ever written here.</small></blockquote>
-    <figure><img src="story/06-map.jpg" alt="The map in road metres from the run" loading="lazy"><figcaption>The map in road metres, from the run. Every number in the letter links to its clip.</figcaption></figure></section>
+    <p style="margin-top:14px;font-size:14px">Every number in the letter links to its clip on the evidence page.</p></section>
 
   <section class="ch r" id="c07"><span class="n">06</span><div class="kicker">To the government</div>
     <h2>From a gate <em>to the road authority.</em></h2>
@@ -189,8 +189,8 @@ code { padding: 2px 6px; border-radius: 4px; background: var(--paper-2); font: 5
 
   <section class="ch r" id="c08"><span class="n">07</span><div class="kicker">The fix</div>
     <h2>The crossing <em>we are asking for.</em></h2>
-    <p>A raised zebra crossing with 20 km/h zone signs, drawn by Muse Image onto the real, blurred street, only inside the band where people were measured crossing. Every other pixel is the real road.</p>
-    <figure><img src="story/09-fix.webp" alt="Muse Image's raised zebra crossing drawn onto the real street" loading="lazy"><figcaption>AI-drawn inside the measured band only; labelled as such.</figcaption></figure>
+    <p>A raised zebra crossing with a speed breaker and 20 km/h zone signs at the gate, drawn by Muse Image onto a photo of our own road, so the college and the road authority can see what is being asked for.</p>
+    <figure><img src="story/09-fix.jpg" alt="The gate road with a raised zebra crossing and a speed breaker drawn on it" loading="lazy"><figcaption>Our gate, with the raised zebra crossing and speed breaker drawn by Muse Image; <i>AI-drawn, labelled as such.</i></figcaption></figure>
     <div class="card"><span class="k">After the fix</span><ul><li>Film two dismissals again from the same spot</li><li>One-sided Fisher exact test at 5%, written before any fix exists</li><li class="wait">The drop counts only if both counts fall</li></ul></div></section>
 
   <section class="ch r" id="c09"><span class="n">08</span><div class="kicker">Open weights</div>
