@@ -268,9 +268,11 @@ function reveal() {
   const seen = new IntersectionObserver((entries) => entries.forEach((x) => { if (x.isIntersecting) { x.target.classList.add("is-in"); seen.unobserve(x.target); } }), { rootMargin: "0px 0px -8% 0px" });
   const instant = reduced || !Number.isNaN(seekParam);  // a seek or reduced motion shows the page composed, no reveals
   document.querySelectorAll(".pf-reveal").forEach((el, i) => { if (instant) { el.style.transition = "none"; el.classList.add("is-in"); return; } el.style.transitionDelay = `${(i % 4) * 70}ms`; seen.observe(el); });
-  if (instant) gsap.set(platform, { opacity: 1 });
+  if (instant) { gsap.set(platform, { opacity: 1 }); document.querySelectorAll(".ch").forEach((c) => c.classList.add("is-in")); }
+  const only = params.get("only");  // QA: ?t=12&only=c05 shows one chapter alone (headless screenshots start at the top)
+  if (only) document.querySelectorAll(".ch, .pf-top, .pf-foot").forEach((el) => { if (el.id !== only) el.hidden = true; });
   document.querySelectorAll(".pf-tile").forEach((tile) => tile.addEventListener("pointermove", (ev) => { const b = tile.getBoundingClientRect(); tile.style.setProperty("--mx", `${ev.clientX - b.left}px`); tile.style.setProperty("--my", `${ev.clientY - b.top}px`); }));
-  if (location.hash && location.hash !== "#gate") document.querySelector(location.hash)?.scrollIntoView();
+  if (location.hash && location.hash !== "#c02") requestAnimationFrame(() => document.querySelector(location.hash)?.scrollIntoView({ behavior: "instant", block: "start" }));
 }
 cta.addEventListener("click", () => enter());
 $("#skip").addEventListener("click", (ev) => { ev.preventDefault(); if (stage === "ready") enter(); else { master?.progress(1, false); go("ready"); enter(); } });
