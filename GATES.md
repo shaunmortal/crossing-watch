@@ -1104,6 +1104,19 @@ Written before `analyze.py`, `monday.py` or any model call touches the gate foot
   900 s target. Reported as recorded, not extended.
 - **If G2 fails** on the stabilized file, its numbers are not used for the letter and the page says why.
 
+## The gate run: two disputed events checked by eye; analysis kept to the taped stretch (Mon 2 Nov 2026, 19:10 IST)
+
+First run on the stabilized file (`out/gate`, SAM $12.34 incl. images): 108 events, 30 kept after Muse Spark's review
+(21 serious, 9 close passes); the case agent read line A to line B as 15.0 m (tape 15 m). The run's "check by eye"
+list named two review_disputed people (kept by the walking-pace rule although Spark said "not a person"): c153 at
+122.1 s and c530 at 375.5 s. **By eye, both are not people:** their boxes sit on the stabilized frame's right edge,
+in the black border and the sliver beside it, and c153 is the path of the very motorcycle it "met" (event 1's clip).
+Both lie outside the taped stretch (x = -0.6 and -1.2 m, beyond line A). **Decision, made before the next run:** set
+`zone_m` to the taped stretch, x 0-15 m (line A to line B) by y 0-7 m (edge to edge), where the held-out 15 m check
+held; nothing outside it is reported. This removes 14 of the 30 kept events (both disputed ones; 5 beyond line A at
+the frame edge; 7 beyond line B, where the far end is extrapolated). It can only lower the counts. SAM replies are
+reused from the cache ($0); the letter and judges run again.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
