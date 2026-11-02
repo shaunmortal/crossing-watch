@@ -7,7 +7,7 @@ One page for the Open Weights review. Every open-weights call runs on our own (K
 
 | Job | Open-weights model | Where it runs | Measured result |
 |---|---|---|---|
-| Write the letter to the road authority | Muse Glimmer 30B (sha256-checked GGUF) | Kaggle, free 2 x T4, llama.cpp | sample letter in 313 s, every number passed the code check on try 2 ([record](<removed-run-record>)) |
+| Write the letter to the road authority | Muse Glimmer 30B (sha256-checked GGUF) | Kaggle, free 2 x T4, llama.cpp, our own account | **our real gate's letter in 276 s, first try**, every number passed the code check ([letter](kaggle/glimmer-gate-letter.txt), [run record](kaggle/glimmer-gate-provenance.json), [notebook](kaggle/glimmer-gate.ipynb)); the sample's in 313 s ([record](<removed-run-record>)) |
 | Write the letter, fast path | Muse Spark Open | Fireworks serverless | sample letter in 55.5 s, $0.012, request id committed ([writers table](kaggle/open-weights.md#writers-table)) |
 | Check the letter for unsupported claims | **Muse Glimmer 30B + our LoRA** (training $0, promotional) | Fireworks on-demand deployment, 1 x H200 (served 2 Nov 2026), and Serverless Training | beats Muse Spark Open in every pre-registered blind test (below); served, it gives the same verdict on 1,499 of 1,501 v6 rows |
 | Decide whether a tracked person is a pedestrian | Muse Spark Open | Fireworks serverless | drone ground truth (DUT): crowd 49 of 52 near-misses kept vs Muse Spark's 47; vehicle crowd 48 vs 48 ([table](kaggle/open-weights.md#spark-free-mode)) |
