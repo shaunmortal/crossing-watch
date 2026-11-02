@@ -1076,6 +1076,15 @@ credit left; (3) v6's edge came almost entirely from a row family we created and
 all other rows Muse Spark led 21 vs 17. Running it could only produce a weak or misleading claim, so v6 stays the
 last judge run, as first pre-registered.
 
+## Judge v6 served from a deployment (Mon 2 Nov 2026, 08:04-08:16 IST; a replication, not a new test)
+
+The v6 adapter (`muse-starter-sl-judge-v6-main`) was deployed once on Fireworks (1 x H200, BF16 live merge), every one
+of the 1,545 v6 holdout prompts was sent as the training session sent it (one user message, temperature 0, 256
+tokens), and the deployment was deleted. Labels unchanged (frozen in d2dbb29 and 881dbf0). Served vs training session:
+same verdict on 1,499 of 1,501 test rows; 1,442 right either way; vs Spark Open 82 vs 43 (p 0.00062), vs Muse Spark
+32 vs 57 (p 0.011), as in the v6 result. Every reply finished (1,545 of 1,545 "stop"). Public bench through
+`pack.py`'s judge path: 21 of 23 lies, 0 of 8 false alarms. Record: `provenance/glimmer-judge-lora-v6/live/`.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no

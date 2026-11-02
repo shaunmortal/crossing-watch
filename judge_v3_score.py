@@ -14,6 +14,7 @@ V3 = Path(__file__).parent / "provenance" / "glimmer-judge-lora-v3"
 V4 = Path(__file__).parent / "provenance" / "glimmer-judge-lora-v4"
 V5 = Path(__file__).parent / "provenance" / "glimmer-judge-lora-v5"
 V6 = Path(__file__).parent / "provenance" / "glimmer-judge-lora-v6"
+LIVE = Path("live") / "predictions_served.jsonl"
 SETS = (("test + natural (primary)", ("test", "natural")), ("natural (model-written)", ("natural",)),
         ("public bench", ("public",)))
 V4_TEST = ("test-asis", "test-template", "test-natural-lie", "test-natural-clean")
@@ -34,6 +35,8 @@ def judges(folder=V3):
     tuned = {"Glimmer + LoRA (tuned)": flags(replies(folder / "main" / "predictions_tuned.jsonl", "answer_text"))}
     if folder == V3:
         tuned["  same, unseen-kind ablation"] = flags(replies(V3 / "unseen" / "predictions_tuned.jsonl", "answer_text"))
+    if (folder / LIVE).exists():  # the same adapter served from a Fireworks on-demand deployment, temperature 0
+        tuned["  same, served (deployment)"] = flags(replies(folder / LIVE, "reply"))
     return {**tuned, "Muse Spark": flags(replies(folder / "labels" / "spark.jsonl", "reply")),
             "Muse Spark Open": flags(replies(folder / "labels" / "spark-open.jsonl", "reply"))}
 
@@ -52,6 +55,10 @@ def main():
             right[name] = [flag[r["index"]] == r["final_planted"] for r in picked]
             print(f"  {name:30} lies {ci(sum(lies), len(lies)):18} clean flagged {ci(sum(clean), len(clean)):16} "
                   f"correct {sum(right[name])}/{len(picked)}")
+        if "  same, served (deployment)" in flagged:
+            same = sum(flagged["  same, served (deployment)"][r["index"]] == flagged["Glimmer + LoRA (tuned)"][r["index"]]
+                       for r in picked)
+            print(f"  served vs training-session replies: same verdict on {same}/{len(picked)}")
         tuned = right["Glimmer + LoRA (tuned)"]
         for other in ("Muse Spark", "Muse Spark Open"):
             b = sum(t and not o for t, o in zip(tuned, right[other]))

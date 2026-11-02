@@ -9,7 +9,7 @@ One page for the Open Weights review. Every open-weights call runs on our own (K
 |---|---|---|---|
 | Write the letter to the road authority | Muse Glimmer 30B (sha256-checked GGUF) | Kaggle, free 2 x T4, llama.cpp | sample letter in 313 s, every number passed the code check on try 2 ([record](<removed-run-record>)) |
 | Write the letter, fast path | Muse Spark Open | Fireworks serverless | sample letter in 55.5 s, $0.012, request id committed ([writers table](kaggle/open-weights.md#writers-table)) |
-| Check the letter for unsupported claims | **Muse Glimmer 30B + our LoRA** (training $0, promotional) | Fireworks Serverless Training (in-session sampling) | beats Muse Spark Open in every pre-registered blind test (below) |
+| Check the letter for unsupported claims | **Muse Glimmer 30B + our LoRA** (training $0, promotional) | Fireworks on-demand deployment, 1 x H200 (served 2 Nov 2026), and Serverless Training | beats Muse Spark Open in every pre-registered blind test (below); served, it gives the same verdict on 1,499 of 1,501 v6 rows |
 | Decide whether a tracked person is a pedestrian | Muse Spark Open | Fireworks serverless | drone ground truth (DUT): crowd 49 of 52 near-misses kept vs Muse Spark's 47; vehicle crowd 48 vs 48 ([table](kaggle/open-weights.md#spark-free-mode)) |
 
 ## The fine-tuned judge: four pre-registered blind tests
@@ -37,6 +37,13 @@ letters written by Muse Spark and Muse Spark Open, with lies and slips planted b
 - **Without the LoRA, Glimmer is no judge at all here:** with the same 256-token cap, base Glimmer finished 0 of 1,545
   verdicts in v6's evaluation (still reasoning when cut off); tuned Glimmer finished every one in about 34 tokens
   (1,167 vs 0 rows right). Base Glimmer with a longer cap was not measured.
+- **Served, not just trained:** on 2 Nov 2026 we deployed the v6 adapter on Fireworks (1 x H200, live merge) and
+  replayed all 1,545 v6 prompts: same verdict as the training session on 1,499 of 1,501 test rows, the same 1,442
+  right, the same 82 vs 43 against Spark Open; every reply finished, median 2.1 s. Through the product's own judge path
+  (`pack.py`'s `JUDGE_MODEL_URL` call) it caught 21 of 23 public-bench lies with 0 of 8 false alarms, as Muse Spark
+  does. Request ids, replies and the run log: `provenance/glimmer-judge-lora-v6/live/`. The 1,545 replies took 202 s
+  of one H200 at $8 per GPU-hour: about $0.45, or about $0.29 per 1,000 verdicts while the GPU is busy (start-up and
+  idle time not counted). The deployment was deleted after the run.
 - **Cost:** about 26 output tokens per verdict; about $2.90 per 1,000 letters at the Glimmer sampling price we recorded
   for Fireworks ($1.96 / $4.88 per 1M tokens), vs Muse Spark Open $5.66 and Muse Spark $10.33 (v4 token counts, list
   prices, no cache discount).
@@ -50,7 +57,7 @@ letters written by Muse Spark and Muse Spark Open, with lies and slips planted b
 ## Check it yourself ($0, no key)
 
 ```
-python3 judge_v3_score.py        # v3; also v4, v5, v6 (v6 prints the per-kind split and the post-hoc line)
+python3 judge_v3_score.py        # v3; also v4, v5, v6 (v6 adds the served replies, the per-kind split, the post-hoc line)
 python3 judge_compare.py         # the v2 same-set table
 python3 writers_table.py         # Glimmer on Kaggle vs Spark Open vs Muse Spark as letter writers
 ```
@@ -61,9 +68,9 @@ python3 writers_table.py         # Glimmer on Kaggle vs Spark Open vs Muse Spark
 
 ## Limits, stated
 
-- **The tuned judge has only run inside the Fireworks training session** (sampling there, on the promoted model ids
-  `muse-starter-sl-judge-v3-main` to `-v6-main`). It is not deployed, and the product's letter check still uses Muse
-  Spark or Spark Open. A Fireworks on-demand deployment needs the account owner's payment method.
+- **The tuned judge was served once, for the test above, and then deleted** (an on-demand deployment bills while it is
+  up). The product's default letter check is Muse Spark or Spark Open; the tuned judge plugs in with
+  `JUDGE_MODEL_URL=https://api.fireworks.ai/inference/v1` and `JUDGE_MODEL=<model>#<deployment>` once it is deployed.
 - **The adapter cannot be downloaded from Fireworks yet** (we asked Fireworks to enable it); the organizers confirmed
   committed model ids, logs, outputs and a re-score script are the reviewable material. `kaggle/glimmer-judge-lora.ipynb`
   is the self-hosting path but is untested and still names the v2 adapter (`muse-starter-sl-judge-v2-b`).

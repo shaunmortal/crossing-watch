@@ -1,0 +1,27 @@
+{
+ "what": "the v6 LoRA served once from a Fireworks on-demand deployment (live merge), every v6 holdout prompt replayed as the training session sampled it (one user message, temperature 0, 256 tokens), then the 31-prompt public bench through the product's own judge path (pack.py's JUDGE_MODEL_URL call, JSON schema, one vote); the deployment was then deleted",
+ "model": "accounts/<fireworks-account>/models/muse-starter-sl-judge-v6-main",
+ "deployment": "accounts/<fireworks-account>/deployments/cw-judge-v6",
+ "deployment_shape": "accounts/fireworks/deploymentShapes/dkuwotf7 (1 x NVIDIA H200 141GB, BF16)",
+ "price": "$8.00 per GPU-hour, billed per second (fireworks.ai/pricing, read 2 Nov 2026)",
+ "log": [
+  "create Mon Nov  2 08:04:22 IST 2026",
+  "READY accounts/<fireworks-account>/deployments/cw-judge-v6",
+  "ready Mon Nov  2 08:11:39 IST 2026",
+  "asking 1545 of 1545",
+  "replies saved: 1545 of 1545 in 202 s",
+  "replay done Mon Nov  2 08:15:02 IST 2026",
+  "product done Mon Nov  2 08:15:47 IST 2026",
+  "deleting cw-judge-v6 (Mon Nov  2 08:15:47 IST 2026)",
+  "[('accounts/<fireworks-account>/deployments/cw-judge-v6', 'DELETING')]"
+ ],
+ "replies": 1545,
+ "finish_stop": 1545,
+ "prompt_tokens": 2234586,
+ "completion_tokens": 53167,
+ "median_wall_s": 2.06,
+ "scripts": [
+  "replay_v6.py",
+  "live_v6.sh"
+ ]
+}
