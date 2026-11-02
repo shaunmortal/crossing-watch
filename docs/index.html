@@ -1,339 +1,236 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="entry-mode">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Crossing Watch</title>
-<meta name="description" content="One phone video of a school or college gate in, measured near-misses and a code-checked letter to the road authority out. Built with Meta SAM 3.1, Muse Spark and open-weights Muse Glimmer.">
+<meta name="description" content="One phone video of a college gate in. Measured near-misses and a code-checked letter to the road authority out. Built on Meta SAM 3.1, Muse Spark and open-weights Muse Glimmer.">
+<meta name="theme-color" content="#050506">
+<meta property="og:title" content="Crossing Watch">
+<meta property="og:description" content="Sadak ka khatra, naap ke, saboot ke saath. One phone video. Measured near-misses. A letter the college signed.">
+<meta property="og:image" content="https://crossingwatch.xyz/og.png">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800;900&family=JetBrains+Mono:wght@500&family=Noto+Sans+Devanagari:wght@600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Space+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #f4f5fb; --ink: #12131d; --muted: #5b6075; --card: rgba(255,255,255,.72); --line: #e3e5f0;
-    --blue: #3b8cff; --violet: #7a5cff; --pink: #e0479e; --red: #ef4444; --cyan: #14b8c4; --amber: #f5b301;
-    --grid: rgba(90,100,160,.08);
-  }
-  :root[data-theme="dark"] {
-    --bg: #0d0f17; --ink: #eef0fb; --muted: #a3a8c3; --card: rgba(22,25,38,.72); --line: #262a3d; --grid: rgba(160,170,230,.06);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #0d0f17; --ink: #eef0fb; --muted: #a3a8c3; --card: rgba(22,25,38,.72); --line: #262a3d; --grid: rgba(160,170,230,.06);
-    }
-  }
-  * { box-sizing: border-box; }
-  html { scroll-behavior: smooth; overflow-x: clip; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font-family: Inter, system-ui, sans-serif; line-height: 1.5;
-         background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
-         background-size: 40px 40px; }
-  a { color: inherit; }
-  .wrap { max-width: 1240px; margin: 0 auto; padding: 0 28px; }
-  nav { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; position: relative; z-index: 3; }
-  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 20px; text-decoration: none; }
-  .logo { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, var(--blue), var(--violet), var(--pink));
-          display: grid; place-items: center; color: #fff; font-size: 15px; }
-  .brand small { font-family: "Noto Sans Devanagari", sans-serif; font-weight: 600; color: var(--muted); font-size: 17px; }
-  .links { display: flex; align-items: center; gap: 26px; font-size: 15px; }
-  .links a { text-decoration: none; color: var(--muted); }
-  .links a:hover { color: var(--ink); }
-  .icon-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--card); cursor: pointer;
-              color: var(--ink); font-size: 17px; }
-  .pill-btn { padding: 10px 20px; border-radius: 999px; color: #fff !important; font-weight: 600; text-decoration: none;
-              background: linear-gradient(90deg, var(--blue), var(--violet)); box-shadow: 0 8px 24px rgba(122,92,255,.3); }
-  .hero { position: relative; min-height: 680px; display: grid; grid-template-columns: 1.15fr 1fr; align-items: center; }
-  .hero-text { position: relative; z-index: 2; padding: 40px 0 70px; }
-  #scene { position: absolute; right: -80px; top: -30px; width: 66%; height: 760px; z-index: 1;
-            -webkit-mask-image: radial-gradient(ellipse 60% 58% at 55% 52%, #000 62%, transparent 100%);
-            mask-image: radial-gradient(ellipse 60% 58% at 55% 52%, #000 62%, transparent 100%); }
-  .badge { display: inline-flex; align-items: center; gap: 10px; font-family: "JetBrains Mono", monospace; font-size: 13px;
-           padding: 7px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--muted); }
-  .badge i { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 0 4px rgba(34,197,94,.15); }
-  h1 { font-size: clamp(42px, 5.4vw, 76px); line-height: .98; letter-spacing: -.035em; margin: 22px 0 14px; font-weight: 900; }
-  h1 .g1 { background: linear-gradient(90deg, var(--blue), var(--violet)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  h1 .g2 { background: linear-gradient(90deg, var(--violet), var(--pink)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-  .deva { font-family: "Noto Sans Devanagari", sans-serif; font-size: clamp(21px, 2.3vw, 29px); font-weight: 700; color: var(--muted); margin: 0 0 16px; }
-  .lede { font-size: 18px; color: var(--muted); max-width: 560px; margin: 0 0 30px; }
-  .ctas { display: flex; gap: 14px; flex-wrap: wrap; }
-  .btn { padding: 15px 26px; border-radius: 999px; font-weight: 600; font-size: 16px; text-decoration: none; border: 1px solid var(--line);
-         background: var(--card); }
-  .btn.primary { color: #fff; border: 0; background: linear-gradient(90deg, var(--blue), var(--violet)); box-shadow: 0 10px 30px rgba(59,140,255,.3); }
-  .tag { position: absolute; z-index: 2; pointer-events: none; font-family: "JetBrains Mono", monospace; font-size: 12.5px; font-weight: 500;
-         padding: 6px 10px; border-radius: 8px; white-space: nowrap; transform: translate(-50%, -130%); opacity: 0; transition: opacity .25s; }
-  .tag.serious { background: rgba(239,68,68,.92); color: #fff; box-shadow: 0 6px 18px rgba(239,68,68,.35); }
-  .tag.soft { background: var(--card); color: var(--ink); border: 1px solid var(--line); backdrop-filter: blur(6px); }
-  section { padding: 70px 0; }
-  .kicker { font-family: "JetBrains Mono", monospace; font-size: 13px; color: var(--violet); letter-spacing: .06em; text-transform: uppercase; }
-  h2 { font-size: clamp(30px, 3.6vw, 46px); letter-spacing: -.025em; margin: 8px 0 12px; line-height: 1.08; }
-  .sub { color: var(--muted); max-width: 720px; font-size: 17px; margin: 0 0 34px; }
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-  .stat, .step, .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 22px; backdrop-filter: blur(8px); }
-  .stat b { display: block; font-size: 44px; letter-spacing: -.03em; line-height: 1.05; }
-  .stat span { color: var(--muted); font-size: 15px; }
-  .stat.hot b { color: var(--red); }
-  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-  .step .n { font-family: "JetBrains Mono", monospace; color: var(--violet); font-size: 13px; }
-  .step h3, .card h3 { margin: 6px 0 8px; font-size: 20px; }
-  .step p, .card p { margin: 0; color: var(--muted); font-size: 15px; }
-  .model { display: inline-block; margin-top: 12px; font-family: "JetBrains Mono", monospace; font-size: 12px; padding: 4px 9px;
-           border-radius: 6px; background: rgba(122,92,255,.12); color: var(--violet); }
-  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-  .card b { font-size: 34px; letter-spacing: -.02em; display: block; margin: 4px 0; }
-  .note { color: var(--muted); font-size: 14px; margin-top: 18px; }
-  footer { border-top: 1px solid var(--line); padding: 30px 0 50px; color: var(--muted); font-size: 14px; }
-  footer .row { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-  @media (max-width: 960px) {
-    .hero { grid-template-columns: minmax(0, 1fr); min-height: 0; }
-    .badge { font-size: 11.5px; }
-    #scene { position: relative; right: 0; top: 0; width: 100%; height: 380px; order: 2; }
-    .hero-text { padding-bottom: 10px; }
-    .stats, .steps { grid-template-columns: 1fr 1fr; }
-    .cards { grid-template-columns: 1fr; }
-    .links a:not(.pill-btn) { display: none; }
-  }
-  @media (max-width: 520px) {
-    .wrap { padding: 0 16px; }
-    .stats, .steps { grid-template-columns: 1fr; }
-    .stat b { font-size: 38px; }
-    .brand small { display: none; }
-  }
+/* Crossing Watch: silver on black. One road, one light, one clock. */
+@property --track { syntax: "<number>"; inherits: false; initial-value: 0.3; }
+@property --sweep { syntax: "<percentage>"; inherits: false; initial-value: 0%; }
+:root {
+  --void: #050506; --studio: #0b0c0d; --pool: #17181a; --pool-mid: #101112;
+  --paper: #eef0f3; --silver: #c6cad1; --dim: #8d93a6; --line: rgba(238, 240, 243, .14);
+  --red: #ef4444; --cyan: #7ee8f5; --blue: #5b9dff;
+  --sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --serif: Cinzel, "Trajan Pro", Georgia, serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { min-width: 320px; margin: 0; background: var(--void); }
+html.entry-mode, html.entry-mode body { height: 100%; overflow: hidden; }
+body { color: var(--paper); font-family: var(--sans); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+button { font: inherit; }
+::selection { background: var(--paper); color: var(--studio); }
+[hidden] { display: none !important; }
+
+/* ── Entry: the one screen. The road scene is WebGL; the type hangs from the horizon line. ── */
+.entry { --horizon: 80svh; --wm: round(clamp(20px, min(2.7vw, 4.4svh), 50px), 1px); position: relative; height: 100svh; overflow: hidden; isolation: isolate; background: var(--void); }
+.entry-pool { position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: radial-gradient(ellipse 46vw 60svh at 50% 40%, var(--pool) 0%, var(--pool-mid) 34%, var(--studio) 62%, var(--void) 100%); }
+.entry-logo, .entry-field, .entry-strike { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.entry-logo { z-index: 2; display: block; }
+.entry-field { z-index: 3; mix-blend-mode: screen; }
+.entry-grain, .entry-vignette { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.entry-grain { opacity: .05; mix-blend-mode: soft-light;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E") 0 0 / 160px 160px; }
+.entry-vignette { background: radial-gradient(ellipse at 50% 42%, transparent 55%, rgba(0, 0, 0, .6) 100%); }
+.entry-strike { z-index: 8; mix-blend-mode: screen; filter: drop-shadow(0 0 5px rgba(200, 225, 255, .95)) drop-shadow(0 0 26px rgba(120, 170, 255, .55)); }
+.entry-overlay { position: absolute; inset: 0; z-index: 9; background: var(--void); opacity: 0; pointer-events: none; }
+
+/* the measured moment, pinned to the road in screen space */
+.entry-tag { position: absolute; z-index: 5; pointer-events: none; padding: 7px 11px; border-radius: 6px; background: rgba(239, 68, 68, .92); color: #fff;
+  font: 500 11.5px / 1 var(--mono); letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; transform: translate(-50%, -150%); opacity: 0;
+  box-shadow: 0 0 24px rgba(239, 68, 68, .45); }
+
+.entry-stack { position: absolute; top: round(var(--horizon), 1px); right: 0; left: 0; z-index: 6; display: flex; flex-direction: column; align-items: center; padding: 0 16px; pointer-events: none; text-align: center; }
+.entry-stack::before { position: absolute; top: calc(var(--wm) * -2.6); left: 50%; z-index: -1; width: min(calc(var(--wm) * 26), 100%); height: calc(var(--wm) * 2.6 + 200px);
+  background: radial-gradient(closest-side, rgba(0, 0, 0, .66), rgba(0, 0, 0, .42) 55%, transparent); translate: -50% 0; content: ""; }
+.og-wordmark { display: flex; justify-content: center; margin: calc(var(--wm) * -1.42) 0 calc(var(--wm) * .42); font: 700 var(--wm) / 1 var(--serif); white-space: nowrap; filter: drop-shadow(0 0 14px rgba(232, 238, 248, .22)); }
+.og-name { --track: .3; margin-right: calc(var(--track) * -1em); color: transparent; letter-spacing: calc(var(--track) * 1em); word-spacing: .06em; text-transform: uppercase;
+  background: linear-gradient(100deg, var(--silver) 0%, #f4f6f9 16.67%, var(--silver) 33.33%, #f4f6f9 44%, #fff 50%, #f4f6f9 56%, var(--silver) 66.67%, #f4f6f9 83.33%, var(--silver) 100%) var(--sweep) 0 / 300% 100%;
+  -webkit-background-clip: text; background-clip: text; }
+.og-rule { display: flex; gap: 10px; align-items: center; width: min(calc(var(--wm) * 13), 100%); height: 20px; margin-top: -10px; }
+.og-rule::before, .og-rule::after { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, rgba(238, 240, 243, .5) 35%, rgba(255, 255, 255, .85)); content: ""; }
+.og-rule::after { scale: -1 1; }
+.og-rule__star { flex: none; width: 14px; height: 14px; overflow: visible; fill: #fff; filter: drop-shadow(0 0 5px rgba(255, 255, 255, .85)); }
+.og-slot { position: relative; align-self: stretch; height: 16px; margin-top: calc(var(--wm) * .34); }
+.og-slot p { position: absolute; inset: 0; margin: 0; color: var(--paper); font-size: 12px; font-weight: 400; letter-spacing: .4em; line-height: 16px; text-indent: .4em; text-transform: uppercase; white-space: nowrap; word-spacing: .9em; }
+.og-caption { opacity: 0; }
+.entry-cta { display: flex; flex: none; align-items: center; justify-content: center; width: 248px; height: 48px; margin-top: round(clamp(20px, 3.3svh, 40px), 1px); padding: 0;
+  border: 1px solid rgba(226, 232, 245, .55); border-radius: 999px; background: rgba(255, 255, 255, .02); color: #fff; cursor: pointer; pointer-events: auto;
+  box-shadow: 0 0 22px rgba(226, 232, 245, .14), inset 0 0 14px rgba(226, 232, 245, .05); translate: var(--mag-x, 0px) var(--mag-y, 0px);
+  transition: transform 80ms ease-out, border-color .3s linear, box-shadow .3s linear, background-color .3s linear; -webkit-tap-highlight-color: transparent; }
+.entry-cta:disabled { cursor: default; }
+.entry-cta:active { transform: scale(.985); }
+.entry-cta:focus-visible { outline: 1px solid var(--paper); outline-offset: 5px; }
+.entry-cta__label { display: flex; gap: 14px; align-items: center; font-size: 11px; font-weight: 500; letter-spacing: .3em; line-height: 1; text-indent: .3em; text-transform: uppercase; translate: var(--mag-ix, 0px) var(--mag-iy, 0px); }
+.entry-cta__label b { font-weight: 400; letter-spacing: 0; text-indent: 0; transition: transform .4s cubic-bezier(.16, 1, .3, 1); }
+.entry--exit .entry-cta { border-color: #fff; background: rgba(255, 255, 255, .08); box-shadow: 0 0 38px rgba(226, 232, 245, .4), inset 0 0 20px rgba(226, 232, 245, .16); }
+@media (hover: hover) and (pointer: fine) {
+  .entry-cta:enabled:hover { border-color: rgba(255, 255, 255, .9); background: rgba(255, 255, 255, .05); box-shadow: 0 0 34px rgba(226, 232, 245, .28), inset 0 0 18px rgba(226, 232, 245, .1); }
+  .entry-cta:enabled:hover b { transform: translateX(5px); }
+}
+.entry-sub { margin: 16px 0 0; color: var(--silver); font-size: 10px; letter-spacing: .3em; line-height: 1; text-indent: .3em; text-transform: uppercase; white-space: nowrap; }
+.entry-skip { position: fixed; z-index: 12; right: 1.25rem; bottom: 1.1rem; color: var(--dim); font: 400 10px / 1 var(--mono); letter-spacing: .2em; text-decoration: none; text-transform: uppercase; opacity: 0; transition: opacity .4s; }
+.entry--ready .entry-skip, .entry--sequence .entry-skip { opacity: .7; }
+.entry-skip:hover { color: var(--paper); }
+.entry--boot :is(.entry-pool, .og-wordmark, .og-rule, .og-tagline, .entry-cta, .entry-sub) { opacity: 0; }
+.corner { position: fixed; z-index: 12; top: 1.1rem; right: 1.25rem; display: flex; gap: .5rem; }
+.corner a { display: inline-flex; align-items: center; justify-content: center; width: 2.5rem; height: 2.5rem; border: 1px solid rgba(238, 240, 243, .35); border-radius: 50%; background: rgba(5, 5, 6, .35); color: rgba(238, 240, 243, .8); }
+.corner a:hover { border-color: rgba(238, 240, 243, .9); color: #fff; }
+.corner svg { width: 1.05rem; height: 1.05rem; fill: currentColor; }
+@media (max-width: 700px) {
+  .entry { --wm: round(clamp(16px, 5.2vw, 26px), 1px); }
+  .entry-pool { background: radial-gradient(ellipse 120vw 60svh at 50% 36%, var(--pool) 0%, var(--pool-mid) 34%, var(--studio) 62%, var(--void) 100%); }
+  .og-name { --track: .2; }
+  .og-slot p { font-size: 9.5px; letter-spacing: .22em; text-indent: .22em; word-spacing: .4em; }
+  .entry-sub { max-width: 100%; font-size: 8.5px; letter-spacing: .16em; line-height: 1.6; white-space: normal; }
+}
+@media (max-height: 700px) { .entry-sub { display: none; } }
+@media (max-height: 520px) { .og-rule, .og-slot { display: none; } .entry-cta { height: 42px; margin-top: 4px; } }
+
+/* ── The platform: what the CTA opens. Same metal, laid out to read. ── */
+.platform { opacity: 0; }
+.pf-wrap { max-width: 1180px; margin: 0 auto; padding: 0 28px; }
+.pf-top { position: sticky; top: 0; z-index: 20; border-bottom: 1px solid var(--line); background: rgba(5, 5, 6, .7); backdrop-filter: blur(10px); }
+.pf-top .pf-wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+.pf-mark { color: var(--paper); font: 700 15px / 1 var(--serif); letter-spacing: .3em; text-decoration: none; text-transform: uppercase; }
+.pf-nav { display: flex; gap: 26px; }
+.pf-nav a { color: var(--dim); font: 500 11px / 1 var(--mono); letter-spacing: .18em; text-decoration: none; text-transform: uppercase; }
+.pf-nav a:hover { color: var(--paper); }
+section.pf { padding: 92px 0; border-bottom: 1px solid var(--line); }
+.pf-kicker { color: var(--silver); font: 500 11px / 1 var(--mono); letter-spacing: .3em; text-transform: uppercase; }
+.pf-kicker::before { display: inline-block; width: 28px; height: 1px; margin-right: 14px; vertical-align: middle; background: linear-gradient(90deg, transparent, #fff); content: ""; }
+.pf h2 { margin: 18px 0 14px; font: 400 clamp(30px, 4vw, 52px) / 1.1 var(--serif); letter-spacing: .01em; }
+.pf h2 em { font-style: normal; color: var(--silver); }
+.pf-lede { max-width: 680px; margin: 0 0 40px; color: var(--dim); font: 400 16px / 1.65 var(--mono); }
+.pf-grid { display: grid; gap: 14px; }
+.pf-grid.four { grid-template-columns: repeat(4, 1fr); }
+.pf-grid.three { grid-template-columns: repeat(3, 1fr); }
+.pf-tile { position: relative; padding: 26px 24px 22px; border: 1px solid var(--line); border-radius: 14px; background: linear-gradient(180deg, rgba(255, 255, 255, .035), rgba(255, 255, 255, .012)); overflow: hidden; }
+.pf-tile::before { position: absolute; inset: 0; background: radial-gradient(240px 140px at var(--mx, 50%) var(--my, 0%), rgba(255, 255, 255, .07), transparent 70%); opacity: 0; transition: opacity .4s; content: ""; pointer-events: none; }
+.pf-tile:hover::before { opacity: 1; }
+.pf-tile b { display: block; margin: 2px 0 8px; font: 400 44px / 1 var(--serif); letter-spacing: -.01em; }
+.pf-tile b.hot { color: var(--red); }
+.pf-tile .pf-k { display: block; margin-bottom: 14px; color: var(--silver); font: 500 10.5px / 1 var(--mono); letter-spacing: .22em; text-transform: uppercase; }
+.pf-tile p { margin: 0; color: var(--dim); font: 400 13.5px / 1.6 var(--mono); }
+.pf-tile h3 { margin: 0 0 10px; font: 600 17px / 1.3 var(--sans); }
+.pf-chip { display: inline-block; margin-top: 14px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 6px; color: var(--silver); font: 500 10.5px / 1 var(--mono); letter-spacing: .1em; }
+.pf-quote { position: relative; max-width: 900px; margin: 0 auto; padding: 40px 0 0; }
+.pf-quote p { margin: 0 0 18px; color: var(--paper); font: 400 clamp(17px, 2vw, 22px) / 1.55 var(--serif); }
+.pf-quote small { display: block; color: var(--dim); font: 400 12px / 1.6 var(--mono); letter-spacing: .08em; }
+.pf-note { margin-top: 22px; color: var(--dim); font: 400 12.5px / 1.7 var(--mono); }
+.pf-note a, .pf-foot a { color: var(--silver); text-decoration: none; border-bottom: 1px solid var(--line); }
+.pf-note a:hover, .pf-foot a:hover { color: #fff; border-color: #fff; }
+.pf-reveal { opacity: 0; translate: 0 18px; transition: opacity .8s cubic-bezier(.16, 1, .3, 1), translate .8s cubic-bezier(.16, 1, .3, 1); }
+.pf-reveal.is-in { opacity: 1; translate: 0 0; }
+.pf-foot { padding: 40px 0 60px; color: var(--dim); font: 400 12px / 1.7 var(--mono); }
+.pf-foot .pf-wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+@media (max-width: 960px) { .pf-grid.four { grid-template-columns: 1fr 1fr; } .pf-grid.three { grid-template-columns: 1fr; } .pf-nav a:not(:last-child) { display: none; } }
+@media (max-width: 520px) { .pf-wrap { padding: 0 16px; } .pf-grid.four { grid-template-columns: 1fr; } section.pf { padding: 64px 0; } }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <nav>
-    <a class="brand" href="#"><span class="logo">◆</span>Crossing Watch <small>सड़क</small></a>
-    <div class="links">
-      <a href="#how">How it works</a>
-      <a href="#gate">Our gate</a>
-      <a href="#open">Open weights</a>
-      <button class="icon-btn" id="theme" aria-label="Switch light or dark">☀</button>
-      <a class="pill-btn" href="https://github.com/shaunmortal/crossing-watch">GitHub</a>
+<main class="entry entry--boot" id="entry" aria-label="Crossing Watch">
+  <div class="entry-pool"></div>
+  <canvas class="entry-logo" id="scene" aria-hidden="true"></canvas>
+  <canvas class="entry-field" id="field" aria-hidden="true"></canvas>
+  <div class="entry-grain" aria-hidden="true"></div>
+  <div class="entry-vignette" aria-hidden="true"></div>
+  <canvas class="entry-strike" id="strike" aria-hidden="true"></canvas>
+  <div class="entry-tag" id="tag">PET 0.0 s · serious near-miss</div>
+  <div class="entry-stack">
+    <h1 class="og-wordmark"><span class="og-name">Crossing Watch</span></h1>
+    <div class="og-rule" aria-hidden="true"><svg class="og-rule__star" viewBox="0 0 10 10"><path d="M5 0 L6 4 L10 5 L6 6 L5 10 L4 6 L0 5 L4 4 Z"/></svg></div>
+    <div class="og-slot" aria-live="polite">
+      <p class="og-caption">Eighty people. Fifty-five vehicles. One phone.</p>
+      <p class="og-caption">Pixels find their paths.</p>
+      <p class="og-caption">A tape turns pixels into metres.</p>
+      <p class="og-caption">Two paths head for one spot.</p>
+      <p class="og-caption">Zero point zero seconds apart.</p>
+      <p class="og-caption">Measured. Signed. Filed.</p>
+      <p class="og-tagline">Sadak ka khatra · naap ke · saboot ke saath</p>
+      <p class="og-caption og-caption--exit">The evidence, as measured.</p>
     </div>
-  </nav>
-
-  <div class="hero">
-    <div class="hero-text">
-      <span class="badge"><i></i>Meta SAM 3.1 · Muse Spark · Muse Glimmer (open weights)</span>
-      <h1>Sadak ka khatra,<br><span class="g1">naap ke,</span><br><span class="g2">saboot ke saath.</span></h1>
-      <p class="deva">सड़क का खतरा, नाप के, सबूत के साथ।</p>
-      <p class="lede">One phone video of a school or college gate in. Measured near-misses, a map in road metres and a
-        code-checked letter to the road authority out. Every face and number plate blurred.</p>
-      <div class="ctas">
-        <a class="btn primary" href="#gate">See our gate, measured →</a>
-        <a class="btn" href="#how">How it works ↓</a>
-      </div>
-    </div>
-    <canvas id="scene" aria-label="3D model of our college gate: the road, the taped marks, people crossing and a motorcycle reaching the same spot as a person"></canvas>
-    <div class="tag serious" id="tag-pet">PET 0.0 s · serious near-miss</div>
-    <div class="tag soft" id="tag-cam">Phone, 8.3 m up</div>
-    <div class="tag soft" id="tag-tape">Tape 15 m · video 15.0 m</div>
+    <button class="entry-cta" id="cta" type="button" disabled><span class="entry-cta__label">See the evidence <b>→</b></span></button>
+    <p class="entry-sub">LNCT Excellence gate · Bhopal · 2 Nov 2026 · every face blurred</p>
   </div>
+  <div class="entry-overlay"></div>
+  <a class="entry-skip" id="skip" href="#gate">Skip ↓</a>
+</main>
+<div class="corner"><a href="https://github.com/shaunmortal/crossing-watch" aria-label="GitHub"><svg viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a></div>
+
+<div class="platform" id="platform" hidden>
+  <header class="pf-top"><div class="pf-wrap"><a class="pf-mark" href="#gate">Crossing Watch</a>
+    <nav class="pf-nav"><a href="#how">How it works</a><a href="#truth">Checked</a><a href="#open">Open weights</a><a href="https://github.com/shaunmortal/crossing-watch">GitHub</a></nav></div></header>
+
+  <section class="pf" id="gate"><div class="pf-wrap">
+    <div class="pf-reveal"><span class="pf-kicker">Our gate, measured</span>
+    <h2>LNCT Excellence, Bhopal.<br><em>One dismissal, 8.6 minutes.</em></h2>
+    <p class="pf-lede">Filmed on 2 November 2026 from the highway 8.3 m above the gate. Counted on the taped 15 m stretch in front of it, on the measured road plane.</p></div>
+    <div class="pf-grid four">
+      <div class="pf-tile pf-reveal"><span class="pf-k">Crossings</span><b>80</b><p>people crossed the road</p></div>
+      <div class="pf-tile pf-reveal"><span class="pf-k">Traffic</span><b>55</b><p>moving vehicles passed; 7 faster than 25 km/h</p></div>
+      <div class="pf-tile pf-reveal"><span class="pf-k">Serious near-misses</span><b class="hot">2</b><p>one with a person and a motorcycle on the same spot at the same instant (0.0 s), plus 3 close passes</p></div>
+      <div class="pf-tile pf-reveal"><span class="pf-k">Tape check</span><b>15.0 m</b><p>read from the video, against 15 m of tape on a line never used to calibrate</p></div>
+    </div>
+  </div></section>
+
+  <section class="pf" id="how"><div class="pf-wrap">
+    <div class="pf-reveal"><span class="pf-kicker">How it works</span>
+    <h2>From a phone on the road <em>to a letter on the right desk.</em></h2>
+    <p class="pf-lede">Four steps. The models do the seeing and the writing; code checks every number before it leaves.</p></div>
+    <div class="pf-grid four">
+      <div class="pf-tile pf-reveal"><span class="pf-k">01 · Film</span><h3>One phone, high up, and a tape measure</h3><p>Taped marks on the road turn pixels into metres. Every face and number plate is blurred before anything is shown.</p></div>
+      <div class="pf-tile pf-reveal"><span class="pf-k">02 · Track</span><h3>Every person and vehicle, by name</h3><p>Motorcycles, auto rickshaws, cars and buses, followed frame by frame.</p><span class="pf-chip">Meta SAM 3.1</span></div>
+      <div class="pf-tile pf-reveal"><span class="pf-k">03 · Measure</span><h3>Who reached the same spot, how many seconds apart</h3><p>Post-encroachment time, speed, and the death risk at that speed. A second model reviews each person.</p><span class="pf-chip">Muse Spark review</span></div>
+      <div class="pf-tile pf-reveal"><span class="pf-k">04 · Write</span><h3>A letter from the measurements only</h3><p>Code checks each number; two judges read it for any claim the measurements do not support.</p><span class="pf-chip">Muse Spark · Muse Glimmer</span></div>
+    </div>
+  </div></section>
+
+  <section class="pf" id="truth"><div class="pf-wrap">
+    <div class="pf-reveal"><span class="pf-kicker">Checked against truth</span>
+    <h2>Measured, <em>not guessed.</em></h2></div>
+    <div class="pf-grid three">
+      <div class="pf-tile pf-reveal"><span class="pf-k">Drone ground truth</span><b>47 of 52</b><p>near-misses found on top-down drone footage (DUT), after Muse Spark's review.</p></div>
+      <div class="pf-tile pf-reveal"><span class="pf-k">Tape check</span><b>15.0 m</b><p>our video's reading of a line we never used to calibrate. The tape said 15 m.</p></div>
+      <div class="pf-tile pf-reveal"><span class="pf-k">Letter check</span><b>24 of 24</b><p>planted false claims flagged by the letter judge on the public bench.</p></div>
+    </div>
+    <div class="pf-quote pf-reveal">
+      <p>"3 of 51 crossings had a moving vehicle through the same spot within 3 s of the person. 1 of 51 had a vehicle within 1.5 s. I request a raised zebra crossing with 20 km/h zone signs at this gate. I offer to share the video for review."</p>
+      <small>From the letter, written by Muse Spark from the measurements and checked by code; ready for the Head of Department's signature on 3 November. Only "filed, reference X" is ever written here.</small>
+    </div>
+  </div></section>
+
+  <section class="pf" id="open"><div class="pf-wrap">
+    <div class="pf-reveal"><span class="pf-kicker">Open weights</span>
+    <h2>Meta's open models, <em>doing the real work.</em></h2></div>
+    <div class="pf-grid three">
+      <div class="pf-tile pf-reveal"><span class="pf-k">Muse Glimmer 30B wrote our letter</span><b>276 s</b><p>on Kaggle's free 2 × T4, first try, every number passing the code check.</p></div>
+      <div class="pf-tile pf-reveal"><span class="pf-k">Our fine-tuned judge</span><b>3 of 3</b><p>pre-registered blind tests won against Muse Spark Open, at about a quarter of Muse Spark's cost.</p></div>
+      <div class="pf-tile pf-reveal"><span class="pf-k">Served live</span><b>1,499 / 1,501</b><p>same verdicts from the adapter deployed on Fireworks as in training.</p></div>
+    </div>
+    <p class="pf-note pf-reveal">Every number on this page re-checks from the repository at $0: <a href="https://github.com/shaunmortal/crossing-watch/blob/main/JUDGES.md">JUDGES.md</a> · <a href="https://github.com/shaunmortal/crossing-watch/blob/main/OPEN_WEIGHTS.md">OPEN_WEIGHTS.md</a> · <a href="https://github.com/shaunmortal/crossing-watch/blob/main/GATES.md">GATES.md</a></p>
+  </div></section>
+
+  <footer class="pf-foot"><div class="pf-wrap"><span>Crossing Watch · solo entry, Meta Global AI Developer Hackathon 2026 · built 28 Oct to 4 Nov</span><a href="https://github.com/shaunmortal/crossing-watch">github.com/shaunmortal/crossing-watch</a></div></footer>
 </div>
 
-<section id="gate">
-  <div class="wrap">
-    <div class="kicker">Our gate, measured</div>
-    <h2>LNCT Excellence, Bhopal. One dismissal, 8.6 minutes.</h2>
-    <p class="sub">Filmed on 2 Nov 2026 from the highway above the gate. Counted on the taped 15 m stretch in front of it.</p>
-    <div class="stats">
-      <div class="stat"><b>80</b><span>people crossed the road</span></div>
-      <div class="stat"><b>55</b><span>moving vehicles passed</span></div>
-      <div class="stat hot"><b>2</b><span>serious near-misses, one at the same instant (0.0 s)</span></div>
-      <div class="stat"><b>15.0 m</b><span>read from video, against 15 m of tape</span></div>
-    </div>
-  </div>
-</section>
-
-<section id="how">
-  <div class="wrap">
-    <div class="kicker">How it works</div>
-    <h2>From a phone on the road to a letter on the right desk.</h2>
-    <p class="sub">Four steps. The models do the seeing and the writing; code checks every number.</p>
-    <div class="steps">
-      <div class="step"><div class="n">01</div><h3>Film</h3><p>One phone, high up, and a tape measure. Taped marks on the road turn pixels into metres.</p></div>
-      <div class="step"><div class="n">02</div><h3>Track</h3><p>Every person, motorcycle, auto rickshaw, car and bus, asked for by name.</p><span class="model">Meta SAM 3.1</span></div>
-      <div class="step"><div class="n">03</div><h3>Measure</h3><p>Who reached the same spot how many seconds apart (PET), at what speed, and how risky that was.</p><span class="model">Muse Spark review</span></div>
-      <div class="step"><div class="n">04</div><h3>Write</h3><p>A letter to the road authority from the measurements only. Code checks each number; a judge reads it.</p><span class="model">Muse Spark · Muse Glimmer</span></div>
-    </div>
-  </div>
-</section>
-
-<section>
-  <div class="wrap">
-    <div class="kicker">Checked against truth</div>
-    <h2>Measured, not guessed.</h2>
-    <div class="cards">
-      <div class="card"><h3>Drone ground truth</h3><b>47 of 52</b><p>near-misses found on top-down drone footage (DUT), after Muse Spark's review.</p></div>
-      <div class="card"><h3>Tape check</h3><b>15.0 m</b><p>our video's reading of a line we never used to calibrate. The tape said 15 m.</p></div>
-      <div class="card"><h3>Letter check</h3><b>24 of 24</b><p>planted false claims flagged by the letter judge on the public bench.</p></div>
-    </div>
-  </div>
-</section>
-
-<section id="open">
-  <div class="wrap">
-    <div class="kicker">Open weights</div>
-    <h2>Meta's open models, doing the real work.</h2>
-    <div class="cards">
-      <div class="card"><h3>Muse Glimmer 30B wrote our letter</h3><b>276 s</b><p>on Kaggle's free 2 × T4, first try, every number passing the code check.</p></div>
-      <div class="card"><h3>Our fine-tuned judge</h3><b>3 of 3</b><p>pre-registered blind tests won against Muse Spark Open, at about a quarter of Muse Spark's cost.</p></div>
-      <div class="card"><h3>Served live</h3><b>1,499 / 1,501</b><p>same verdicts from the adapter deployed on Fireworks as in training.</p></div>
-    </div>
-    <p class="note">Every number on this page re-checks from the repository: <a href="https://github.com/shaunmortal/crossing-watch/blob/main/JUDGES.md">JUDGES.md</a> ·
-      <a href="https://github.com/shaunmortal/crossing-watch/blob/main/OPEN_WEIGHTS.md">OPEN_WEIGHTS.md</a> ·
-      <a href="https://github.com/shaunmortal/crossing-watch/blob/main/GATES.md">GATES.md</a></p>
-  </div>
-</section>
-
-<footer>
-  <div class="wrap row">
-    <span>Crossing Watch · solo entry, Meta Global AI Developer Hackathon 2026 · built 28 Oct to 4 Nov</span>
-    <span><a href="https://github.com/shaunmortal/crossing-watch">github.com/shaunmortal/crossing-watch</a></span>
-  </div>
-</footer>
-
-<script>
-  const root = document.documentElement, btn = document.getElementById("theme");
-  const dark = () => root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
-  const paint = () => { btn.textContent = dark() ? "☾" : "☀"; };
-  btn.addEventListener("click", () => { root.dataset.theme = dark() ? "light" : "dark"; paint(); });
-  paint();
-</script>
+<script src="tracks.js"></script>
+<script src="field.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <script type="importmap">{"imports": {"three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
-<script type="module">
-import * as THREE from "three";
-
-const canvas = document.getElementById("scene");
-let renderer;
-try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true }); }
-catch (err) { canvas.style.display = "none"; throw err; }  // no WebGL: the page reads fine without the scene
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 400);
-const target = new THREE.Vector3(0, 0, 0.5);
-scene.add(new THREE.HemisphereLight(0xffffff, 0xc9cfee, 1.6));
-const sun = new THREE.DirectionalLight(0xffffff, 1.4); sun.position.set(10, 30, 14); scene.add(sun);
-
-// glass block: translucent faces plus crisp edges, the look of the reference
-function block(w, h, d, color, opacity = 0.42, edge = 0.55) {
-  const g = new THREE.BoxGeometry(w, h, d);
-  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color, transparent: true, opacity, roughness: .35, metalness: .05, depthWrite: false }));
-  m.add(new THREE.LineSegments(new THREE.EdgesGeometry(g), new THREE.LineBasicMaterial({ color, transparent: true, opacity: edge })));
-  return m;
-}
-const at = (m, x, y, z) => { m.position.set(x, y, z); scene.add(m); return m; };
-
-// road (x along the road, z across: wall side -3.5, gate side +3.5), the wall with the highway on top, the gate side
-at(block(34, .25, 7, 0x6b7280, .5, .35), 0, 0, 0);
-for (let x = -16; x < 17; x += 3) at(block(1.6, .02, .14, 0xffffff, .9, 0), x, .14, 0);
-at(block(34, 5.2, 1.2, 0xa5b4fc, .22, .5), 0, 2.6, -5.1);            // retaining wall
-at(block(34, .5, 7, 0x8b9cf7, .2, .45), 0, 5.4, -9.2);              // highway deck
-at(block(34, .2, 5, 0xc4b5fd, .3, .45), 0, .1, 6);                  // gate apron
-const red = 0xe25563;
-at(block(1.1, 3.4, 1.1, red, .5, .75), -4.6, 1.7, 8.6);              // gate pillars and beam
-at(block(1.1, 3.4, 1.1, red, .5, .75), 4.6, 1.7, 8.6);
-at(block(10.3, .8, 1.1, red, .5, .75), 0, 3.8, 8.6);
-at(block(9, 2.8, 1, 0xf0abfc, .25, .4), -11, 1.4, 8.8);             // college buildings, faint
-at(block(9, 3.6, 1, 0xa5f3fc, .25, .4), 11, 1.8, 8.8);
-
-// taped rectangle N1 N2 F2 F1 (8 x 7 m) and lines A, B 15 m apart
-for (const [x, z] of [[-4, 3.4], [4, 3.4], [-4, -3.4], [4, -3.4]]) at(block(.7, .05, .7, 0xffffff, .95, .9), x, .16, z);
-const rect = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([[-4, 3.4], [4, 3.4], [4, -3.4], [-4, -3.4]].map(([x, z]) => new THREE.Vector3(x, .17, z))),
-  new THREE.LineDashedMaterial({ color: 0xef4444, dashSize: .5, gapSize: .3 }));
-rect.computeLineDistances(); scene.add(rect);
-for (const x of [-7.5, 7.5]) {
-  at(block(.12, .03, 7, 0x3b8cff, .9, .9), x, .16, 0);
-  for (const z of [-3.6, 3.6]) at(new THREE.Mesh(new THREE.CylinderGeometry(.18, .18, .8, 16), new THREE.MeshStandardMaterial({ color: 0x3b8cff })), x, .55, z);
-}
-
-// the phone on the highway railing and its view cone onto the rectangle
-const phone = at(block(.5, .9, .25, 0x111827, .95, .9), 2.5, 6.3, -6.2);
-const corners = [[-8, 3.6], [8, 3.6], [8, -3.6], [-8, -3.6]].map(([x, z]) => new THREE.Vector3(x, .2, z));
-const cone = [];
-for (const c of corners) cone.push(phone.position.clone(), c);
-scene.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(cone), new THREE.LineBasicMaterial({ color: 0x7a5cff, transparent: true, opacity: .35 })));
-
-// people and vehicles on a 14 s loop; one person and one motorcycle reach (0, 1.5) at the same instant, t = 4.93 s
-const LOOP = 14, EVENT_T = 4.93, EVENT = new THREE.Vector3(0, .2, 1.5);
-const agents = [];
-function agent(mesh, color, path) {  // path(t) -> [x, z] or null when off stage
-  const trail = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color, transparent: true, opacity: .75 }));
-  scene.add(mesh); scene.add(trail);
-  agents.push({ mesh, trail, path, pts: [] });
-}
-const person = (c = 0x14b8c4) => new THREE.Mesh(new THREE.CapsuleGeometry(.28, .7, 4, 10), new THREE.MeshStandardMaterial({ color: c, roughness: .4 }));
-const vehicle = (l, w, h, c) => block(l, h, w, c, .85, .9);
-const walk = (x0, x1, t0, speed = 1.4) => t => {
-  const z = 7 - (t - t0) * speed; if (t < t0 || z < -4.6) return null;
-  return [x0 + (x1 - x0) * (7 - z) / 11.6, z];
-};
-const drive = (lane, dir, t0, speed) => t => {
-  const x = -17 * dir + (t - t0) * speed * dir; if (t < t0 || Math.abs(x) > 17) return null;
-  return [x, lane];
-};
-agent(person(0xff5aa5), 0xff5aa5, walk(0, 0, 1.0));                                             // the person in the near-miss
-agent(vehicle(1.9, .7, .9, 0xef4444), 0xef4444, drive(1.5, 1, EVENT_T - 17 / 5, 5));              // the motorcycle that meets them
-agent(person(), 0x14b8c4, walk(-2.5, -5, 2.4));
-agent(person(), 0x14b8c4, walk(3, 6, 6.2, 1.2));
-agent(person(), 0x14b8c4, walk(-6, -3, 8.5));
-agent(vehicle(2.9, 1.4, 1.5, 0xf5b301), 0xf5b301, drive(-1.6, -1, 3.0, 3.6));                     // auto rickshaw
-agent(vehicle(1.9, .7, .9, 0x7a5cff), 0x7a5cff, drive(1.5, 1, 9.0, 6));
-agent(vehicle(4.2, 1.8, 1.4, 0x9ca3af), 0x9ca3af, drive(-1.6, -1, 8.4, 4.4));                     // car
-
-const ring = new THREE.Mesh(new THREE.RingGeometry(.6, .78, 48), new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, side: THREE.DoubleSide }));
-ring.rotation.x = -Math.PI / 2; ring.position.copy(EVENT); scene.add(ring);
-
-const tags = { pet: document.getElementById("tag-pet"), cam: document.getElementById("tag-cam"), tape: document.getElementById("tag-tape") };
-const v = new THREE.Vector3();
-function place(el, world, show) {
-  v.copy(world).project(camera);
-  const r = canvas.getBoundingClientRect(), host = canvas.offsetParent.getBoundingClientRect();
-  el.style.left = `${r.left - host.left + (v.x + 1) / 2 * r.width}px`;
-  el.style.top = `${r.top - host.top + (1 - v.y) / 2 * r.height}px`;
-  el.style.opacity = show && v.z < 1 ? 1 : 0;
-}
-
-let mx = 0, my = 0;
-addEventListener("pointermove", e => { mx = e.clientX / innerWidth - .5; my = e.clientY / innerHeight - .5; });
-function resize() {
-  const w = canvas.clientWidth, h = canvas.clientHeight;
-  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
-}
-addEventListener("resize", resize); resize();
-
-const frozen = parseFloat(new URLSearchParams(location.search).get("t"));  // ?t=4.93 holds one moment (screenshots)
-const still = matchMedia("(prefers-reduced-motion: reduce)").matches || frozen >= 0;
-const clock = new THREE.Clock();
-if (still) for (const el of Object.values(tags)) el.style.transition = "none";
-function frame() {
-  const t = still ? (frozen >= 0 ? frozen : EVENT_T) : clock.getElapsedTime() % LOOP;
-  const small = canvas.clientWidth < 600;
-  camera.position.set(24 + mx * 6, 40 - my * 4, 28).multiplyScalar(small ? 1.25 : 1.12);
-  camera.lookAt(target);
-  for (const a of agents) {
-    const p = a.path(t);
-    a.mesh.visible = !!p;
-    if (!p) { a.pts = []; a.trail.geometry.setFromPoints([]); continue; }
-    a.mesh.position.set(p[0], a.mesh.geometry.type === "CapsuleGeometry" ? .7 : .65, p[1]);
-    a.pts.push(new THREE.Vector3(p[0], .2, p[1])); if (a.pts.length > 70) a.pts.shift();
-    a.trail.geometry.setFromPoints(a.pts);
-  }
-  const k = t - EVENT_T, hot = k > -0.2 && k < 2.6;
-  ring.visible = hot; ring.scale.setScalar(1 + Math.max(0, k) * 1.4); ring.material.opacity = hot ? Math.max(0, 1 - Math.max(0, k) / 2.6) : 0;
-  place(tags.pet, EVENT, hot);
-  place(tags.cam, phone.position.clone().add(new THREE.Vector3(0, .8, 0)), true);
-  place(tags.tape, new THREE.Vector3(7.5, .3, -3.6), true);
-  renderer.render(scene, camera);
-  if (!still) requestAnimationFrame(frame);
-}
-frame();
-if (still) {  // one frame only: redraw once the layout and fonts settle, and on resize
-  addEventListener("resize", frame);
-  document.fonts.ready.then(() => { resize(); frame(); });
-  addEventListener("load", () => { resize(); frame(); });
-}
-</script>
+<script type="module" src="entry.js"></script>
 </body>
 </html>
