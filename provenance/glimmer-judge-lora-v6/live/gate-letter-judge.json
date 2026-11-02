@@ -1,0 +1,140 @@
+{
+ "model": "accounts/<fireworks-account>/models/muse-starter-sl-judge-v6-main#accounts/<fireworks-account>/deployments/cw-judge-gate",
+ "letter_sha256": "8c6d7768825ecca3bc27fbe804177631f2f135316a23929c818fe0b9ad52326f",
+ "prompt_sha256": "3d9bf4a1dc55d2f7faa9f8034383391da90f525059ed71309befea6368eacdea",
+ "fix": "a painted zebra crossing at the gate with no hump and no speed breaker, and \"College Zone 20 km/h\" signs on both approaches",
+ "runs": [
+  {
+   "schema": false,
+   "reply": "{\"problems\": []}",
+   "problems": [],
+   "response_id": "chatcmpl-be548acb623d492c9262535e7c96fd0e",
+   "finish": "stop",
+   "usage": {
+    "prompt_tokens": 2229,
+    "total_tokens": 2238,
+    "completion_tokens": 9,
+    "prompt_tokens_details": {
+     "cached_tokens": 0
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0
+    },
+    "output_tokens_details": {
+     "reasoning_tokens": 0
+    }
+   },
+   "wall_s": 2.02
+  },
+  {
+   "schema": false,
+   "reply": "{\"problems\": []}",
+   "problems": [],
+   "response_id": "chatcmpl-a331733005ad4c34b2803fde8087eaba",
+   "finish": "stop",
+   "usage": {
+    "prompt_tokens": 2229,
+    "total_tokens": 2238,
+    "completion_tokens": 9,
+    "prompt_tokens_details": {
+     "cached_tokens": 2176
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0
+    },
+    "output_tokens_details": {
+     "reasoning_tokens": 0
+    }
+   },
+   "wall_s": 1.41
+  },
+  {
+   "schema": false,
+   "reply": "{\"problems\": []}",
+   "problems": [],
+   "response_id": "chatcmpl-279cca5772974f0c8df13ee6d9785f92",
+   "finish": "stop",
+   "usage": {
+    "prompt_tokens": 2229,
+    "total_tokens": 2238,
+    "completion_tokens": 9,
+    "prompt_tokens_details": {
+     "cached_tokens": 2176
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0
+    },
+    "output_tokens_details": {
+     "reasoning_tokens": 0
+    }
+   },
+   "wall_s": 1.94
+  },
+  {
+   "schema": true,
+   "reply": "{\"problems\": []}",
+   "problems": [],
+   "response_id": "chatcmpl-700e6f8dae02492fb1e72a8da0cea2d6",
+   "finish": "stop",
+   "usage": {
+    "prompt_tokens": 2229,
+    "total_tokens": 2238,
+    "completion_tokens": 9,
+    "prompt_tokens_details": {
+     "cached_tokens": 2176
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0
+    },
+    "output_tokens_details": {
+     "reasoning_tokens": 0
+    }
+   },
+   "wall_s": 3.7
+  },
+  {
+   "schema": true,
+   "reply": "{\"problems\": []}",
+   "problems": [],
+   "response_id": "chatcmpl-a9033432e1654da59ecf57f435e1f115",
+   "finish": "stop",
+   "usage": {
+    "prompt_tokens": 2229,
+    "total_tokens": 2238,
+    "completion_tokens": 9,
+    "prompt_tokens_details": {
+     "cached_tokens": 2176
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0
+    },
+    "output_tokens_details": {
+     "reasoning_tokens": 0
+    }
+   },
+   "wall_s": 1.56
+  },
+  {
+   "schema": true,
+   "reply": "{\"problems\": []}",
+   "problems": [],
+   "response_id": "chatcmpl-4511b97e5c194677bd2263d566583224",
+   "finish": "stop",
+   "usage": {
+    "prompt_tokens": 2229,
+    "total_tokens": 2238,
+    "completion_tokens": 9,
+    "prompt_tokens_details": {
+     "cached_tokens": 2176
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0
+    },
+    "output_tokens_details": {
+     "reasoning_tokens": 0
+    }
+   },
+   "wall_s": 1.64
+  }
+ ]
+}
