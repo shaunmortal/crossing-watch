@@ -34,8 +34,8 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
   19 teachers signed a support sheet (18 agreed to be named publicly). The signed paper stays off the repo.
 - The output is something an authority can act on: a letter where code checks every number, plus legal quotes added
   by code, never a model (2025 INSC 1189). [README, How it works](README.md#how-it-works), `gazette.py`.
-- **Pending:** our gate's headline [PLACEHOLDER: k of n crossings, from Monday's run]; letter signed by the HOD
-  (Tue 3 Nov); filing (Tue 3 Nov). Only "filed, reference X" will ever be written as filed.
+- **Our gate (Mon 2 Nov):** In 8.6 minutes of our gate's dismissal, 80 people crossed among 55 moving vehicles: 2 serious near-misses (one person and motorcycle on the same spot at the same instant) and 3 close passes; the video's 15.0 m matched the tape's 15 m. [README](README.md), [GATES](GATES.md#verdict-now).
+  Letter signed by the HOD and filed on Tue 3 Nov; only "filed, reference X" will ever be written as filed.
 
 ## Demo
 
@@ -92,7 +92,8 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
 
 ## Known limits
 
-- The gate is not filmed yet (Mon 2 Nov). G2, G4, G5, G6 and G8 have not run; G7 has no verdict before submission.
+- Our gate was filmed hand-held from the highway and stabilized before analysis; counts cover the taped 15 m stretch
+  (GATES.md). G5, G6 and G8 have not run; G7 has no verdict before submission.
 - All ground truth (DUT, SinD) is top-down drone footage: no one is hidden. Phone-angle numbers are simulations.
 - The open-weights judge is tested on synthetic letters; on the 260 letters as written it is level with Spark Open.
 - A Muse judge reading Muse letters is not independent. The tuned judge missed all six real slips the letter writers
