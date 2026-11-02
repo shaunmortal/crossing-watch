@@ -1085,6 +1085,25 @@ same verdict on 1,499 of 1,501 test rows; 1,442 right either way; vs Spark Open 
 32 vs 57 (p 0.011), as in the v6 result. Every reply finished (1,545 of 1,545 "stop"). Public bench through
 `pack.py`'s judge path: 21 of 23 lies, 0 of 8 false alarms. Record: `provenance/glimmer-judge-lora-v6/live/`.
 
+## The gate recording: hand-held, stabilized before analysis (Mon 2 Nov 2026, 18:00 IST, before any analysis run)
+
+Written before `analyze.py`, `monday.py` or any model call touches the gate footage.
+- **What was filmed:** `VID20261102153251.mp4` (OPPO F25 Pro, 1x lens, 1920x1080 HEVC, 1,002 s, file start 15:32:51
+  IST by its name). Dismissal bell 15:30 (the filmer's note). Filmed from the highway above the retaining wall,
+  camera 8.3 m above the road. **Hand-held over the railing** (the filmer did not leave a phone on a highway parapet),
+  so filmcheck's steadiness check fails: the view moves 20-36 px (of 640) throughout.
+- **Fix, decided now:** `stabilize.py` maps every frame onto the frame at 300 s by a RANSAC homography (SIFT), which is
+  exact for a camera that only turns in place over a flat road; frames with under 40 inliers reuse the previous
+  frame's homography and are logged (`gate-stable.mp4.stab.json`). Analysis runs on the stabilized file.
+- **Calibration:** the taped rectangle N1-N2-F2-F1, 8 m along the road x 7 m across (filmer's sheet), clicked on the
+  stabilized 300 s frame (F2 from a late frame, after a parked car left it). **Held out:** lines A and B, 15 m apart
+  (3.5 m beyond each end of the rectangle); G2 passes at 12.75-17.25 m as before. The wall-side strip (2.20 m at A,
+  1.90 m at B) is not a calibration input.
+- **Window:** the rule's [B-2 min, B+13 min] = 15:28-15:43 starts before the file does; analysed: from the first
+  frame that registers (inliers >= 40 for 10 s running, about 1:30 into the file) to 15:43:00, about 550 s, under the
+  900 s target. Reported as recorded, not extended.
+- **If G2 fails** on the stabilized file, its numbers are not used for the letter and the page says why.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
