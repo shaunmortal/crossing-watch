@@ -1117,6 +1117,16 @@ held; nothing outside it is reported. This removes 14 of the 30 kept events (bot
 the frame edge; 7 beyond line B, where the far end is extrapolated). It can only lower the counts. SAM replies are
 reused from the cache ($0); the letter and judges run again.
 
+## The gate run: one track ruled out by eye (Mon 2 Nov 2026, 19:40 IST)
+
+Second run (taped stretch only): 9 kept events, 5 serious, 4 close passes. By eye on the evidence clips (events 2, 4
+and 5), **piece c116/0 is not a pedestrian**: its box rides inside the moving motorcycle's and auto rickshaw's boxes
+frame after frame and covers about 10 m in about 2 s, so it is someone on or in those vehicles (Spark judged one crop
+of it, where it looked like someone standing). Its 3 serious and 1 close-pass events are removed through a new site
+key, `by_eye_not_pedestrians: ["c116/0"]` (analyze.py marks that piece "not a pedestrian, by eye"). c483/0 (events 1
+and 3), c169/0 and c589/0 walk across on foot in their clips and stay. Decided before the next run; it only lowers
+the counts.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
