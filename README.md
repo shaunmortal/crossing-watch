@@ -7,25 +7,28 @@
 ### One phone video in. Proof the road authority can act on, out.
 **सड़क का ख़तरा · नाप के · सबूत के साथ**
 
-<img src="docs/readme/card-hackathon.svg" height="76" alt="Meta Global AI Developer Hackathon 2026, Indie track entry"> <a href="OPEN_WEIGHTS.md"><img src="docs/readme/card-openweights.svg" height="76" alt="Open weights: Muse Glimmer 30B fine-tuned, served, 3 blind-test wins"></a> <a href="TECHNICAL.md#end-to-end-against-ground-truth-dut"><img src="docs/readme/card-truth.svg" height="76" alt="Drone ground truth: 47 of 52 near-misses found"></a>
-
 **English** · [हिंदी](https://crossingwatch.xyz/?lang=hi) · every page of the website has a हिंदी / English switch
 
-<a href="https://crossingwatch.xyz"><img src="https://img.shields.io/badge/Website-crossingwatch.xyz-f5a623?style=for-the-badge&labelColor=121314&logo=googlechrome&logoColor=white" alt="Website: crossingwatch.xyz"></a> <a href="#-demo"><img src="https://img.shields.io/badge/Demo-video-e5482f?style=for-the-badge&labelColor=121314&logo=youtube&logoColor=white" alt="Demo: video"></a> <a href="https://crossingwatch.xyz/manual/"><img src="https://img.shields.io/badge/Manual-7%20steps-2fa36b?style=for-the-badge&labelColor=121314&logo=readthedocs&logoColor=white" alt="Manual: 7 steps"></a> <a href="https://crossingwatch.xyz/app/"><img src="https://img.shields.io/badge/App-4%20steps-e5482f?style=for-the-badge&labelColor=121314&logo=googlechrome&logoColor=white" alt="App: 4 steps"></a> <a href="https://crossingwatch.xyz/explorer/"><img src="https://img.shields.io/badge/Live%20explorer-try%20it-f5a623?style=for-the-badge&labelColor=121314&logo=googlechrome&logoColor=white" alt="Live explorer: try it"></a> <a href="JUDGES.md"><img src="https://img.shields.io/badge/Judges-5--minute%20map-2fa36b?style=for-the-badge&labelColor=121314&logo=readthedocs&logoColor=white" alt="Judges: 5-minute map"></a>
+<a href="docs/evidence/event1.mp4"><img src="docs/readme/nearmiss.gif" width="100%" alt="Real footage from our college gate, faces and plates blurred: SAM 3.1 tracks a person (cyan) and a motorcycle (red) reaching the same spot"></a>
+<p><b>Real footage from our college gate, faces blurred.</b> A person (cyan) and a motorcycle (red) reach the same spot at the same instant: post-encroachment time <b>0.0 s</b>, motorcycle at <b>18.7 km/h</b>.</p>
 
-<img src="https://img.shields.io/badge/Built%20with%20Meta-SAM%203.1-f5a623?style=for-the-badge&labelColor=121314&logo=meta&logoColor=white" alt="Built with Meta: SAM 3.1"> <img src="https://img.shields.io/badge/Meta-Muse%20Spark-f5a623?style=for-the-badge&labelColor=121314&logo=meta&logoColor=white" alt="Meta: Muse Spark"> <img src="https://img.shields.io/badge/Meta-Muse%20Image-f5a623?style=for-the-badge&labelColor=121314&logo=meta&logoColor=white" alt="Meta: Muse Image"> <img src="https://img.shields.io/badge/Meta-Muse%20Wonder-f5a623?style=for-the-badge&labelColor=121314&logo=meta&logoColor=white" alt="Meta: Muse Wonder">
-
-<img src="https://img.shields.io/badge/Open%20weights-Muse%20Glimmer%2030B%20%C2%B7%20fine--tuned-2fa36b?style=for-the-badge&labelColor=121314&logo=meta&logoColor=white" alt="Open weights: Muse Glimmer 30B · fine-tuned"> <img src="https://img.shields.io/badge/Open%20weights-Muse%20Spark%20Open-2fa36b?style=for-the-badge&labelColor=121314&logo=meta&logoColor=white" alt="Open weights: Muse Spark Open">
+<b>▶ Demo video (2:52): GATE-TBD</b>
 
 Near-miss evidence for a dangerous school or college crossing. **Meta SAM 3.1** tracks every person and vehicle,<br>
 code measures each near-miss in road metres, and **Muse Spark** writes a letter whose every number is checked.
+
+**Six Meta models:** SAM 3.1 · Muse Spark · Muse Image · Muse Wonder · Muse Glimmer 30B (open weights, fine-tuned by us) · Muse Spark Open (open weights) · [what each one does](#-six-meta-models-each-doing-real-work)
+
+<a href="https://crossingwatch.xyz"><img src="https://img.shields.io/badge/Website-crossingwatch.xyz-f5a623?style=for-the-badge&labelColor=121314&logo=googlechrome&logoColor=white" alt="Website: crossingwatch.xyz"></a> <a href="#-demo"><img src="https://img.shields.io/badge/Demo-video-e5482f?style=for-the-badge&labelColor=121314&logo=youtube&logoColor=white" alt="Demo: video"></a> <a href="https://crossingwatch.xyz/manual/"><img src="https://img.shields.io/badge/Manual-7%20steps-2fa36b?style=for-the-badge&labelColor=121314&logo=readthedocs&logoColor=white" alt="Manual: 7 steps"></a> <a href="https://crossingwatch.xyz/app/"><img src="https://img.shields.io/badge/App-4%20steps-e5482f?style=for-the-badge&labelColor=121314&logo=googlechrome&logoColor=white" alt="App: 4 steps"></a> <a href="https://crossingwatch.xyz/explorer/"><img src="https://img.shields.io/badge/Live%20explorer-try%20it-f5a623?style=for-the-badge&labelColor=121314&logo=googlechrome&logoColor=white" alt="Live explorer: try it"></a> <a href="JUDGES.md"><img src="https://img.shields.io/badge/Judges-5--minute%20map-2fa36b?style=for-the-badge&labelColor=121314&logo=readthedocs&logoColor=white" alt="Judges: 5-minute map"></a>
+
+<img src="docs/readme/card-hackathon.svg" height="76" alt="Meta Global AI Developer Hackathon 2026, Indie track entry"> <a href="OPEN_WEIGHTS.md"><img src="docs/readme/card-openweights.svg" height="76" alt="Open weights: Muse Glimmer 30B fine-tuned, served, 3 blind-test wins"></a> <a href="TECHNICAL.md#end-to-end-against-ground-truth-dut"><img src="docs/readme/card-truth.svg" height="76" alt="Drone ground truth: 47 of 52 near-misses found"></a>
 
 <table>
 <tr>
 <td align="center" width="33%">
 
 ### 📱 1. Film
-One phone over the road, a tape measure and 8 sheets of A4.
+One phone over the road, a tape measure and 4 bright markers (A4 paper works).
 
 </td>
 <td align="center" width="33%">
@@ -43,12 +46,7 @@ Muse Spark writes the letter; code and two judges check it; the college certifie
 </tr>
 </table>
 
-<img src="docs/story/03-nearmiss.jpg" width="100%" alt="Real footage from our college gate, faces blurred: a person and a motorcycle reach the same spot, post-encroachment time 0.0 s">
-<p><sub><b>Real footage from our college gate, faces blurred.</b> A person (cyan) and a motorcycle (red) reach the same spot at the same instant: post-encroachment time <b>0.0 s</b>, motorcycle at <b>18.7 km/h</b>.</sub></p>
-
-<br><br>
-
-<sub>Every line of code, every measurement and every image here was made during the hackathon, from 28 Oct 2026 ([declarations](#declarations)).</sub>
+<i>Every line of code, every measurement and every image here was made during the hackathon, from 28 Oct 2026 ([declarations](#declarations)).</i>
 
 </div>
 
@@ -56,7 +54,7 @@ Muse Spark writes the letter; code and two judges check it; the college certifie
 
 ## 📑 Contents
 
-[The problem](#-the-problem) · [Results](#-results-on-our-gate) · [Demo](#-demo) · [Try it in your browser](#-try-it-in-your-browser) · [Pipeline](#-pipeline) · [Six Meta models](#-six-meta-models-each-doing-real-work) · [How we know it's right](#-how-we-know-its-right) · [Screens](#-screens) · [Try it in one minute](#-try-it-in-one-minute) · [Privacy and cost](#-privacy-and-cost) · [Deep dive](#-deep-dive) · [Declarations](#declarations)
+[The problem](#-the-problem) · [Results](#-results-on-our-gate) · [Demo](#-demo) · [Try it in your browser](#-try-it-in-your-browser) · [Pipeline](#-pipeline) · [Six Meta models](#-six-meta-models-each-doing-real-work) · [How we know it's right](#-how-we-know-its-right) · [Screens](#-screens) · [Run it locally](#-run-it-locally) · [Privacy and cost](#-privacy-and-cost) · [Deep dive](#-deep-dive) · [Declarations](#declarations)
 
 ## 🚨 The problem
 
@@ -68,7 +66,7 @@ phone video into that proof:** measured near-misses, blurred clips, and a letter
 
 ## 📊 Results on our gate
 
-<sub>LNCT Excellence main gate, Bhopal (service road below NH 146) · Mon 2 Nov 2026, afternoon dismissal · one phone, 8.3 m up</sub>
+<i>LNCT Excellence main gate, Bhopal (service road below NH 146) · Mon 2 Nov 2026, afternoon dismissal · one phone, 8.3 m up</i>
 
 | Measured | Value |
 |---|---|
@@ -80,6 +78,9 @@ phone video into that proof:** measured near-misses, blurred clips, and a letter
 | 📏 Tape check (never used to calibrate) | video **15.0 m** · tape **15 m** |
 | 🏛️ The college | certified in writing (3 Nov 2026): filmed at its gate with permission, **the report is genuine** |
 | 📄 The ask | a **painted zebra crossing** (no hump: college buses use this road) and **"College Zone 20 km/h"** signs |
+
+<img src="docs/evidence/event1-strobe.jpg" width="100%" alt="Time-lapse still of the 0.0 s near-miss: SAM 3.1 tracks the motorcycle (red) and the person (cyan)">
+<p><b>The 0.0 s near-miss in one picture.</b> SAM 3.1 tracks the motorcycle (red) and the person (cyan); one copy every 0.5 s, so wider spacing means faster. Faces and plates blurred.</p>
 
 ## 🎬 Demo
 
@@ -98,8 +99,8 @@ No install, no key. Every page works in a browser and has a हिंदी / En
 
 <table>
 <tr>
-<td width="50%"><a href="https://crossingwatch.xyz/explorer/"><img src="docs/readme/shot-explorer.jpg" alt="The Explorer: threshold slider, Muse Spark review switch and the timeline of 75 candidates"></a><br><sub><b>Explorer.</b> Watch the tool decide.</sub></td>
-<td width="50%"><a href="https://crossingwatch.xyz/app/"><img src="docs/readme/shot-app.jpg" alt="The App, step 3: the agent asks a person to tape-measure the check line"></a><br><sub><b>App.</b> The agent stops and asks for a tape measure.</sub></td>
+<td width="50%"><a href="https://crossingwatch.xyz/explorer/"><img src="docs/readme/shot-explorer.jpg" alt="The Explorer: threshold slider, Muse Spark review switch and the timeline of 75 candidates"></a><br><i><b>Explorer.</b> Watch the tool decide.</i></td>
+<td width="50%"><a href="https://crossingwatch.xyz/app/"><img src="docs/readme/shot-app.jpg" alt="The App, step 3: the agent asks a person to tape-measure the check line"></a><br><i><b>App.</b> The agent stops and asks for a tape measure.</i></td>
 </tr>
 </table>
 
@@ -160,13 +161,13 @@ flowchart TD
 
 <table>
 <tr>
-<td width="33%"><img src="docs/story/02-gate.jpg" alt="Our college gate, real photo"><br><sub><b>The gate.</b> Real photo, the road we measured.</sub></td>
-<td width="33%"><a href="docs/story/06-letter.jpg"><img src="docs/story/06-letter-top.jpg" alt="The letter to the road authority"></a><br><sub><b>The letter.</b> To the road authority, every number code-checked.</sub></td>
-<td width="33%"><img src="docs/story/09-fix.jpg" alt="Muse Image draws the requested zebra crossing on the gate"><br><sub><b>The fix.</b> Muse Image draws what the letter asks for.</sub></td>
+<td width="33%"><img src="docs/story/02-gate.jpg" alt="Our college gate, real photo"><br><i><b>The gate.</b> Real photo, the road we measured.</i></td>
+<td width="33%"><a href="docs/story/06-letter.jpg"><img src="docs/story/06-letter-top.jpg" alt="The letter to the road authority"></a><br><i><b>The letter.</b> To the road authority, every number code-checked.</i></td>
+<td width="33%"><img src="docs/story/09-fix.jpg" alt="Muse Image draws the requested zebra crossing on the gate"><br><i><b>The fix, drawn by Muse Image.</b> What the letter asks for. AI-generated: the people are not real.</i></td>
 </tr>
 </table>
 
-## 🚀 Try it in one minute
+## 🚀 Run it locally
 
 Needs Python 3.11+ and ffmpeg; no key, no video. With `MODEL_API_KEY` or `LETTER_MODEL_URL` set, the sample also gets the fix and the letter.
 ```
