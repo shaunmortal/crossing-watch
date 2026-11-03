@@ -39,7 +39,7 @@ SAM 3.1 tracks everyone; code turns pixels into road metres and finds every near
 <td align="center" width="33%">
 
 ### 📄 3. Prove
-Muse Spark writes the letter; code and two judges check it; the college sends it.
+Muse Spark writes the letter; code and two judges check it; the college certifies it is genuine.
 
 </td>
 </tr>
@@ -81,6 +81,7 @@ phone video into that proof:** measured near-misses, blurred clips, and a letter
 | 🟠 Close passes (1.5 to 3.0 s) | **3** |
 | 📏 Tape check (never used to calibrate) | video **15.0 m** · tape **15 m** |
 | 🛰️ Drone ground truth (DUT) | **47 of 52** near-misses found after Muse Spark's review |
+| 🏛️ The college | certified in writing (3 Nov 2026): filmed at its gate with permission, **the report is genuine** |
 | 📄 The ask | a **painted zebra crossing** (no hump: college buses use this road) and **"College Zone 20 km/h"** signs |
 
 ## 🎬 Demo
@@ -99,7 +100,7 @@ flowchart LR
   F --> G["Letter<br/>Muse Spark or Muse Glimmer"]
   G --> H{"Code check<br/>+ two judges"}
   H --> I["📄 Letter · evidence page<br/>· Muse Image fix"]
-  I --> J["🏛️ Head of department<br/>→ road authority"]
+  I --> J["🏛️ College certifies<br/>footage and report genuine"]
 ```
 
 ## 🧠 Six Meta models, each doing real work
@@ -124,7 +125,7 @@ flowchart LR
 - **Muse Spark Open (open weights)** on Fireworks wrote the synthetic sample's letter in one try, 55.5 s, and is the second judge of our crossing's letter. [record](provenance/spark-open-fireworks-sample.json)
 
 
-**Our crossing** (LNCT Excellence main gate, Bhopal, Mon 2 Nov 2026 dismissal, filmed 8.3 m up from the highway): in 8.6 minutes on the taped 15 m stretch, 80 people crossed among 55 moving vehicles; 2 serious near-misses, one with a person and a motorcycle on the same spot at the same instant, and 3 close passes. The video read the held-out tape line as 15.0 m; the tape says 15 m. Letter by Muse Spark, checked by Muse Spark and Muse Spark Open; the head of department signs it Tue 3 Nov. **Filed:** only "filed, reference X" is ever written here.
+**Our crossing** (LNCT Excellence main gate, Bhopal, Mon 2 Nov 2026 dismissal, filmed 8.3 m up from the highway): in 8.6 minutes on the taped 15 m stretch, 80 people crossed among 55 moving vehicles; 2 serious near-misses, one with a person and a motorcycle on the same spot at the same instant, and 3 close passes. The video read the held-out tape line as 15.0 m; the tape says 15 m. Letter by Muse Spark, checked by Muse Spark and Muse Spark Open; the college certified in writing on 3 Nov 2026 that the footage was filmed at its gate with permission and that the report is genuine (signed by the head of department; shown to judges on request).
 **Gates**, [pre-registered](GATES.md#verdict-now): G1 passed (news CCTV); G2 passed on our gate (15.0 m vs 15 m taped); G3 passed on DUT ground truth; G4 passed (our footage, end to end); G5, G6 and G8 not run yet; G7's mark is written.
 
 
