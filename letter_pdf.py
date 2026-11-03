@@ -19,14 +19,14 @@ from video.split import CHROME_TIMEOUT_S, CHROMES
 
 COLLEGE = "Lakshmi Narain College of Technology Excellence, Bhopal"
 SIGNER = "Head of Department, Computer Science and Engineering (Data Science)"
-STYLE = """@page { size: A4; margin: 18mm 20mm; }
-body { font-family: "Times New Roman", Georgia, serif; font-size: 11.5pt; line-height: 1.45; color: #000;
+STYLE = """@page { size: A4; margin: 14mm 18mm; }
+body { font-family: "Times New Roman", Georgia, serif; font-size: 11pt; line-height: 1.38; color: #000;
        background: #fff; max-width: 170mm; margin: 0 auto; }
 .head { text-align: center; border-bottom: 1px solid #000; padding-bottom: 6px; margin-bottom: 14px; }
 .head b { font-size: 14pt; }
 .meta p { margin: 2px 0; }
-.letter { white-space: pre-wrap; margin: 14px 0; }
-.sign { margin-top: 26px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.letter { white-space: pre-wrap; margin: 10px 0; }
+.sign { margin-top: 38mm; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
 .sign div { border-top: 1px solid #000; padding-top: 4px; }
 .small { font-size: 9pt; color: #333; margin-top: 18px; }"""
 
@@ -40,8 +40,7 @@ def sheet(plan, site, college=COLLEGE, signer=SIGNER):
     subject = ("" if "subject" in plan["letter"][:500].lower() else
                f'<p><b>Subject:</b> Request for safety measures at the road crossing outside our main gate: '
                f'{html.escape(plan["fix"])}</p>')
-    enclosures = ("Evidence page: measurements, blurred clips and method (printed copy)",
-                  "Statement of support signed by teachers of the college (annexure)")
+    enclosures = ("Evidence page: measurements, blurred clips and method (printed copy)",)
     return f"""<!doctype html><meta charset="utf-8"><title>Letter for signing</title><style>{STYLE}</style>
 <div class="head"><b>{html.escape(college)}</b></div>
 <div class="meta">{to_block}<p>Date: ____________________</p>{subject}</div>
