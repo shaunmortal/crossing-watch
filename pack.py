@@ -290,9 +290,9 @@ def headline(events, seen, site):
     (k3, s3), (k15, s15) = tiers
     shares = " and ".join(f"{100 * lo:.1f}-{100 * hi:.1f}%" for lo, hi in (share_range(k, n) for k, _ in tiers))
     counts = " and ".join(f"{lo:.1f}-{hi:.1f}" for lo, hi in (poisson_range(k) for k, _ in tiers))
-    lines = [f"{k3} of {n} crossings{one_in(k3)} had a moving vehicle through the same spot within {s3:g} s of the "
-             f"person; {k15} of {n}{one_in(k15)} within {s15:g} s.",
-             f"Exact 95% ranges, if this recording is typical: {shares} of crossings (Clopper-Pearson); {counts} people "
+    lines = [f"{k3} of {n} people who crossed{one_in(k3)} had a moving vehicle through the same spot within {s3:g} s "
+             f"of them; {k15} of {n}{one_in(k15)} within {s15:g} s.",
+             f"Exact 95% ranges, if this recording is typical: {shares} of people who crossed (Clopper-Pearson); {counts} people "
              f"in a recording this long (Poisson)."]
     days, length = (site.get(key) for key in SCHOOL_YEAR)
     minutes = watched_minutes(seen)

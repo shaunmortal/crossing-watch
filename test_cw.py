@@ -824,8 +824,8 @@ def test_close_passes_and_exposure_never_read_as_safe():
         "minutes": 1.0, "crossings": 1, "vehicles": 1, "speed_85th_kmh": 28.8}
     tiles = " ".join(pack.stats([], seen))  # the tiles and the line of other counts
     assert "pedestrian crossings watched" in tiles and "85% of vehicles" in tiles and "conflicts per 100" not in tiles
-    assert pack.headline([], seen, {})[0] == "0 of 1 crossings had a moving vehicle through the same spot within 3 s " \
-                                             "of the person; 0 of 1 within 1.5 s."
+    assert pack.headline([], seen, {})[0] == "0 of 1 people who crossed had a moving vehicle through the same spot within 3 s " \
+                                             "of them; 0 of 1 within 1.5 s."
 
 
 def test_exact_ranges_match_published_values():
@@ -850,13 +850,14 @@ def test_headline_counts_each_person_who_crossed_once():
     events = [hit("c1/0", 0.4), hit("c1/1", 2.0), hit("c1/0", 1.0), hit("c2/0", 2.5), hit("pole/0", 0.1)]
     seen = {"minutes": 1.0, "duration_s": 60.0, "crossings": 9, "crossers": [f"c{i}" for i in range(1, 10)]}
     lines = pack.headline(events, seen, {})
-    assert lines[0] == ("2 of 9 crossings (1 in 4.5) had a moving vehicle through the same spot within 3 s of the "
-                        "person; 1 of 9 (1 in 9) within 1.5 s.")
+    assert lines[0] == ("2 of 9 people who crossed (1 in 4.5) had a moving vehicle through the same spot within 3 s "
+                        "of them; 1 of 9 (1 in 9) within 1.5 s.")
+    assert "of people who crossed (Clopper-Pearson)" in lines[1]
     assert "Clopper-Pearson" in lines[1] and "Poisson" in lines[1] and len(lines) == 2
     measured = pack.facts({"name": "gate"}, events, seen)
     assert next(iter(json.loads(measured))) == "headline" and lines[0] in measured and '"c1"' not in measured
     quiet = pack.headline([], seen, {})[0]
-    assert quiet.startswith("0 of 9 crossings had") and f'<p class="lead">{quiet}</p>' in pack.page(
+    assert quiet.startswith("0 of 9 people who crossed had") and f'<p class="lead">{quiet}</p>' in pack.page(
         {"name": "gate", "world_points": SQUARE_ROAD}, [], seen, None, None, 10)
     assert pack.headline(events, {"crossings": 9, "minutes": 1.0}, {}) == []  # an older events.json
     assert "headline" not in pack.facts({"name": "gate"}, events, {"crossings": 9, "minutes": 1.0})
@@ -870,7 +871,7 @@ def test_headline_leaves_out_crossers_spark_rejected():
     seen = {"minutes": 1.0, "crossings": 4, "crossers": ["c1", "c2", "c3", "rider"]}
     kept = pack.real_crossers(events, seen)
     assert kept["crossers"] == ["c1", "c2", "c3"] and seen["crossers"][-1] == "rider" and kept["crossings"] == 4
-    assert pack.headline(pack.confirmed(events), kept, {})[0].startswith("2 of 3 crossings")
+    assert pack.headline(pack.confirmed(events), kept, {})[0].startswith("2 of 3 people who crossed")
     assert pack.real_crossers(events, {"minutes": 1.0}) == {"minutes": 1.0}  # an older events.json
 
 
