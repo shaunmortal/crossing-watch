@@ -110,7 +110,7 @@ flowchart LR
 | **SAM 3.1** | Tracks every person and vehicle, frame by frame | 47 of 52 near-misses vs drone truth; speed error 0.16 km/h mean ([DUT](#end-to-end-against-ground-truth-dut)) |
 | **Muse Spark** | Reviews each person, runs the case agent, writes the letter, judges it | flagged 24 of 24 planted lies ([bench](#checking-the-checks)) |
 | **Muse Image** | Draws the fix onto the real, blurred street, only where people crossed | [how](#how-it-works) |
-| **Muse Wonder** | Listens around each near-miss for horns, brakes and shouts | heard brakes on our college clip, spectrogram agrees |
+| **Muse Wonder** | Listens around each near-miss for horns, brakes and shouts | heard horns around 4 of the 5 near-misses at our gate |
 | **Muse Glimmer 30B** · open weights | Wrote our real gate's letter on a free Kaggle GPU; our LoRA fine-tune judges letters | letter in **276 s, first try**; tuned judge **wins 3 pre-registered blind tests** vs Muse Spark Open ([one page](OPEN_WEIGHTS.md)) |
 | **Muse Spark Open** · open weights | Second judge of our real letter | 6 of 6 reads of our real letter: no unsupported claim ([record](provenance/spark-open-fireworks-gate.json)) |
 
