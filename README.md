@@ -9,9 +9,9 @@
 
 <img src="docs/readme/card-hackathon.svg" height="76" alt="Meta Global AI Developer Hackathon 2026, Indie track entry"> <a href="OPEN_WEIGHTS.md"><img src="docs/readme/card-openweights.svg" height="76" alt="Open weights: Muse Glimmer 30B fine-tuned, served, 3 blind-test wins"></a> <a href="#end-to-end-against-ground-truth-dut"><img src="docs/readme/card-truth.svg" height="76" alt="Drone ground truth: 47 of 52 near-misses found"></a>
 
-**English** · [हिंदी (website)](https://crossingwatch.xyz/?lang=hi)
+**English** · [हिंदी](https://crossingwatch.xyz/?lang=hi) · every page of the website has a हिंदी / English switch
 
-<a href="https://crossingwatch.xyz"><img src="https://img.shields.io/badge/Website-crossingwatch.xyz-f5a623?style=for-the-badge&labelColor=121314&logo=googlechrome&logoColor=white" alt="Website: crossingwatch.xyz"></a> <a href="#-demo"><img src="https://img.shields.io/badge/Demo-video-e5482f?style=for-the-badge&labelColor=121314&logo=youtube&logoColor=white" alt="Demo: video"></a> <a href="https://crossingwatch.xyz/app/"><img src="https://img.shields.io/badge/App-4%20steps-e5482f?style=for-the-badge&labelColor=121314&logo=googlechrome&logoColor=white" alt="App: 4 steps"></a> <a href="https://crossingwatch.xyz/explorer/"><img src="https://img.shields.io/badge/Live%20explorer-try%20it-f5a623?style=for-the-badge&labelColor=121314&logo=googlechrome&logoColor=white" alt="Live explorer: try it"></a> <a href="JUDGES.md"><img src="https://img.shields.io/badge/Judges-5--minute%20map-2fa36b?style=for-the-badge&labelColor=121314&logo=readthedocs&logoColor=white" alt="Judges: 5-minute map"></a> <a href="OPEN_WEIGHTS.md"><img src="https://img.shields.io/badge/Open%20weights-one%20page-2fa36b?style=for-the-badge&labelColor=121314&logo=huggingface&logoColor=white" alt="Open weights: one page"></a>
+<a href="https://crossingwatch.xyz"><img src="https://img.shields.io/badge/Website-crossingwatch.xyz-f5a623?style=for-the-badge&labelColor=121314&logo=googlechrome&logoColor=white" alt="Website: crossingwatch.xyz"></a> <a href="#-demo"><img src="https://img.shields.io/badge/Demo-video-e5482f?style=for-the-badge&labelColor=121314&logo=youtube&logoColor=white" alt="Demo: video"></a> <a href="https://crossingwatch.xyz/manual/"><img src="https://img.shields.io/badge/Manual-7%20steps-2fa36b?style=for-the-badge&labelColor=121314&logo=readthedocs&logoColor=white" alt="Manual: 7 steps"></a> <a href="https://crossingwatch.xyz/app/"><img src="https://img.shields.io/badge/App-4%20steps-e5482f?style=for-the-badge&labelColor=121314&logo=googlechrome&logoColor=white" alt="App: 4 steps"></a> <a href="https://crossingwatch.xyz/explorer/"><img src="https://img.shields.io/badge/Live%20explorer-try%20it-f5a623?style=for-the-badge&labelColor=121314&logo=googlechrome&logoColor=white" alt="Live explorer: try it"></a> <a href="JUDGES.md"><img src="https://img.shields.io/badge/Judges-5--minute%20map-2fa36b?style=for-the-badge&labelColor=121314&logo=readthedocs&logoColor=white" alt="Judges: 5-minute map"></a> <a href="OPEN_WEIGHTS.md"><img src="https://img.shields.io/badge/Open%20weights-one%20page-2fa36b?style=for-the-badge&labelColor=121314&logo=huggingface&logoColor=white" alt="Open weights: one page"></a>
 
 <img src="https://img.shields.io/badge/Built%20with%20Meta-SAM%203.1-f5a623?style=for-the-badge&labelColor=121314&logo=meta&logoColor=white" alt="Built with Meta: SAM 3.1"> <img src="https://img.shields.io/badge/Meta-Muse%20Spark-f5a623?style=for-the-badge&labelColor=121314&logo=meta&logoColor=white" alt="Meta: Muse Spark"> <img src="https://img.shields.io/badge/Meta-Muse%20Image-f5a623?style=for-the-badge&labelColor=121314&logo=meta&logoColor=white" alt="Meta: Muse Image"> <img src="https://img.shields.io/badge/Meta-Muse%20Wonder-f5a623?style=for-the-badge&labelColor=121314&logo=meta&logoColor=white" alt="Meta: Muse Wonder">
 
@@ -58,7 +58,7 @@ Muse Spark writes the letter; code and two judges check it; the college certifie
 
 ## 📑 Contents
 
-[The problem](#-the-problem) · [Results on our gate](#-results-on-our-gate) · [Demo](#-demo) · [Pipeline](#-pipeline) · [Six Meta models](#-six-meta-models-each-doing-real-work) · [Screens](#-screens) · [Try it in one minute](#-try-it-in-one-minute) · [Check it yourself](#check-it-yourself) · [How it works](#how-it-works) · [Open weights](#open-weights-muse-glimmer-writes-the-letter) · [Case agent](#case-agent-it-stops-to-ask-for-a-tape-measure) · [Checking the checks](#checking-the-checks) · [Ground truth](#validation-on-ground-truth-trajectories) · [Limits](#limits-stated) · [Declarations](#declarations)
+[The problem](#-the-problem) · [Results on our gate](#-results-on-our-gate) · [Demo](#-demo) · [Try it in your browser](#-try-it-in-your-browser) · [Pipeline](#-pipeline) · [Six Meta models](#-six-meta-models-each-doing-real-work) · [Screens](#-screens) · [Try it in one minute](#-try-it-in-one-minute) · [Check it yourself](#check-it-yourself) · [How it works](#how-it-works) · [Open weights](#open-weights-muse-glimmer-writes-the-letter) · [Case agent](#case-agent-it-stops-to-ask-for-a-tape-measure) · [Checking the checks](#checking-the-checks) · [Ground truth](#validation-on-ground-truth-trajectories) · [Limits](#limits-stated) · [Declarations](#declarations)
 
 ## 🚨 The problem
 
@@ -86,7 +86,25 @@ phone video into that proof:** measured near-misses, blurred clips, and a letter
 
 ## 🎬 Demo
 
-GATE-TBD: the demo video link (2:40) and its thumbnail.
+GATE-TBD: the 2:52 demo video link. It opens on our real near-miss (0.0 s), then the problem, the run, the checks, the open models and the fix.
+
+## 🧪 Try it in your browser
+
+No install, no key. Every page works in a browser and has a हिंदी / English switch.
+
+| Page | What you can do |
+|---|---|
+| 🛠️ **[App](https://crossingwatch.xyz/app/)** | Crossing Watch in 4 steps. Step 1 is the real road-marking tool: press **Try it with our gate** and the 4 corners of our 8 m × 7 m rectangle turn pixels into metres. Steps 2 and 3 replay our real run and the agent asking for a tape measure. |
+| 🔎 **[Explorer](https://crossingwatch.xyz/explorer/)** | All 75 near-miss candidates from our gate. Move the threshold, switch Muse Spark's review off and on, replay any near-miss on the road map, play its blurred clip. |
+| 📘 **[Manual](https://crossingwatch.xyz/manual/)** | 7 simple steps to measure the road outside your own school, with the tape plan and a printable field sheet. |
+| 📄 **[Evidence dashboard](https://crossingwatch.xyz/evidence/)** | The report the tool made for our gate: clips, map, the Muse Image fix and the letter. |
+
+<table>
+<tr>
+<td width="50%"><a href="https://crossingwatch.xyz/explorer/"><img src="docs/readme/shot-explorer.jpg" alt="The Explorer: threshold slider, Muse Spark review switch and the timeline of 75 candidates"></a><br><sub><b>Explorer.</b> Watch the tool decide.</sub></td>
+<td width="50%"><a href="https://crossingwatch.xyz/app/"><img src="docs/readme/shot-app.jpg" alt="The App, step 3: the agent asks a person to tape-measure the check line"></a><br><sub><b>App.</b> The agent stops and asks for a tape measure.</sub></td>
+</tr>
+</table>
 
 ## 🧭 Pipeline
 

@@ -1,7 +1,9 @@
 # For judges: where each claim is proved
 
 Solo Indie entry: one phone video of a dangerous crossing becomes near-miss evidence and a code-checked letter to the road authority.
-Each claim links to its proof. **Pending** = not done yet; what needs the gate recording (Mon 2 Nov) is `[PLACEHOLDER]`.
+
+**Try it in a browser, no key:** [App](https://crossingwatch.xyz/app/) (press *Try it with our gate*) · [Explorer](https://crossingwatch.xyz/explorer/) · [Manual](https://crossingwatch.xyz/manual/) · [Evidence dashboard](https://crossingwatch.xyz/evidence/). Every page has a हिंदी / English switch.
+Each claim links to its proof.
 
 ## Only in Crossing Watch
 - **The whole loop, on our real gate:** a phone video becomes measured near-misses and a code-checked
