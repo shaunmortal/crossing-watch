@@ -4239,9 +4239,12 @@ def test_readme_first_screen_fits_a_phone_its_links_resolve_and_one_story_on_the
     def slugs(text):  # GitHub's heading anchors: lower case, punctuation dropped, spaces to hyphens
         return {re.sub(r"[^\w\- ]", "", h.strip().lower()).replace(" ", "-")
                 for h in re.findall(r"^#+ (.+)$", text, re.M)}
-    for page, anchors in (("", slugs(readme)), ("GATES.md", slugs(gates))):
-        for anchor in re.findall(r"\]\(" + re.escape(page) + r"#([^)]+)\)", readme):
-            assert anchor in anchors, (page or "README.md", anchor)
+    technical = (here / "TECHNICAL.md").read_text()
+    for text, own in ((readme, "README.md"), (technical, "TECHNICAL.md")):
+        for page, anchors in (("", slugs(text)), ("GATES.md", slugs(gates)), ("TECHNICAL.md", slugs(technical)),
+                              ("README.md", slugs(readme))):
+            for anchor in re.findall(r'(?:\]\(|href=")' + re.escape(page) + r'#([^)"]+)', text):
+                assert anchor in anchors, (own, page or own, anchor)
     who = "The Kaggle notebook was run by the author."
     assert who in readme.split("## Declarations")[1]
     assert " ".join(who.split()) in " ".join((here / "kaggle" / "<removed-run-record>").read_text().split())

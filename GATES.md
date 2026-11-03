@@ -1141,3 +1141,5 @@ the counts.
 - Sun 1 Nov 2026, 11:05 IST: "Verdict now" got a new last-updated date, G4's evidence cell and a dated note on the due
   dates that move to Mon 2 Nov; a dated note on what v4's Muse Spark comparison rests on was added after the v4 result.
   No pre-registered text changed.
+- Tue 3 Nov 2026: the README's technical sections moved, headings unchanged, to TECHNICAL.md; earlier references to a
+  README section now mean that section in TECHNICAL.md. No pre-registered text changed.
