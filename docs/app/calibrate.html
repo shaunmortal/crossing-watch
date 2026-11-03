@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crossing Watch calibration</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+:root { --bg: #fafaf7; --ink: #1d1d1b; --muted: #5f5f58; --line: #d4d4cb; --surface: #fff; --accent: #b8321f; color-scheme: light; }
+@media (prefers-color-scheme: dark) { :root { --bg: #161614; --ink: #ecece6; --muted: #a8a89f; --line: #3a3a34;
+  --surface: #1f1f1c; --accent: #ff7b6b; color-scheme: dark; } }
+body { margin: 0 auto; max-width: 900px; padding: 24px 16px 80px; background: var(--bg); color: var(--ink);
+       font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+h1 { font-size: clamp(1.5rem, 4.5vw, 2rem); line-height: 1.2; margin: 0 0 8px; }
+h2 { font-size: 1.25rem; margin: 40px 0 8px; padding-top: 16px; border-top: 1px solid var(--line); }
+canvas { display: block; width: 100%; margin: 8px 0; border: 1px solid var(--line); border-radius: 6px; background: var(--surface);
+         cursor: crosshair; touch-action: manipulation; }
+label { display: block; margin: 12px 0 4px; }
+input[type=number], input[type=text] { font: inherit; padding: 6px 8px; width: 10em; max-width: 100%; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+input[type=radio], input[type=checkbox] { accent-color: var(--accent); margin-right: 6px; }
+textarea { width: 100%; height: 14em; padding: 10px; font: 13px/1.45 ui-monospace, monospace; color: var(--ink);
+           background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+code { overflow-wrap: anywhere; }
+.muted { color: var(--muted); }
+button { font: inherit; font-weight: 600; padding: 8px 14px; margin: 4px 8px 4px 0; color: var(--ink); background: var(--surface);
+         border: 1px solid var(--line); border-radius: 6px; cursor: pointer; } button:hover { border-color: var(--ink); }
+#save { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 16px 0; padding: 8px 16px 12px; background: var(--surface); }
+legend { font-weight: 600; padding: 0 6px; } [hidden] { display: none; }
+</style>
+</head>
+<body>
+<h1>Crossing Watch: mark the road</h1>
+<p class="muted">Take a full frame of the video itself, not a screenshot with player bars:
+<code>ffmpeg -ss S -i VIDEO -frames:v 1 frame.jpg</code>, with S the start of the site's <code>window_s</code> in
+seconds (0 without one). The page scales it to the 640 px analysis size.</p>
+
+<fieldset><legend>How do you know distances on the road?</legend>
+<label><input type="radio" name="mode" value="tape" checked> I measured a rectangle on the road with a tape</label>
+<label><input type="radio" name="mode" value="map"> No tape: match points to a satellite view (Google Maps or similar) that shows a scale bar</label>
+</fieldset>
+
+<h2>1. Video frame</h2>
+<p class="muted">Click four points on the road surface, going round an area in one direction. With a tape, use the
+corners of the rectangle you measured. With a map, use four points you can also find on the map, spread over the
+crossing: zebra corners, kerb corners, lane-line ends.</p>
+<input type="file" id="frameFile" accept="image/*">
+<canvas id="frame" width="640" height="360"></canvas>
+<p id="frameStatus" class="muted">Open a frame to begin.</p>
+<button id="frameUndo">Undo point</button>
+<p class="muted">Optional, for the speed check (gate G6): after the four rectangle corners, click the four speed-line
+tape marks, line A near kerb, line B near kerb, line B far kerb, line A far kerb, and give the taped distance between
+the lines. The page writes <code>trap</code> from them, and <code>check</code> (line A to line B along the near kerb,
+which the case agent asks a person to tape). SITE.json is empty at 5 to 7 points.</p>
+<label>Line A to line B (metres) <input type="number" id="trapM" min="1" step="0.1" value="15"></label>
+
+<section id="tapeInputs">
+<label>Length of side 1 → 2 (metres) <input type="number" id="w" min="0.5" step="0.1" value="3.5"></label>
+<label>Length of side 2 → 3 (metres) <input type="number" id="h" min="0.5" step="0.1" value="3.0"></label>
+</section>
+
+<section id="mapInputs" hidden>
+<h2>2. Satellite view</h2>
+<p class="muted">Open a screenshot of the same place from above, including the map's scale bar. Click the same four
+points in the same order (1 to 4), then the two ends of the scale bar (S1, S2).</p>
+<input type="file" id="mapFile" accept="image/*">
+<canvas id="map" width="640" height="360"></canvas>
+<p id="mapStatus" class="muted">Open a satellite screenshot.</p>
+<button id="mapUndo">Undo point</button>
+<label>Scale bar length (metres) <input type="number" id="bar" min="1" step="1" value="20"></label>
+</section>
+
+<label>Site name <input type="text" id="name" value="My school gate" style="width: 20em"></label>
+<label>Vehicles to track (comma separated) <input type="text" id="vehicles" value="car, motorcycle, bus, auto rickshaw" style="width: 20em"></label>
+<label><input type="checkbox" id="crowded"> Crowded: more than about 15 people in view at once (detects people
+frame by frame; costs more)</label>
+<label><input type="checkbox" id="dense"> Dense traffic: more than about 15 vehicles of one kind pass in 15 seconds,
+or many are parked in view (detects vehicles frame by frame; costs more)</label>
+<label><input type="checkbox" id="fromclip"> This frame is from the prepared <code>out/NAME/clip.mp4</code>
+(needed when the site uses <code>prep_filter</code>)</label>
+<label>Letter language <input type="text" id="lang" value="English"></label>
+<h2>SITE.json</h2>
+<textarea id="out" readonly></textarea>
+<button id="save">Download SITE.json</button>
+<script>
+const ANALYSIS_WIDTH = 640;
+const field = id => document.getElementById(id);
+const mode = () => document.querySelector("input[name=mode]:checked").value;
+
+// One clickable image. width: fixed canvas width in stored pixels, or null to keep the image's own pixels.
+function picker(name, labels, width) {
+  const canvas = field(name), ctx = canvas.getContext("2d");
+  const state = { image: null, points: [] };
+  const draw = () => {
+    if (!state.image) return;
+    ctx.drawImage(state.image, 0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = ctx.fillStyle = "#ff3b30";
+    ctx.lineWidth = Math.max(2, canvas.width / 320);
+    ctx.font = `bold ${Math.max(16, canvas.width / 40)}px system-ui`;
+    const corners = state.points.slice(0, 4);
+    ctx.beginPath();
+    corners.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    if (corners.length === 4) ctx.closePath();
+    ctx.stroke();
+    state.points.forEach(([x, y], i) => { ctx.fillRect(x - 3, y - 3, 7, 7); ctx.fillText(labels[i], x + 6, y - 6); });
+    const next = labels[state.points.length];
+    field(name + "Status").textContent = next ? `Click point ${next}.` : "Done.";
+    render();
+  };
+  field(name + "File").addEventListener("change", event => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const img = new Image();
+    img.onload = () => {
+      state.image = img;
+      canvas.width = width || img.naturalWidth;
+      canvas.height = width ? Math.round(img.naturalHeight * width / img.naturalWidth / 2) * 2 : img.naturalHeight;
+      state.points = [];
+      draw();
+    };
+    img.onerror = () => { field(name + "Status").textContent = "Could not open that file as an image."; };
+    img.src = URL.createObjectURL(file);
+  });
+  canvas.addEventListener("click", event => {
+    if (!state.image || state.points.length === labels.length) return;
+    const box = canvas.getBoundingClientRect();
+    state.points = [...state.points, [(event.clientX - box.left) * canvas.width / box.width,
+                                      (event.clientY - box.top) * canvas.height / box.height]];
+    draw();
+  });
+  field(name + "Undo").addEventListener("click", () => { state.points = state.points.slice(0, -1); draw(); });
+  return { state, canvas };
+}
+
+const TRAP_LABELS = ["A near", "B near", "B far", "A far"];
+const frame = picker("frame", ["1", "2", "3", "4", ...TRAP_LABELS], ANALYSIS_WIDTH);
+const map = picker("map", ["1", "2", "3", "4", "S1", "S2"], null);
+
+// Road metres for the four frame points, and a note saying where they came from; null until complete.
+function worldPoints() {
+  if (mode() === "tape") {
+    const w = parseFloat(field("w").value), h = parseFloat(field("h").value);
+    if (!(w > 0 && h > 0)) return null;
+    return { points: [[0, 0], [w, 0], [w, h], [0, h]], note: `Rectangle ${w} m x ${h} m measured on the road with a tape.` };
+  }
+  const p = map.state.points, bar = parseFloat(field("bar").value);
+  if (p.length !== 6 || !(bar > 0)) return null;
+  const barPx = Math.hypot(p[5][0] - p[4][0], p[5][1] - p[4][1]);
+  if (barPx < 5) return null;
+  const metresPerPx = bar / barPx;
+  return { points: p.slice(0, 4).map(([x, y]) => [+(x * metresPerPx).toFixed(3), +(y * metresPerPx).toFixed(3)]),
+           note: `Points matched to a satellite view; scale from its ${bar} m scale bar. Expect errors of a few percent.` };
+}
+
+// What to do next once the rectangle is done: the speed-line marks are optional, all four or none.
+function trapStatus(clicks, trapM) {
+  if (clicks === 4) return `Rectangle done. Optional, for the speed check: click point ${TRAP_LABELS[0]}.`;
+  if (clicks < 8) return `Click point ${TRAP_LABELS[clicks - 4]} (optional; SITE.json comes back at 8, or Undo to 4).`;
+  return trapM > 0 ? "Done: the rectangle, the speed-line marks and the along-road check."
+                   : "Trap dropped: give the distance from line A to line B, more than 0 m.";
+}
+
+function render() {
+  const world = worldPoints();
+  const clicks = frame.state.points.map(([x, y]) => [Math.round(x), Math.round(y)]);
+  const trapM = parseFloat(field("trapM").value);
+  if (clicks.length >= 4) field("frameStatus").textContent = trapStatus(clicks.length, trapM);
+  if (![4, 8].includes(clicks.length) || !world) { field("out").value = ""; return; }
+  const site = {
+    name: field("name").value.trim() || "Unnamed site",
+    frame_size: [frame.canvas.width, frame.canvas.height],
+    marked_on: field("fromclip").checked ? "clip" : "raw video frame",
+    image_points: clicks.slice(0, 4),
+    world_points: world.points,
+    calibration_note: world.note,
+    person: "person",
+    ...(field("crowded").checked ? { person_mode: "crowd" } : {}),
+    ...(field("dense").checked ? { vehicle_mode: "crowd" } : {}),
+    vehicles: field("vehicles").value.split(",").map(v => v.trim()).filter(Boolean),
+    letter_language: field("lang").value.trim() || "English",
+    // never a number in "what": the case agent reads it to a person as the distance to tape (agent.py)
+    ...(clicks.length === 8 && trapM > 0 ? {
+      trap: { image_points: clicks.slice(4), distance_m: trapM },
+      check: { what: "line A to line B along the near kerb (the A near and B near speed-line tape marks)",
+               points: clicks.slice(4, 6) },
+    } : {}),
+  };
+  field("out").value = JSON.stringify(site, null, 1);
+}
+
+document.querySelectorAll("input[name=mode]").forEach(radio => radio.addEventListener("change", () => {
+  field("tapeInputs").hidden = mode() !== "tape";
+  field("mapInputs").hidden = mode() !== "map";
+  render();
+}));
+["w", "h", "bar", "name", "vehicles", "lang", "fromclip", "crowded", "dense", "trapM"].forEach(id => field(id).addEventListener("input", render));
+field("save").addEventListener("click", () => {
+  if (!field("out").value) return;
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([field("out").value], { type: "application/json" }));
+  link.download = "site.json";
+  link.click();
+});
+</script>
+</body>
+</html>

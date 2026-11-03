@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Crossing Watch app</title>
+<meta name="description" content="How Crossing Watch works as an app, in four steps, with the real tool and our real run: mark the road, run, the agent checks itself, results.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;1,9..144,400&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root { --bg: #121314; --card: #1b1d1f; --line: #2a2d30; --ink: #f6f3ec; --muted: #9aa0a6; --saffron: #f5a623; --signal: #e5482f; --go: #2fa36b;
+  --display: Fraunces, Georgia, serif; --sans: Inter, system-ui, sans-serif; --mono: "IBM Plex Mono", monospace; }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 var(--sans); }
+a { color: var(--saffron); }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 22px 16px 70px; }
+.top { display: flex; flex-wrap: wrap; gap: 10px 22px; justify-content: space-between; font: 500 14px/1 var(--mono); }
+.top a { color: var(--ink); text-decoration: none; opacity: .8; }
+.kick { font: 500 13px/1 var(--mono); letter-spacing: .18em; text-transform: uppercase; color: var(--saffron); }
+h1 { font: 500 clamp(34px, 5vw, 56px)/1.05 var(--display); letter-spacing: -.02em; margin: 14px 0 8px; }
+h1 em, h2 em { color: var(--saffron); font-weight: 400; }
+h2 { font: 500 clamp(26px, 3.4vw, 36px)/1.1 var(--display); margin: 8px 0 6px; }
+.lede { color: #c9cdd2; max-width: 780px; }
+.steps { position: sticky; top: 0; z-index: 5; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 12px 0; background: linear-gradient(var(--bg) 80%, transparent); }
+.steps a { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); color: var(--ink); text-decoration: none; font: 500 14px/1.2 var(--sans); transition: border-color .3s, background .3s; }
+.steps a b { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: #2a2d30; font: 600 13px var(--mono); transition: background .3s, color .3s; }
+.steps a.on { border-color: var(--saffron); } .steps a.on b { background: var(--saffron); color: #121314; }
+@media (max-width: 700px) { .steps { grid-template-columns: repeat(2, 1fr); } }
+.step { margin-top: 26px; padding: 22px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); opacity: 0; transform: translateY(30px); transition: opacity .8s, transform .8s; }
+.step.in { opacity: 1; transform: none; }
+.what { margin: 10px 0 16px; padding: 10px 14px; border-left: 3px solid var(--saffron); background: rgba(245,166,35,.07); border-radius: 0 10px 10px 0; color: #e7e3da; font-size: 15px; }
+.what b { color: var(--saffron); font: 600 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; margin-right: 8px; }
+iframe { width: 100%; height: 760px; border: 1px solid var(--line); border-radius: 12px; background: #fafaf7; }
+.btn { display: inline-flex; gap: 8px; align-items: center; padding: 11px 16px; border-radius: 10px; background: var(--saffron); color: #121314; font: 600 14px var(--sans); text-decoration: none; border: 0; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid #3a3d40; }
+.row { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+.term { background: #0b0c0d; border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; font: 13.5px/1.7 var(--mono); color: #d7dadd; min-height: 230px; white-space: pre-wrap; overflow-x: auto; }
+.term .p { color: var(--saffron); } .term .ok { color: #6fd39b; } .term .hl { color: #fff; background: rgba(245,166,35,.16); }
+.chat { display: flex; flex-direction: column; gap: 12px; }
+.msg { max-width: 760px; padding: 12px 14px; border-radius: 14px; background: #232629; border: 1px solid var(--line); opacity: 0; transform: translateY(14px); transition: opacity .5s, transform .5s; }
+.msg.in { opacity: 1; transform: none; }
+.msg .meta { font: 500 12px var(--mono); color: var(--muted); margin-bottom: 4px; }
+.msg .meta b { color: var(--saffron); font-weight: 600; }
+.msg.ask { border-color: rgba(245,166,35,.6); }
+.msg.human { align-self: flex-end; background: #2a2416; border-color: rgba(245,166,35,.45); }
+.msg.done { border-color: rgba(47,163,107,.7); background: rgba(47,163,107,.08); }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.card { display: block; padding: 18px; border-radius: 14px; background: #232629; border: 1px solid var(--line); color: var(--ink); text-decoration: none; transition: transform .25s, border-color .25s; }
+.card:hover { transform: translateY(-4px); border-color: var(--saffron); }
+.card b { display: block; font: 500 22px/1.2 var(--display); margin: 6px 0; }
+.card span { color: var(--muted); font-size: 14px; }
+.note { color: var(--muted); font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { .step, .msg { opacity: 1; transform: none; transition: none; } }
+</style></head>
+<body><div class="wrap">
+<nav class="top"><a href="../">← Crossing<span style="color:var(--saffron)">.</span>Watch</a><span><a href="../explorer/">Explorer</a> &nbsp;·&nbsp; <a href="../evidence/">Evidence</a> &nbsp;·&nbsp; <a href="https://github.com/shaunmortal/crossing-watch">GitHub</a></span></nav>
+
+<header style="margin-top:26px">
+  <div class="kick">The app · four steps · our real run</div>
+  <h1>From one phone video <em>to a checked letter.</em></h1>
+  <p class="lede">This is Crossing Watch as a school would use it. Step 1 is the real tool, working here in your browser. Steps 2 and 3 show our real run on our college gate on 2 Nov 2026, exactly as it was logged. Step 4 opens the results.</p>
+</header>
+
+<nav class="steps" aria-label="Steps">
+  <a href="#s1"><b>1</b>Mark the road</a><a href="#s2"><b>2</b>Run</a><a href="#s3"><b>3</b>The agent checks</a><a href="#s4"><b>4</b>Results</a>
+</nav>
+
+<section class="step" id="s1">
+  <div class="kick">Step 1 · works here, no key</div>
+  <h2>Mark the road: <em>pixels become metres.</em></h2>
+  <div class="what"><b>What happens</b>Tape 8 sheets of A4 on the road in a rectangle and film it. Load one frame, click the 4 corners, type the sizes. The tool turns the picture into a road map in metres, so speeds and gaps can be measured.</div>
+  <div class="row"><a class="btn" href="sample-frame.jpg" download>Download our gate's frame</a><a class="btn ghost" href="calibrate.html" target="_blank" rel="noopener">Open the tool full screen ↗</a></div>
+  <iframe src="calibrate.html" title="Crossing Watch calibration tool" loading="lazy"></iframe>
+  <p class="note">Faces in the sample frame are blurred. The tool runs in your browser; nothing is uploaded.</p>
+</section>
+
+<section class="step" id="s2">
+  <div class="kick">Step 2 · needs a Meta Model API key</div>
+  <h2>Run it: <em>Meta's models do the seeing.</em></h2>
+  <div class="what"><b>What happens</b>SAM 3.1 tracks every person and vehicle; code measures who reached the same spot how many seconds apart; Muse Spark looks at each person and removes riders and things that are not people. Below are lines from our real run's log, in order (long lines cut where marked ...).</div>
+  <div class="term" id="term" aria-label="Real run output"></div>
+  <p class="note">About $12 of SAM for an 8.6-minute video at Meta's list prices. Python 3.11+ and ffmpeg; <a href="https://github.com/shaunmortal/crossing-watch">code on GitHub</a>.</p>
+</section>
+
+<section class="step" id="s3">
+  <div class="kick">Step 3 · the case agent, on Muse Spark</div>
+  <h2>The agent checks itself: <em>it asks for a tape measure.</em></h2>
+  <div class="what"><b>What happens</b>Before it trusts a single metre, the agent stops and asks a person to measure a second line with a tape, one the maths never used. If the video and the tape agree, the letter goes ahead; then it waits for the head of the school. This is the real log.</div>
+  <div class="chat" id="chat"></div>
+  <p class="note">Five agent turns, about $0.02 in all.</p>
+</section>
+
+<section class="step" id="s4">
+  <div class="kick">Step 4 · results</div>
+  <h2>The evidence, <em>ready to send.</em></h2>
+  <div class="what"><b>What happens</b>Every near-miss with its blurred clip, a road map in metres, the fix drawn by Muse Image, and a letter whose every number is checked by code. Our college certified this report genuine on 3 Nov 2026.</div>
+  <div class="cards">
+    <a class="card" href="../explorer/"><span>Interactive</span><b>Replay the decisions →</b><span>Move the threshold, switch the review off and on, replay any near-miss.</span></a>
+    <a class="card" href="../evidence/"><span>The report</span><b>Evidence dashboard →</b><span>Clips, map, fix and the letter, as the tool made them.</span></a>
+    <a class="card" href="https://github.com/shaunmortal/crossing-watch"><span>The code</span><b>Run it yourself →</b><span>Self-checks and a synthetic sample run with no key.</span></a>
+  </div>
+</section>
+</div>
+
+<script>
+const LOG = [
+  ["p", "$ python3 monday.py gate-stable.mp4 sites/gate.json --budget 14 --yes"],
+  ["", "8.6 min of video, 40 part(s), 200 SAM video request(s)"],
+  ["", "8.6 min, 80 crossings, 55 moving vehicles, 85th-percentile speed 23.2 km/h; 51 serious near-misses (PET < 1.5 s), 24 close passes (< 3.0 s)"],
+  ["hl", "  [serious] person c396/0 / motorcycle#23.0:6: PET 0.0 s, 0.16 m, 27.3 km/h  [Spark: rider]"],
+  ["hl", "  [close pass] person c482/0 / car#26.0:1: PET 2.6 s, 1.0 m, 22.0 km/h  [Spark: not a person]"],
+  ["ok", "review: Muse Spark reviewed 32 pedestrians and rejected 29; 5 of 75 near-misses kept."],
+  ["ok", "measure: ... 15.0 m. Serious near-misses: 2, close passes: 3."],
+];
+const AGENT = [
+  ["track", "Tracked people in auto mode and vehicles in video mode: near-misses kept: 5. No request was full.", "", "$0.002"],
+  ["review", "Muse Spark reviewed 32 pedestrians and rejected 29; 5 of 75 near-misses kept.", "", "$0.004"],
+  ["measure", "Video reading of the check distance (line A to line B along the wall-side edge): 15.0 m. Serious near-misses: 2, close passes: 3.", "", "$0.009"],
+  ["request_measurement", "Asked a person (R1) to tape-measure line A to line B along the wall-side edge (the A and B wall-side tape marks).", "ask", "$0.014"],
+  ["person", "R1 answered: 15 m", "human", ""],
+  ["submit_letter", "Video 15.0 m, tape 15 m, 0% off: proven. Letter written by Muse Spark; waiting for the head of the school.", "done", "$0.019"],
+];
+const term = document.getElementById("term"), chat = document.getElementById("chat");
+function typeLog() {
+  let i = 0;
+  const next = () => {
+    if (i >= LOG.length) return;
+    const [cls, text] = LOG[i++], line = document.createElement("div");
+    if (cls) line.className = cls; term.append(line);
+    let k = 0; const t = setInterval(() => { line.textContent = text.slice(0, ++k); if (k >= text.length) { clearInterval(t); setTimeout(next, 260); } }, 14);
+  };
+  next();
+}
+function playChat() {
+  AGENT.forEach(([tool, text, kind, usd], i) => {
+    const m = document.createElement("div"); m.className = "msg " + kind;
+    m.innerHTML = `<div class="meta">${kind === "human" ? "<b>Person</b> · tape measure" : `<b>Muse Spark</b> · turn ${i < 4 ? i + 1 : 5} · ${tool}${usd ? " · total so far " + usd : ""}`}</div>${text}`;
+    chat.append(m); setTimeout(() => m.classList.add("in"), 500 + i * 900);
+  });
+}
+const started = new Set();
+const io = new IntersectionObserver((es) => es.forEach((e) => {
+  if (!e.isIntersecting) return;
+  e.target.classList.add("in");
+  if (e.target.id === "s2" && !started.has("s2")) { started.add("s2"); typeLog(); }
+  if (e.target.id === "s3" && !started.has("s3")) { started.add("s3"); playChat(); }
+}), { threshold: .25 });
+document.querySelectorAll(".step").forEach((s) => io.observe(s));
+const tabs = [...document.querySelectorAll(".steps a")];
+const spy = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) tabs.forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + e.target.id)); }), { rootMargin: "-45% 0px -50% 0px" });
+document.querySelectorAll(".step").forEach((s) => spy.observe(s));
+</script>
+</body></html>
