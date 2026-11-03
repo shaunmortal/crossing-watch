@@ -153,4 +153,5 @@ const tabs = [...document.querySelectorAll(".steps a")];
 const spy = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) tabs.forEach((a) => a.classList.toggle("on", a.getAttribute("href") === "#" + e.target.id)); }), { rootMargin: "-45% 0px -50% 0px" });
 document.querySelectorAll(".step").forEach((s) => spy.observe(s));
 </script>
+<script src="../shared.js"></script>
 </body></html>

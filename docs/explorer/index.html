@@ -186,4 +186,5 @@ fetch("data.json").then((r) => r.json()).then((d) => {
   $("thr").addEventListener("input", render); $("rev").addEventListener("change", render); $("play").addEventListener("click", play);
 }).catch(() => { $("detail").textContent = "Could not load data.json."; });
 </script>
+<script src="../shared.js"></script>
 </body></html>

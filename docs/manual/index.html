@@ -128,4 +128,5 @@ document.querySelectorAll("pre button").forEach((b) => b.addEventListener("click
 const io = new IntersectionObserver((es) => es.forEach((e) => e.isIntersecting && e.target.classList.add("in")), { threshold: .2 });
 document.querySelectorAll(".step").forEach((s) => io.observe(s));
 </script>
+<script src="../shared.js"></script>
 </body></html>
