@@ -13,7 +13,6 @@ import masks
 PAD_S = 2.0
 HEAD_SHARE = 0.3   # the top 30% of a person box holds the head
 MIN_BLUR_PX = 3    # heads smaller than this are unrecognisable anyway, and delogo needs room
-PLATE_SHARE = 0.25  # the bottom 25% of a vehicle box holds its number plate
 MAX_FILTERS = 2000  # ffmpeg 9 died (SIGBUS) on one chain of 5000 delogos (fine at 3000): a crowd is blurred in passes
 TRAIL_STEP = 2     # a footstep dot every 2nd frame
 DOT_PX = 6         # footstep dot size
@@ -57,8 +56,8 @@ def blur_filters(person_tracks, first, last, frame_size):
 
 
 def plate_filters(vehicle_tracks, first, last, frame_size):
-    """One delogo per number plate per frame, over the bottom PLATE_SHARE of each vehicle box, clamped as in
-    blur_filters."""
+    """One delogo per vehicle per frame over its whole box, clamped as in blur_filters: seen from above at an angle,
+    a turned vehicle's plate can sit anywhere in its box, so no band of it is safe to leave."""
     width, height = frame_size
     out = []
     for track in vehicle_tracks:
@@ -66,7 +65,7 @@ def plate_filters(vehicle_tracks, first, last, frame_size):
             b = track.get(f)
             if not b:
                 continue
-            x1, y1 = max(1, round(b[0])), max(1, round(b[3] - PLATE_SHARE * (b[3] - b[1])))
+            x1, y1 = max(1, round(b[0])), max(1, round(b[1]))
             x2, y2 = min(width - 2, round(b[2])), min(height - 2, round(b[3]))
             if x2 - x1 >= MIN_BLUR_PX and y2 - y1 >= MIN_BLUR_PX:
                 out.append(f"delogo=x={x1}:y={y1}:w={x2 - x1}:h={y2 - y1}:enable='eq(n,{f - first})'")
@@ -165,7 +164,7 @@ def silhouettes(pairs, folder, first, last, frame_size):
 
 def render(clip, event, person_track, vehicle_track, fps, out_path, everyone=(), frame_size=None, vehicles=(),
            top_down=False):
-    """Write the evidence clip for one event, heads of `everyone` and number plates of `vehicles` blurred, the two
+    """Write the evidence clip for one event, heads of `everyone` and all of `vehicles` (whole boxes) blurred, the two
     drawn as SAM silhouettes where their masks are cached next to `clip` (else as boxes); returns out_path."""
     first, last = window(event, fps)
     pairs = [(vehicle_track, "red"), (person_track, "cyan")]  # the pedestrian drawn last, on top

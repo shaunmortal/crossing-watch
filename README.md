@@ -202,7 +202,8 @@ Everything else is in **[TECHNICAL.md](TECHNICAL.md)**:
 ## Declarations
 
 Solo entry by Ayush Kumar, built with Claude Code as a coding assistant. All work here was done during the hackathon,
-from 28 Oct 2026; the one ported piece is the mask decoder below. The Kaggle notebook was run by the author.
+from 28 Oct 2026; the one ported piece is the mask decoder below. The Kaggle notebook was run by the author. The gate letter's run
+(`kaggle/glimmer-gate.ipynb`) was on the author's own Kaggle account.
 
 - **Licences.** `masks.py` ports the one_bit mask decoder from Meta's meta-sam-parser (`_mask_codec.py`, Copyright (c)
   Meta Platforms, Inc. and affiliates) under its SAM License, in `LICENSES/SAM-License.txt`; everything else is MIT

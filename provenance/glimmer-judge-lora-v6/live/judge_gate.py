@@ -10,7 +10,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-CW = Path("~/Desktop/crossing-watch")
+CW = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(CW))
 import pack  # noqa: E402
 

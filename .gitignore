@@ -5,7 +5,7 @@ __pycache__/
 *.mp4
 # docs/ (GitHub Pages) may hold only the blurred evidence clips and hero shots, never clip.mp4 or blind clips
 !docs/**/event[0-9]*.mp4
-!docs/film/story.mp4
+!docs/hero/gate.mp4
 docs/**/person-*.jpg
 docs/**/person-*.json
 docs/**/blind*

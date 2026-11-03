@@ -1164,12 +1164,17 @@ def test_street_photo_blurs_plates_and_never_trusts_a_full_video_reply_alone():
         finally:
             pack.subprocess.run = old
     filters = calls[-1][calls[-1].index("-vf") + 1]
-    assert "delogo=x=400:y=260:w=100:h=20:" in filters and "delogo=x=600:" in filters  # the plate; a missed person
+    assert "delogo=x=400:y=200:w=100:h=80:" in filters and "delogo=x=600:" in filters  # the car; a missed person
 
 
-def test_number_plates_are_blurred_in_the_bottom_quarter_of_each_vehicle():
+def test_number_plates_are_blurred_with_the_whole_vehicle_box():
+    """Seen from 8.3 m up at an angle, a turned car's rear plate can sit anywhere in its box (the gate's white SUV
+    showed its plate above a bottom-quarter band): every tracked vehicle is blurred whole, clamped to the frame."""
     car = {10: [100, 100, 200, 140], 11: [637, 350, 700, 400]}  # then off the frame's corner: nothing left to blur
-    assert render.plate_filters([car], 10, 11, (640, 360)) == ["delogo=x=100:y=130:w=100:h=10:enable='eq(n,0)'"]
+    blurs = render.plate_filters([car], 10, 11, (640, 360))
+    assert blurs == ["delogo=x=100:y=100:w=100:h=40:enable='eq(n,0)'"]
+    x, y, w, h = (int(v.split("=")[-1]) for v in blurs[0].split(":")[:4])
+    assert x <= 100 and y <= 100 and x + w >= 200 and y + h >= 120  # the box's top half is inside the blur
     calls, old = [], render.subprocess.run
     render.subprocess.run = lambda args, **kwargs: calls.append(args)
     try:
@@ -1177,7 +1182,7 @@ def test_number_plates_are_blurred_in_the_bottom_quarter_of_each_vehicle():
                       frame_size=(640, 360), vehicles=[{5: [100, 100, 200, 140]}])
     finally:
         render.subprocess.run = old
-    assert "delogo=x=100:y=130:w=100:h=10:enable='eq(n,5)'" in calls[0][calls[0].index("-vf") + 1]
+    assert "delogo=x=100:y=100:w=100:h=40:enable='eq(n,5)'" in calls[0][calls[0].index("-vf") + 1]
 
 
 def test_heads_a_full_video_request_missed_are_searched_on_every_published_frame():

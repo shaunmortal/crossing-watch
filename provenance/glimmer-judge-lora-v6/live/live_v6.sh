@@ -2,13 +2,14 @@
 # Serve the v6 adapter once on 1 x H200 (BF16, live merge; $8/GPU-hour, billed per second), replay all 1,545 v6
 # holdout prompts through it, run the public bench through the product's own judge path, then ALWAYS delete it.
 # Needs a payment method on the Fireworks account. Run only with Ayush's approval for this spend.
-D=~/Desktop/META/build-scratch/glimmer-ft/deploy
-PY=~/Desktop/META/build-scratch/glimmer-ft/venv/bin/python
-ACCT=<fireworks-account>; DEP=cw-judge-v6
+CW=$(git rev-parse --show-toplevel)
+D=${CW_DEPLOY_DIR:?set CW_DEPLOY_DIR to a scratch folder}
+PY=${CW_PYTHON:-python3}
+ACCT=${FIREWORKS_ACCOUNT:?set FIREWORKS_ACCOUNT}; DEP=cw-judge-v6
 MODEL=accounts/$ACCT/models/muse-starter-sl-judge-v6-main
 SHAPE=accounts/fireworks/deploymentShapes/dkuwotf7
 REF=$MODEL#accounts/$ACCT/deployments/$DEP  # live merge: full model path # full deployment path
-set -a; . ~/Desktop/crossing-watch/.env; set +a
+set -a; . "$CW/.env"; set +a
 sdk() { $PY -c "from fireworks import Fireworks; c = Fireworks(account_id='$ACCT'); $1"; }
 cleanup() {
   echo "deleting $DEP ($(date))"
@@ -30,13 +31,13 @@ print('READY', d.name)" || exit 1
 echo "ready $(date)"
 python3 $D/replay_v6.py "$REF" $D/v6-live.jsonl || echo "replay failed"
 echo "replay done $(date)"
-python3 - <<'PY'
-import json
-b = json.load(open('~/Desktop/crossing-watch/kaggle/judge-bench-public.json'))
+cd "$CW" && python3 - <<'PY'
+import json, os
+b = json.load(open('kaggle/judge-bench-public.json'))
 b = [{k: v for k, v in i.items() if not k.startswith('glimmer')} for i in b]
-json.dump(b, open('~/Desktop/META/build-scratch/glimmer-ft/deploy/product-bench-v6.json', 'w'), indent=1)
+json.dump(b, open(os.environ['CW_DEPLOY_DIR'] + '/product-bench-v6.json', 'w'), indent=1)
 PY
-cd ~/Desktop/crossing-watch && JUDGE_MODEL_URL=https://api.fireworks.ai/inference/v1 \
+cd "$CW" && JUDGE_MODEL_URL=https://api.fireworks.ai/inference/v1 \
   JUDGE_MODEL="$REF" JUDGE_VOTES=1 \
   python3 judge_bench.py --out $D/product-bench-v6.json --glimmer 1 > $D/product-bench-v6.log 2>&1 || echo "product bench failed"
 echo "product done $(date)"
