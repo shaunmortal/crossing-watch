@@ -7,7 +7,7 @@
 ### One phone video in. Proof the road authority can act on, out.
 **सड़क का ख़तरा · नाप के · सबूत के साथ**
 
-<img src="docs/readme/card-hackathon.svg" height="76" alt="Meta Global AI Developer Hackathon 2026, Indie track entry"> <a href="OPEN_WEIGHTS.md"><img src="docs/readme/card-openweights.svg" height="76" alt="Open weights: Muse Glimmer 30B fine-tuned, served, 3 of 3 blind tests"></a> <a href="#end-to-end-against-ground-truth-dut"><img src="docs/readme/card-truth.svg" height="76" alt="Drone ground truth: 47 of 52 near-misses found"></a>
+<img src="docs/readme/card-hackathon.svg" height="76" alt="Meta Global AI Developer Hackathon 2026, Indie track entry"> <a href="OPEN_WEIGHTS.md"><img src="docs/readme/card-openweights.svg" height="76" alt="Open weights: Muse Glimmer 30B fine-tuned, served, 3 blind-test wins"></a> <a href="#end-to-end-against-ground-truth-dut"><img src="docs/readme/card-truth.svg" height="76" alt="Drone ground truth: 47 of 52 near-misses found"></a>
 
 **English** · [हिंदी (website)](https://crossingwatch.xyz/?lang=hi)
 
@@ -111,37 +111,37 @@ flowchart LR
 | **Muse Spark** | Reviews each person, runs the case agent, writes the letter, judges it | flagged 24 of 24 planted lies ([bench](#checking-the-checks)) |
 | **Muse Image** | Draws the fix onto the real, blurred street, only where people crossed | [how](#how-it-works) |
 | **Muse Wonder** | Listens around each near-miss for horns, brakes and shouts | heard brakes on our college clip, spectrogram agrees |
-| **Muse Glimmer 30B** · open weights | Wrote our real gate's letter on a free Kaggle GPU; our LoRA fine-tune judges letters | letter in **276 s, first try**; tuned judge **wins 3 of 3 pre-registered blind tests** vs Muse Spark Open ([one page](OPEN_WEIGHTS.md)) |
-| **Muse Spark Open** · open weights | Second judge of our real letter | no unsupported claim ([record](provenance/spark-open-fireworks-sample.json)) |
+| **Muse Glimmer 30B** · open weights | Wrote our real gate's letter on a free Kaggle GPU; our LoRA fine-tune judges letters | letter in **276 s, first try**; tuned judge **wins 3 pre-registered blind tests** vs Muse Spark Open ([one page](OPEN_WEIGHTS.md)) |
+| **Muse Spark Open** · open weights | Second judge of our real letter | 6 of 6 reads of our real letter: no unsupported claim ([record](provenance/spark-open-fireworks-gate.json)) |
 
 <details>
 <summary><b>Every model's numbers in full</b></summary>
 
 - **SAM 3.1** tracks people and vehicles. Against DUT's top-down drone ground truth: 47 of 52 conflicts found after Muse Spark's review (50 of 52 by geometry alone; crowd mode); speed error 0.16 km/h mean, 0.55 km/h at the 95th percentile (vehicle crowd mode). [DUT](#end-to-end-against-ground-truth-dut), [30 Oct re-score](GATES.md#accuracy-fixes-merged-re-scored-at-0-fri-30-oct-2026)
-- **Muse Spark** reviews each person (after it: 48 of 52 in vehicle crowd mode, 1 fewer than the geometry's 49; 47 of 52 in crowd mode, 3 fewer than the geometry's 50; its "unclear keeps the person" and "a lone walker overrules not a person" rules were set after seeing DUT cases), writes the fix and the letter, and as judge flagged 24 of 24 planted lies and 1 of 8 clean letters (code alone: 4 of 24); a Muse judge is not independent of Muse letters. It also runs the [case agent](#case-agent-it-stops-to-ask-for-a-tape-measure), which stops to ask for a tape measure; one recorded run, on Spark Open with the sample. [bench](#checking-the-checks)
+- **Muse Spark** reviews each person (after it: 48 of 52 in vehicle crowd mode, 1 fewer than the geometry's 49; 47 of 52 in crowd mode, 3 fewer than the geometry's 50; its "unclear keeps the person" and "a lone walker overrules not a person" rules were set after seeing DUT cases), writes the fix and the letter, and as judge flagged 24 of 24 planted lies and 1 of 8 clean letters (code alone: 4 of 24); a Muse judge is not independent of Muse letters. It also runs the [case agent](#case-agent-it-stops-to-ask-for-a-tape-measure), which stops to ask for a tape measure; recorded on our gate ("Video 15.0 m, tape 15 m, 0% off: proven") and on Spark Open with the sample. [bench](#checking-the-checks)
 - **Muse Image** draws the fix only inside the strip where people were measured crossing; every other pixel stays the real, blurred street (the whole photo when no path was measured). Nothing measured. [how](#how-it-works)
 - **Muse Wonder** listens around each near-miss for horns, brakes and shouts. On our college clip it heard brakes, which a spectrogram corroborates; not ground truth. [GATES](GATES.md#status-update-second-pass-written-before-the-first-commit-28-oct-1919-ist)
-- **Muse Glimmer 30B (open weights)**, self-hosted on Kaggle 2 x T4 from sha256-checked weights, wrote **our real gate's letter in 276 s on the first try**, every number passing the code check ([letter](kaggle/glimmer-gate-letter.txt)). Our free LoRA fine-tune of Glimmer **beats Muse Spark Open in three pre-registered blind tests** (p 0.005, 0.029, 0.0006) and, with our code check, beats Muse Spark on model-written slips (p 0.027); served on a Fireworks H200 it gives the same verdict on 1,499 of 1,501 rows; overall Muse Spark stays ahead; about a quarter of Spark's cost. [record](<removed-run-record>), [open weights, one page](OPEN_WEIGHTS.md)
+- **Muse Glimmer 30B (open weights)**, self-hosted on Kaggle 2 x T4 from sha256-checked weights, wrote **our real gate's letter in 276 s on the first try**, every number passing the code check ([letter](kaggle/glimmer-gate-letter.txt); written from our first notes, which asked for a raised crossing; the letter that goes out is Muse Spark's, painted, no hump). Our free LoRA fine-tune of Glimmer **beats Muse Spark Open in three pre-registered blind tests** (p 0.005, 0.029, 0.0006) and, with our code check, beats Muse Spark on model-written slips (p 0.027); served on a Fireworks H200 it gives the same verdict on 1,499 of 1,501 rows; overall Muse Spark stays ahead; about a quarter of Spark's cost. [record](<removed-run-record>), [open weights, one page](OPEN_WEIGHTS.md)
 - **Muse Spark Open (open weights)** on Fireworks wrote the synthetic sample's letter in one try, 55.5 s, and is the second judge of our crossing's letter. [record](provenance/spark-open-fireworks-sample.json)
 
 
-**Our crossing** (LNCT Excellence main gate, Bhopal, Mon 2 Nov 2026 dismissal, filmed 8.3 m up from the highway): in 8.6 minutes on the taped 15 m stretch, 80 people crossed among 55 moving vehicles; 2 serious near-misses, one with a person and a motorcycle on the same spot at the same instant, and 3 close passes. The video read the held-out tape line as 15.0 m; the tape says 15 m. Letter by Muse Spark, checked by Muse Spark and Muse Spark Open; the college certified in writing on 3 Nov 2026 that the footage was filmed at its gate with permission and that the report is genuine (signed by the head of department; shown to judges on request).
+**Our crossing** (LNCT Excellence main gate, Bhopal, Mon 2 Nov 2026 dismissal, filmed 8.3 m up from the highway): in 8.6 minutes on the taped 15 m stretch, 80 pedestrian crossings among 55 moving vehicles; 2 serious near-misses, one with a person and a motorcycle on the same spot at the same instant, and 3 close passes. The video read the held-out tape line as 15.0 m; the tape says 15 m. Letter by Muse Spark, checked by Muse Spark and Muse Spark Open; the college certified in writing on 3 Nov 2026 that the footage was filmed at its gate with permission and that the report is genuine (signed by the head of department; shown to judges on request).
 **Gates**, [pre-registered](GATES.md#verdict-now): G1 passed (news CCTV); G2 passed on our gate (15.0 m vs 15 m taped); G3 passed on DUT ground truth; G4 passed (our footage, end to end); G5, G6 and G8 not run yet; G7's mark is written.
 
 
 </details>
 
-## 🖼️ Screens
+## 📸 Screens
 
 <table>
 <tr>
 <td width="33%"><img src="docs/story/02-gate.jpg" alt="Our college gate, real photo"><br><sub><b>The gate.</b> Real photo, the road we measured.</sub></td>
-<td width="33%"><a href="docs/story/06-letter.jpg"><img src="docs/story/06-letter-top.jpg" alt="The letter for the head of department"></a><br><sub><b>The letter.</b> Every number code-checked, ready to sign.</sub></td>
+<td width="33%"><a href="docs/story/06-letter.jpg"><img src="docs/story/06-letter-top.jpg" alt="The letter to the road authority"></a><br><sub><b>The letter.</b> To the road authority, every number code-checked.</sub></td>
 <td width="33%"><img src="docs/story/09-fix.jpg" alt="Muse Image draws the requested zebra crossing on the gate"><br><sub><b>The fix.</b> Muse Image draws what the letter asks for.</sub></td>
 </tr>
 </table>
 
-## ▶️ Try it in one minute
+## 🚀 Try it in one minute
 
 No key and no video needed (Python 3.11+ and ffmpeg; the fix and the letter need `MODEL_API_KEY` or `LETTER_MODEL_URL`):
 ```
@@ -354,7 +354,7 @@ the Hugging Face revision, checks both files against their published sha256 befo
 with medium reasoning and the model card's sampling, stops with a clear error if Glimmer runs out of context, and
 writes `<removed-run-record>` (llama.cpp build, GPUs, timings, the letter's sha256, the git commit and pack.py's
 sha256). The page then says "Muse Glimmer 30B wrote this in N s on Kaggle 2 x T4", with N from the server's own
-timings. Two runs have a record, both on the synthetic sample, which has no person tracks and so no photo:
+timings. Two runs on the synthetic sample have a record here (the sample has no person tracks and so no photo); the gate run's log stays with the raw video, off the repo:
 - [`<removed-run-record>`](<removed-run-record>), with llama-server's default sampling and the template's
   default "high" reasoning: Glimmer's part took 592 s; it proposed a raised zebra crossing and wrote a letter whose
   every number passed the code check. The letter was correct but stiff.
@@ -433,7 +433,7 @@ the server rejects the JSON schema with HTTP 400, pack.py asks once more for any
 
 First Fireworks run, 29 Oct, on `sample/`: Muse Spark Open wrote the fix and letter in one try, 55.5 s wall time (1,019 prompt and 2,732 completion tokens, 2,140 of them reasoning), and both the number check and Muse Spark as judge passed it. The record is `provenance/spark-open-fireworks-sample.json` (request id, usage and the letter's sha256; no key). An earlier attempt the same day, with the number lock on, came back as "a0a0a0..."; that is why the lock is now opt-in.
 
-Our crossing's letter from Muse Spark Open, written on a copy of the folder after Monday's paid run (never the folder the principal signs): GATE-TBD (record `provenance/spark-open-fireworks-gate.json`, with the gate pack's sha256).
+Muse Spark Open judged our crossing's real letter six times on Fireworks (three plain, three with the product's JSON schema): no unsupported claim in any reply. Record: `provenance/spark-open-fireworks-gate.json`, with the letter's sha256.
 
 A judge whose call fails (a dropped line, an HTTP 503, a reply of the wrong shape) never throws the letter away: the
 letter is kept with the point "The reviewer's reply could not be read." to check. The letter prompt signs it from "The
@@ -478,8 +478,8 @@ The head of the school then approves the letter or sends it back with notes; `--
 pack.py's receipt, the street seen from above, the Muse Image fix drawn only inside the measured band, and a `share/`
 folder with its `SHA256SUMS`. Every step goes to
 `out/VIDEO/case/agent_log.jsonl`, and the page shows "How the agent worked this case", without the notes of a letter
-sent back (they may name a pupil or a teacher; the log keeps them). No agent run has been made
-against the Meta API yet; a test drives it with a scripted model.
+sent back (they may name a pupil or a teacher; the log keeps them). On our gate it ran on Muse Spark: "Video 15.0 m,
+tape 15 m, 0% off: proven", then needs_review; a test also drives it with a scripted model.
 
 ```
 python3 agent.py VIDEO site.json                      # runs until it needs a person

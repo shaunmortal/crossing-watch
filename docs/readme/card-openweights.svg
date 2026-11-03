@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="350" height="84" viewBox="0 0 350 84" role="img" aria-label="OPEN WEIGHTS · MUSE GLIMMER 30B: Fine-tuned · served · 3/3 blind">
+<svg xmlns="http://www.w3.org/2000/svg" width="350" height="84" viewBox="0 0 350 84" role="img" aria-label="OPEN WEIGHTS · MUSE GLIMMER 30B: Fine-tuned · served · 3 blind-test wins">
   <rect x="1" y="1" width="348" height="82" rx="10" fill="#fbf8f2" stroke="#e3dccd" stroke-width="2"/>
   <rect x="5" y="5" width="340" height="74" rx="7" fill="none" stroke="#efe9dd"/>
   <g transform="translate(18 18)"><circle cx="24" cy="24" r="22" fill="none" stroke="#2fa36b" stroke-width="3"/><path d="M24 10l4 9 10 1-7.5 6.5 2.5 10-9-5.5-9 5.5 2.5-10L10 20l10-1z" fill="#2fa36b"/></g>
   <text x="76" y="35" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="9.5" font-weight="700" letter-spacing="0.9" fill="#2fa36b">OPEN WEIGHTS · MUSE GLIMMER 30B</text>
-  <text x="76" y="57" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="16" font-weight="600" fill="#17181c">Fine-tuned · served · 3/3 blind</text>
+  <text x="76" y="57" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="16" font-weight="600" fill="#17181c">Fine-tuned · served · 3 blind-test wins</text>
 </svg>

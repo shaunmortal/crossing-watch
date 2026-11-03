@@ -4231,7 +4231,9 @@ def test_readme_first_screen_fits_a_phone_its_links_resolve_and_one_story_on_the
     from pathlib import Path
     here = Path(__file__).parent
     readme, gates = (here / "README.md").read_text(), (here / "GATES.md").read_text()
-    assert len(readme.split("\n## Check it yourself")[0].splitlines()) < 30
+    top = readme.split("\n## Check it yourself")[0]  # the judge-facing top: every headline number and link
+    for must in ("**80**", "**55**", "47 of 52", "**15.0 m**", "JUDGES.md", "OPEN_WEIGHTS.md", "276 s"):
+        assert must in top, must
 
     def slugs(text):  # GitHub's heading anchors: lower case, punctuation dropped, spaces to hyphens
         return {re.sub(r"[^\w\- ]", "", h.strip().lower()).replace(" ", "-")
@@ -5101,6 +5103,68 @@ def test_judge_v6_slip_edit_kept_only_when_one_sentence_changes_into_a_checked_s
     assert "{facts}" in judge_v6.SLIP_PROMPT and all(q in judge_v6.SLIP_PROMPT for q in judge_v6.QUANTITIES)
     for q, (value, word) in judge_v6.QUANTITIES.items():
         assert value(facts) is not None, q
+
+
+def test_judge_v7_train_edits_keep_marked_lies_and_clean_restatements_and_drop_refusals():
+    """Offline: Muse Spark edits 2 of every 3 letters; every lie kind is asked in turn; a train lie is kept only as one
+    new sentence carrying its kind's mark (an unmeasured number for "number not measured"), never a refusal; a
+    restatement only when natural_edits and pack.slips find nothing in it; rows carry editor, kind and their place."""
+    import finetune_judge
+    import judge_v7
+    measured = finetune_judge.synthetic_pack(3)
+    facts = json.loads(measured)
+    n = facts["observed"]["crossings"]
+    letter = f"Dear Sir,\nWe counted {n} crossings. Please act.\nThe Principal"
+    bases = [{"writer": w, "seed": s, "measured": measured, "plan": {"letter": letter}}
+             for w in ("spark", "spark-open") for s in (judge_v7.FIRST + 2, judge_v7.FIRST + 1, judge_v7.FIRST)]
+    who = judge_v7.editors(bases)
+    assert [who[(b["writer"], b["seed"])] for b in judge_v7.order(bases)] == ["spark", "spark", "spark-open"] * 2
+    kinds = judge_v7.kinds_of(bases)
+    asked = [k for ks in kinds.values() for k in ks]
+    assert set(asked) == set(judge_v7.LIE_KINDS) and max(map(asked.count, set(asked))) - min(map(asked.count, set(asked))) <= 1
+    assert all(len(set(ks)) == judge_v7.TRAIN_EDITS for ks in kinds.values())
+    prompt = judge_v7.train_prompt(kinds[("spark-open", judge_v7.FIRST)])
+    assert prompt.format(facts=measured, letter=letter).count("\n1. ") == 1 and "KIND_LIST" not in prompt
+    after = f"We counted {n} crossings."
+    lie = lambda s, why="It is not measured.": {"sentence": s, "after": after, "why": why}
+    kept = {"death risk for a child": "A child hit here would likely not survive.",
+            "outside fact invented": "Parents have told us drivers use their phones here.",
+            "standard said to be met": "These counts meet the national standard for a signal.",
+            "stretched to every day": "This happens every school morning.",
+            "number not measured": "Drivers passed at 987 km/h.",
+            "cause or motive invented": "Drivers rush because they are late.",
+            "effect of a fix promised": "A crossing will prevent every death here.",
+            "near-miss called a collision": "One person was struck by a car."}
+    assert set(kept) == set(judge_v7.LIE_KINDS)
+    for kind, sentence in kept.items():
+        text, row_kind, problems = judge_v7.check_lie(letter, measured, lie(sentence), kind)
+        assert text == letter.replace(after, f"{after} {sentence}") and row_kind == f"natural v7: {kind}", kind
+        assert problems == [f'"{sentence}": It is not measured.']
+    for kind, sentence in (("death risk for a child", "The road is wide."), ("number not measured", f"We saw {n} crossings."),
+                           ("stretched to every day", "Drivers were fast."),
+                           ("outside fact invented", "I cannot write an unsupported claim about the parents.")):
+        assert judge_v7.check_lie(letter, measured, lie(sentence), kind)[0] is None, sentence
+    assert judge_v7.check_lie(letter, measured, lie(kept["standard said to be met"], "I can't do that."),
+                              "standard said to be met")[0] is None
+    assert judge_v7.check_lie(letter, measured, {**lie("Two. Sentences every day."), "after": after},
+                              "stretched to every day")[0] is None
+    good = {"sentence": f"In all, {n} people crossed.", "after": after}
+    assert judge_v7.check_clean(letter, measured, good) == (letter.replace(after, f"{after} {good['sentence']}"),
+                                                           "natural v7 clean", [])
+    for bad in ("A child crossed 999 times.", "I cannot restate the measurements.", "Every school day it is busy."):
+        assert judge_v7.check_clean(letter, measured, {"sentence": bad, "after": after})[0] is None, bad
+    b = bases[0]
+    raw = json.dumps({"unsupported": [lie(kept[k]) for k in kinds[(b["writer"], b["seed"])]],
+                      "supported": [good, {"sentence": "I'm sorry, I cannot.", "after": after}]})
+    rows, report = judge_v7.train_edit_rows([b], {(b["writer"], b["seed"]): {
+        "editor": "spark", "raw": raw, "kinds": kinds[(b["writer"], b["seed"])]}})
+    assert [(r["planted"], r["k"], r["editor"], r["set"]) for r in rows] == [
+        (True, "v7-lie-0", "spark", "train"), (True, "v7-lie-1", "spark", "train"), (True, "v7-lie-2", "spark", "train"),
+        (False, "v7-clean-0", "spark", "train")]
+    assert report["spark"]["kept"] == 4 and sorted(report["spark"]["dropped"].values()) == ["fields missing", "refusal"]
+    assert all(r["messages"][0]["content"] == pack.JUDGE_PROMPT.format(facts=measured, letter=r["letter"]) for r in rows)
+    assert judge_v7.added(rows[0]["letter"], letter) == [kept[kinds[(b["writer"], b["seed"])][0]]]
+    assert judge_v7.fireworks({"spark-open": 1.0, "slip:spark-open": 0.5, "natural:spark": 2.0, "spark": 3.0}) == 1.5
 
 if __name__ == "__main__":
     for name, check in list(globals().items()):

@@ -44,7 +44,7 @@ letters written by Muse Spark and Muse Spark Open, with lies and slips planted b
   does. Request ids, replies and the run log: `provenance/glimmer-judge-lora-v6/live/`. The 1,545 replies took 202 s
   of one H200 at $8 per GPU-hour: about $0.45, or about $0.29 per 1,000 verdicts while the GPU is busy (start-up and
   idle time not counted). The deployment was deleted after the run.
-- **On our real gate letter (3 Nov 2026):** served once more, the tuned judge read the letter the college signs, on the product's own judge prompt and measurements, six times (three plain, three with the product's JSON schema): no unsupported claim in any reply, as Muse Spark and Muse Spark Open also found. Replies and response ids: `provenance/glimmer-judge-lora-v6/live/gate-letter-judge.json`.
+- **On our real gate letter (3 Nov 2026):** served once more, the tuned judge read our real gate letter, on the product's own judge prompt and measurements, six times (three plain, three with the product's JSON schema): no unsupported claim in any reply, as Muse Spark and Muse Spark Open also found. Replies and response ids: `provenance/glimmer-judge-lora-v6/live/gate-letter-judge.json`.
 - **Cost:** about 26 output tokens per verdict; about $2.90 per 1,000 letters at the Glimmer sampling price we recorded
   for Fireworks ($1.96 / $4.88 per 1M tokens), vs Muse Spark Open $5.66 and Muse Spark $10.33 (v4 token counts, list
   prices, no cache discount).
@@ -69,7 +69,7 @@ python3 writers_table.py         # Glimmer on Kaggle vs Spark Open vs Muse Spark
 
 ## Limits, stated
 
-- **The tuned judge was served once, for the test above, and then deleted** (an on-demand deployment bills while it is
+- **The tuned judge was served twice (2 and 3 Nov) and deleted after each run** (an on-demand deployment bills while it is
   up). The product's default letter check is Muse Spark or Spark Open; the tuned judge plugs in with
   `JUDGE_MODEL_URL=https://api.fireworks.ai/inference/v1` and `JUDGE_MODEL=<model>#<deployment>` once it is deployed.
 - **The adapter cannot be downloaded from Fireworks yet** (we asked Fireworks to enable it); the organizers confirmed

@@ -1,18 +1,17 @@
 # For judges: where each claim is proved
 
-Solo Indie entry: one phone video of a dangerous crossing becomes near-miss evidence and a letter the school signs.
+Solo Indie entry: one phone video of a dangerous crossing becomes near-miss evidence and a code-checked letter to the road authority.
 Each claim links to its proof. **Pending** = not done yet; what needs the gate recording (Mon 2 Nov) is `[PLACEHOLDER]`.
 
 ## Only in Crossing Watch
-- **The loop up to filing; filing pending Tue 3 Nov:** a phone video becomes measured near-misses and a code-checked
-  letter for the college to sign and seal (Principal and HOD signed the project application on 31 Oct; 19 teachers
-  signed in support); the filing with the road authority is **pending** (Tue 3 Nov).
+- **The whole loop, on our real gate:** a phone video becomes measured near-misses and a code-checked
+  letter to the road authority (Principal and HOD signed the project application on 31 Oct; 19 teachers
+  signed in support). On 3 Nov 2026 the college certified in writing that the footage was filmed at its gate with permission and that the report is genuine.
 - **Measured against ground truth:** drone-tracked DUT clips, 47 of 52 near-misses found after Muse Spark's review
   (50 of 52 by geometry alone); SinD, speed error 0.24 km/h mean, 37 of 63 crossings within 3 s.
 - **Our open-weights judge beats Muse Spark Open in three blind tests:** a LoRA on Muse Glimmer, protocols written
   down first: p 0.005 (1,016 rows), 0.029 (1,278), 0.0006 (1,501), at a quarter of Spark's cost. Muse Spark is still
   ahead overall (v6: 1,467 vs 1,445 right).
-- **Checked by people, not only models:** teachers rate the clips blind against the measurements (**pending**, Tue).
 - **Built for India:** a Hindi copy of the letter, the HOD's spoken notes, Supreme Court and IRC references.
 
 ## 5-minute path
@@ -30,12 +29,12 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
 ## Impact
 
 - A real institution is behind it: on 31 Oct 2026 the Principal and the HOD (CSE-DS) of LNCT Excellence, Bhopal
-  signed and sealed the application (filming on Mon 2 Nov approved; the HOD may sign the letter for the college), and
+  signed and sealed the application (filming on Mon 2 Nov approved; on 3 Nov the college certified the report genuine), and
   19 teachers signed a support sheet (18 agreed to be named publicly). The signed paper stays off the repo.
 - The output is something an authority can act on: a letter where code checks every number, plus legal quotes added
   by code, never a model (2025 INSC 1189). [README, How it works](README.md#how-it-works), `gazette.py`.
-- **Our gate (Mon 2 Nov):** In 8.6 minutes of our gate's dismissal, 80 people crossed among 55 moving vehicles: 2 serious near-misses (one person and motorcycle on the same spot at the same instant) and 3 close passes; the video's 15.0 m matched the tape's 15 m. [README](README.md), [GATES](GATES.md#verdict-now).
-  Letter signed by the HOD and filed on Tue 3 Nov; only "filed, reference X" will ever be written as filed.
+- **Our gate (Mon 2 Nov):** In 8.6 minutes of our gate's dismissal, 80 pedestrian crossings among 55 moving vehicles: 2 serious near-misses (one person and motorcycle on the same spot at the same instant) and 3 close passes; the video's 15.0 m matched the tape's 15 m. [README](README.md), [GATES](GATES.md#verdict-now).
+  On 3 Nov 2026 the college certified in writing that the footage was filmed at its gate with permission and that the report is genuine.
 
 ## Demo
 
@@ -52,7 +51,7 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
   [README, DUT](README.md#end-to-end-against-ground-truth-dut),
   [GATES.md, 30 Oct re-score](GATES.md#accuracy-fixes-merged-re-scored-at-0-fri-30-oct-2026). Not re-runnable by a
   judge: DUT has no licence, so its footage and our cache stay private; read the record.
-- Gates written before results ([GATES.md](GATES.md)): G1 passed; G3 passed on DUT only; the rest are pending.
+- Gates written before results ([GATES.md](GATES.md)): G1 passed; G2 (our gate: 15.0 m vs 15 m taped) and G4 (our footage, end to end) passed; G3 passed on DUT.
 
 ## Use of Meta models
 
@@ -82,13 +81,13 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
   to tape-measure a distance; the letter is refused until video and tape agree within 15% ([README, Case
   agent](README.md#case-agent-it-stops-to-ask-for-a-tape-measure)).
 - One run, Spark Open on a copy of the sample: `provenance/spark-open-agent-sample.json`; a scripted-model test is in
-  `test_cw.py`. **Pending:** a run on the gate footage.
+  `test_cw.py`. On our gate: "Video 15.0 m, tape 15 m, 0% off: proven", then it stopped at needs_review.
 
 ## Creative bonus
 
 - Muse Image draws the fix only inside the strip where people were measured crossing; every other pixel stays the
   real, blurred street. Muse Wonder listens around each near-miss for horns, brakes and shouts. `fixband.py`,
-  `ailabel.py`, `listen.py`. **Pending:** [PLACEHOLDER: the Muse Image fix for our gate].
+  `ailabel.py`, `listen.py`. On our gate: [the fix](docs/story/09-fix.jpg), a painted zebra crossing and College Zone 20 km/h signs.
 
 ## Known limits
 
@@ -99,5 +98,5 @@ Each claim links to its proof. **Pending** = not done yet; what needs the gate r
 - A Muse judge reading Muse letters is not independent. The tuned judge missed all six real slips the letter writers
   made themselves in v4 (Spark caught six); a code check added afterwards (`pack.slips`, GATES.md) now catches 11 of
   the 12 slip rows with no false alarm, but it was built from those rows, so that is not a blind result.
-- No agent run against the Meta API yet; the Kaggle notebook is not public yet. Muse Image measures nothing, and
+- The Kaggle notebook is not public yet. Muse Image measures nothing, and
   Muse Wonder's sound check is not ground truth.

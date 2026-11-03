@@ -28,7 +28,7 @@ The table above does not change; this one is updated as gates run. Last updated 
 | G3 Conflicts | not tested on its own footage; passed on DUT drone ground truth (29 Oct); phone angle pending | 'Status update, third pass' below |
 | G4 Own footage | **passed Mon 2 Nov:** filmed from the highway 8.3 m above our gate, calibrated on a taped 8 m x 7 m rectangle, run end to end (hand-held, stabilized first) | `sites/gate.json`; 'The gate recording' notes below |
 | G5 Blind check | not run | no rater has labelled; rules in 'G5 Blind check, pre-registered' below |
-| G6 Speed | not run | no taped lines filmed yet; rules in 'G6 pre-registration' below |
+| G6 Speed | not run | lines A and B, 15 m apart, filmed 2 Nov; the hand-timed log is not made yet; rules in 'G6 pre-registration' below |
 | G7 After the fix | no verdict before submission; **mark written Mon 2 Nov:** baseline 3 of 51 crossings with a moving vehicle through the same spot within 3 s (3 distinct vehicles), so one after-film this long cannot show a drop; film 2 dismissals after the fix | the evidence page's step 9; rules in 'G7 After-fix pass mark' below |
 | G8 Second operator | not run | after G6's log and Monday's run; rules in 'G8 Second operator' below |
 
