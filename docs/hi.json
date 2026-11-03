@@ -115,5 +115,8 @@
  "Muse Spark": "Muse Spark",
  "Run it on your own crossing": "इसे अपनी crossing पर चलाएँ",
  "Python 3.11+ and ffmpeg. The self-checks and the synthetic sample need no key; your own video needs a Meta Model API key.": "Python 3.11+ और ffmpeg। Self-checks और नकली sample के लिए key नहीं चाहिए; आपके अपने video के लिए Meta Model API key चाहिए।",
- "This page replays recorded results; it calls no model. Rules: serious under the threshold you set, close pass under 3.0 s; a track Muse Spark calls a rider or not a person is removed from every event, as <code>pack.confirmed</code> does.": "यह page रिकॉर्ड किए गए नतीजे replay करता है; यह कोई model नहीं चलाता। नियम: आपकी तय की threshold से कम गंभीर, 3.0 s से कम करीबी पास; जिस track को Muse Spark सवार या इंसान नहीं बताता, उसे हर घटना से हटा दिया जाता है, जैसा <code>pack.confirmed</code> करता है।"
+ "This page replays recorded results; it calls no model. Rules: serious under the threshold you set, close pass under 3.0 s; a track Muse Spark calls a rider or not a person is removed from every event, as <code>pack.confirmed</code> does.": "यह page रिकॉर्ड किए गए नतीजे replay करता है; यह कोई model नहीं चलाता। नियम: आपकी तय की threshold से कम गंभीर, 3.0 s से कम करीबी पास; जिस track को Muse Spark सवार या इंसान नहीं बताता, उसे हर घटना से हटा दिया जाता है, जैसा <code>pack.confirmed</code> करता है।",
+ "The plan seen from above: the 4 corner markers (red, N1 N2 F1 F2) and the 15 m check line (blue, A to B). Click to open it full size.": "ऊपर से देखा गया नक्शा: 4 कोनों के निशान (लाल, N1 N2 F1 F2) और 15 m की जाँच लाइन (नीली, A से B)। पूरा देखने के लिए click करें।",
+ "Print this sheet and write each number on it while you measure.": "यह शीट print करें और नापते समय हर संख्या इस पर लिखें।",
+ "📝 Open the field sheet": "📝 Field sheet खोलें"
 }
