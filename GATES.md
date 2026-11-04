@@ -19,7 +19,7 @@ Written Wed 28 Oct 2026, before running the full pipeline on real footage. These
 
 ## Verdict now
 
-The table above does not change; this one is updated as gates run. Last updated Mon 2 Nov 2026, 20:15 IST, after the gate run.
+The table above does not change; this one is updated as gates run. Last updated Mon 2 Nov 2026, 18:57 IST, after the gate run.
 
 | Gate | Verdict now | Evidence |
 |---|---|---|
@@ -1082,7 +1082,7 @@ same verdict on 1,499 of 1,501 test rows; 1,442 right either way; vs Spark Open 
 32 vs 57 (p 0.011), as in the v6 result. Every reply finished (1,545 of 1,545 "stop"). Public bench through
 `pack.py`'s judge path: 21 of 23 lies, 0 of 8 false alarms. Record: `provenance/glimmer-judge-lora-v6/live/`.
 
-## The gate recording: hand-held, stabilized before analysis (Mon 2 Nov 2026, 18:00 IST, before any analysis run)
+## The gate recording: hand-held, stabilized before analysis (Mon 2 Nov 2026, 17:53 IST, before any analysis run)
 
 Written before `analyze.py`, `monday.py` or any model call touches the gate footage.
 - **What was filmed:** `VID20261102153251.mp4` (OPPO F25 Pro, 1x lens, 1920x1080 HEVC, 1,002 s, file start 15:32:51
@@ -1101,7 +1101,7 @@ Written before `analyze.py`, `monday.py` or any model call touches the gate foot
   900 s target. Reported as recorded, not extended.
 - **If G2 fails** on the stabilized file, its numbers are not used for the letter and the page says why.
 
-## The gate run: two disputed events checked by eye; analysis kept to the taped stretch (Mon 2 Nov 2026, 19:10 IST)
+## The gate run: two disputed events checked by eye; analysis kept to the taped stretch (Mon 2 Nov 2026, 18:40 IST)
 
 First run on the stabilized file (`out/gate`, SAM $12.34 incl. images): 108 events, 30 kept after Muse Spark's review
 (21 serious, 9 close passes); the case agent read line A to line B as 15.0 m (tape 15 m). The run's "check by eye"
@@ -1114,7 +1114,7 @@ held; nothing outside it is reported. This removes 14 of the 30 kept events (bot
 the frame edge; 7 beyond line B, where the far end is extrapolated). It can only lower the counts. SAM replies are
 reused from the cache ($0); the letter and judges run again.
 
-## The gate run: one track ruled out by eye (Mon 2 Nov 2026, 19:40 IST)
+## The gate run: one track ruled out by eye (Mon 2 Nov 2026, 18:45 IST)
 
 Second run (taped stretch only): 9 kept events, 5 serious, 4 close passes. By eye on the evidence clips (events 2, 4
 and 5), **piece c116/0 is not a pedestrian**: its box rides inside the moving motorcycle's and auto rickshaw's boxes
@@ -1185,3 +1185,6 @@ certified letter stays as written.
   saved at 05:09 IST and the run started at 05:15 IST (the notebook's nvidia-smi stamp, 23:45:32 UTC); 05:40 was a
   slip. The notebook's own copy of the pass bar, in the Kaggle version pushed at 05:15 IST, still says 05:40. No
   pre-registered text changed.
+- Wed 4 Nov 2026, 15:40 IST: four times written on Mon 2 Nov were set to the commit times git shows for them ("Last
+  updated" 20:15 -> 18:57; the recording note 18:00 -> 17:53; the two by-eye notes 19:10 -> 18:40 and 19:40 -> 18:45).
+  Each was written before or at its commit; no pre-registered text changed.
