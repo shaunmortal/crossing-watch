@@ -12,9 +12,9 @@
 <a href="docs/evidence/event1.mp4"><img src="docs/readme/nearmiss.gif" width="100%" alt="Real footage from our college gate, faces and plates blurred: SAM 3.1 tracks a person (cyan) and a motorcycle (red) reaching the same spot"></a>
 <p><b>Real footage from our college gate, faces blurred.</b> A person (cyan) and a motorcycle (red) reach the same spot at the same instant: post-encroachment time <b>0.0 s</b>, motorcycle at <b>18.7 km/h</b>.</p>
 
-<a href="#-demo"><img src="docs/readme/video-thumb.jpg" width="100%" alt="Demo video, 2:53: real footage of our college gate, a person and a motorcycle 0.42 m apart at the same instant"></a>
+<a href="#-demo"><img src="docs/readme/video-thumb.jpg" width="100%" alt="Demo video, 2:42: real footage of our college gate, a person and a motorcycle 0.42 m apart at the same instant"></a>
 
-<b>▶ Demo video (2:53): GATE-TBD</b>
+<b>▶ Demo video (2:42): GATE-TBD</b>
 
 Near-miss evidence for a dangerous school or college crossing. **Meta SAM 3.1** tracks people and vehicles,<br>
 code measures each near-miss in road metres, and **Muse Spark** writes a letter whose every number is checked.
@@ -94,7 +94,7 @@ phone video into that proof:** measured near-misses, blurred clips, and a letter
 
 ## 🎬 Demo
 
-GATE-TBD: the 2:53 demo video link, narrated by the author. It opens on our real near-miss (0.0 s), the author on camera, then the problem, a live run on our gate (its real log, sped up), a screen capture of the Live Explorer (Muse Spark's review off and on), our team measuring the check line with a tape, a screen capture of the real letter, the open-weights run records and the fix Muse Image drew on our real street. Its full log and commands: [provenance/live-run-2026-11-03](provenance/live-run-2026-11-03/README.md) (Muse Spark request resp_6ae9fb6e…). Video file: [release submission-2026-11-04](https://github.com/shaunmortal/crossing-watch/releases/tag/submission-2026-11-04).
+GATE-TBD: the 2:42 demo video link, narrated by the author. It opens on our real near-miss (0.0 s), the author on camera, then the problem, a live run on our gate (its real log, sped up), a screen capture of the Live Explorer (Muse Spark's review off and on), our team measuring the check line with a tape, a screen capture of the real letter, the open-weights run records and the fix Muse Image drew on our real street. Its full log and commands: [provenance/live-run-2026-11-03](provenance/live-run-2026-11-03/README.md) (Muse Spark request resp_6ae9fb6e…). Video file: [release submission-2026-11-04](https://github.com/shaunmortal/crossing-watch/releases/tag/submission-2026-11-04).
 
 ## 🧪 Try it in your browser
 
@@ -139,7 +139,7 @@ flowchart TD
 | **Muse Wonder** | Listens around each near-miss for horns, brakes and shouts | heard horns around 4 of the 5 near-misses at our gate |
 | **Muse Voice Transcribe** | Finds human speech in each clip's sound so it can be silenced before publishing; the horn stays | no speech in our five clips, so every clip keeps its full road sound ([how](TECHNICAL.md#how-it-works)) |
 | **Muse Glimmer 30B** · open weights | Wrote a full letter for our real gate on a free Kaggle GPU; our LoRA fine-tune judges letters; as the crop reviewer it made the same keep/remove call as Muse Spark on all 32 people at our gate ([review](provenance/glimmer-vision-review-2026-11-04/README.md)) | letter in **276 s, first try**; tuned judge **wins 3 pre-registered blind tests on planted errors** vs Muse Spark Open, Muse Spark (closed) still ahead overall ([one page](OPEN_WEIGHTS.md)); served on Fireworks, read our real letter 6 of 6 times, no unsupported claim ([record](provenance/glimmer-judge-lora-v6/live/gate-letter-judge.json)); runs free on Kaggle's 2 x T4 too and beats Spark Open again (81 vs 49, p 0.006, [score](provenance/glimmer-judge-lora-v6/kaggle/score.json)) |
-| **Muse Spark Open** · open weights | Runs every language and vision step of our gate case on open weights (Spark Open review, agent and letter; our tuned Glimmer reviewer); SAM 3.1 tracking, Muse Wonder and Muse Image are not open weights | same 5 near-misses and 51 people as Muse Spark; letter passes every check first try ([run](provenance/open-gate-2026-11-04/README.md)) |
+| **Muse Spark Open** · open weights | Runs every reasoning step of our gate case on open weights (Spark Open review, agent and letter; our tuned Glimmer reviewer); SAM 3.1 and Muse Wonder replies reused from the hosted run | same 5 near-misses and 51 people as Muse Spark; letter passes every check first try ([run](provenance/open-gate-2026-11-04/README.md)) |
 
 <details>
 <summary><b>Every model's numbers in full</b></summary>
@@ -173,7 +173,7 @@ flowchart TD
 <table>
 <tr>
 <td width="33%"><img src="docs/story/02-gate.jpg" alt="Our college gate, real photo"><br><i><b>The gate.</b> Real photo, the road we measured.</i></td>
-<td width="33%"><a href="docs/story/06-letter.jpg"><img src="docs/story/06-letter-top.jpg" alt="The letter to the road authority"></a><br><i><b>The letter.</b> To the road authority, every number code-checked.</i></td>
+<td width="33%"><a href="docs/story/06-letter.jpg"><img src="docs/story/06-letter-top.jpg" alt="The letter to the road authority"></a><br><i><b>The letter.</b> To the road authority, every number code-checked; its "80 pedestrian crossings" counts tracked crossings before Muse Spark's review (51 people crossed on foot).</i></td>
 <td width="33%"><img src="docs/story/09-fix.jpg" alt="Muse Image draws the requested zebra crossing on the gate"><br><i><b>The fix, drawn by Muse Image.</b> What the letter asks for. AI-generated: the people are not real.</i></td>
 </tr>
 </table>
@@ -235,6 +235,7 @@ from 28 Oct 2026; the one ported piece is the mask decoder below. The gate lette
   (github.com/dongfang-steven-yang/vci-dataset-dut; published openly by its authors with a request to cite, which we do;
   it has no licence file, so we redistribute none of it, only our scores; Yang D. et al., IEEE IV 2019, arXiv:1902.00487). Two YouTube clips used only for local testing: the schoolchildren CCTV clip
   (https://youtu.be/9YqdnG5Jxnw) and the Indian time-lapse (https://youtu.be/_l99w_CKwCU).
+- **Commit ids.** Ids quoted in files before 4 Nov 2026 are from before the one history cleanup; COMMIT_IDS.md maps each to its id in this repository.
 - **AI assistance.** Code and docs were written with an AI coding assistant, and the reviews named in `GATES.md` were
   AI-assisted; every model call in the product is to a Meta model. The demo video's voice is the author's own, recorded on
   his laptop; its AI pictures are labelled on screen.
