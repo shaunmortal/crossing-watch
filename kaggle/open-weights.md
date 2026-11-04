@@ -1,21 +1,26 @@
 # Open weights: two paths, the writers table and the public judge bench
 
-Both Muse open-weights models wrote the letter for the synthetic `sample/` (made-up tracks, no video), each with a
-run record in this repo.
+Both Muse open-weights models wrote a letter with a run record in this repo: Muse Glimmer 30B for our real gate,
+Muse Spark Open for the synthetic `sample/` (made-up tracks, no video).
 
 ## Two open-weights paths
 
-**Muse Glimmer 30B, self-hosted on Kaggle 2 x T4** (`<removed-run-record>`, Version 2; record
-`<removed-run-record>`, run notes `<removed-run-record>`). It proves the weights ran on hardware we
-control with no Meta API key: llama.cpp `b11976` built in the run, Meta's 4-bit GGUF at a pinned Hugging Face
-revision with both files checked against their published sha256, nvidia-smi's table, the git commit and `pack.py`'s
-sha256 all in the record. Glimmer needed 2 tries, every number in the kept letter passed the code check, and no judge
-read it (no `MODEL_API_KEY` in that run). As a judge on the private bench it flagged 24 of 24 planted lies but also 6
-of 8 clean letters (`<removed-run-record>`): too jumpy alone, hence the 2-vote rule below.
+**Muse Glimmer 30B, self-hosted on Kaggle 2 x T4** (`kaggle/glimmer-gate.ipynb`, on the author's own Kaggle account;
+record `kaggle/glimmer-gate-provenance.json`, letter `kaggle/glimmer-gate-letter.txt`). It proves the weights ran on
+hardware we control with no Meta API key: llama.cpp `b11976` built in the run, Meta's 4-bit GGUF at a pinned Hugging
+Face revision with both files checked against their published sha256, nvidia-smi's table, the git commit and
+`pack.py`'s sha256 all in the record. Glimmer wrote a letter for our real gate in 276 s on the first try, every number
+passed the code check, and no judge read it (no `MODEL_API_KEY` in that run). Kaggle's own log of the run (nvidia-smi,
+the llama.cpp build, `server ready`, `pack.py`'s return, the record as printed) is `kaggle/glimmer-gate-run-log.json`.
+The record and the log are kept exactly as the run wrote them; their `notebook` field names the notebook by its earlier
+file name. Screenshots of the Kaggle notebook (cw-glimmer-gate, the author's own account, "Successfully ran in 2254.7s",
+GPU T4 x2) and of these log lines: [notebook](glimmer-gate-kaggle-notebook.jpg), [run](glimmer-gate-kaggle-log.jpg),
+[log lines](glimmer-gate-kaggle-log-lines.jpg).
 
 **Muse Spark Open on Fireworks**, a hackathon infra partner (record `provenance/spark-open-fireworks-sample.json`,
-letter `provenance/spark-open-sample-letter.txt`, its sha256 in the record). It proves the open model writes a letter
-that passes every check on the first try, through a partner's serverless API: request id
+letter `provenance/spark-open-sample-letter.txt`, its sha256 in the record, taken without the file's final newline).
+It proves the open model writes a letter that passes every check on the first try, through a partner's serverless API:
+request id
 `chatcmpl-9e68cb0170d84c348eb29b1687354a4f`, 55.5 s, about one cent. The record (pack.py's `letter-provenance.json`)
 kept the tries but not the checks when it ran; its `judged_by` was added afterwards from the run's `plan.json` (about
 `sample/`, kept outside the repo, same letter sha256), which says `"judged_by": "Muse Spark (a separate reviewer)"`
@@ -24,16 +29,14 @@ early only then). pack.py's records now keep the judge, and on a letter kept aft
 
 ## Writers table
 
-`python3 writers_table.py [RECORD.json ...]` (offline) prints it from the run records; as produced now from the two
-committed records:
+`python3 writers_table.py [RECORD.json ...]` (offline) prints it from the run records; as produced now from the
+committed records (Glimmer's row is its letter for our real gate, the other two the sample's):
 
 | Writer | Open weights | Where it ran | Wall s | Prompt tokens (cached) | Completion tokens | Reasoning tokens | Tries | Number check | Passed by judge | Cost per letter |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Muse Glimmer 30B | yes | Kaggle, 2 x Tesla T4, self-hosted | 313 | 962 (926) | 2,263 | not reported | 2 | passed | none ran | $0 (free Kaggle GPU quota) |
+| Muse Glimmer 30B | yes | Kaggle, 2 x Tesla T4, self-hosted | 276 | 1,572 (0) | 3,672 | not reported | 1 | passed | none ran | $0 (free Kaggle GPU quota) |
 | Muse Spark Open | yes | Fireworks (serverless) | 55.5 | 1,019 (960) | 2,732 | 2,140 | 1 | passed | Muse Spark (a separate reviewer) | $0.0118 |
 | Muse Spark | no | Meta API | 17.0 | 899 (0) | 3,961 | 3,472 | 1 | passed | Muse Spark (a separate reviewer) | $0.0180 |
-
-Prices, USD per 1M tokens input / cached input / output, read 29 Oct 2026: Muse Spark Open 1.25 / 0.15 / 4.25 (https://fireworks.ai/models/fireworks/muse-spark-open); Muse Spark 1.25 / 0.15 / 4.25 (https://dev.meta.ai/docs/pricing-rate-limits.md). Tokens are the kept reply's; wall seconds are the whole pack.py run where the record has it (Kaggle), else the reply's.
 
 Prices, USD per 1M tokens input / cached input / output, read 29 Oct 2026: Muse Spark Open 1.25 / 0.15 / 4.25 (https://fireworks.ai/models/fireworks/muse-spark-open); Muse Spark 1.25 / 0.15 / 4.25 (https://dev.meta.ai/docs/pricing-rate-limits.md). Tokens are the kept reply's; wall seconds are the whole pack.py run where the record has it (Kaggle), else the reply's.
 
@@ -44,12 +47,9 @@ Prices, USD per 1M tokens input / cached input / output, read 29 Oct 2026: Muse 
 - Neither page says how reasoning tokens are billed. The API's completion tokens (2,732) already include the 2,140
   reasoning tokens, so the cost bills them at the output price: (59 x $1.25 + 960 x $0.15 + 2,732 x $4.25) / 1M =
   $0.0118.
-- Glimmer's tokens are the kept reply's only (its first try was 1,973 tokens, not in the record). Its 313 s is the
-  whole `pack.py` run with both tries; llama-server's own timing for the kept reply is 166.1 s. The two times come
-  from different hardware and say nothing about the models' speed on equal footing.
-- No Muse Spark row yet: `pack.py` keeps no run record for a Meta API letter. A record with `"model":
-  "muse-spark-1.3"`, `"host": "api.meta.ai"` and the Responses API `usage` is priced the same way (test fixture
-  `test_writers_table_prices_each_letter_from_its_run_record_and_marks_what_it_cannot_check`).
+- Glimmer's 276 s is the whole `pack.py` run; llama-server's own timing for its reply is 271.1 s. Its prompt is our
+  gate's, longer than the sample's, and the times come from different hardware, so they say nothing about the
+  models' speed on equal footing.
 
 ## Public judge bench
 
@@ -61,7 +61,7 @@ Build it (offline, scores the code check only): `python3 judge_bench.py --public
 
 | Base | Writer | Where the text is | Source |
 |---|---|---|---|
-| `glimmer` | Muse Glimmer 30B, open weights, self-hosted on Kaggle 2 x T4 | quoted in `<removed-run-record>` | `sample/` |
+| `glimmer` | Muse Glimmer 30B, open weights, written during development | `kaggle/glimmer-sample-letter.txt` | `sample/` |
 | `spark-open` | Muse Spark Open, open weights, on Fireworks (1 try, 55.5 s, 1,019 prompt + 2,732 completion tokens) | `provenance/spark-open-sample-letter.txt`, its sha256 checked against `provenance/spark-open-fireworks-sample.json` | `sample/` |
 
 Each base gets the same planted lies as the private bench (one per copy) and the same 4 clean controls. Spark
@@ -77,36 +77,29 @@ Code check, scored offline (`judge_bench.py --public`):
 | Kinds not named | 2/11 (5-48%) |
 | Clean controls: false alarms | 0/8 (0-32%) |
 
-It catches only the two kinds with a number in them: a count in words and km/h written as mph. The Muse Spark and
-Muse Glimmer columns are empty until a paid run fills them (`--spark N`, `--glimmer N` with the same file).
+It catches only the two kinds with a number in them: a count in words and km/h written as mph. Muse Spark's column is
+filled from its cached replies (21/23, 0/8); the Muse Glimmer column is empty until a run fills it (`--glimmer N` with
+the same file).
 
 Note on the clean controls: both base letters offer to share "the video", and the measurements say the sample has no
 video. A judge that flags a control for that is arguably right, so read the false-alarm row with that in mind.
 
 ## Two votes for an open-weights judge (`JUDGE_VOTES=2`)
 
-Asked once, Muse Glimmer as judge flagged 24 of 24 planted lies but also 6 of 8 clean letters (Muse Spark: 24/24 and
-1/8; `<removed-run-record>`, the v2 run). `JUDGE_VOTES=2` is opt-in and applies only to the
-`JUDGE_MODEL_URL` judge: it is asked twice per letter, and a problem counts only when both replies list one
-(`pack.vote`). In `pack.py` that is the open judge's verdict on each try at the letter; in `judge_bench.py` it is the
+`JUDGE_VOTES=2` is opt-in and applies only to the `JUDGE_MODEL_URL` judge: it is asked twice per letter, and a problem
+counts only when both replies list one (`pack.vote`). In `pack.py` that is the open judge's verdict on each try at the letter; in `judge_bench.py` it is the
 Glimmer column's verdict per run, with both raw replies and the vote kept under `glimmer_votes` in the bench file and
 a line under the table saying how many runs were votes. A reply that cannot be read makes the vote unreadable: counted
 apart in the bench, and one problem to check in `pack.py`, never a pass. Muse Spark is always asked once.
 
 Why two: Glimmer samples at temperature 1.0 (the model card's setting), so a reply can list a problem that is not
-there; a planted lie, flagged on 24 of 24 single asks, should be listed both times, while a stray flag on a clean letter
-has to come up twice to count. It costs one more reply per letter, and a lie that one of the two replies misses is
-missed. Whether it cuts the 6 of 8 without losing lies is what the Version 3
-run measures; until then the rule is a hypothesis, and it is off unless `JUDGE_VOTES=2` is set.
-
-Notebook Version 3 (`<removed-run-record>`) keeps every Version 2 pin (llama.cpp `b11976`, the model's
-revision and sha256 checks, `-c 32768`, medium reasoning, the card's sampling), saves `plan.json` and
-`glimmer-letter.txt` (the sample letter) as outputs, and judges this public bench with `JUDGE_VOTES=2`, saving
-`judge-bench-public.json` (every letter, both raw replies, the vote) next to `<removed-run-record>`. Glimmer's
-2-vote numbers are not measured yet: they come from that run.
+there; a planted lie should be listed both times, while a stray flag on a clean letter has to come up twice to count.
+It costs one more reply per letter, and a lie that one of the two replies misses is missed. It is off unless
+`JUDGE_VOTES=2` is set.
 
 The case agent (`agent.py`) can also take its turns on Muse Spark Open on Fireworks (`AGENT_MODEL_URL`, see the
-README's case agent section); no such run has been made yet.
+README's case agent section); first run 30 Oct 2026 on a copy of the synthetic `sample/`: 29 turns across resumes,
+about $0.19 (`provenance/spark-open-agent-sample.json`).
 
 ## Fine-tuned Glimmer judge
 
@@ -120,7 +113,6 @@ is 4 whole synthetic letters plus all 31 public-bench prompts, none trained on. 
 
 | Judge | Public bench: lies flagged | Clean letters flagged | Reply |
 |---|---|---|---|
-| Glimmer, self-hosted, 2 votes (above) | 23/23 | 5/8 | about 2,300 tokens of reasoning |
 | **Glimmer + our LoRA**, 1 vote | 18/23 (21/23 with the code checks) | **0/8** | about 90 characters |
 | Muse Spark Open, effort low, 1 vote | 22/23 | 0/8 | about 740 tokens |
 
@@ -130,7 +122,7 @@ puts two near-misses in one sentence) and one "every school day". The in-session
 base replies ran out of the 4,096-token cap while reasoning, so the starter's base-vs-tuned delta is not a fair test.
 Serving the LoRA for $0 on Kaggle (`--lora` on the same Q4_K_M base) is not done yet.
 
-### v2: a pre-registered sweep, and the tuned judge passes Muse Spark
+### v2: a pre-registered sweep
 
 Sat 31 Oct 2026. 150 training letters from two writers (Muse Spark Open, and Muse Spark through the Meta API), 62
 "near-misses swapped" rows (v1 had 2), split by whole letters into train (1,620 rows) and dev (180 rows from 15
@@ -147,7 +139,7 @@ Record: `provenance/glimmer-judge-lora-v2.json`, every reply in `provenance/glim
 | D rank 32, 2 epochs, 5e-5 | 104/105, 0/75 | 21/23, 0/8 (not chosen) |
 
 On the same public bench Muse Spark flags 21/23 lies (22/23 in a second run) and 0/8 clean letters, Muse Spark Open (effort low) 22/23 and
-0/8, and untuned Glimmer (2 votes) 23/23 and 5/8. One vote, temperature 0, and a small bench: 23/23 is 86-100% and
+0/8. One vote, temperature 0, and a small bench: 23/23 is 86-100% and
 0/8 is 0-32% (Wilson 95%). The configs that were not chosen show the spread a different pick would have given.
 
 Paired on the same 211 holdout prompts (180 dev, 31 public; one vote each; `judge_compare.py`, GATES.md "Same-set
@@ -170,7 +162,8 @@ labels were frozen (`provenance/glimmer-judge-lora-v3/labels-frozen.json`). Prot
 | Muse Spark (Meta API) | 396 | 238/244 | 15/173 |
 | Muse Spark Open (Fireworks) | 402 | 230/244 | 1/173 |
 
-Exact McNemar on the pre-registered primary endpoint: against Muse Spark 19 vs 5, **p 0.0066**; against Spark Open
+Exact McNemar on the pre-registered primary endpoint: against Muse Spark 19 vs 5, p 0.0066 (8 vs 5, p 0.58 with its
+ordinal flags set aside; see v4); against Spark Open
 11 vs 3, p 0.057 (not significant). On the 57 model-written rows: 56, 50 and 53 right. All three get 30/31 on the
 public bench. Built with Muse Spark Open: the training letters were written by Muse Spark Open and Muse Spark, so the
 adapter follows the Muse Model License. A second run trained without two lie kinds still caught all 30 rows of them (an easy pair: every judge
@@ -226,6 +219,10 @@ test of 260 letters, 1,501 rows (GATES.md "v6"). **Beats Muse Spark Open** (1,44
 beats Muse Spark on model-written slips (225 vs 214 of 230, p 0.027); **Muse Spark is ahead overall** (1,467, p 0.023),
 mainly on model-written lies (243 vs 214 of 245). Pre-registered as the last judge run before submission.
 
+On 4 Nov 2026 the v6 adapter ran over Meta's 4-bit Glimmer on Kaggle's free 2 x T4 (`kaggle/glimmer-judge-lora.ipynb`,
+pass bar written before the run): judge alone, 1,435 right (the Fireworks deployment 1,442), **beats Muse Spark Open
+81 vs 49 (p 0.006)**. Record: `provenance/glimmer-judge-lora-v6/kaggle/`.
+
 ## Spark-free mode
 
 Each closed-model step and its open-weights substitute, measured against the closed one (DUT: numbers only, crops stay
@@ -234,25 +231,17 @@ the last 6 vehicle-crowd pieces for about $0.02).
 
 | Component | Closed | Open substitute | Measured result |
 |---|---|---|---|
-| Letter writer | Muse Spark (1 try) | Spark Open on Fireworks; Glimmer 30B on Kaggle | number check passed on try 1; Glimmer on try 2 (writers table) |
+| Letter writer | Muse Spark (1 try) | Spark Open on Fireworks; Glimmer 30B on Kaggle | number check passed on try 1, Glimmer's too (writers table) |
 | Letter judge | Muse Spark: public bench 21/23 lies, 0/8 false alarms | Spark Open, effort low; Glimmer + our LoRA | tuned Glimmer v4 on 1,016 blind rows from 260 letters: **998 right, 5/491 false alarms** vs Spark Open 980 and 4/491 (p 0.0051); vs Spark 959 and 49/491 (p 7.2e-06 as pre-registered; 16 vs 18, p 0.86, with its ordinal and method-sentence flags set aside) |
 | Crop reviewer | Muse Spark: crowd 47/52, 3 extra; vehicle crowd 48/52, 4 extra | Spark Open (`REVIEW_MODEL_URL`, `validate_offline.py --reviewer open`) | crowd 49/52, 3 extra; vehicle crowd 48/52, 3 extra (none unreviewed); same keep/remove call as Spark on 51 of 53 and 45 of 46 pieces both judged |
 
 ## Runs still to come
 
-1. **Kaggle Version 3, the clean bench** (free GPU, no paid call; Kaggle step). Zip one commit:
-   `git archive --format=zip --add-virtual-file=GIT_SHA:$(git rev-parse HEAD) -o crossing-watch.zip HEAD`, upload it
-   as a new version of the `crossing-watch` dataset, open `<removed-run-record>` (Version 3) in the notebook
-   with GPU T4 x2 and Internet on, Save & Run All. It gives Glimmer's 2-vote column on this public bench (letters about
-   `sample/` only, so its output may be committed), a new sample letter, its `plan.json` and a fresh
-   `<removed-run-record>`, for the table: `python3 writers_table.py PATH/TO/v3/<removed-run-record>
-   provenance/spark-open-fireworks-sample.json`.
-2. **Glimmer on the real gate pack, with the blurred street photo** (Kaggle step). Same pins, with the gate pack's
-   output folder as a private input in place of `sample/`, so Glimmer is shown the blurred `street.jpg`:
+1. **Glimmer shown the blurred street photo** (Kaggle step). The 2 Nov gate run sent none; the same notebook with
+   `street.jpg` added to the private cw-gate input:
    `LETTER_MODEL_URL=http://127.0.0.1:8080/v1 LETTER_MODEL_HOST="Kaggle 2 x T4" python3 pack.py out/GATE_VIDEO
-   out/GATE_VIDEO/site.json`. The gate pack is real footage of children: its letter, `plan.json` and run record stay
-   outside the repo, the Kaggle dataset and any public release. `writers_table.py` can print its row locally.
-3. **Spark Open judging Glimmer's real letter** (paid, Fireworks). In the run above, with `FIREWORKS_API_KEY` as a
+   out/GATE_VIDEO/site.json`. `writers_table.py` can print its row locally.
+2. **Spark Open judging Glimmer's real letter** (paid, Fireworks). In the run above, with `FIREWORKS_API_KEY` as a
    Kaggle secret exported to the environment, add the Fireworks judge:
    `JUDGE_MODEL_URL=https://api.fireworks.ai/inference/v1 JUDGE_MODEL=accounts/fireworks/models/muse-spark-open`.
    Then both models are open weights, one writing and one judging, and the record's `judged_by` names Spark Open.
