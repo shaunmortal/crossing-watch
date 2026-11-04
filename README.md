@@ -6,7 +6,7 @@
 
 ### One phone video in. Proof the road authority can act on, out.
 
-**75 alarms → 5 real near-misses** · closest **0.0 s, 0.42 m apart** · tape **15 m**, video **15.0 m** · our college **certified the footage and report genuine**
+At our college gate, a student and a motorcycle reached the same spot at the same instant, **0.42 m apart**.<br>Crossing Watch measured it from one phone video, checked the video against a tape (**15.0 m** vs 15 m), and our college certified the footage and report genuine.
 
 <a href="https://youtu.be/9QSc-Urqpr4"><img src="docs/readme/video-thumb.jpg" width="100%" alt="Watch the 2:45 demo: real footage of our college gate, a person and a motorcycle 0.42 m apart at the same instant"></a>
 
