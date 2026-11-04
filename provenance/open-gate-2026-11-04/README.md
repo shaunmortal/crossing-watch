@@ -1,7 +1,7 @@
-# Our real gate, end to end on open weights (4 Nov 2026)
+# Our real gate: every reasoning step on open weights (4 Nov 2026)
 
-The real gate case (LNCT Excellence main gate, Bhopal, 8.6 minutes analysed) worked again with every language and
-vision step on Meta open-weights models: the person review, the case agent and the letter on **Muse Spark Open**
+The real gate case (LNCT Excellence main gate, Bhopal, 8.6 minutes analysed) worked again with every reasoning step
+on Meta open-weights models: the person review, the case agent and the letter on **Muse Spark Open**
 (Fireworks serverless), and the letter's judge on **our LoRA-tuned Muse Glimmer judge (v6)**, served on a Fireworks
 on-demand deployment for 4 minutes and then deleted. No Meta API key was set for these steps, and every host except
 api.fireworks.ai went to a dead proxy for the whole run, so no Meta API call could succeed.

@@ -1,5 +1,5 @@
 {
- "what": "Our real gate case (LNCT Excellence main gate, Bhopal; 8.6 min analysed) worked end to end with every language and vision step on Meta open-weights models, 4 Nov 2026 (IST), on a frozen copy of the repo and a copy of out/gate. No Meta API key was set for the review, agent or letter steps, and every host except api.fireworks.ai was sent to a dead proxy for the whole run, so no Meta API call could succeed.",
+ "what": "Our real gate case (LNCT Excellence main gate, Bhopal; 8.6 min analysed) worked with every reasoning step on Meta open-weights models, 4 Nov 2026 (IST), on a frozen copy of the repo and a copy of out/gate. No Meta API key was set for the review, agent or letter steps, and every host except api.fireworks.ai was sent to a dead proxy for the whole run, so no Meta API call could succeed.",
  "steps": [
   {
    "step": "person review (is each tracked near-miss pedestrian a person?)",
