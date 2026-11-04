@@ -206,6 +206,7 @@ field("demo").addEventListener("click", () => {
   field("w").value = 8; field("h").value = 7; field("name").value = "Our college gate (sample)";
   frame.load("sample-frame.jpg", [[339.67, 323.33], [117.33, 328.17], [219.33, 160.33], [407.33, 94]]);
 });
+if (parent !== window) field("demo").click();   // inside the App page: open on our gate; Undo lets you click the corners yourself
 // tell the app page how tall this page is, so it shows without an inner scroll bar
 const tellHeight = () => parent !== window && parent.postMessage({ cwHeight: document.documentElement.scrollHeight }, "*");
 new ResizeObserver(tellHeight).observe(document.body);

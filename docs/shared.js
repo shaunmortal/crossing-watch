@@ -12,6 +12,7 @@
     .cw-lang { margin-left: 14px; border: 1px solid currentColor; border-radius: 99px; padding: 5px 12px; background: transparent;
       color: inherit; font: 600 13px/1 "Noto Sans Devanagari", Inter, sans-serif; cursor: pointer; opacity: .85; }
     .cw-lang:hover { opacity: 1; }
+    html[lang=hi] * { letter-spacing: 0 !important; }
     #cw-progress { position: fixed; top: 0; left: 0; height: 3px; width: 0; background: #e08a12; z-index: 99; }
     .cw-glow { position: fixed; z-index: -1; width: 70vmax; height: 70vmax; border-radius: 50%; pointer-events: none; filter: blur(30px); }
     .cw-glow.a { background: radial-gradient(circle, rgba(224,138,18,.16), transparent 62%); top: -30vmax; left: -20vmax; animation: cwDrift 26s ease-in-out infinite alternate; }

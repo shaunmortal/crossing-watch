@@ -150,7 +150,7 @@ h2 em { font-style: italic; font-weight: 300; }
 /* the end */
 .end .btn.solid { background: var(--ink); color: var(--saffron); border-color: var(--ink); }
 .bot { opacity: 0; transition: opacity .6s; } .bot.on { opacity: 1; }
-@media (max-width: 900px) { .bot { display: none; } }
+@media (max-width: 1499px) { .bot { display: none; } }
 .end { background: var(--saffron); color: var(--ink); text-align: center; padding: 140px 0 120px; overflow: hidden; }
 .end h2 { font-size: clamp(42px, 7.5vw, 112px); line-height: .98; }
 .end h2 em { color: var(--ink); }
@@ -195,6 +195,9 @@ footer a { color: var(--zebra); }
   footer { padding-left: 20px; padding-bottom: 110px; }
 }
 @media (prefers-reduced-motion: reduce) { .marquee-track, .bot, .bot .lid, .cue, .kick i { animation: none; } }
+@media (max-width: 480px) { .nav { gap: 10px; } .nav a[href="app/"] { display: none; } .nav .gh { padding: 8px 12px; } }
+@media (max-width: 600px) { #story .wrap > div { grid-template-columns: 1fr 1fr !important; gap: 12px !important; } #story img { border-radius: 8px !important; } }
+html[lang=hi] * { letter-spacing: 0 !important; }
 </style>
 </head>
 <body>
@@ -205,7 +208,7 @@ footer a { color: var(--zebra); }
 
 <section class="hero" id="top" aria-label="Real footage of our college gate, faces and number plates blurred">
   <video src="hero/gate.mp4" poster="hero/poster.jpg" autoplay muted loop playsinline preload="metadata"></video>
-  <span class="illus" data-hi="असली फ़ुटेज · चेहरे और नंबर प्लेट धुंधले">Real footage · faces and plates blurred</span>
+  <span class="illus" data-hi="असली फ़ुटेज · SAM 3.1 ट्रैकिंग · नीला: व्यक्ति · लाल: गाड़ी · चेहरे और नंबर प्लेट धुंधले">Real footage · SAM 3.1 tracking · cyan: person · red: vehicle · faces and plates blurred</span>
   <div class="hero-text">
     <span class="kick" data-hi="असली फ़ुटेज · हमारा कॉलेज गेट, भोपाल · 2 नवंबर 2026">Real footage · our college gate, Bhopal · 2 Nov 2026</span>
     <h1 id="title" data-hi="&lt;span class=&quot;w&quot;&gt;&lt;span&gt;सड़क&lt;/span&gt;&lt;/span&gt; &lt;span class=&quot;w&quot;&gt;&lt;span&gt;का&lt;/span&gt;&lt;/span&gt; &lt;span class=&quot;w&quot;&gt;&lt;span&gt;ख़तरा,&lt;/span&gt;&lt;/span&gt; &lt;span class=&quot;w&quot;&gt;&lt;span&gt;&lt;em&gt;नाप&lt;/em&gt;&lt;/span&gt;&lt;/span&gt; &lt;span class=&quot;w&quot;&gt;&lt;span&gt;&lt;em&gt;के,&lt;/em&gt;&lt;/span&gt;&lt;/span&gt; &lt;span class=&quot;w&quot;&gt;&lt;span&gt;सबूत&lt;/span&gt;&lt;/span&gt; &lt;span class=&quot;w&quot;&gt;&lt;span&gt;के&lt;/span&gt;&lt;/span&gt; &lt;span class=&quot;w&quot;&gt;&lt;span&gt;साथ।&lt;/span&gt;&lt;/span&gt;"><span class="w"><span>Road</span></span> <span class="w"><span>danger,</span></span> <span class="w"><span><em>measured,</em></span></span> <span class="w"><span>with</span></span> <span class="w"><span>proof.</span></span></h1>
@@ -321,11 +324,11 @@ footer a { color: var(--zebra); }
     <p class="lede rv" data-hi="Muse Glimmer 30B ने Kaggle के मुफ़्त T4 पर 276 सेकंड में, पहली ही बार में, हमारे गेट के लिए कोड से जाँचा गया पूरा पत्र लिखा। Muse Spark Open ने हमारा असली पत्र छह बार पढ़ा और कोई बिना-सबूत दावा नहीं मिला। हमारा फ़ाइन-ट्यून किया Glimmer जज डाली गई गलतियों वाले तीन पहले से दर्ज ब्लाइंड टेस्ट में Muse Spark Open से आगे है, और Fireworks पर लाइव चलाया गया; Muse Spark (क्लोज़्ड) कुल मिलाकर अब भी आगे है।">Muse Glimmer 30B wrote a full, code-checked letter for our gate in 276 s on Kaggle's free T4s, first try. Muse Spark Open read our real letter six times and found no unsupported claim. Our fine-tuned Glimmer judge beats Muse Spark Open in three pre-registered blind tests on planted errors and was served live on Fireworks; Muse Spark (closed) stays ahead overall.</p>
     <div class="tiles">
       <div class="tile tilt rv"><b>276 s</b><span data-hi="Glimmer 30B से हमारे गेट के लिए एक पत्र, 2 × T4 पर">a letter for our gate by Glimmer 30B, on 2 × T4</span></div>
-      <div class="tile tilt rv"><b>4 / 4</b><span data-hi="डाली गई गलतियों वाले पहले से दर्ज ब्लाइंड टेस्ट में Muse Spark Open से आगे, 3 में सांख्यिकीय रूप से पक्का; Muse Spark अब भी आगे">pre-registered blind tests on planted errors ahead of Muse Spark Open, 3 significant; Muse Spark still ahead</span></div>
-      <div class="tile tilt rv"><b>1,499</b><span data-hi="1,501 में से एक जैसे फ़ैसले, लाइव">of 1,501 verdicts the same, served live</span></div>
+      <div class="tile tilt rv"><b>4 / 4</b><span data-hi="डाली गई गलतियों वाले पहले से दर्ज ब्लाइंड टेस्ट में Muse Spark Open से आगे, 3 में सांख्यिकीय रूप से पक्का">pre-registered blind tests on planted errors ahead of Muse Spark Open, 3 significant</span></div>
+      <div class="tile tilt rv"><b>81 vs 49</b><span data-hi="Kaggle के मुफ़्त 2 × T4 पर फिर Muse Spark Open से आगे (p 0.006)">beats Muse Spark Open again, run free on Kaggle's 2 × T4 (p 0.006)</span></div>
       <div class="tile tilt rv"><b>¼</b><span data-hi="प्रति फ़ैसले Muse Spark की लागत का">of Muse Spark's cost per verdict</span></div>
     </div>
-    <div class="chips rv"><span>Meta SAM 3.1</span><span>Muse Spark</span><span>Muse Wonder</span><span>Muse Image</span><span>Muse Glimmer</span><span>Muse Spark Open</span></div>
+    <div class="chips rv"><span>Meta SAM 3.1</span><span>Muse Spark</span><span>Muse Wonder</span><span>Muse Image</span><span>Muse Voice Transcribe</span><span>Muse Glimmer</span><span>Muse Spark Open</span></div>
   </div>
 </section>
 

@@ -55,6 +55,7 @@ tr.out td { color: #a19d93; text-decoration: line-through; text-decoration-color
 .listwrap { max-height: 420px; overflow: auto; margin-top: 10px; }
 pre { background: #0b0c0d; border: 1px solid var(--line); border-radius: 12px; padding: 14px; overflow: auto; font: 13px/1.6 var(--mono); color: #d7dadd; }
 .note { color: var(--muted); font-size: 13px; }
+@media (max-width: 600px) { #tl text { display: none; } .listwrap th:nth-child(5), .listwrap td:nth-child(5) { display: none; } .listwrap table { font-size: 12.5px; } .stats .stat:last-child { grid-column: 1 / -1; } }
 </style></head>
 <body><div class="wrap">
 <nav class="top"><a href="../">← Crossing<span style="color:var(--saffron)">.</span>Watch</a><span><a href="../evidence/">Evidence dashboard</a> &nbsp;·&nbsp; <a href="https://github.com/shaunmortal/crossing-watch">GitHub</a></span></nav>
@@ -74,6 +75,7 @@ pre { background: #0b0c0d; border: 1px solid var(--line); border-radius: 12px; p
 </section>
 
 <section class="panel">
+  <p style="margin:0 0 14px;font-size:17px"><b>Try it:</b> switch <b>Muse Spark review</b> off and the 5 near-misses become 75 alarms; switch it back on.</p>
   <div class="controls">
     <div><label for="thr">Serious if the post-encroachment time is under <output id="thrOut">1.5 s</output> <span class="note">(close pass: under 3.0 s)</span></label>
       <input id="thr" type="range" min="0.2" max="3" step="0.1" value="1.5"></div>
