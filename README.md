@@ -6,7 +6,7 @@
 
 ### One phone video in. Proof the road authority can act on, out.
 
-**75 alarms → 5 real near-misses** · closest **0.0 s, 0.42 m apart** · tape **15 m**, video **15.0 m** · our college **certified the report genuine**
+**75 alarms → 5 real near-misses** · closest **0.0 s, 0.42 m apart** · tape **15 m**, video **15.0 m** · our college **certified the footage and report genuine**
 
 <a href="https://youtu.be/9QSc-Urqpr4"><img src="docs/readme/video-thumb.jpg" width="100%" alt="Watch the 2:45 demo: real footage of our college gate, a person and a motorcycle 0.42 m apart at the same instant"></a>
 
@@ -29,7 +29,6 @@
 
 <i>Everything here was built during the hackathon, from 28 Oct 2026, on Meta's models; the one ported piece is Meta's SAM mask decoder ([declarations](#declarations)). Built with Muse Spark Open.</i>
 
-</div>
 </div>
 
 ---
@@ -56,8 +55,8 @@ phone video into that proof:** measured near-misses, blurred clips, and a letter
 | Measured | Value |
 |---|---|
 | ⏱️ Video | **8.6 minutes** on a taped 15 m stretch |
-| 🚶 Crossings | **80** tracked crossings; **51** people crossed on foot after Muse Spark set aside 28 riders and empty boxes, and 1 more was ruled out by eye |
-| 🔎 Near-miss alarms | **75** candidates; Muse Spark set aside **66** (riders SAM saw as people, and empty boxes), **4** more were ruled out by eye; **5** remain (counted per alarm, where the row above counts people) |
+| 🚶 Crossings | **80** tracked crossings; **51** people crossed on foot (riders and empty boxes set aside: 28 by Muse Spark, 1 by eye) |
+| 🔎 Near-miss alarms | **75** candidates; Muse Spark set aside **66** (riders SAM saw as people, and empty boxes), **4** more were ruled out by eye; **5** remain |
 | 🏍️ Moving vehicles | **55** · 85th-percentile speed **23.2 km/h** |
 | 🔴 Serious near-misses (PET < 1.5 s) | **2**: 0.0 s at 18.7 km/h, 0.9 s at 18.3 km/h |
 | 🟠 Close passes (1.5 to 3.0 s) | **3** |
@@ -144,7 +143,7 @@ flowchart TD
 
 | | Check | Result | Proof |
 |---|---|---|---|
-| 🛰️ | Drone ground truth (DUT, top-down) | **47 of 52** near-misses found after Muse Spark's review; speed error **0.16 km/h** mean | [method](TECHNICAL.md#end-to-end-against-ground-truth-dut) |
+| 🛰️ | Drone ground truth (DUT, top-down) | **47 of 52** near-misses found after Muse Spark's review (geometry alone **50 of 52**, every miss a threshold case); speed error **0.16 km/h** mean. At our gate every alarm Muse Spark set aside stays visible in the [Live Explorer](https://crossingwatch.xyz/explorer/) behind its review switch | [method](TECHNICAL.md#end-to-end-against-ground-truth-dut) |
 | 📏 | Tape check on our gate, a line the maths never used | video **15.0 m**, tape **15 m**, 0% off | [the agent](TECHNICAL.md#case-agent-it-stops-to-ask-for-a-tape-measure) |
 | 🧮 | Near-miss maths on public drone data (SinD) | speed error **0.24 km/h** mean | [validation](TECHNICAL.md#validation-on-ground-truth-trajectories) |
 | 🕵️ | The letter: planted false numbers and claims | Muse Spark flagged **24 of 24** (**21 of 23** on the public bench you can re-run at $0); code checks every number | [bench](TECHNICAL.md#checking-the-checks) |
