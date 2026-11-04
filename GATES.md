@@ -1254,6 +1254,23 @@ certified letter stays as written.
 - **Files:** [`provenance/summedits-2026-11-05/`](provenance/summedits-2026-11-05/): every prompt, every reply with its
   request id, the scripts and `score.json`.
 
+## SummEdits replication on fresh rows (pre-registered Thu 5 Nov 2026, 00:25 IST, before the deployment is created and before any row is asked)
+
+- **Why.** The first SummEdits test (above) put the tuned judge ahead of Muse Spark Open, 50 vs 32, but at p 0.060,
+  short of the bar. This is a new, larger test on rows neither judge has seen; it does not change or replace the first
+  result, which stands as reported.
+- **Data.** 1,200 SummEdits rows: 60 consistent and 60 inconsistent per domain, seed 20261106, prompt at most 9,000
+  characters, none of them in the first test or its dev set (`rep.jsonl` sha256 `32636714…`, 198 documents).
+  SummEdits makes several edits of one document, so a document can appear in both tests; the document-level check
+  below covers the dependence within this test.
+- **Prompt, settings, reply rule:** exactly as in the first test (`make_sets.py`'s prompt; tuned at temperature 0 and
+  256 tokens on a fresh Fireworks deployment; Muse Spark Open with json_schema and reasoning_effort low).
+- **Primary:** exact two-sided sign test on the rows where exactly one judge is right. **Pass:** the tuned judge right
+  on more rows than Muse Spark Open, p < 0.05. **Secondary, reported either way:** a document-level sign test (per
+  document, who is right on more of its rows) and a document-level bootstrap of the net wins; balanced accuracy and
+  per-domain counts. The two tests are reported separately, never pooled.
+- **Cost cap:** about $10; the deployment is deleted at the end (2-hour expiry as a backstop).
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
@@ -1288,3 +1305,5 @@ certified letter stays as written.
 - Thu 5 Nov 2026, 00:07 IST: a pre-registration for the tuned judge on SummEdits added above, before its deployment
   was created. No pre-registered text changed.
 - Thu 5 Nov 2026, 00:25 IST: the SummEdits result section added above. No pre-registered text changed.
+- Thu 5 Nov 2026, 00:25 IST: a pre-registration for a SummEdits replication on fresh rows added above, before its
+  deployment was created. No pre-registered text changed.
