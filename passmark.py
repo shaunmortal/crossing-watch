@@ -61,7 +61,7 @@ def after_mark(events, seen):
     passes = lambda m: mark(k, n, m * n) is not None and mark(v, n, m * n) is not None
     if not passes(1):
         films = next(m for m in itertools.count(2) if passes(m))  # ends: even 1 of n passes at 0 of 19 x n
-        return (f"With {k} of {n} crossings having {tier} ({v} distinct vehicle{'' if v == 1 else 's'}), no after-film "
+        return (f"With {k} of the {n} people who crossed having {tier} ({v} distinct vehicle{'' if v == 1 else 's'}), no after-film "
                 f"this long can show a drop ({test}): film {films} dismissals after the fix, from the same spot for as "
                 "long each.")
     return (f"After the fix, film the same dismissal from the same spot for as long. The drop counts only if "

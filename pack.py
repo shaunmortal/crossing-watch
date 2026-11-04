@@ -149,8 +149,8 @@ YOUR LETTER:
 
 NOTES:
 {notes}"""
-# the principal's notes as both letter checks read them, after the measurements: the judge must neither reject the
-# school's own facts nor take them as measured
+# the notes given to the writer as both letter checks read them, after the measurements: the judge must neither
+# reject the school's own facts nor take them as measured
 STATED = "\n\nSTATED BY THE PRINCIPAL, NOT MEASURED (a letter may give these as the school's own statements):\n"
 SIGNOFF_KEYS = ("approved_by", "school", "date", "letter_sha256")  # signoff.json
 PLAN_BACKUP = "plan-{sha8}.json"  # a replaced plan.json, named by the first 8 hex digits of its signed_sha
@@ -202,13 +202,14 @@ def confirmed(events):
 
 def real_crossers(events, seen):
     """exposure without the crossers Spark rejected as 'not a person', so the headline's n holds the same people as
-    its k (a rider or a moved pole must not count as a crossing nobody was hit in). By person, not piece: one with
-    any piece left in confirmed(events) stays."""
+    its k (a rider or a moved pole must not count as a crossing nobody was hit in), and so does `crossings`, which
+    road.exposure counts once per crosser. By person, not piece: one with any piece left in confirmed(events) stays."""
     if not seen.get("crossers"):
         return seen
     kept = {e["person"].split("/")[0] for e in confirmed(events)}
     rejected = {e["person"].split("/")[0] for e in events if (e.get("review") or {}).get("is_person") is False} - kept
-    return {**seen, "crossers": [c for c in seen["crossers"] if c not in rejected]}
+    crossers = [c for c in seen["crossers"] if c not in rejected]
+    return {**seen, "crossers": crossers, "crossings": len(crossers)}
 
 
 def serious(events):
@@ -605,8 +606,8 @@ def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES, stated=(
     measurements do not support. An invalid reply or either objection goes back with the reason; after the last try
     the letter is kept with what remains listed for a person to check before sending. Numbers are checked against
     `measured` only, never the prompt (its wording would let "3.1" from "SAM 3.1" pass), plus `stated`, the
-    principal's notes, which both checks read labelled as stated by the principal, not measured. "tries" counts the
-    model's replies, for the pack's receipt."""
+    notes given to the writer, which both checks read labelled as stated by the principal, not measured. "tries"
+    counts the model's replies, for the pack's receipt."""
     note, plan, bad, crossed, accused, problems = "", None, [], [], [], []
     facts = json.loads(measured)
     worst, measured = facts.get("worst", []), measured + stated_text(stated)
@@ -643,7 +644,8 @@ def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES, stated=(
 
 
 def stated_text(notes):
-    """The principal's notes as the letter checks read them, after the measurements: labelled, never as measured."""
+    """The notes given to the writer as the letter checks read them, after the measurements: labelled, never as
+    measured."""
     return STATED + "\n\n".join(notes) if notes else ""
 
 
@@ -685,7 +687,7 @@ def read_problems(text):
 
 
 # opt-in: JUDGE_VOTES=2 asks the JUDGE_MODEL_URL judge twice per letter, a problem counted only when both replies list
-# one (Glimmer 30B as judge flagged 6 of 8 clean letters asked once). Muse Spark is always asked once.
+# one, so a stray flag from a model sampling at temperature 1.0 must come up twice. Muse Spark is always asked once.
 JUDGE_VOTES = max(1, int(os.environ.get("JUDGE_VOTES") or 1))
 
 
@@ -836,14 +838,17 @@ def photo_people(clip, person_concept="person"):
 
 
 def street_photo(clip, out_path, person_concept="person", vehicles=()):
-    """First frame of the clip with every head (photo_people) and number plate blurred (it is shown on the page and
-    sent to Muse Image); no photo rather than unblurred faces."""
+    """First frame of the clip with every head (photo_people) blurred and every number plate under the plate mosaic
+    (render.plate_filters: the plates SAM 3.1 found on frame 0, cached by analyze.fetch_plates, else every vehicle near
+    enough for a readable plate); it is shown on the page and sent to Muse Image. No photo rather than unblurred
+    faces."""
     people = photo_people(clip, person_concept)
     size = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
                            "-of", "csv=p=0", str(clip)], check=True, capture_output=True, text=True).stdout.strip()
     frame_size = tuple(int(v) for v in size.split(","))
     filters = ",".join(render.blur_filters(people, 0, 0, frame_size)
-                       + render.plate_filters(frame0_tracks(clip, vehicles), 0, 0, frame_size)) or "null"
+                       + render.plate_filters(frame0_tracks(clip, vehicles), 0, 0, frame_size,
+                                              render.cached_plates(Path(clip).parent, 0, 0, frame_size))) or "null"
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(clip), "-vf", filters, "-frames:v", "1", str(out_path)],
                    check=True)
     return out_path
@@ -864,7 +869,8 @@ def passed(e):
 
 
 def video_tag(e):
-    return f'<video src="{html.escape(e["clip"])}" controls muted loop playsinline></video>' if e.get("clip") else ""
+    """The card's player: not muted, as the clip carries the road's own sound (render.road_sound)."""
+    return f'<video src="{html.escape(e["clip"])}" controls loop playsinline></video>' if e.get("clip") else ""
 
 
 def card_title(i, e):
@@ -1144,7 +1150,7 @@ def letter_section(plan, events=(), measured="", signoff=None):
         + [f"this sentence says someone broke a rule, which a video cannot show: {s}" for s in plan.get("accuses", [])]
         + [f"the reviewer says: {p}" for p in plan.get("unsupported", [])]
         + ([f"fill in {', '.join(blanks)} before signing."] if blanks else []))
-    sources = "the measurements" + (" and the principal's notes" if plan.get("notes") else "")
+    sources = "the measurements" + (" and the notes given to the writer" if plan.get("notes") else "")
     checked = (f"Every number was checked against {sources} by code, and the claims by {plan['judged_by']}."
                if plan.get("judged_by") else f"Every number was checked against {sources} by code.")
     clean = not (plan.get("unmeasured") or plan.get("mixed") or plan.get("unsupported") or plan.get("accuses")
@@ -1213,7 +1219,7 @@ def disclosure(plan, signoff=None):
     """Written by code after both checks, never inside plan["letter"] (the number check would read it): the letter
     is an AI draft until a named person approves it, and Meta's AUP forbids passing outputs off as human-written.
     signoff.json fills in the blank only while its sha256 is still the letter's."""
-    source = ("the measurements in this pack" + (" and the principal's notes" if plan.get("notes") else "")
+    source = ("the measurements in this pack" + (" and the notes given to the writer" if plan.get("notes") else "")
               + spoken_line(plan))
     signed = is_signed(plan, signoff)
     by = (f"{signoff['approved_by']}, {signoff['school']}, {signoff['date']} ({edits(plan)})" if signed
@@ -1224,7 +1230,7 @@ def disclosure(plan, signoff=None):
 
 
 def spoken_line(plan):
-    """How many of the principal's notes were spoken (--voice-notes) and transcribed, for the sign-off line."""
+    """How many of the notes given to the writer were spoken (--voice-notes) and transcribed, for the sign-off line."""
     spoken, notes = len(plan.get("spoken_notes", [])), len(plan.get("notes", []))
     if not spoken:
         return ""
@@ -1263,14 +1269,15 @@ def signed_sha(plan):
 
 
 def edits(plan):
-    """How much the principal's notes changed the AI draft, by sentence (difflib): "1 of 12 sentences changed after
-    the principal's notes". A sentence cut or added counts, out of the longer of the two letters."""
+    """How much the notes given to the writer changed the AI draft, by sentence (difflib): "1 of 12 sentences
+    changed after the notes given to the writer". A sentence cut or added counts, out of the longer of the two
+    letters."""
     if "draft_letter" not in plan:
         return "as drafted, no notes"
     draft, final = sentences(plan["draft_letter"]), sentences(plan["letter"])
     kept = sum(b.size for b in difflib.SequenceMatcher(None, draft, final, autojunk=False).get_matching_blocks())
     longer = max(len(draft), len(final))
-    return f"{longer - kept} of {longer} sentences changed after the principal's notes"
+    return f"{longer - kept} of {longer} sentences changed after the notes given to the writer"
 
 
 def sentences(text):
@@ -1454,10 +1461,10 @@ def saved_plan(out_dir, prompt):
 
 
 def new_plan(out_dir, prompt, measured, key, photo, revise=None, notes="", spoken=""):
-    """A new fix and letter, or `revise`'s letter revised by the principal's notes, saved to plan.json with the sha256
-    of the prompt it came from. A revision also keeps every note so far (later checks read them as stated by the
-    principal) and the first AI draft, which the sign-off counts changed sentences against. `spoken`: the sha256 of
-    the audio `notes` were transcribed from (--voice-notes), kept in "spoken_notes" for the sign-off line."""
+    """A new fix and letter, or `revise`'s letter revised by the notes given to the writer, saved to plan.json with
+    the sha256 of the prompt it came from. A revision also keeps every note so far (later checks read them as stated
+    by the principal) and the first AI draft, which the sign-off counts changed sentences against. `spoken`: the
+    sha256 of the audio `notes` were transcribed from (--voice-notes), kept in "spoken_notes" for the sign-off line."""
     stated = revise.get("notes", []) + [notes] if revise else []
     ask = prompt + REVISE.format(letter=revise["letter"], notes=notes) if revise else prompt
     plan = {**ask_plan(ask, measured, key, photo, stated=stated), "prompt_sha256": sha256(prompt)}
@@ -1529,8 +1536,8 @@ def check_signable(letter):
     """Refuses (SystemExit, before anything is written or paid for) to sign a letter that still holds a blank."""
     if blanks := placeholders(letter):
         raise SystemExit(f"not signed: the letter still holds {', '.join(blanks)}. Give the real words in the "
-                         "principal's notes (pack.py --notes FILE, or agent.py --reject --notes \"...\"), read the "
-                         "revised letter, then sign it")
+                         "notes given to the writer (pack.py --notes FILE, or agent.py --reject --notes \"...\"), "
+                         "read the revised letter, then sign it")
 
 
 def sign(out_dir, plan, approved_by, school):
@@ -1575,10 +1582,11 @@ def parse_args():
     parser.add_argument("site", nargs="?")
     parser.add_argument("--verify", metavar="FOLDER", help=f"check a shared folder against its {seal.SUMS}: MATCH, "
                         "CHANGED or MISSING per file (alone, without out_dir and site)")
-    parser.add_argument("--notes", metavar="FILE", help="the principal's notes on plan.json's letter: only the "
+    parser.add_argument("--notes", metavar="FILE", help="the notes given to the writer on plan.json's letter: only the "
                         "sentences they ask about change")
-    parser.add_argument("--voice-notes", metavar="AUDIO", help="the principal's notes spoken into a phone (m4a, opus, "
-                        f"wav...): {voice.NAME} writes them down, and they revise the letter as --notes would")
+    parser.add_argument("--voice-notes", metavar="AUDIO", help="the notes given to the writer, spoken into a phone "
+                        f"(m4a, opus, wav...): {voice.NAME} writes them down, and they revise the letter as --notes "
+                        "would")
     parser.add_argument("--approved-by", default="", metavar="NAME",
                         help='who read and approved plan.json\'s letter, e.g. "A. Rao, Principal" (with --school)')
     parser.add_argument("--school", default="", help="the school that sends the letter")
