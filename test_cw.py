@@ -4500,6 +4500,8 @@ def test_readme_first_screen_fits_a_phone_its_links_resolve_and_one_story_on_the
     record = json.loads((here / "kaggle" / "glimmer-gate-provenance.json").read_text())
     assert record["team"] == "Run by the author on the author's own Kaggle account (free 2 x T4)."
     assert "not downloaded yet" not in readme
+    architecture = (here / "ARCHITECTURE.md").read_text()  # the code map names every module at the root
+    assert [p.name for p in sorted(here.glob("*.py")) if f"`{p.name}`" not in architecture] == []
 
 
 def test_feet_overlap_counts_frames_whose_feet_sit_on_a_vehicle_box_after_the_rider_filter():

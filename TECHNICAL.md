@@ -18,16 +18,8 @@ Crossing Watch turns one phone video of a school or college crossing into measur
 
 ## Files
 
-- **Run:** `analyze.py` (video to events.json) with `sam.py`, `crowd.py`, `road.py`, `pace.py`, `review.py`,
-  `listen.py`, `render.py`, `masks.py` and `seal.py`; before filming, `calibrate.html` and `filmcheck.py`.
-- **Page and letter:** `pack.py` with `summary.py`, `roadmap.py`, `overlay.py`, `fixband.py`, `ailabel.py`,
-  `openweights.py`, `passmark.py` and `gazette.py`.
-- **Case agent:** `agent.py`.
-- **Checks:** `test_cw.py`; `validate_sind.py`, `validate_dut.py` and `validate_offline.py` (ground truth);
-  `validate_gate.py` (G6, G8); `blind_set.py` and `score_humans.py` (G5); `judge_bench.py`; `vehicle_test.py`;
-  `feet_overlap.py` (feet on a vehicle's box, at an angle).
-- **Video and X:** `video/split.py` (the hero shot); `guess.py` (X replies' speed guesses against the measured speed).
-- **Docs and records:** `FILMING.md`, `GATES.md`, `sites/`, `sample/`, `kaggle/`, `provenance/`, `LICENSES/`.
+Every module in one line, in seven groups, with the evaluation table and the data behind each number: [ARCHITECTURE.md](ARCHITECTURE.md).
+Docs and records: `FILMING.md`, `GATES.md`, `sites/`, `sample/`, `kaggle/`, `provenance/`, `LICENSES/`.
 
 ## How it works
 

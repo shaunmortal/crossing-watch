@@ -17,13 +17,13 @@
 
 | Judging | Where to look |
 |---|---|
-| **Impact** | A real gate, real near-misses: closest **0.0 s, 0.42 m apart**. Our college certified the report genuine (3 Nov 2026), and its Head of CSE (Data Science) writes of "several close calls" and that until now the college "did not have any documented evidence" ([his statement](#from-the-college-in-its-own-words)). Any school can repeat it with a phone, a tape and the [Manual](https://crossingwatch.xyz/manual/), for about **$12** of SAM for our 8.6-minute video |
+| **Impact** | A real gate, real near-misses: closest **0.0 s, 0.42 m apart**. Our college certified the report genuine (3 Nov 2026), 19 of its teachers signed a support sheet (31 Oct), and its Head of CSE (Data Science) writes of "several close calls" and that until now the college "did not have any documented evidence" ([his statement](#from-the-college-in-its-own-words)). Any school can repeat it with a phone, a tape and the [Manual](https://crossingwatch.xyz/manual/), for about **$12** of SAM for our 8.6-minute video |
 | **Meta AI tooling** | Seven Meta models, one job each ([table](#-seven-meta-models-each-doing-real-work)). Core: **SAM 3.1** tracks people and vehicles and finds plates to hide; **Muse Spark** sets aside 66 of 75 alarms, runs the case agent and writes the letter; **Muse Spark Open** and **Muse Glimmer 30B** (LoRA-tuned by us) run every reasoning step of the case on open weights. Supporting: **Muse Wonder** hears the horns, **Muse Voice Transcribe** finds speech to silence, **Muse Image** draws the fix |
-| **Technical depth** | Tape 15 m vs video **15.0 m**, on a line the maths never used; drone ground truth **47 of 52**; [3 pre-registered blind-test wins](OPEN_WEIGHTS.md); **243** self-checks |
+| **Technical depth** | Tape 15 m vs video **15.0 m**, on a line the maths never used; drone ground truth **47 of 52**; [3 pre-registered blind-test wins](OPEN_WEIGHTS.md); **243** self-checks; [code map and every evaluation, one page](ARCHITECTURE.md) |
 | **Demo** | The [2:45 video](https://youtu.be/9QSc-Urqpr4); the [Live Explorer](https://crossingwatch.xyz/explorer/): switch Muse Spark's review off and on and watch 75 alarms become 5; the [live run's full log](provenance/live-run-2026-11-03/README.md); the [case agent live on camera](provenance/agent-live-2026-11-04/README.md) |
 | **Open Weights** | Every reasoning step of our gate case on open weights, same 5 near-misses and 51 people ([run](provenance/open-gate-2026-11-04/README.md)); our LoRA-tuned Glimmer judge beats Muse Spark Open on Kaggle's free 2 x T4, **81 vs 49, p 0.006**; the LoRA takes base Glimmer from **781** to **1,163** right on the same 1,210 blind rows, in about 35 output tokens a verdict instead of about 8,000 (most of base's misses are verdicts still reasoning at the cap) ([one page](OPEN_WEIGHTS.md), [run](GATES.md#base-glimmer-against-the-tuned-judge-result-wed-4-nov-2026-run-2013-2127-ist)); adapter public on Hugging Face with every sha256; four Fireworks training session ids, a response id on every served row, Kaggle's own run log; re-score in one command, no key ([verifier checklist](OPEN_WEIGHTS.md)) |
 | **Agentic** | The case agent works 5 tools, stops to ask a person for a tape measure, and refuses the letter until video and tape agree ([log](provenance/gate-agent-2026-11-02/agent_log.jsonl), [replay](https://crossingwatch.xyz/app/#s3)) |
-| **Creative** | Muse Image draws the painted zebra and College Zone 20 km/h signs the letter asks for ([the fix](docs/story/09-fix.jpg)); Muse Wonder times the horns |
+| **Creative** | Muse Image draws the fix the letter asks for (a painted zebra, "College Zone 20 km/h") onto our real, blurred street, only inside the strip where people were measured crossing ([the fix](docs/readme/fix-band.jpg)); Muse Wonder times the horns |
 
 **सड़क का ख़तरा · नाप के · सबूत के साथ**
 
@@ -35,13 +35,16 @@
 
 ## 📑 Contents
 
-[The problem](#-the-problem) · [Results](#-results-on-our-gate) · [Demo](#-demo) · [Try it in your browser](#-try-it-in-your-browser) · [Pipeline](#-pipeline) · [Seven Meta models](#-seven-meta-models-each-doing-real-work) · [How we know it's right](#-how-we-know-its-right) · [Screens](#-screens) · [Run it locally](#-run-it-locally) · [Privacy and cost](#-privacy-and-cost) · [Deep dive](#-deep-dive) · [Declarations](#declarations)
+[The problem](#-the-problem) · [Results](#-results-on-our-gate) · [Demo](#-demo) · [Try it in your browser](#-try-it-in-your-browser) · [Pipeline](#-pipeline) · [Seven Meta models](#-seven-meta-models-each-doing-real-work) · [How we know it's right](#-how-we-know-its-right) · [Screens](#-screens) · [Run it locally](#-run-it-locally) · [Code map](#-code-map) · [Privacy and cost](#-privacy-and-cost) · [Deep dive](#-deep-dive) · [Declarations](#declarations)
 
 ## 🚨 The problem
 
 Outside schools and colleges everywhere, students cross between bikes, cars and buses every day. Road crashes kill about
 **1.19 million people a year** and are the **leading cause of death for people aged 5 to 29** ([WHO, Global status report
-on road safety 2023](https://www.who.int/publications/i/item/9789240086517)). Every school wants a speed breaker or a zebra
+on road safety 2023](https://www.who.int/publications/i/item/9789240086517)). In India they killed **35,221 pedestrians**
+in 2023, and two-wheelers killed more of them than any other vehicle, **28.2%** ([MoRTH, Road Accidents in India
+2023](https://data.opencity.in/dataset/road-accidents-in-india-2023), Table 4.4 and para 4.19); all 5 near-misses at our
+gate were with a motorcycle. Every school wants a speed breaker or a zebra
 crossing at its gate, and only the road authority can build one. The authority asks for proof. **Crossing Watch turns one
 phone video into that proof:** measured near-misses, blurred clips, and a letter the head of the college can sign.
 
@@ -118,7 +121,7 @@ flowchart TD
 |---|---|---|
 | **SAM 3.1** | Tracks people and vehicles, frame by frame | 47 of 52 near-misses vs drone truth; speed error 0.16 km/h mean ([DUT](TECHNICAL.md#end-to-end-against-ground-truth-dut)) |
 | **Muse Spark** | Reviews each person in a near-miss, runs the case agent, writes the letter, judges it | flagged 24 of 24 planted lies ([bench](TECHNICAL.md#checking-the-checks)) |
-| **Muse Image** | Draws the fix onto the real, blurred street, only where people crossed | [how](TECHNICAL.md#how-it-works) |
+| **Muse Image** | Draws the fix onto the real, blurred street, only where people crossed | [the fix on our street](docs/readme/fix-band.jpg): code keeps Muse Image's pixels only inside the measured strip and labels the picture AI-generated (`fixband.py`) |
 | **Muse Wonder** | Listens around each near-miss for horns, brakes and shouts | heard horns around 4 of the 5 near-misses at our gate |
 | **Muse Voice Transcribe** | Finds human speech in each clip's sound so it can be silenced before publishing; the horn stays | no speech in our five clips, so every clip keeps its full road sound ([how](TECHNICAL.md#how-it-works)) |
 | **Muse Glimmer 30B** · open weights | Wrote a full letter for our real gate on a free Kaggle GPU; our LoRA fine-tune judges letters ([adapter on Hugging Face](https://huggingface.co/shaunmortal/crossing-watch-glimmer-judge-v6)); as the crop reviewer it made the same keep/remove call as Muse Spark on all 32 people at our gate ([review](provenance/glimmer-vision-review-2026-11-04/README.md)) | letter in **276 s, first try**; tuned judge **wins 3 pre-registered blind tests on planted errors** vs Muse Spark Open, Muse Spark (closed) leads overall ([one page](OPEN_WEIGHTS.md)); served on Fireworks, read our real letter 6 of 6 times, no unsupported claim ([record](provenance/glimmer-judge-lora-v6/live/gate-letter-judge.json)); runs free on Kaggle's 2 x T4 too and beats Spark Open again (81 vs 49, p 0.006, [score](provenance/glimmer-judge-lora-v6/kaggle/score.json)) |
@@ -141,6 +144,8 @@ flowchart TD
 
 ## 🔬 How we know it's right
 
+Each check's ground truth and the command that re-runs it: [evaluation at a glance](ARCHITECTURE.md#evaluation-at-a-glance).
+
 | | Check | Result | Proof |
 |---|---|---|---|
 | 🛰️ | Drone ground truth (DUT, top-down) | **47 of 52** near-misses found after Muse Spark's review (geometry alone **50 of 52**, every miss a threshold case); speed error **0.16 km/h** mean. At our gate every alarm Muse Spark set aside stays visible in the [Live Explorer](https://crossingwatch.xyz/explorer/) behind its review switch | [method](TECHNICAL.md#end-to-end-against-ground-truth-dut) |
@@ -157,7 +162,7 @@ flowchart TD
 <tr>
 <td width="33%"><img src="docs/story/02-gate.jpg" alt="Our college gate, real photo"><br><i><b>The gate.</b> Real photo, the road we measured.</i></td>
 <td width="33%"><a href="docs/story/06-letter.jpg"><img src="docs/story/06-letter-top.jpg" alt="The letter to the road authority"></a><br><i><b>The letter.</b> To the road authority, every number code-checked; its "80 pedestrian crossings" counts tracked crossings before Muse Spark's review (51 people crossed on foot).</i></td>
-<td width="33%"><img src="docs/story/09-fix.jpg" alt="Muse Image draws the requested zebra crossing on the gate"><br><i><b>The fix, drawn by Muse Image.</b> What the letter asks for. AI-generated: the people are not real.</i></td>
+<td width="33%"><img src="docs/readme/fix-band.jpg" alt="Muse Image's zebra crossing, kept only inside the measured strip (dashed) on our real, blurred street, labelled AI-generated"><br><i><b>The fix, drawn by Muse Image</b> only inside the strip where people were measured crossing; the rest is our real, blurred street. AI-generated, not evidence.</i></td>
 </tr>
 </table>
 
@@ -169,6 +174,20 @@ python3 test_cw.py                        # self-checks, under a minute
 python3 pack.py sample sample/site.json   # the synthetic sample (made-up tracks) -> sample/index.html
 open sample/index.html                    # macOS; elsewhere open the file in a browser
 ```
+
+## 🧩 Code map
+
+47 flat Python modules in seven groups; the pipeline and every check need only the standard library and ffmpeg. One line per module, and why the root stays flat: [ARCHITECTURE.md](ARCHITECTURE.md).
+
+| Group | Modules (start at the first) |
+|---|---|
+| Measure: video to `events.json` | `analyze.py` · `sam.py` `crowd.py` `masks.py` `road.py` `pace.py` `review.py` `listen.py` `voice.py` `render.py` `seal.py` |
+| Before filming | `filmcheck.py` · `calibrate.html` `stabilize.py` |
+| Evidence page and letter | `pack.py` · `summary.py` `roadmap.py` `overlay.py` `fixband.py` `ailabel.py` `gazette.py` `passmark.py` `hindi.py` `openweights.py` `letter_pdf.py` |
+| Case agent | `agent.py` · `openagent.py` `monday.py` |
+| Ground truth and human checks | `validate_dut.py` · `validate_sind.py` `validate_offline.py` `validate_gate.py` `vehicle_test.py` `feet_overlap.py` `blind_set.py` `score_humans.py` `guess.py` |
+| Letter judge and open weights | `judge_v3_score.py` · `judge_bench.py` `finetune_judge.py` `natural_edits.py` `judge_v4.py`…`judge_v7.py` (one per pre-registered test) `judge_compare.py` `writers_table.py` |
+| Self-checks | `test_cw.py` (243 checks, offline) |
 
 ## 🔒 Privacy and cost
 
@@ -184,7 +203,7 @@ Everything else is in **[TECHNICAL.md](TECHNICAL.md)**:
 - **[Open weights, one page](OPEN_WEIGHTS.md)**: Glimmer's gate letter, our LoRA judge and its three blind-test wins on planted errors over Muse Spark Open (Muse Spark, closed, leads overall)
 - **[Case agent](TECHNICAL.md#case-agent-it-stops-to-ask-for-a-tape-measure)**: the agent that stops to ask for a tape measure
 - **[Check it yourself](TECHNICAL.md#check-it-yourself)**: every claim, the command that re-checks it, and whether a judge can do it for $0
-- **[Files](TECHNICAL.md#files)**: what each script does
+- **[Code map and evaluation](ARCHITECTURE.md)**: every module in one line, every check with its ground truth and re-run command
 - **[How it works](TECHNICAL.md#how-it-works)**: every step: the model or method and its file
 - **[Run](TECHNICAL.md#run)**: the commands, notes and sign-off, the Hindi copy, what gets published, Standard mode, caching
 - **[Checking the checks](TECHNICAL.md#checking-the-checks)**: the planted-lies bench and the blind check

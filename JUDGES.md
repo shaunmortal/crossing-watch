@@ -42,6 +42,7 @@ The App, Explorer and Manual have a हिंदी / English switch. Every gate
 
 ## Depth
 
+- **One page for an engineer:** [ARCHITECTURE.md](ARCHITECTURE.md): the 47 modules in seven groups, every evaluation with its ground truth and the command that re-runs it, and the data behind each number.
 - Near-miss maths on drone ground truth (SinD, public sample): 37 of 63 crossings had a moving vehicle through the same spot within 3 s; speed error 0.24 km/h
   mean, 0.91 km/h at the 95th percentile ([TECHNICAL, SinD](TECHNICAL.md#validation-on-ground-truth-trajectories)). At $0
   after downloading SinD: `python3 validate_sind.py data/sind`.
