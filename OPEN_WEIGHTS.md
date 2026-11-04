@@ -8,7 +8,7 @@ One page for the Open Weights review. Every open-weights call runs on our own (K
 | | Base Muse Glimmer 30B | Glimmer + our LoRA |
 |---|---|---|
 | Verdicts finished under a 256-token cap (v6 test, 1,545 prompts) | 0 (still reasoning when cut off) | **1,545 of 1,545**, about 34 tokens each |
-| Verdicts finished under an 8,192-token cap, JSON mode (4 Nov, 1,210 scored rows) | 437 of 1,210; median 8,192 output tokens and 56 s a verdict | all; median 37 tokens, 2.1 s |
+| Verdicts finished under an 8,192-token cap, JSON mode (4 Nov, 1,210 scored rows) | 437 of 1,210; median 8,192 output tokens and 56 s a verdict | all; median 37 tokens, 2.1 s: **about 220 times fewer output tokens, 27 times faster** |
 | Right on v6's blind test rows (labels frozen before any tuned reply) | **781** of the 1,210 it was given (8,192-token cap) | **1,442** of 1,501; on the same 1,210 rows **1,163** (there, Muse Spark Open 1,128 and Muse Spark 1,181) |
 | Against Muse Spark Open, three pre-registered blind tests (v4, v5, v6) | – | **wins all three** (p 0.005, 0.029, 0.0006) |
 | v6 self-hosted on Kaggle's free 2 x T4 (Meta's 4-bit base) | – | **1,435 right; 81 vs 49 against Muse Spark Open, p 0.006** |
