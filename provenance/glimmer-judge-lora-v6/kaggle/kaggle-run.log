@@ -1,0 +1,348 @@
+[{"stream_name":"stderr","time":5.825398421,"data":"/usr/local/lib/python3.13/dist-packages/nbformat/validator.py:434: MissingIDFieldWarning: Cell is missing an id field, this will become a hard error in future nbformat versions. You may want to use `normalize()` on your notebooks before validations (available since nbformat 5.1.4). Previous versions of nbformat are fixing this issue transparently, and will stop doing so in the future.\n"}
+,{"stream_name":"stderr","time":5.825486781,"data":"  _validate(nbdict, ref, version, version_minor, relax_add_props)\n"}
+,{"stream_name":"stderr","time":6.658468232,"data":"0.00s - Debugger warning: It seems that frozen modules are being used, which may\n"}
+,{"stream_name":"stderr","time":6.658496019,"data":"0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off\n"}
+,{"stream_name":"stderr","time":6.65850179,"data":"0.00s - to python to disable frozen modules.\n"}
+,{"stream_name":"stderr","time":6.658506335,"data":"0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.\n"}
+,{"stream_name":"stderr","time":7.256440764,"data":"0.00s - Debugger warning: It seems that frozen modules are being used, which may\n"}
+,{"stream_name":"stderr","time":7.256470855,"data":"0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off\n"}
+,{"stream_name":"stderr","time":7.256475683,"data":"0.00s - to python to disable frozen modules.\n"}
+,{"stream_name":"stderr","time":7.256479496,"data":"0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.\n"}
+,{"stream_name":"stdout","time":8.784690273,"data":"Tue Nov  3 23:45:32 2026       \n"}
+,{"stream_name":"stdout","time":8.784725733,"data":"+-----------------------------------------------------------------------------------------+\n"}
+,{"stream_name":"stdout","time":8.784731894,"data":"| NVIDIA-SMI 580.178.04             Driver Version: 580.178.04     CUDA Version: 13.0     |\n"}
+,{"stream_name":"stdout","time":8.784736013,"data":"+-----------------------------------------+------------------------+----------------------+\n"}
+,{"stream_name":"stdout","time":8.784739898,"data":"| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |\n"}
+,{"stream_name":"stdout","time":8.784743762,"data":"| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |\n"}
+,{"stream_name":"stdout","time":8.784747589,"data":"|                                         |                        |               MIG M. |\n"}
+,{"stream_name":"stdout","time":8.784751458,"data":"|=========================================+========================+======================|\n"}
+,{"stream_name":"stdout","time":8.78475541,"data":"|   0  Tesla T4                       Off |   00000000:00:04.0 Off |                    0 |\n"}
+,{"stream_name":"stdout","time":8.784759278,"data":"| N/A   38C    P8             10W /   70W |       0MiB /  15360MiB |      0%      Default |\n"}
+,{"stream_name":"stdout","time":8.784763143,"data":"|                                         |                        |                  N/A |\n"}
+,{"stream_name":"stdout","time":8.78476875,"data":"+-----------------------------------------+------------------------+----------------------+\n"}
+,{"stream_name":"stdout","time":8.784777567999999,"data":"|   1  Tesla T4                       Off |   00000000:00:05.0 Off |                    0 |\n"}
+,{"stream_name":"stdout","time":8.784780375,"data":"| N/A   40C    P8             12W /   70W |       0MiB /  15360MiB |      0%      Default |\n"}
+,{"stream_name":"stdout","time":8.784782977999999,"data":"|                                         |                        |                  N/A |\n"}
+,{"stream_name":"stdout","time":8.784817744,"data":"+-----------------------------------------+------------------------+----------------------+\n"}
+,{"stream_name":"stdout","time":8.784823604,"data":"\n"}
+,{"stream_name":"stdout","time":8.784827697,"data":"+-----------------------------------------------------------------------------------------+\n"}
+,{"stream_name":"stdout","time":8.78483156,"data":"| Processes:                                                                              |\n"}
+,{"stream_name":"stdout","time":8.784835967,"data":"|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |\n"}
+,{"stream_name":"stdout","time":8.784840007,"data":"|        ID   ID                                                               Usage      |\n"}
+,{"stream_name":"stdout","time":8.78484382,"data":"|=========================================================================================|\n"}
+,{"stream_name":"stdout","time":8.78484765,"data":"|  No running processes found                                                             |\n"}
+,{"stream_name":"stdout","time":8.784853934000001,"data":"+-----------------------------------------------------------------------------------------+\n"}
+,{"stream_name":"stdout","time":8.784858387,"data":" Kaggle 2 x T4\n"}
+,{"stream_name":"stdout","time":1835.195159792,"data":"-- Configuring done (5.9s)\n"}
+,{"stream_name":"stdout","time":1835.195199686,"data":"-- Generating done (0.5s)\n"}
+,{"stream_name":"stdout","time":1835.195204082,"data":"-- Build files have been written to: /kaggle/working/llama.cpp/build\n"}
+,{"stream_name":"stdout","time":1835.19520758,"data":"[100%] Linking CXX executable ../../bin/llama-server\n"}
+,{"stream_name":"stdout","time":1835.195212353,"data":"[100%] Built target llama-server\n"}
+,{"stream_name":"stdout","time":1835.195235677,"data":"ndim fix applied\n"}
+,{"stream_name":"stderr","time":1835.1962818,"data":"Cloning into 'llama.cpp'...\n"}
+,{"stream_name":"stderr","time":1835.196294072,"data":"Note: switching to '2e0d86bebc210947680e8f0d67daa79f3260c106'.\n"}
+,{"stream_name":"stderr","time":1835.196298858,"data":"\n"}
+,{"stream_name":"stderr","time":1835.196304907,"data":"You are in 'detached HEAD' state. You can look around, make experimental\n"}
+,{"stream_name":"stderr","time":1835.196313018,"data":"changes and commit them, and you can discard any commits you make in this\n"}
+,{"stream_name":"stderr","time":1835.196316315,"data":"state without impacting any branches by switching back to a branch.\n"}
+,{"stream_name":"stderr","time":1835.196319384,"data":"\n"}
+,{"stream_name":"stderr","time":1835.196322468,"data":"If you want to create a new branch to retain commits you create, you may\n"}
+,{"stream_name":"stderr","time":1835.196325676,"data":"do so (now or later) by using -c with the switch command. Example:\n"}
+,{"stream_name":"stderr","time":1835.196328581,"data":"\n"}
+,{"stream_name":"stderr","time":1835.196331344,"data":"  git switch -c \u003cnew-branch-name\u003e\n"}
+,{"stream_name":"stderr","time":1835.196334622,"data":"\n"}
+,{"stream_name":"stderr","time":1835.196338044,"data":"Or undo this operation with:\n"}
+,{"stream_name":"stderr","time":1835.196356706,"data":"\n"}
+,{"stream_name":"stderr","time":1835.196361649,"data":"  git switch -\n"}
+,{"stream_name":"stderr","time":1835.196366721,"data":"\n"}
+,{"stream_name":"stderr","time":1835.196371766,"data":"Turn off this advice by setting config variable advice.detachedHead to false\n"}
+,{"stream_name":"stderr","time":1835.196376453,"data":"\n"}
+,{"stream_name":"stderr","time":1835.196380526,"data":"CMAKE_BUILD_TYPE=Release\n"}
+,{"stream_name":"stderr","time":1835.196394366,"data":"\n"}
+,{"stream_name":"stderr","time":1835.196397773,"data":"Cloning into 'llama.cpp'...\n"}
+,{"stream_name":"stderr","time":1835.196401253,"data":"Note: switching to '2e0d86bebc210947680e8f0d67daa79f3260c106'.\n"}
+,{"stream_name":"stderr","time":1835.196404698,"data":"\n"}
+,{"stream_name":"stderr","time":1835.196407982,"data":"You are in 'detached HEAD' state. You can look around, make experimental\n"}
+,{"stream_name":"stderr","time":1835.196411532,"data":"changes and commit them, and you can discard any commits you make in this\n"}
+,{"stream_name":"stderr","time":1835.196415082,"data":"state without impacting any branches by switching back to a branch.\n"}
+,{"stream_name":"stderr","time":1835.196420369,"data":"\n"}
+,{"stream_name":"stderr","time":1835.196427512,"data":"If you want to create a new branch to retain commits you create, you may\n"}
+,{"stream_name":"stderr","time":1835.196430008,"data":"do so (now or later) by using -c with the switch command. Example:\n"}
+,{"stream_name":"stderr","time":1835.196432364,"data":"\n"}
+,{"stream_name":"stderr","time":1835.19643504,"data":"  git switch -c \u003cnew-branch-name\u003e\n"}
+,{"stream_name":"stderr","time":1835.196438178,"data":"\n"}
+,{"stream_name":"stderr","time":1835.196459534,"data":"Or undo this operation with:\n"}
+,{"stream_name":"stderr","time":1835.196463528,"data":"\n"}
+,{"stream_name":"stderr","time":1835.196467479,"data":"  git switch -\n"}
+,{"stream_name":"stderr","time":1835.196471104,"data":"\n"}
+,{"stream_name":"stderr","time":1835.196475061,"data":"Turn off this advice by setting config variable advice.detachedHead to false\n"}
+,{"stream_name":"stderr","time":1835.196479035,"data":"\n"}
+,{"stream_name":"stderr","time":1835.196482361,"data":"CMAKE_BUILD_TYPE=Release\n"}
+,{"stream_name":"stderr","time":1836.141401283,"data":"Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.\n"}
+,{"stream_name":"stderr","time":1836.141432331,"data":"\n"}
+,{"stream_name":"stderr","time":1836.141437403,"data":"Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.\n"}
+,{"stream_name":"stdout","time":2028.742967323,"data":"{\n"}
+,{"stream_name":"stdout","time":2028.743026254,"data":" \"files_sha256\": {\n"}
+,{"stream_name":"stdout","time":2028.74303104,"data":"  \"adapter_config.json\": \"b4ea83e72337afda1793d60eb78960fc864663faa4f0f5fa37756df8396b2ef1\",\n"}
+,{"stream_name":"stdout","time":2028.743034915,"data":"  \"adapter_model-00001-of-00001.safetensors\": \"1a1f9c6ab8159141591b73d6b35ee257656843f9b3f13a9e43ce89bea045af1e\"\n"}
+,{"stream_name":"stdout","time":2028.743053672,"data":" },\n"}
+,{"stream_name":"stdout","time":2028.743059456,"data":" \"fw_checkpoint\": {\n"}
+,{"stream_name":"stdout","time":2028.7430649,"data":"  \"checkpoint_format\": \"HF_LORA_ADAPTER\",\n"}
+,{"stream_name":"stdout","time":2028.74307048,"data":"  \"checkpoint_kind\": \"SAMPLING_CHECKPOINT\",\n"}
+,{"stream_name":"stdout","time":2028.743088901,"data":"  \"commit_time\": 1793540571.1418767,\n"}
+,{"stream_name":"stdout","time":2028.743094252,"data":"  \"commit_time_iso\": \"2026-11-01T13:42:51.141877Z\",\n"}
+,{"stream_name":"stdout","time":2028.743099203,"data":"  \"format_version\": 1,\n"}
+,{"stream_name":"stdout","time":2028.743104802,"data":"  \"trainer_image\": \"us-chicago-1.ocir.io/axhaeqbjwexc/serving/train-firetitan:0.638.662-arm\"\n"}
+,{"stream_name":"stdout","time":2028.743110915,"data":" },\n"}
+,{"stream_name":"stdout","time":2028.743115793,"data":" \"r\": 32,\n"}
+,{"stream_name":"stdout","time":2028.743132206,"data":" \"lora_alpha\": 32,\n"}
+,{"stream_name":"stdout","time":2028.743136098,"data":" \"target_modules\": [\n"}
+,{"stream_name":"stdout","time":2028.743139771,"data":"  \"down_proj\",\n"}
+,{"stream_name":"stdout","time":2028.74314343,"data":"  \"gate_proj\",\n"}
+,{"stream_name":"stdout","time":2028.743147056,"data":"  \"k_proj\",\n"}
+,{"stream_name":"stdout","time":2028.743150866,"data":"  \"o_proj\",\n"}
+,{"stream_name":"stdout","time":2028.743155071,"data":"  \"q_proj\",\n"}
+,{"stream_name":"stdout","time":2028.743172723,"data":"  \"up_proj\",\n"}
+,{"stream_name":"stdout","time":2028.743187402,"data":"  \"v_proj\"\n"}
+,{"stream_name":"stdout","time":2028.743190804,"data":" ],\n"}
+,{"stream_name":"stdout","time":2028.74319407,"data":" \"tensors\": 832,\n"}
+,{"stream_name":"stdout","time":2028.743197523,"data":" \"params\": 209584128,\n"}
+,{"stream_name":"stdout","time":2028.743201042,"data":" \"layers\": 52,\n"}
+,{"stream_name":"stdout","time":2028.743204483,"data":" \"base_architectures\": [\n"}
+,{"stream_name":"stdout","time":2028.743207911,"data":"  \"MuseGlimmerForConditionalGeneration\"\n"}
+,{"stream_name":"stdout","time":2028.743211407,"data":" ],\n"}
+,{"stream_name":"stdout","time":2028.74321466,"data":" \"lm_head_trained\": false,\n"}
+,{"stream_name":"stdout","time":2028.743218328,"data":" \"first_tensors\": {\n"}
+,{"stream_name":"stdout","time":2028.743225326,"data":"  \"base_model.model.model.language_model.layers.0.mlp.down_proj.lora_A.weight\": [\n"}
+,{"stream_name":"stdout","time":2028.743227925,"data":"   32,\n"}
+,{"stream_name":"stdout","time":2028.743230187,"data":"   19968\n"}
+,{"stream_name":"stdout","time":2028.743232455,"data":"  ],\n"}
+,{"stream_name":"stdout","time":2028.743234712,"data":"  \"base_model.model.model.language_model.layers.0.mlp.down_proj.lora_B.weight\": [\n"}
+,{"stream_name":"stdout","time":2028.743238439,"data":"   6656,\n"}
+,{"stream_name":"stdout","time":2028.743252305,"data":"   32\n"}
+,{"stream_name":"stdout","time":2028.743256749,"data":"  ],\n"}
+,{"stream_name":"stdout","time":2028.743260567,"data":"  \"base_model.model.model.language_model.layers.0.mlp.gate_proj.lora_A.weight\": [\n"}
+,{"stream_name":"stdout","time":2028.74326482,"data":"   32,\n"}
+,{"stream_name":"stdout","time":2028.74326871,"data":"   6656\n"}
+,{"stream_name":"stdout","time":2028.74327208,"data":"  ],\n"}
+,{"stream_name":"stdout","time":2028.743275411,"data":"  \"base_model.model.model.language_model.layers.0.mlp.gate_proj.lora_B.weight\": [\n"}
+,{"stream_name":"stdout","time":2028.743279041,"data":"   19968,\n"}
+,{"stream_name":"stdout","time":2028.743282355,"data":"   32\n"}
+,{"stream_name":"stdout","time":2028.743285727,"data":"  ]\n"}
+,{"stream_name":"stdout","time":2028.743288962,"data":" }\n"}
+,{"stream_name":"stdout","time":2028.743292267,"data":"}\n"}
+,{"stream_name":"stdout","time":2058.441405295,"data":"b,        torch.bfloat16 --\u003e F16, shape = {32, 256}\n"}
+,{"stream_name":"stdout","time":2058.441448549,"data":"INFO:hf-to-gguf:blk.9.ffn_down.weight.lora_a,      torch.bfloat16 --\u003e F16, shape = {19968, 32}\n"}
+,{"stream_name":"stdout","time":2058.441454277,"data":"INFO:hf-to-gguf:blk.9.ffn_down.weight.lora_b,      torch.bfloat16 --\u003e F16, shape = {32, 6656}\n"}
+,{"stream_name":"stdout","time":2058.441459025,"data":"INFO:hf-to-gguf:blk.9.ffn_gate.weight.lora_a,      torch.bfloat16 --\u003e F16, shape = {6656, 32}\n"}
+,{"stream_name":"stdout","time":2058.441463664,"data":"INFO:hf-to-gguf:blk.9.ffn_gate.weight.lora_b,      torch.bfloat16 --\u003e F16, shape = {32, 19968}\n"}
+,{"stream_name":"stdout","time":2058.441472807,"data":"INFO:hf-to-gguf:blk.9.ffn_up.weight.lora_a,        torch.bfloat16 --\u003e F16, shape = {6656, 32}\n"}
+,{"stream_name":"stdout","time":2058.441487526,"data":"INFO:hf-to-gguf:blk.9.ffn_up.weight.lora_b,        torch.bfloat16 --\u003e F16, shape = {32, 19968}\n"}
+,{"stream_name":"stdout","time":2058.441490173,"data":"INFO:hf-to-gguf:blk.9.attn_gate.weight.lora_a,     torch.bfloat16 --\u003e F16, shape = {6656, 32}\n"}
+,{"stream_name":"stdout","time":2058.441492605,"data":"INFO:hf-to-gguf:blk.9.attn_gate.weight.lora_b,     torch.bfloat16 --\u003e F16, shape = {32, 4096}\n"}
+,{"stream_name":"stdout","time":2058.441495091,"data":"INFO:hf-to-gguf:blk.9.attn_k.weight.lora_a,        torch.bfloat16 --\u003e F16, shape = {6656, 32}\n"}
+,{"stream_name":"stdout","time":2058.441497532,"data":"INFO:hf-to-gguf:blk.9.attn_k.weight.lora_b,        torch.bfloat16 --\u003e F16, shape = {32, 256}\n"}
+,{"stream_name":"stdout","time":2058.441499924,"data":"INFO:hf-to-gguf:blk.9.attn_output.weight.lora_a,   torch.bfloat16 --\u003e F16, shape = {4096, 32}\n"}
+,{"stream_name":"stdout","time":2058.441502319,"data":"INFO:hf-to-gguf:blk.9.attn_output.weight.lora_b,   torch.bfloat16 --\u003e F16, shape = {32, 6656}\n"}
+,{"stream_name":"stdout","time":2058.441504713,"data":"INFO:hf-to-gguf:blk.9.attn_q_norm.weight,          torch.bfloat16 --\u003e F32, shape = {128}\n"}
+,{"stream_name":"stdout","time":2058.441507466,"data":"INFO:hf-to-gguf:blk.9.attn_k_norm.weight,          torch.bfloat16 --\u003e F32, shape = {128}\n"}
+,{"stream_name":"stdout","time":2058.441509835,"data":"INFO:hf-to-gguf:blk.9.attn_q.weight.lora_a,        torch.bfloat16 --\u003e F16, shape = {6656, 32}\n"}
+,{"stream_name":"stdout","time":2058.441512212,"data":"INFO:hf-to-gguf:blk.9.attn_q.weight.lora_b,        torch.bfloat16 --\u003e F16, shape = {32, 4096}\n"}
+,{"stream_name":"stdout","time":2058.441514589,"data":"INFO:hf-to-gguf:blk.9.attn_v.weight.lora_a,        torch.bfloat16 --\u003e F16, shape = {6656, 32}\n"}
+,{"stream_name":"stdout","time":2058.441517057,"data":"INFO:hf-to-gguf:blk.9.attn_v.weight.lora_b,        torch.bfloat16 --\u003e F16, shape = {32, 256}\n"}
+,{"stream_name":"stdout","time":2058.441519477,"data":"INFO:hf-to-gguf:Set meta model\n"}
+,{"stream_name":"stdout","time":2058.441521771,"data":"INFO:hf-to-gguf:Set model parameters\n"}
+,{"stream_name":"stdout","time":2058.441524068,"data":"INFO:hf-to-gguf:Set model quantization version\n"}
+,{"stream_name":"stdout","time":2058.441526442,"data":"INFO:hf-to-gguf:Set model tokenizer\n"}
+,{"stream_name":"stdout","time":2058.441528704,"data":"INFO:gguf.gguf_writer:Writing the following files:\n"}
+,{"stream_name":"stdout","time":2058.441531087,"data":"INFO:gguf.gguf_writer:/kaggle/working/glimmer-judge-lora-f16.gguf: n_tensors = 936, total_size = 419.2M\n"}
+,{"stream_name":"stdout","time":2058.441533519,"data":"\n"}
+,{"stream_name":"stdout","time":2058.441537014,"data":"Writing:   0%|          | 0.00/419M [00:00\u003c?, ?byte/s]\n"}
+,{"stream_name":"stdout","time":2058.441539585,"data":"Writing:   8%|▊         | 31.5M/419M [00:00\u003c00:01, 315Mbyte/s]\n"}
+,{"stream_name":"stdout","time":2058.441542659,"data":"Writing:  15%|█▌        | 64.5M/419M [00:00\u003c00:01, 323Mbyte/s]\n"}
+,{"stream_name":"stdout","time":2058.441545126,"data":"Writing:  23%|██▎       | 98.0M/419M [00:00\u003c00:01, 321Mbyte/s]\n"}
+,{"stream_name":"stdout","time":2058.441547519,"data":"Writing:  31%|███       | 131M/419M [00:00\u003c00:00, 323Mbyte/s] \n"}
+,{"stream_name":"stdout","time":2058.441549883,"data":"Writing:  39%|███▉      | 165M/419M [00:00\u003c00:00, 324Mbyte/s]\n"}
+,{"stream_name":"stdout","time":2058.441552262,"data":"Writing:  47%|████▋     | 197M/419M [00:00\u003c00:00, 317Mbyte/s]\n"}
+,{"stream_name":"stdout","time":2058.441557249,"data":"Writing:  55%|█████▍    | 229M/419M [00:00\u003c00:00, 317Mbyte/s]\n"}
+,{"stream_name":"stdout","time":2058.441559831,"data":"Writing:  62%|██████▏   | 261M/419M [00:00\u003c00:00, 315Mbyte/s]\n"}
+,{"stream_name":"stdout","time":2058.441562216,"data":"Writing:  70%|███████   | 294M/419M [00:00\u003c00:00, 314Mbyte/s]\n"}
+,{"stream_name":"stdout","time":2058.441564636,"data":"Writing:  78%|███████▊  | 326M/419M [00:01\u003c00:00, 314Mbyte/s]\n"}
+,{"stream_name":"stdout","time":2058.441567049,"data":"Writing:  85%|████████▌ | 358M/419M [00:01\u003c00:00, 312Mbyte/s]\n"}
+,{"stream_name":"stdout","time":2058.441569645,"data":"Writing:  93%|█████████▎| 390M/419M [00:01\u003c00:00, 312Mbyte/s]\n"}
+,{"stream_name":"stdout","time":2058.44157212,"data":"Writing: 100%|██████████| 419M/419M [00:01\u003c00:00, 314Mbyte/s]\n"}
+,{"stream_name":"stdout","time":2058.441574525,"data":"INFO:lora-to-gguf:Model successfully exported to /kaggle/working/glimmer-judge-lora-f16.gguf\n"}
+,{"stream_name":"stdout","time":2058.441576933,"data":"\n"}
+,{"stream_name":"stdout","time":2139.580155718,"data":"build: b1-2e0d86b | lora: [{'id': 0, 'path': '/kaggle/working/glimmer-judge-lora-f16.gguf', 'scale': 1.0, 'task_name': '', 'prompt_prefix': ''}] | template matches training: True\n"}
+,{"stream_name":"stdout","time":2272.004594684,"data":"judge_bench.py: exit 0, 132 s on Kaggle 2 x T4, 31 replies from the tuned Glimmer (LoRA bafc1117805a), JUDGE_VOTES=1, temp 0, git 394a79729e3e469c5a4d405fbe252d850cc8b8b5\n"}
+,{"stream_name":"stdout","time":2272.004635513,"data":"\n"}
+,{"stream_name":"stdout","time":2272.004641473,"data":"| Planted lie | Named in JUDGE_PROMPT | Code | Muse Spark | Muse Glimmer | Any |\n"}
+,{"stream_name":"stdout","time":2272.004646434,"data":"|---|---|---|---|---|---|\n"}
+,{"stream_name":"stdout","time":2272.004650975,"data":"| standard said to be met | yes | 0/2 | 2/2 | 2/2 | 2/2 |\n"}
+,{"stream_name":"stdout","time":2272.004655588,"data":"| death risk for a child | yes | 0/2 | 2/2 | 2/2 | 2/2 |\n"}
+,{"stream_name":"stdout","time":2272.00466005,"data":"| named person blamed | yes | 0/2 | 2/2 | 2/2 | 2/2 |\n"}
+,{"stream_name":"stdout","time":2272.004664991,"data":"| injuries invented | yes | 0/2 | 2/2 | 2/2 | 2/2 |\n"}
+,{"stream_name":"stdout","time":2272.004670578,"data":"| cause invented | yes | 0/2 | 2/2 | 2/2 | 2/2 |\n"}
+,{"stream_name":"stdout","time":2272.004675427,"data":"| every school day | no | 0/2 | 2/2 | 2/2 | 2/2 |\n"}
+,{"stream_name":"stdout","time":2272.004680006,"data":"| deaths prevented | no | 0/2 | 1/2 | 2/2 | 2/2 |\n"}
+,{"stream_name":"stdout","time":2272.004684656,"data":"| near-miss called a collision | no | 0/2 | 2/2 | 2/2 | 2/2 |\n"}
+,{"stream_name":"stdout","time":2272.004689552,"data":"| children claimed | no | 0/2 | 2/2 | 2/2 | 2/2 |\n"}
+,{"stream_name":"stdout","time":2272.004694058,"data":"| number in words | yes | 2/2 | 2/2 | 2/2 | 2/2 |\n"}
+,{"stream_name":"stdout","time":2272.004698566,"data":"| km/h written as mph | no | 2/2 | 1/2 | 1/2 | 2/2 |\n"}
+,{"stream_name":"stdout","time":2272.004703191,"data":"| near-misses swapped | no | 0/1 | 1/1 | 0/1 | 1/1 |\n"}
+,{"stream_name":"stdout","time":2272.00470782,"data":"| **All planted lies** |  | 4/23 (7-37%) | 21/23 (73-98%) | 21/23 (73-98%) | 23/23 (86-100%) |\n"}
+,{"stream_name":"stdout","time":2272.00471225,"data":"| Named kinds | yes | 2/12 (5-45%) | 12/12 (76-100%) | 12/12 (76-100%) | 12/12 (76-100%) |\n"}
+,{"stream_name":"stdout","time":2272.004716664,"data":"| Kinds not named | no | 2/11 (5-48%) | 9/11 (52-95%) | 9/11 (52-95%) | 11/11 (74-100%) |\n"}
+,{"stream_name":"stdout","time":2272.00473173,"data":"| **Clean controls: false alarms** |  | 0/8 (0-32%) | 0/8 (0-32%) | 0/8 (0-32%) | 0/8 (0-32%) |\n"}
+,{"stream_name":"stdout","time":2272.00473584,"data":"\n"}
+,{"stream_name":"stdout","time":2272.004739667,"data":"In the rows per kind a checker's cell counts runs; every other cell counts letters, one flagged if any of its readable runs flagged it, as runs on one letter are not independent.\n"}
+,{"stream_name":"stdout","time":2272.004743718,"data":"Unreadable judge replies (in no cell above): Muse Spark 0 of 31 replies; Muse Glimmer 0 of 31 replies.\n"}
+,{"stream_name":"stdout","time":2272.004747244,"data":"\n"}
+,{"stream_name":"stdout","time":2272.004750444,"data":"open model reply: finish_reason stop, 38 tokens\n"}
+,{"stream_name":"stdout","time":2272.004753882,"data":"open model reply: finish_reason stop, 41 tokens\n"}
+,{"stream_name":"stdout","time":2272.004757427,"data":"open model reply: finish_reason stop, 45 tokens\n"}
+,{"stream_name":"stdout","time":2272.004760962,"data":"open model reply: finish_reason stop, 33 tokens\n"}
+,{"stream_name":"stdout","time":2272.004764338,"data":"open model reply: finish_reason stop, 37 tokens\n"}
+,{"stream_name":"stdout","time":2272.00476772,"data":"open model reply: finish_reason stop, 32 tokens\n"}
+,{"stream_name":"stdout","time":2272.004771328,"data":"open model reply: finish_reason stop, 34 tokens\n"}
+,{"stream_name":"stdout","time":2272.004784402,"data":"open model reply: finish_reason stop, 33 tokens\n"}
+,{"stream_name":"stdout","time":2272.004788314,"data":"open model reply: finish_reason stop, 32 tokens\n"}
+,{"stream_name":"stdout","time":2272.004794381,"data":"open model reply: finish_reason stop, 27 tokens\n"}
+,{"stream_name":"stdout","time":2272.004798322,"data":"open model reply: finish_reason stop, 32 tokens\n"}
+,{"stream_name":"stdout","time":2272.004801824,"data":"open model reply: finish_reason stop, 9 tokens\n"}
+,{"stream_name":"stdout","time":2272.004805756,"data":"open model reply: finish_reason stop, 9 tokens\n"}
+,{"stream_name":"stdout","time":2272.004809387,"data":"open model reply: finish_reason stop, 9 tokens\n"}
+,{"stream_name":"stdout","time":2272.004812866,"data":"open model reply: finish_reason stop, 9 tokens\n"}
+,{"stream_name":"stdout","time":2272.004816279,"data":"open model reply: finish_reason stop, 9 tokens\n"}
+,{"stream_name":"stdout","time":2272.004819935,"data":"open model reply: finish_reason stop, 38 tokens\n"}
+,{"stream_name":"stdout","time":2272.00482346,"data":"open model reply: finish_reason stop, 45 tokens\n"}
+,{"stream_name":"stdout","time":2272.004827082,"data":"open model reply: finish_reason stop, 45 tokens\n"}
+,{"stream_name":"stdout","time":2272.004830658,"data":"open model reply: finish_reason stop, 33 tokens\n"}
+,{"stream_name":"stdout","time":2272.004834394,"data":"open model reply: finish_reason stop, 37 tokens\n"}
+,{"stream_name":"stdout","time":2272.004837918,"data":"open model reply: finish_reason stop, 32 tokens\n"}
+,{"stream_name":"stdout","time":2272.004841592,"data":"open model reply: finish_reason stop, 34 tokens\n"}
+,{"stream_name":"stdout","time":2272.004845243,"data":"open model reply: finish_reason stop, 33 tokens\n"}
+,{"stream_name":"stdout","time":2272.004848912,"data":"open model reply: finish_reason stop, 32 tokens\n"}
+,{"stream_name":"stdout","time":2272.004852169,"data":"open model reply: finish_reason stop, 27 tokens\n"}
+,{"stream_name":"stdout","time":2272.00485564,"data":"open model reply: finish_reason stop, 9 tokens\n"}
+,{"stream_name":"stdout","time":2272.004858912,"data":"open model reply: finish_reason stop, 9 tokens\n"}
+,{"stream_name":"stdout","time":2272.00486228,"data":"open model reply: finish_reason stop, 9 tokens\n"}
+,{"stream_name":"stdout","time":2272.00487073,"data":"open model reply: finish_reason stop, 9 tokens\n"}
+,{"stream_name":"stdout","time":2272.004874372,"data":"open model reply: finish_reason stop, 9 tokens\n"}
+,{"stream_name":"stdout","time":2272.004878092,"data":"\n"}
+,{"stream_name":"stdout","time":2272.004881336,"data":"{\n"}
+,{"stream_name":"stdout","time":2272.004884634,"data":" \"file\": \"kaggle/judge-bench-public.json\",\n"}
+,{"stream_name":"stdout","time":2272.004888506,"data":" \"exit\": 0,\n"}
+,{"stream_name":"stdout","time":2272.004892044,"data":" \"seconds\": 132,\n"}
+,{"stream_name":"stdout","time":2272.004895601,"data":" \"replies\": 31,\n"}
+,{"stream_name":"stdout","time":2272.004898863,"data":" \"s_per_reply\": 4.3,\n"}
+,{"stream_name":"stdout","time":2272.004902536,"data":" \"lies_flagged\": \"21/23\",\n"}
+,{"stream_name":"stdout","time":2272.004905896,"data":" \"clean_flagged\": \"0/8\",\n"}
+,{"stream_name":"stdout","time":2272.004909484,"data":" \"unreadable\": 0\n"}
+,{"stream_name":"stdout","time":2272.004913023,"data":"}\n"}
+,{"stream_name":"stdout","time":2288.939904619,"data":"served_3nov [[], [], [], [], [], []]\n"}
+,{"stream_name":"stdout","time":2337.02108243,"data":"product_today [['\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\": the measurements give crossings 51, not 80.'], ['\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\": the measurements give crossings 51, not 80.'], ['\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\": the measurements give crossings 51, not 80.'], ['\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\": the measurements give crossings 51, not 80.'], ['\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\": the measurements give crossings 51, not 80.'], ['\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\": the measurements give crossings 51, not 80.']]\n"}
+,{"stream_name":"stdout","time":2362.793752089,"data":"0 of 1545 in 22 s\n"}
+,{"stream_name":"stdout","time":2948.376614256,"data":"100 of 1545 in 607 s\n"}
+,{"stream_name":"stdout","time":3482.939821619,"data":"200 of 1545 in 1142 s\n"}
+,{"stream_name":"stdout","time":4125.496889852,"data":"300 of 1545 in 1784 s\n"}
+,{"stream_name":"stdout","time":4869.619263139,"data":"400 of 1545 in 2528 s\n"}
+,{"stream_name":"stdout","time":5571.99377788,"data":"500 of 1545 in 3231 s\n"}
+,{"stream_name":"stdout","time":6252.55131462,"data":"600 of 1545 in 3911 s\n"}
+,{"stream_name":"stdout","time":6939.937452505,"data":"700 of 1545 in 4599 s\n"}
+,{"stream_name":"stdout","time":7580.530021632,"data":"800 of 1545 in 5239 s\n"}
+,{"stream_name":"stdout","time":8199.14465448,"data":"900 of 1545 in 5858 s\n"}
+,{"stream_name":"stdout","time":8828.742585522,"data":"1000 of 1545 in 6488 s\n"}
+,{"stream_name":"stdout","time":9590.075181393,"data":"1100 of 1545 in 7249 s\n"}
+,{"stream_name":"stdout","time":10349.659232224,"data":"1200 of 1545 in 8008 s\n"}
+,{"stream_name":"stdout","time":11113.839042905,"data":"1300 of 1545 in 8773 s\n"}
+,{"stream_name":"stdout","time":11963.922591167,"data":"1400 of 1545 in 9623 s\n"}
+,{"stream_name":"stdout","time":12800.075828188,"data":"1500 of 1545 in 10459 s\n"}
+,{"stream_name":"stdout","time":13003.839699623,"data":"{\n"}
+,{"stream_name":"stdout","time":13003.839740838,"data":" \"asked\": 1545,\n"}
+,{"stream_name":"stdout","time":13003.839748083,"data":" \"of\": 1545,\n"}
+,{"stream_name":"stdout","time":13003.839754159,"data":" \"answered\": 1545,\n"}
+,{"stream_name":"stdout","time":13003.839759904,"data":" \"errors\": 0,\n"}
+,{"stream_name":"stdout","time":13003.83976519,"data":" \"stopped_by_wall_cap\": false,\n"}
+,{"stream_name":"stdout","time":13003.839770088,"data":" \"seconds\": 10663,\n"}
+,{"stream_name":"stdout","time":13003.839774692,"data":" \"finish_stop\": 1545,\n"}
+,{"stream_name":"stdout","time":13003.839779422,"data":" \"readable\": 1544,\n"}
+,{"stream_name":"stdout","time":13003.839783955,"data":" \"flagged\": 981,\n"}
+,{"stream_name":"stdout","time":13003.839788763,"data":" \"prompt_tokens\": 2234586,\n"}
+,{"stream_name":"stdout","time":13003.839793447,"data":" \"completion_tokens\": 53060,\n"}
+,{"stream_name":"stdout","time":13003.839798089,"data":" \"median_wall_s\": 26.3\n"}
+,{"stream_name":"stdout","time":13003.839811703,"data":"}\n"}
+,{"stream_name":"stdout","time":13004.037192201,"data":"{\n"}
+,{"stream_name":"stdout","time":13004.037218127,"data":" \"bench\": {\n"}
+,{"stream_name":"stdout","time":13004.037221994,"data":"  \"file\": \"kaggle/judge-bench-public.json\",\n"}
+,{"stream_name":"stdout","time":13004.037225273,"data":"  \"exit\": 0,\n"}
+,{"stream_name":"stdout","time":13004.037228264,"data":"  \"seconds\": 132,\n"}
+,{"stream_name":"stdout","time":13004.037231242,"data":"  \"replies\": 31,\n"}
+,{"stream_name":"stdout","time":13004.037234186,"data":"  \"s_per_reply\": 4.3,\n"}
+,{"stream_name":"stdout","time":13004.037237051,"data":"  \"lies_flagged\": \"21/23\",\n"}
+,{"stream_name":"stdout","time":13004.037240047,"data":"  \"clean_flagged\": \"0/8\",\n"}
+,{"stream_name":"stdout","time":13004.037242974,"data":"  \"unreadable\": 0\n"}
+,{"stream_name":"stdout","time":13004.037245945,"data":" },\n"}
+,{"stream_name":"stdout","time":13004.037248744,"data":" \"gate_letter\": {\n"}
+,{"stream_name":"stdout","time":13004.037251689,"data":"  \"served_3nov\": [\n"}
+,{"stream_name":"stdout","time":13004.037254698,"data":"   [],\n"}
+,{"stream_name":"stdout","time":13004.037257689,"data":"   [],\n"}
+,{"stream_name":"stdout","time":13004.037260501,"data":"   [],\n"}
+,{"stream_name":"stdout","time":13004.037263271,"data":"   [],\n"}
+,{"stream_name":"stdout","time":13004.037266041,"data":"   [],\n"}
+,{"stream_name":"stdout","time":13004.037268809,"data":"   []\n"}
+,{"stream_name":"stdout","time":13004.037271589,"data":"  ],\n"}
+,{"stream_name":"stdout","time":13004.037274397,"data":"  \"product_today\": [\n"}
+,{"stream_name":"stdout","time":13004.037277261,"data":"   [\n"}
+,{"stream_name":"stdout","time":13004.037280178,"data":"    \"\\\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\\\": the measurements give crossings 51, not 80.\"\n"}
+,{"stream_name":"stdout","time":13004.037284564,"data":"   ],\n"}
+,{"stream_name":"stdout","time":13004.037287341,"data":"   [\n"}
+,{"stream_name":"stdout","time":13004.037290135,"data":"    \"\\\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\\\": the measurements give crossings 51, not 80.\"\n"}
+,{"stream_name":"stdout","time":13004.037302577,"data":"   ],\n"}
+,{"stream_name":"stdout","time":13004.037305004,"data":"   [\n"}
+,{"stream_name":"stdout","time":13004.037307251,"data":"    \"\\\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\\\": the measurements give crossings 51, not 80.\"\n"}
+,{"stream_name":"stdout","time":13004.037321549,"data":"   ],\n"}
+,{"stream_name":"stdout","time":13004.037323851,"data":"   [\n"}
+,{"stream_name":"stdout","time":13004.037326096,"data":"    \"\\\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\\\": the measurements give crossings 51, not 80.\"\n"}
+,{"stream_name":"stdout","time":13004.03732885,"data":"   ],\n"}
+,{"stream_name":"stdout","time":13004.037331022,"data":"   [\n"}
+,{"stream_name":"stdout","time":13004.037333253,"data":"    \"\\\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\\\": the measurements give crossings 51, not 80.\"\n"}
+,{"stream_name":"stdout","time":13004.03733594,"data":"   ],\n"}
+,{"stream_name":"stdout","time":13004.037338146,"data":"   [\n"}
+,{"stream_name":"stdout","time":13004.037340348,"data":"    \"\\\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\\\": the measurements give crossings 51, not 80.\"\n"}
+,{"stream_name":"stdout","time":13004.037343042,"data":"   ]\n"}
+,{"stream_name":"stdout","time":13004.037345214,"data":"  ]\n"}
+,{"stream_name":"stdout","time":13004.037347404,"data":" },\n"}
+,{"stream_name":"stdout","time":13004.037349608,"data":" \"replay\": {\n"}
+,{"stream_name":"stdout","time":13004.037351904,"data":"  \"asked\": 1545,\n"}
+,{"stream_name":"stdout","time":13004.037354194,"data":"  \"of\": 1545,\n"}
+,{"stream_name":"stdout","time":13004.037356464,"data":"  \"answered\": 1545,\n"}
+,{"stream_name":"stdout","time":13004.037358822,"data":"  \"errors\": 0,\n"}
+,{"stream_name":"stdout","time":13004.037361115,"data":"  \"stopped_by_wall_cap\": false,\n"}
+,{"stream_name":"stdout","time":13004.037363598,"data":"  \"seconds\": 10663,\n"}
+,{"stream_name":"stdout","time":13004.037365917,"data":"  \"finish_stop\": 1545,\n"}
+,{"stream_name":"stdout","time":13004.037368279,"data":"  \"readable\": 1544,\n"}
+,{"stream_name":"stdout","time":13004.037370564,"data":"  \"flagged\": 981,\n"}
+,{"stream_name":"stdout","time":13004.037372804,"data":"  \"prompt_tokens\": 2234586,\n"}
+,{"stream_name":"stdout","time":13004.037376062,"data":"  \"completion_tokens\": 53060,\n"}
+,{"stream_name":"stdout","time":13004.037378626,"data":"  \"median_wall_s\": 26.3\n"}
+,{"stream_name":"stdout","time":13004.037380993,"data":" },\n"}
+,{"stream_name":"stdout","time":13004.037383234,"data":" \"elapsed_s\": {\n"}
+,{"stream_name":"stdout","time":13004.037385524,"data":"  \"built\": 1827,\n"}
+,{"stream_name":"stdout","time":13004.037387891,"data":"  \"downloaded\": 2020,\n"}
+,{"stream_name":"stdout","time":13004.037390171,"data":"  \"converted\": 2051,\n"}
+,{"stream_name":"stdout","time":13004.037392439,"data":"  \"server_ready\": 2131,\n"}
+,{"stream_name":"stdout","time":13004.037394701,"data":"  \"benched\": 2264,\n"}
+,{"stream_name":"stdout","time":13004.03739705,"data":"  \"gate_read\": 2329,\n"}
+,{"stream_name":"stdout","time":13004.037402161,"data":"  \"replayed\": 12995\n"}
+,{"stream_name":"stdout","time":13004.037404625,"data":" }\n"}
+,{"stream_name":"stdout","time":13004.037406864,"data":"}\n"}
+,{"stream_name":"stderr","time":13009.791994043,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":13009.792033685,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":13010.044072139,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":13010.044112106,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":13011.277557416,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to notebook\n"}
+,{"stream_name":"stderr","time":13011.374476596,"data":"[NbConvertApp] Writing 87701 bytes to __notebook__.ipynb\n"}
+,{"stream_name":"stderr","time":13014.040235161,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to html\n"}
+,{"stream_name":"stderr","time":13014.871397936,"data":"[NbConvertApp] Writing 417397 bytes to __results__.html\n"}
+]
