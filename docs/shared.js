@@ -32,6 +32,8 @@
 
   // Motion: drifting light, scroll progress, words of the title rise, blocks fade up as they enter
   document.body.insertAdjacentHTML("afterbegin", '<div id="cw-progress"></div><div class="cw-glow a"></div><div class="cw-glow b"></div>');
+  // the Meta models this page runs on (nominative: Meta's mark beside the models' names, linked to the table)
+  document.body.insertAdjacentHTML("beforeend", '<p style="text-align:center;margin:28px 0 22px"><a class="cw-meta" href="https://github.com/shaunmortal/crossing-watch#-seven-meta-models-each-doing-real-work" style="display:inline-block;margin:6px 0"><img src="https://img.shields.io/badge/Built%20with-Meta%20AI%20models-0467DF?style=flat&logo=meta&logoColor=white" alt="Built with Meta AI models: SAM 3.1, Muse Spark, Muse Image, Muse Wonder, Muse Voice Transcribe, Muse Glimmer, Muse Spark Open" height="20" style="height:20px;vertical-align:middle"></a></p>');
   const bar = document.getElementById("cw-progress");
   addEventListener("scroll", () => { const h = document.documentElement; bar.style.width = (100 * h.scrollTop / Math.max(1, h.scrollHeight - innerHeight)) + "%"; }, { passive: true });
   const riseTitle = () => document.querySelectorAll("h1").forEach((h1) => {
