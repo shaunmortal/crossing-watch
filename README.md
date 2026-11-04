@@ -5,58 +5,31 @@
 # 🚸 Crossing Watch
 
 ### One phone video in. Proof the road authority can act on, out.
-**सड़क का ख़तरा · नाप के · सबूत के साथ**
 
-**English** · [हिंदी](https://crossingwatch.xyz/?lang=hi) · the home page, App, Explorer and Manual have a हिंदी / English switch
+**75 alarms → 5 real near-misses** · closest **0.0 s, 0.42 m apart** · tape **15 m**, video **15.0 m** · our college **certified the report genuine**
 
-<a href="docs/evidence/event1.mp4"><img src="docs/readme/nearmiss.gif" width="100%" alt="Real footage from our college gate, faces and plates blurred: SAM 3.1 tracks a person (cyan) and a motorcycle (red) reaching the same spot"></a>
-<p><b>Real footage from our college gate, faces blurred.</b> A person (cyan) and a motorcycle (red) reach the same spot at the same instant: post-encroachment time <b>0.0 s</b>, motorcycle at <b>18.7 km/h</b>.</p>
+<a href="https://youtu.be/mp9p4P14XfE"><img src="docs/readme/video-thumb.jpg" width="100%" alt="Watch the 2:42 demo: real footage of our college gate, a person and a motorcycle 0.42 m apart at the same instant"></a>
 
-<a href="https://youtu.be/mp9p4P14XfE"><img src="docs/readme/video-thumb.jpg" width="100%" alt="Demo video, 2:42: real footage of our college gate, a person and a motorcycle 0.42 m apart at the same instant"></a>
+<b><a href="https://youtu.be/mp9p4P14XfE">▶ Watch the demo (2:42)</a></b> · <a href="https://crossingwatch.xyz/explorer/">Live Explorer</a> · <a href="https://crossingwatch.xyz/app/">App</a> · <a href="JUDGES.md">Judges: 5-minute map</a> · <a href="OPEN_WEIGHTS.md">Open weights</a> · <a href="https://crossingwatch.xyz/?lang=hi">हिंदी</a>
 
-<b>▶ <a href="https://youtu.be/mp9p4P14XfE">Demo video (2:42)</a></b>
+<img src="https://img.shields.io/badge/Meta-SAM%203.1-0467DF?style=flat&logo=meta&logoColor=white" alt="Meta: SAM 3.1"> <img src="https://img.shields.io/badge/Meta-Muse%20Spark-0467DF?style=flat&logo=meta&logoColor=white" alt="Meta: Muse Spark"> <img src="https://img.shields.io/badge/Meta-Muse%20Image-0467DF?style=flat&logo=meta&logoColor=white" alt="Meta: Muse Image"> <img src="https://img.shields.io/badge/Meta-Muse%20Wonder-0467DF?style=flat&logo=meta&logoColor=white" alt="Meta: Muse Wonder"> <img src="https://img.shields.io/badge/Meta-Muse%20Voice%20Transcribe-0467DF?style=flat&logo=meta&logoColor=white" alt="Meta: Muse Voice Transcribe"> <img src="https://img.shields.io/badge/open%20weights-Muse%20Glimmer%2030B-2fa36b?style=flat&logo=meta&logoColor=white" alt="open weights: Muse Glimmer 30B"> <img src="https://img.shields.io/badge/open%20weights-Muse%20Spark%20Open-2fa36b?style=flat&logo=meta&logoColor=white" alt="open weights: Muse Spark Open">
 
-Near-miss evidence for a dangerous school or college crossing. **Meta SAM 3.1** tracks people and vehicles,<br>
-code measures each near-miss in road metres, and **Muse Spark** writes a letter whose every number is checked.
-
-**Seven Meta models:** SAM 3.1 · Muse Spark · Muse Image · Muse Wonder · Muse Voice Transcribe · Muse Glimmer 30B (open weights, fine-tuned by us) · Muse Spark Open (open weights) · [what each one does](#-seven-meta-models-each-doing-real-work)
-
-<a href="https://crossingwatch.xyz"><img src="https://img.shields.io/badge/Website-crossingwatch.xyz-f5a623?style=for-the-badge&labelColor=121314&logo=googlechrome&logoColor=white" alt="Website: crossingwatch.xyz"></a> <a href="https://crossingwatch.xyz/app/"><img src="https://img.shields.io/badge/App-4%20steps-e5482f?style=for-the-badge&labelColor=121314&logo=googlechrome&logoColor=white" alt="App: 4 steps"></a> <a href="https://crossingwatch.xyz/explorer/"><img src="https://img.shields.io/badge/Live%20explorer-try%20it-f5a623?style=for-the-badge&labelColor=121314&logo=googlechrome&logoColor=white" alt="Live explorer: try it"></a> <a href="JUDGES.md"><img src="https://img.shields.io/badge/Judges-5--minute%20map-2fa36b?style=for-the-badge&labelColor=121314&logo=readthedocs&logoColor=white" alt="Judges: 5-minute map"></a>
-
-<img src="docs/readme/card-hackathon.svg" height="76" alt="Meta Global AI Developer Hackathon 2026, Indie track entry"> <a href="OPEN_WEIGHTS.md"><img src="docs/readme/card-openweights.svg" height="76" alt="Open weights: Muse Glimmer 30B fine-tuned, served, 3 blind-test wins on planted errors"></a> <a href="TECHNICAL.md#end-to-end-against-ground-truth-dut"><img src="docs/readme/card-truth.svg" height="76" alt="Drone ground truth: 47 of 52 near-misses found"></a>
-
-<table>
-<tr>
-<td align="center" width="33%">
-
-### 📱 1. Film
-One phone over the road, a tape measure and 8 bright markers (A4 paper works): 4 corners and a 15 m check line.
-
-</td>
-<td align="center" width="33%">
-
-### 📏 2. Measure
-SAM 3.1 tracks people and vehicles; code turns pixels into road metres and measures each near-miss.
-
-</td>
-<td align="center" width="33%">
-
-### 📄 3. Prove
-Muse Spark writes the letter; code and two AI reviewers check it; the college certifies the report is genuine.
-
-</td>
-</tr>
-</table>
 
 | Judging | Where to look |
 |---|---|
-| **Impact** | A real gate and a real near-miss: **0.0 s**, **0.42 m** apart. Our college certified the report genuine. Any school can repeat it with the [Manual](https://crossingwatch.xyz/manual/) |
-| **Meta AI tooling** | Seven Meta models, one job each ([table](#-seven-meta-models-each-doing-real-work)); Muse Spark's agent asks a person for a tape check; SAM 3.1 also finds plates to hide |
-| **Technical depth** | Tape 15 m vs video **15.0 m**; drone ground truth **47 of 52**; [pre-registered blind tests on planted errors](OPEN_WEIGHTS.md); 242 self-checks |
-| **Demo** | The [video](#-demo), the [Live Explorer](https://crossingwatch.xyz/explorer/), the [live run's full log](provenance/live-run-2026-11-03/README.md) |
+| **Impact** | A real gate, real near-misses: closest **0.0 s, 0.42 m apart**. Our college certified the report genuine (3 Nov 2026). Any school can repeat it with the [Manual](https://crossingwatch.xyz/manual/), for about **$12** of SAM for our 8.6-minute video against about **C$5,000** an intersection for a funded near-miss study |
+| **Meta AI tooling** | Seven Meta models, one job each ([table](#-seven-meta-models-each-doing-real-work)): **SAM 3.1** tracks and finds plates to hide; **Muse Spark** sets aside 66 of 75 alarms, runs the case agent and writes the letter; **Muse Image** draws the fix; **Muse Wonder** hears the horns; **Muse Voice Transcribe** finds speech to silence; **Muse Glimmer 30B** (LoRA-tuned by us) and **Muse Spark Open** run every reasoning step of the case on open weights |
+| **Technical depth** | Tape 15 m vs video **15.0 m**, on a line the maths never used; drone ground truth **47 of 52**; [3 pre-registered blind-test wins](OPEN_WEIGHTS.md); **242** self-checks |
+| **Demo** | The [2:42 video](https://youtu.be/mp9p4P14XfE); the [Live Explorer](https://crossingwatch.xyz/explorer/): switch Muse Spark's review off and on and watch 75 alarms become 5; the [live run's full log](provenance/live-run-2026-11-03/README.md) |
+| **Open Weights** | Every reasoning step of our gate case on open weights, same 5 near-misses and 51 people ([run](provenance/open-gate-2026-11-04/README.md)); our LoRA-tuned Glimmer judge beats Muse Spark Open on Kaggle's free 2 x T4, **81 vs 49, p 0.006** ([one page](OPEN_WEIGHTS.md)) |
+| **Agentic** | The case agent works 5 tools, stops to ask a person for a tape measure, and refuses the letter until video and tape agree ([log](provenance/gate-agent-2026-11-02/agent_log.jsonl), [replay](https://crossingwatch.xyz/app/#s3)) |
+| **Creative** | Muse Image paints the zebra only inside the strip where people were measured crossing; Muse Wonder times the horns ([the fix](docs/story/09-fix.jpg)) |
+
+**सड़क का ख़तरा · नाप के · सबूत के साथ**
 
 <i>Everything here was built during the hackathon, from 28 Oct 2026, on Meta's models; the one ported piece is Meta's SAM mask decoder ([declarations](#declarations)). Built with Muse Spark Open.</i>
 
+</div>
 </div>
 
 ---
@@ -74,6 +47,9 @@ crossing at its gate, and only the road authority can build one. The authority a
 phone video into that proof:** measured near-misses, blurred clips, and a letter the head of the college can sign.
 
 ## 📊 Results on our gate
+
+<a href="docs/evidence/event1.mp4"><img src="docs/readme/nearmiss.gif" width="100%" alt="Real footage from our college gate, faces and plates blurred: SAM 3.1 tracks a person (cyan) and a motorcycle (red) reaching the same spot"></a>
+<p><b>Real footage from our college gate, faces blurred.</b> A person (cyan) and a motorcycle (red) reach the same spot at the same instant: post-encroachment time <b>0.0 s</b>, motorcycle at <b>18.7 km/h</b>.</p>
 
 <i>LNCT Excellence main gate, Bhopal (service road below NH 146) · Mon 2 Nov 2026, afternoon dismissal · one phone, 8.3 m up</i>
 
