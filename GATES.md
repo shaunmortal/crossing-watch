@@ -1176,6 +1176,28 @@ certified letter stays as written.
   sha256 `bafc1117805a6918659d7c821e3c8e4ad2f809438e4aed3b04e44053958edd66`. Re-score at $0:
   `python3 provenance/glimmer-judge-lora-v6/kaggle/score_kaggle.py provenance/glimmer-judge-lora-v6/kaggle/predictions_kaggle.jsonl`.
 
+## Base Glimmer against the tuned judge (pre-registered Wed 4 Nov 2026, 20:13 IST, before the deployment is created)
+
+- **Question.** Does our LoRA make Muse Glimmer 30B a better judge, or only a shorter one? The v6 result says base
+  Glimmer finished 0 of 1,545 verdicts under the training session's 256-token cap; this run gives the base model
+  room to finish.
+- **Run.** Base `accounts/fireworks/models/muse-glimmer-30b` on a Fireworks on-demand deployment (1 x H200, BF16,
+  $8 per GPU-hour, 2-hour expiry, deleted at the end). Each v6 holdout prompt as the training session sampled it
+  (one user message), temperature 0, `max_tokens` 8,192, JSON mode (`response_format` json_object) so a finished
+  verdict is readable, the model's default reasoning. Rows are asked in a seeded shuffle (seed 20261104, 16 at a
+  time) and the run stops after 70 minutes; every row with a reply is scored, as v6 scored a wall-capped replay.
+  A reply that is not JSON with a `problems` list (including one cut off by the cap) counts as "no problem found",
+  as in v6. Script: `replay_base.py`, committed with the replies.
+- **Scoring.** `labels-frozen.json`, the same rows and rule as v6; head-to-head exact two-sided sign test, tuned
+  (the served v6 replies, `live/predictions_served.jsonl`) against base on the rows base answered; the same against
+  Muse Spark Open and Muse Spark on those rows. Also reported: base right / rows scored, tokens and wall time per
+  verdict for both, and the deployment's cost.
+- **What each outcome means, fixed now.** Tuned ahead, p < 0.05: the LoRA adds accuracy, not only brevity. No
+  significant difference: the LoRA keeps the accuracy at about 34 output tokens a verdict instead of the base
+  model's count, which is the cost and latency result. Base ahead, p < 0.05: reported as it is; the LoRA is then a
+  format and cost adapter and OPEN_WEIGHTS.md says so. None of these changes the three blind-test results against
+  Muse Spark Open, which stand as recorded.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
@@ -1200,3 +1222,5 @@ certified letter stays as written.
 - Wed 4 Nov 2026, 15:40 IST: four times written on Mon 2 Nov were set to the commit times git shows for them ("Last
   updated" 20:15 -> 18:57; the recording note 18:00 -> 17:53; the two by-eye notes 19:10 -> 18:40 and 19:40 -> 18:45).
   Each was written before or at its commit; no pre-registered text changed.
+- Wed 4 Nov 2026, 20:13 IST: a pre-registration for the base-Glimmer run added above, before its deployment was
+  created. No pre-registered text changed.
