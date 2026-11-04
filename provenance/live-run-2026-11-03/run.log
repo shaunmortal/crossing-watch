@@ -1,0 +1,62 @@
+20:47:09 $ python3 -u analyze.py $FOOTAGE/gate-stable.mp4 sites/site-live.json --out out/live-demo --budget 0
+20:47:09 warning: sites/site-live.json: window_s is 15 s; under 15 minutes the page gives no hourly rates, PV² or school-year line
+20:47:11 recorded 2026-11-02 15:32:51 IST
+20:47:14 auto mode may add up to $0.19 of SAM images (person frame by frame); the run stops before sending them if they would pass the $0.00 cap
+20:47:14 0.2 min of video, 1 part(s), 5 SAM video request(s), 0 image request(s); SAM cost about $0.15
+20:47:14 estimated SAM cost $0.15 is over the $0.00 this run may still spend; pass a larger --budget USD (without one the cap is $10, lifted by --allow-cost). Replies already received are cached and not paid for again
+20:47:24 $ python3 -u analyze.py $FOOTAGE/gate-stable.mp4 sites/site-live.json --out out/live-demo --budget 1
+20:47:24 warning: sites/site-live.json: window_s is 15 s; under 15 minutes the page gives no hourly rates, PV² or school-year line
+20:47:26 recorded 2026-11-02 15:32:51 IST
+20:47:26 auto mode may add up to $0.19 of SAM images (person frame by frame); the run stops before sending them if they would pass the $1.00 cap
+20:47:26 0.2 min of video, 1 part(s), 5 SAM video request(s), 0 image request(s); SAM cost about $0.15
+20:47:44 auto mode: person: 16 objects taken within 0.0 s in 1 of 1 part, so frame-by-frame was used
+20:47:44 0.2 min of video, 1 part(s), 0 SAM video request(s), 75 image request(s); SAM cost about $0.19
+20:48:14 Muse Spark: track c15/0 removed: rider, bike box under them ("The boxed person is sitting on an...")
+20:48:17 Spark verdicts reused: 0 of 2
+20:48:17 checked by eye, not pedestrians: c116/0
+20:48:23 evidence clip 1 of 3 written
+20:48:29 evidence clip 2 of 3 written
+20:48:37 evidence clip 3 of 3 written
+20:48:37 0.2 min, 5 crossings, 3 moving vehicles, 85th-percentile speed 19.8 km/h; 3 serious near-misses (PET < 1.5 s), 1 close passes (< 3.0 s)
+20:48:37   [serious] person c15/0 / motorcycle#5: PET 0.0 s, 0.16 m, 17.1 km/h (adult death risk if hit 0.5%; at a 20 km/h limit 17.1 km/h, 0.5%), at 11.7 s  [Spark: rider]
+20:48:37   [serious] person c23/0 / motorcycle#1: PET 0.0 s, 0.52 m, 18.7 km/h (adult death risk if hit 0.5%; at a 20 km/h limit 18.7 km/h, 0.5%), at 7.0 s  [Spark: adult]
+20:48:37   [serious] person c23/0 / motorcycle#5: PET 0.9 s, 0.77 m, 18.3 km/h (adult death risk if hit 0.5%; at a 20 km/h limit 18.3 km/h, 0.5%), at 10.6 s  [Spark: adult]
+20:48:37   [close pass] person c23/0 / motorcycle#4: PET 2.0 s, 0.94 m, 14.4 km/h (adult death risk if hit 0.0%; at a 20 km/h limit 0.0 km/h, 0.0%), at 9.6 s  [Spark: adult]
+20:48:44 $ python3 -u pack.py out/live-demo sites/site-live.json
+20:49:36 fix drawn inside the band; outside it Muse Image's picture matches the photo at SSIM 0.65
+20:49:36 wrote out/live-demo/index.html: 2 serious, 1 close passes, fix: raised zebra crossing
+20:50:18 $ grep -o 'Receipt:[^<]*' out/live-demo/index.html; for f in out/live-demo/letter-provenance.json out/live-demo/person-*.json out/live-demo/event*-heard.json; do echo "== $f"; cat "$f"; echo; done
+20:50:18 Receipt: the analysis ran 1.2 minutes and sent 80 new SAM requests; Muse Spark looked at 2 people; Muse Wonder listened around 3 near-misses; Muse Spark wrote the letter in 1 try; Muse Image drew 1 picture; the largest camera shift was 0 px (of 640), at 7:45. Dollar costs on this page are for SAM only.
+20:50:18 == out/live-demo/letter-provenance.json
+20:50:18 {
+20:50:18  "model": "muse-spark-1.3",
+20:50:18  "host": "api.meta.ai",
+20:50:18  "request_id": "resp_6ae9fb6e852673df7a114a01",
+20:50:18  "usage": {
+20:50:18   "input_tokens": 1636,
+20:50:18   "input_tokens_details": {
+20:50:18    "cached_tokens": 0
+20:50:18   },
+20:50:18   "output_tokens": 3442,
+20:50:18   "output_tokens_details": {
+20:50:18    "reasoning_tokens": 2795
+20:50:18   },
+20:50:18   "total_tokens": 5078
+20:50:18  },
+20:50:18  "wall_s": 26.5,
+20:50:18  "timings": null,
+20:50:18  "response_format": "json_object",
+20:50:18  "tries": 1,
+20:50:18  "judged_by": "Muse Spark (a separate reviewer)",
+20:50:18  "letter_sha256": "825a613a4dae2a4447a6a2c1fff8aeb6e7e1bbd388b448fcee064cfc10e45581"
+20:50:18 }
+20:50:18 == out/live-demo/person-c15-0.json
+20:50:18 {"inputs_sha256": "d27f0161573aabdce65dcd3455a996243319c39ee1ca79113bd84b10359b4733", "reply": "{\"cyan_is_a_pedestrian\": false, \"road_user\": \"rider\", \"reason\": \"The boxed person is sitting on and operating a red motorcycle.\"}"}
+20:50:18 == out/live-demo/person-c23-0.json
+20:50:18 {"inputs_sha256": "c555af2e8fcb2549d78f454192eb78cb24a20355251c5362e22efeca02b70bc5", "reply": "{\"cyan_is_a_pedestrian\": true, \"road_user\": \"adult\", \"reason\": \"A man in white shirt is walking on foot across the road with clear stride posture.\"}"}
+20:50:18 == out/live-demo/event1-heard.json
+20:50:18 {"inputs_sha256": "55b1958ab3ea9c606f54ddcdeb5c91e0095f76b1de0da8bdac182800fa122e33", "reply": "{\"sounds\": [{\"t_s\": 4.6, \"sound\": \"horn\"}]}"}
+20:50:18 == out/live-demo/event2-heard.json
+20:50:18 {"inputs_sha256": "24ff92bc0ed5227163e73caf97697ed983d770e5171b157a93ed1ebd618c44b6", "reply": "{\"sounds\": []}"}
+20:50:18 == out/live-demo/event3-heard.json
+20:50:18 {"inputs_sha256": "93331e2e0dcaf8be01e188303c1477a32d1b4aea3579354ddf805cc2764eb6fc", "reply": "{\"sounds\": []}"}

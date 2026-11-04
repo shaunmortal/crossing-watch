@@ -1,0 +1,4 @@
+python3 -u analyze.py $FOOTAGE/gate-stable.mp4 sites/site-live.json --out out/live-demo --budget 0
+python3 -u analyze.py $FOOTAGE/gate-stable.mp4 sites/site-live.json --out out/live-demo --budget 1
+python3 -u pack.py out/live-demo sites/site-live.json
+grep -o 'Receipt:[^<]*' out/live-demo/index.html; for f in out/live-demo/letter-provenance.json out/live-demo/person-*.json out/live-demo/event*-heard.json; do echo "== $f"; cat "$f"; echo; done
