@@ -1,0 +1,16 @@
+name: checks
+on: [push, pull_request]
+jobs:
+  self-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: ffmpeg 7.1 or newer (Ubuntu's 6.1 lacks the scale filter's out_transfer)
+        run: |
+          curl -sSL -o ff.tar.xz https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz
+          tar -xf ff.tar.xz && sudo cp ffmpeg-master-latest-linux64-gpl/bin/ffmpeg ffmpeg-master-latest-linux64-gpl/bin/ffprobe /usr/local/bin/
+          ffmpeg -version | head -1
+      - run: python3 test_cw.py
