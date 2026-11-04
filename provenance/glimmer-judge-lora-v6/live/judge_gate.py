@@ -15,10 +15,11 @@ sys.path.insert(0, str(CW))
 import pack  # noqa: E402
 
 URL = "https://api.fireworks.ai/inference/v1/chat/completions"
+MAX_TOKENS = int(os.environ.get("JUDGE_MAX_TOKENS", "400"))  # 400 for the tuned judge; Spark Open's run used 6000
 
 
 def ask(model, prompt, schema):
-    body = {"model": model, "temperature": 0, "max_tokens": 400, "messages": [{"role": "user", "content": prompt}]}
+    body = {"model": model, "temperature": 0, "max_tokens": MAX_TOKENS, "messages": [{"role": "user", "content": prompt}]}
     if schema:
         body["response_format"] = {"type": "json_schema", "json_schema": {"name": "problems", "schema": pack.PROBLEMS_SCHEMA}}
     req = urllib.request.Request(URL, json.dumps(body).encode(), {"Content-Type": "application/json",

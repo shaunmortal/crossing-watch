@@ -1,6 +1,6 @@
 #!/bin/zsh
-# Serve the v6 adapter once on 1 x H200 (BF16, live merge; $8/GPU-hour, billed per second), replay all 1,545 v6
-# holdout prompts through it, run the public bench through the product's own judge path, then ALWAYS delete it.
+# Serve the v6 adapter once on 1 x H200 (BF16, live merge; $8/GPU-hour, billed per second), have it judge our real
+# gate letter 6 times (judge_gate.py), then ALWAYS delete it.
 # Needs a payment method on the Fireworks account. Run only with Ayush's approval for this spend.
 CW=$(git rev-parse --show-toplevel)
 D=${CW_DEPLOY_DIR:?set CW_DEPLOY_DIR to a scratch folder}
