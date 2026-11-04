@@ -22,11 +22,11 @@ Each claim links to its proof.
    sample/site.json`, then open `sample/index.html`: the measurements page built offline from a synthetic sample.
    Without a key it has no letter ("letter failed" is expected); the sample's letter is in
    `provenance/spark-open-sample-letter.txt`.
-2. Read [kaggle/open-weights.md, v4](kaggle/open-weights.md#v4-1016-blind-rows-pre-registered-against-both-muse-judges):
-   our fine-tuned open-weights judge against both Muse models in a blind test on planted errors (1,016 rows).
+2. Read [OPEN_WEIGHTS.md](OPEN_WEIGHTS.md): our fine-tuned open-weights judge against both Muse models in four
+   pre-registered blind tests on planted errors, and the same judge on Kaggle's free 2 x T4.
 3. Read [GATES.md, Verdict now](GATES.md#verdict-now): what was pre-registered, what passed, what has not run.
 4. Read [TECHNICAL, Limits, stated](TECHNICAL.md#limits-stated) and the known limits below.
-5. Watch the demo: GATE-TBD (the 2:53 video link). Our gate's evidence page: [crossingwatch.xyz/evidence](https://crossingwatch.xyz/evidence/).
+5. Watch the demo: GATE-TBD (the 2:42 video link). Our gate's evidence page: [crossingwatch.xyz/evidence](https://crossingwatch.xyz/evidence/).
 
 ## Impact
 
@@ -42,7 +42,7 @@ Each claim links to its proof.
 ## Demo
 
 - Today, at $0: `python3 pack.py sample sample/site.json` builds the page offline (no key, no video).
-- **Evidence page:** [crossingwatch.xyz/evidence](https://crossingwatch.xyz/evidence/), from Monday's footage. Demo video: GATE-TBD (2:53). Live run in the video, full log: [provenance/live-run-2026-11-03](provenance/live-run-2026-11-03/README.md).
+- **Evidence page:** [crossingwatch.xyz/evidence](https://crossingwatch.xyz/evidence/), from Monday's footage. Demo video: GATE-TBD (2:42). Live run in the video, full log: [provenance/live-run-2026-11-03](provenance/live-run-2026-11-03/README.md).
 
 ## Depth
 
@@ -67,13 +67,13 @@ Each claim links to its proof.
 ## Open Weights bonus
 
 - One page for the review, with $0 checks: [OPEN_WEIGHTS.md](OPEN_WEIGHTS.md).
-- Every language and vision step of our gate case on open weights (Spark Open review, agent and letter; our tuned Glimmer reviewer): [run](provenance/open-gate-2026-11-04/README.md). SAM 3.1 tracking, Muse Wonder and Muse Image are not open weights. Glimmer 30B as the crop reviewer: the same keep/remove call as Muse Spark on all 32 people at our gate ([review](provenance/glimmer-vision-review-2026-11-04/README.md)).
+- Every reasoning step of our gate case on open weights (Spark Open review, agent and letter; our tuned Glimmer reviewer): [run](provenance/open-gate-2026-11-04/README.md). SAM 3.1 tracking and Muse Wonder were reused from the hosted run, and Muse Image was not called. Glimmer 30B as the crop reviewer: the same keep/remove call as Muse Spark on all 32 people at our gate ([review](provenance/glimmer-vision-review-2026-11-04/README.md)).
 
 - Fine-tuned Muse Glimmer judge (LoRA, training $0), pre-registered blind tests on planted errors, labels frozen before any tuned reply
   was read. **v4, 1,016 rows from 260 synthetic letters: 998 right vs Muse Spark Open 980 (28 vs 10, p 0.0051)**,
   mostly lies Spark Open missed; clean rows flagged 5/491 vs Spark Open 4/491. In-distribution letters only.
 - Against Muse Spark: ahead in v4 only through a prompt ambiguity; with the prompt fixed, Muse Spark wins v5 (p 0.043)
-  and v6 (p 0.023), though v6 beats it on model-written slips. Full record: [open-weights.md](kaggle/open-weights.md). Labels were
+  and v6 (p 0.023 for tuned + code check; p 0.011 tuned alone), though v6 beats it on model-written slips. Full record: [open-weights.md](kaggle/open-weights.md). Labels were
   adjudicated by an AI agent, blind to the tuned replies. [GATES.md v3 and v4 results](GATES.md); replies and frozen labels: `provenance/glimmer-judge-lora-v3/` and `-v4/`;
   re-score: `python3 judge_v3_score.py v4`.
 - Muse Glimmer 30B self-hosted on Kaggle's free 2 x T4 from sha256-checked weights wrote a letter for our real gate in
