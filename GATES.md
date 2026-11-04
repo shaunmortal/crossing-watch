@@ -1240,6 +1240,20 @@ certified letter stays as written.
   result is reported here with every reply and request id; the three blind-test results stand as recorded.
 - **Cost cap:** the deployment is deleted at the end (2-hour expiry as a backstop); at most about $20.
 
+## The tuned judge on SummEdits: result (Thu 5 Nov 2026, run 00:08-00:19 IST)
+
+- **Run as pre-registered.** Deployment `cw-judge-summedits` (1 x H200) created 00:08 IST, ready 00:10, deleted 00:12:
+  about 4 GPU-minutes. Both judges answered all 400 test rows; no reply was unreadable.
+- **Outcome by the pre-registered rule: not met.** The tuned judge was right on **340** of 400, Muse Spark Open on
+  **322** (balanced accuracy 85.0% vs 80.5%). Head to head **50 vs 32**, exact sign test **p 0.060**, so the bar of
+  p < 0.05 is missed. The tuned judge is ahead in 8 of the 10 domains, level in 1 and one row behind in 1.
+- **Reading.** On public, human-labelled data from domains it never saw (news, bills, earnings calls, meetings,
+  podcasts, sales calls and emails, chats, science abstracts, Shakespeare), the judge trained only on our road-safety
+  letters stays ahead of Muse Spark Open, at a median of 9 output tokens and 1.6 s a verdict against 554 tokens and
+  21 s, but the margin is not significant at the level set beforehand.
+- **Files:** [`provenance/summedits-2026-11-05/`](provenance/summedits-2026-11-05/): every prompt, every reply with its
+  request id, the scripts and `score.json`.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
@@ -1273,3 +1287,4 @@ certified letter stays as written.
   provenance/glimmer-judge-lora-v6/live/live_v6.sh re-serves it. No pre-registered text changed.
 - Thu 5 Nov 2026, 00:07 IST: a pre-registration for the tuned judge on SummEdits added above, before its deployment
   was created. No pre-registered text changed.
+- Thu 5 Nov 2026, 00:25 IST: the SummEdits result section added above. No pre-registered text changed.
