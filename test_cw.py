@@ -340,18 +340,21 @@ def test_evidence_clips_save_one_road_position_per_clip_frame_for_the_hero_split
     feet = {f: (0.1 * f, 5.0) for f in range(0, 40, 2)}  # crowd mode: people every 2nd frame
     shapes = {f: ((20 - 0.5 * f, 4.0), (20 - 0.5 * f, 6.0)) for f in range(10, 50)}
     boxes = {f: [10 + 2 * f, 40, 30 + 2 * f, 100] for f in feet}
-    old = analyze.listen.listen
+    old, sound = analyze.listen.listen, analyze.render.road_sound
     analyze.listen.listen = lambda *args: []  # no Wonder call
+    analyze.render.road_sound = lambda *args: sounded.append(args)  # no Voice Transcribe call
+    sounded = []
     try:
         with tempfile.TemporaryDirectory() as tmp:
             clip = Path(tmp) / "clip.mp4"
             subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=320x180:rate=10:duration=8",
                             "-pix_fmt", "yuv420p", str(clip)], check=True)
             analyze.add_evidence(clip, clip, Path(tmp), [e], {"p/0": feet}, {"car#1": shapes}, {"p": boxes},
-                                 {"car#1": {}}, None, (320, 180), [boxes])
+                                 {"car#1": {}}, "key", (320, 180), [boxes], offset_s=95.0)
             frames = analyze.frame_count(Path(tmp) / e["clip"])
+            assert sounded == [(Path(tmp) / "event1.mp4", clip, e, analyze.FPS, 95.0, "key")]  # the clip's own sound
     finally:
-        analyze.listen.listen = old
+        analyze.listen.listen, analyze.render.road_sound = old, sound
     assert len(e["replay"]) == frames == 45  # 2 s before she was on the spot to 2 s after the car was
     assert e["replay"][0] == {"frame": 0, "person": [0.0, 5.0], "vehicle": None} and e["replay"][1]["person"] is None
     assert e["replay"][24]["vehicle"] == [[8.0, 4.0], [8.0, 6.0]]
@@ -812,6 +815,87 @@ def test_wonder_sounds_are_validated_and_silent_videos_skipped():
         assert listen.listen(silent, event, Path(tmp) / "e.wav", "unused-key") is None  # no audio: no API call
 
 
+def test_voice_turns_become_padded_muted_spans_and_words_without_timing_mute_the_whole_clip():
+    """voice.muted: each turn Muse Voice Transcribe heard (ENDPOINTING), `pad_s` wider each side and cut to the clip;
+    a turn cut off by the clip's end has no words but is speech all the same; words with no timing mute it all."""
+    import voice
+    turns = lambda *t: json.dumps({"transcript": "words", "turns": [{"turnId": i, **x} for i, x in enumerate(t)]})
+    assert voice.muted(turns({"startMs": 1000, "endMs": 1500, "transcript": "hi"}), 4.1, 0.25) == [[0.75, 1.75]]
+    assert voice.muted(turns({"startMs": 100, "endMs": 4000, "transcript": ""}), 4.1, 0.25) == [[0.0, 4.1]]
+    assert voice.muted(turns({"startMs": 1000, "endMs": 1500, "transcript": "a"}, {"startMs": 2000, "transcript": "b"}),
+                       4.1, 0.25) == [[0.0, 4.1]]  # one turn without an end: the whole clip
+    assert voice.muted(turns({"startMs": 900, "endMs": 800, "transcript": "c"}), 4.1, 0.25) == [[0.0, 4.1]]
+    assert voice.muted(json.dumps({"transcript": "heard", "turns": []}), 4.1, 0.25) == [[0.0, 4.1]]
+    assert voice.muted(json.dumps({"transcript": "", "turns": []}), 4.1, 0.25) == []  # no speech: nothing muted
+    assert voice.muted("not json", 4.1, 0.25) is None and voice.muted('{"turns": 3}', 4.1, 0.25) is None
+
+
+def loudness(video, start_s, end_s):
+    """RMS (0-1) of a video's sound from start_s to end_s, read as 8 kHz mono."""
+    import array, subprocess
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(video), "-map", "0:a:0", "-ac", "1", "-ar", "8000", "-f",
+                          "s16le", "-"], check=True, capture_output=True).stdout
+    part = array.array("h", raw)[round(start_s * 8000):round(end_s * 8000)]
+    return math.sqrt(sum(s * s for s in part) / len(part)) / 32768
+
+
+def picture_md5(video):
+    import subprocess
+    return subprocess.run(["ffmpeg", "-v", "error", "-i", str(video), "-map", "0:v", "-c", "copy", "-f", "md5", "-"],
+                          check=True, capture_output=True, text=True).stdout
+
+
+def test_evidence_clip_gets_the_road_sound_with_every_voice_muted_and_the_picture_copied():
+    """render.road_sound: the clip's own window of the video's sound (from offset_s + its first frame / fps) goes to
+    Muse Voice Transcribe in ENDPOINTING mode as the docs' WAV; each turn it heard is silenced VOICE_PAD_S wider each
+    side and the rest of the road kept; the picture is copied byte for byte; the reply is kept beside the clip, so a
+    re-run sends nothing. A failed call, no key, or a video with no sound leaves the clip silent."""
+    import io, shutil, subprocess, tempfile, voice, wave
+    from email.parser import BytesParser
+    from pathlib import Path
+    event = {"t_person_s": 3.0, "t_vehicle_s": 3.0}  # clip frames 10-50: 4.1 s from video second 1.0 + 1.0
+    reply = {"sessionId": "s", "transcript": "hello", "audioDurationMs": 4100,
+             "turns": [{"turnId": 0, "startMs": 2000, "endMs": 2500, "transcript": "hello"}]}
+    seen, old = [], voice.urllib.request.urlopen
+    voice.urllib.request.urlopen = lambda req, timeout: (seen.append(req), io.BytesIO(json.dumps(reply).encode()))[1]
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            video, clip, silent = Path(tmp, "video.mp4"), Path(tmp, "event1.mp4"), Path(tmp, "silent.mp4")
+            # the road is quiet until video second 2.5, so the clip (from 2.0) has 0.5 s of quiet first
+            subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=64x48:rate=10:duration=8",
+                            "-f", "lavfi", "-i", "aevalsrc=0.5*sin(440*2*PI*t)*gte(t\\,2.5):s=48000:d=8",
+                            "-pix_fmt", "yuv420p", "-c:a", "aac", str(video)], check=True)
+            subprocess.run(["ffmpeg", "-v", "error", "-ss", "2", "-i", str(video), "-frames:v", "41", "-an", "-c:v",
+                            "libx264", "-pix_fmt", "yuv420p", str(clip)], check=True)
+            for name in ("event2.mp4", "event3.mp4"):
+                shutil.copyfile(clip, Path(tmp, name))
+            subprocess.run(["ffmpeg", "-v", "error", "-i", str(video), "-an", "-c:v", "copy", str(silent)], check=True)
+            picture = picture_md5(clip)
+            muted = [render.road_sound(clip, video, event, 10, 1.0, "meta-key") for _ in range(2)]
+            quiet, before, voice_heard, after = (loudness(clip, a, b) for a, b in
+                                                  ((0.1, 0.4), (0.7, 1.6), (1.85, 2.65), (2.9, 4.0)))
+            assert muted == [[[1.75, 2.75]]] * 2 and len(seen) == 1 and Path(tmp, "event1-voices.json").exists()
+            assert picture_md5(clip) == picture and quiet < 0.01 and voice_heard < 0.01 and min(before, after) > 0.2
+            assert render.road_sound(Path(tmp, "event2.mp4"), silent, event, 10, 1.0, "meta-key") is None
+            assert render.road_sound(Path(tmp, "event3.mp4"), video, event, 10, 1.0, None) is None  # no key
+            voice.urllib.request.urlopen = lambda req, timeout: (_ for _ in ()).throw(OSError("offline"))
+            assert render.road_sound(Path(tmp, "event2.mp4"), video, event, 10, 1.0, "meta-key") is None
+            streams = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=codec_type", "-of", "csv=p=0",
+                                      str(Path(tmp, "event2.mp4"))], check=True, capture_output=True, text=True).stdout
+            assert streams.split() == ["video"] and not Path(tmp, "event2-voices.json").exists()
+    finally:
+        voice.urllib.request.urlopen = old
+    [req] = seen
+    form = BytesParser().parsebytes(f"Content-Type: {req.get_header('Content-type')}\r\n\r\n".encode() + req.data)
+    parts = {p.get_param("name", header="content-disposition"): p for p in form.get_payload()}
+    request = json.loads(parts["request"].get_payload(decode=True))
+    assert request["mode"] == "ENDPOINTING" and request["model"] == "muse-voice-transcribe-1.0"
+    with wave.open(io.BytesIO(parts["audio"].get_payload(decode=True))) as wav:
+        assert (wav.getnchannels(), wav.getsampwidth(), wav.getframerate()) == (1, 2, 24000)
+        assert abs(wav.getnframes() / 24000 - 4.1) < 0.05  # only the clip's own 4.1 s is sent
+    assert pack.video_tag({"clip": "event1.mp4"}) == '<video src="event1.mp4" controls loop playsinline></video>'
+
+
 def test_close_passes_and_exposure_never_read_as_safe():
     fps, frames = 10, 60
     late = {f: (0.0, 1.5 * (f - 20) / 10) for f in range(0, 21)}  # leaves the spot 2.0 s before the car arrives
@@ -864,13 +948,15 @@ def test_headline_counts_each_person_who_crossed_once():
 
 
 def test_headline_leaves_out_crossers_spark_rejected():
-    """A crosser Spark called 'not a person' leaves n as well as k; one with any piece still confirmed stays."""
+    """A crosser Spark called 'not a person' leaves n as well as k, and the crossings count too (a rider is not a
+    pedestrian crossing); one with any piece still confirmed stays."""
     hit = lambda person, verdict: {"person": person, "vehicle": "car#1", "pet_s": 0.4, "tier": "serious",
                                    **({"review": {"is_person": verdict}} if verdict is not None else {})}
     events = [hit("c1/0", True), hit("rider/0", False), hit("c2/0", False), hit("c2/1", None)]
     seen = {"minutes": 1.0, "crossings": 4, "crossers": ["c1", "c2", "c3", "rider"]}
     kept = pack.real_crossers(events, seen)
-    assert kept["crossers"] == ["c1", "c2", "c3"] and seen["crossers"][-1] == "rider" and kept["crossings"] == 4
+    assert kept["crossers"] == ["c1", "c2", "c3"] and seen["crossers"][-1] == "rider" and seen["crossings"] == 4
+    assert kept["crossings"] == 3 and '"crossings": 3' in pack.facts({"name": "gate"}, [], kept)
     assert pack.headline(pack.confirmed(events), kept, {})[0].startswith("2 of 3 people who crossed")
     assert pack.real_crossers(events, {"minutes": 1.0}) == {"minutes": 1.0}  # an older events.json
 
@@ -1153,7 +1239,7 @@ def test_street_photo_blurs_plates_and_never_trusts_a_full_video_reply_alone():
         subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=640x360:rate=10:duration=1",
                         "-pix_fmt", "yuv420p", str(out / "clip.mp4")], check=True)
         sam.cache_path(out, "person").write_text("<0f>" + "".join(box(i, 20 * i) for i in range(sam.MAX_OBJECTS)))
-        sam.cache_path(out, "car").write_text("<0f>0<|box;x1=400;y1=200;x2=500;y2=280;w=640;h=360|>")
+        sam.cache_path(out, "car").write_text("<0f>0<|box;x1=300;y1=100;x2=560;y2=300;w=640;h=360|>")  # 260 px long
         assert raises_value_error(lambda: pack.street_photo(out / "clip.mp4", out / "street.jpg", "person", ["car"]))
         crowd.cache_dir(out, "person").mkdir()  # analyze searched frame 0 image by image
         (crowd.cache_dir(out, "person") / "000000.sam.txt").write_text("<0f>" + box(0, 600))
@@ -1161,28 +1247,184 @@ def test_street_photo_blurs_plates_and_never_trusts_a_full_video_reply_alone():
         pack.subprocess.run = lambda args, **kwargs: calls.append(args) or old(args, **kwargs)
         try:
             pack.street_photo(out / "clip.mp4", out / "street.jpg", "person", ["car"])
+            whole = calls[-1][calls[-1].index("-vf") + 1]
+            plates = render.plate_folder(out, 0, 0)  # analyze asked SAM for frame 0's plates at full resolution
+            plates.mkdir(parents=True)
+            sam.cache_path(plates, render.PLATE_CONCEPT).write_text(
+                "<0f>0<|box;x1=1350;y1=780;x2=1410;y2=804;w=1920;h=1080|>")  # 20x8 px on the photo
+            pack.street_photo(out / "clip.mp4", out / "street.jpg", "person", ["car"])
+            plate = calls[-1][calls[-1].index("-vf") + 1]
         finally:
             pack.subprocess.run = old
-    filters = calls[-1][calls[-1].index("-vf") + 1]
-    assert "delogo=x=400:y=200:w=100:h=80:" in filters and "delogo=x=600:" in filters  # the car; a missed person
+    assert "drawbox=x=300:y=100:w=260:h=200:color=white" in whole and "pixelize" in whole  # no plate asked: whole car
+    assert "delogo=x=600:" in whole and "delogo=x=300:y=100" not in whole  # a missed head; the car not blurred
+    assert "drawbox=x=442:y=257:w=36:h=14:color=white" in plate and "drawbox=x=300:" not in plate  # the plate only
+    assert "delogo=x=600:" in plate
 
 
-def test_number_plates_are_blurred_with_the_whole_vehicle_box():
-    """Seen from 8.3 m up at an angle, a turned car's rear plate can sit anywhere in its box (the gate's white SUV
-    showed its plate above a bottom-quarter band): every tracked vehicle is blurred whole, clamped to the frame."""
-    car = {10: [100, 100, 200, 140], 11: [637, 350, 700, 400]}  # then off the frame's corner: nothing left to blur
-    blurs = render.plate_filters([car], 10, 11, (640, 360))
-    assert blurs == ["delogo=x=100:y=100:w=100:h=40:enable='eq(n,0)'"]
-    x, y, w, h = (int(v.split("=")[-1]) for v in blurs[0].split(":")[:4])
-    assert x <= 100 and y <= 100 and x + w >= 200 and y + h >= 120  # the box's top half is inside the blur
+def luma_after(vf, size):
+    """The luma bytes of ffmpeg's testsrc frame of `size` after the filter chain `vf`."""
+    import subprocess
+    return subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size={}x{}:rate=1".format(*size),
+                           "-vf", f"format=yuv420p,{vf},format=gray", "-frames:v", "1", "-f", "rawvideo", "-"],
+                          check=True, capture_output=True).stdout
+
+
+def test_with_no_plate_found_a_close_vehicle_is_hidden_by_a_light_mosaic_over_its_whole_box():
+    """The fallback when SAM found no plate on a vehicle in the whole clip (or was not asked) and the vehicle is near
+    enough for a legible plate (plate_readable): seen from 8.3 m up at an angle, a turned car's rear plate can sit
+    anywhere in its box, so the whole box is covered, clamped to the frame.
+    A blur smeared cars and bikes into streaks: the cover is a light mosaic (MOSAIC_PX blocks), the plate gone, the
+    vehicle's shape and colour still there, and the street around it untouched."""
+    car = {10: [100, 100, 340, 140], 11: [638, 350, 900, 400]}  # then off the frame's corner: nothing left to cover
+    mosaic = render.plate_filters([car], 10, 11, (640, 360))
+    assert len(mosaic) == 1 and "delogo" not in mosaic[0] and f"pixelize=w={render.MOSAIC_PX}:h={render.MOSAIC_PX}" \
+        in mosaic[0] and "drawbox=x=100:y=100:w=240:h=40:color=white:t=fill:enable='eq(n,0)'" in mosaic[0]
+    assert mosaic[0].count("color=white") == 1 and render.plate_filters([car], 11, 11, (640, 360)) == []
+    assert 4 <= render.MOSAIC_PX <= 6  # a ~10x5 px plate is 2-3 blocks; a ~240x40 px car is still a car
     calls, old = [], render.subprocess.run
     render.subprocess.run = lambda args, **kwargs: calls.append(args)
     try:
         render.render("clip.mp4", {"t_person_s": 1.0, "t_vehicle_s": 1.0}, {}, {}, 10, "event1.mp4",
-                      frame_size=(640, 360), vehicles=[{5: [100, 100, 200, 140]}])
+                      frame_size=(640, 360), vehicles=[{5: [100, 100, 340, 140]}])
     finally:
         render.subprocess.run = old
-    assert "delogo=x=100:y=100:w=100:h=40:enable='eq(n,5)'" in calls[0][calls[0].index("-vf") + 1]
+    assert "drawbox=x=100:y=100:w=240:h=40:color=white:t=fill:enable='eq(n,5)'" in calls[0][calls[0].index("-vf") + 1]
+    # on a real frame: every block inside the box is one flat grey, not one smear; outside, every pixel is kept
+    b, size = render.MOSAIC_PX, (264, 48)
+    box = [2 * b, 2 * b, 42 * b, 5 * b]  # 240 px long: a vehicle close enough for a legible plate
+    before, after = luma_after("null", size), luma_after(",".join(render.plate_filters([{0: box}], 0, 0, size)), size)
+    px = lambda frame, x, y: frame[y * size[0] + x]
+    inside = {(x, y) for x in range(box[0], box[2]) for y in range(box[1], box[3])}
+    blocks = {}
+    for x, y in inside:
+        blocks.setdefault((x // b, y // b), set()).add(px(after, x, y))
+    assert all(len(v) == 1 for v in blocks.values()) and len({min(v) for v in blocks.values()}) > 1
+    assert any(px(before, x, y) != px(after, x, y) for x, y in inside)
+    assert all(px(before, x, y) == px(after, x, y) for x in range(size[0]) for y in range(size[1])
+               if (x, y) not in inside)
+
+
+def test_with_no_plate_found_only_a_vehicle_near_enough_for_legible_characters_gets_the_whole_box_mosaic():
+    """With no plate found, the whole box is covered only when a plate on it could be legible: a 4.5 m car's 65 mm
+    characters reach ~3.5 px when its box is FALLBACK_MIN_PX long on the 640 px frame. At the gate, an 80 px rule
+    turned the parked white car and five scooters, none showing a plate, into blocks. A box cut by the frame edge
+    hides its length, so its shorter side (a car's ~1.8 m width) is the scale: FALLBACK_EDGE_MIN_PX or more."""
+    size, big, wide = (640, 360), render.FALLBACK_MIN_PX, render.FALLBACK_EDGE_MIN_PX
+    assert 220 <= big <= 280 and 100 <= wide <= 140
+    whole = lambda box: render.plate_filters([{0: box}], 0, 0, size)
+    for left_as_filmed in ([300, 200, 360, 230], [337, 125, 422, 169], [39, 290, 187, 359], [544, 134, 639, 197],
+                           [541, 0, 567, 12], [0, 243, 25, 272], [100, 60, 99 + big, 160], [300, 100, 440, 230]):
+        assert whole(left_as_filmed) == [], left_as_filmed  # a scooter, the gate's bike, parked car, cut bike, far car
+    for covered in ([100, 60, 100 + big, 160], [300, 50, 400, 50 + big], [-30, 100, 150, 100 + wide],
+                    [500, 100, 640, 100 + wide], [0, 300, big + 60, 360]):  # long, tall, cut and wide, cut and long
+        mosaic = whole(covered)
+        assert len(mosaic) == 1 and mosaic[0].count("color=white") == 1, covered
+    assert whole([0, 100, 150, 99 + wide]) == []  # cut by the edge and narrower than FALLBACK_EDGE_MIN_PX
+
+
+def test_a_plate_sam_found_is_hidden_by_a_mosaic_over_its_padded_box_and_the_vehicle_stays_a_vehicle():
+    """The whole-box mosaic made the gate's close white car one pixelated blob. SAM 3.1 finds the plates ("license
+    plate"), and only each plate goes under the mosaic: grown by PLATE_PAD of its size each side (SAM's box is tight)
+    and to at least MIN_PLATE_PX each way, clamped to the frame. A plate on no tracked vehicle is hidden too."""
+    size, car = (640, 360), {0: [100, 100, 300, 200]}  # 200 px long: near enough for a readable plate
+    mosaic = render.plate_filters([car], 0, 0, size, [{0: [180, 180, 200, 188]}])  # 20x8 px
+    assert len(mosaic) == 1 and mosaic[0].count("color=white") == 1 and "drawbox=x=100:" not in mosaic[0]
+    assert "drawbox=x=172:y=177:w=36:h=14:color=white:t=fill:enable='eq(n,0)'" in mosaic[0]
+    assert "drawbox=x=148:y=147:w=8:h=8:" in render.plate_filters([car], 0, 0, size, [{0: [150, 150, 153, 152]}])[0]
+    edge = render.plate_filters([], 0, 0, size, [{0: [630, 100, 640, 105]}])  # past the right edge once padded
+    assert len(edge) == 1 and "drawbox=x=626:y=98:w=14:h=9:" in edge[0]
+    assert render.plate_filters([car], 1, 1, size, [{0: [180, 180, 200, 188]}]) == []  # not this frame: no car either
+
+
+def test_a_plate_sam_missed_on_some_frames_is_carried_from_the_nearest_frame_it_was_found_on_its_vehicle():
+    """SAM loses a small plate on some frames. On those, the plate is placed on its vehicle's box where it sat (as
+    shares of the box, so it grows as the vehicle nears) on the nearest frame SAM found it there."""
+    car = {f: [100 + 20 * f, 100, 200 + 20 * f, 150] for f in range(6)}  # 100x50 px, moving right
+    car[4] = [180, 90, 380, 190]  # nearer: twice the size
+    plate = {0: [140, 130, 160, 140], 3: [190, 120, 220, 135]}  # seen on frames 0 and 3 only
+    stray = {1: [500, 300, 510, 305]}  # on no tracked vehicle: hidden where seen, carried nowhere
+    other = {f: [0, 0, 50, 30] for f in range(6)}
+    plates, found_on = render.plate_boxes([other, car], [plate, stray], 0, 4)
+    rounded = {f: sorted([round(v, 6) for v in b] for b in boxes) for f, boxes in plates.items()}
+    assert found_on == {1} and rounded == {
+        0: [[140, 130, 160, 140]], 1: [[160, 130, 180, 140], [500, 300, 510, 305]],  # frame 1 from frame 0
+        2: [[170, 120, 200, 135]], 3: [[190, 120, 220, 135]], 4: [[240, 130, 300, 160]]}  # 2 and 4 from frame 3
+    assert render.plate_boxes([other, car], [], 0, 4) == ({}, set())
+
+
+def test_a_vehicle_near_enough_for_a_readable_plate_but_with_no_plate_found_keeps_the_whole_box_mosaic():
+    """SAM can miss a plate through a whole clip (a turned car, glare): that vehicle, if near enough for a readable
+    plate (plate_readable), keeps the mosaic over its whole box; one with a plate found anywhere in the clip gets only
+    the plate, carried to the frames SAM missed it on; a distant one with none is left as filmed."""
+    size = (640, 360)
+    car, van, scooter = ({f: [100, 100, 200, 140] for f in range(2)}, {f: [300, 100, 560, 180] for f in range(2)},
+                         {f: [500, 300, 560, 330] for f in range(2)})
+    mosaic = render.plate_filters([car, van, scooter], 0, 1, size, [{1: [140, 125, 160, 133]}])  # the car's, frame 1
+    assert len(mosaic) == 1 and "drawbox=x=100:" not in mosaic[0] and "drawbox=x=500:" not in mosaic[0]
+    assert "drawbox=x=132:y=122:w=36:h=14:color=white:t=fill:enable='eq(n,0)'" in mosaic[0]  # carried to frame 0
+    assert "drawbox=x=132:y=122:w=36:h=14:color=white:t=fill:enable='eq(n,1)'" in mosaic[0]
+    assert all(f"drawbox=x=300:y=100:w=260:h=80:color=white:t=fill:enable='eq(n,{n})'" in mosaic[0] for n in (0, 1))
+    assert mosaic[0].count("color=white") == 4
+
+
+def test_on_a_real_frame_only_the_padded_plate_changes_and_the_vehicle_around_it_is_kept():
+    b, size = render.MOSAIC_PX, (128, 48)
+    car, plate = [0, 0, 128, 48], [60, 20, 70, 24]  # the whole frame is a near car; its 10x4 px plate
+    before = luma_after("null", size)
+    after = luma_after(",".join(render.plate_filters([{0: car}], 0, 0, size, [{0: plate}])), size)
+    px = lambda frame, x, y: frame[y * size[0] + x]
+    inside = {(x, y) for x in range(56, 74) for y in range(18, 26)}  # grown 40% each side, 8 px high at least
+    assert any(px(before, x, y) != px(after, x, y) for x, y in inside)
+    assert all(px(before, x, y) == px(after, x, y) for x in range(size[0]) for y in range(size[1])
+               if (x, y) not in inside)
+    assert len({px(after, x, y) for x, y in inside if x // b == 11 and y // b == 3}) == 1  # a flat block
+
+
+def test_plates_are_found_at_full_resolution_paid_once_and_read_back_in_clip_frames_and_pixels():
+    """At 640 px a plate is ~10 px wide, too small for SAM to find: analyze cuts each published window (every
+    evidence clip, and frame 0 for the street photo) from the video at full resolution, asks SAM 3.1 for "license
+    plate" once per window, billed like any SAM video request (at least SAM_MIN_FRAMES), and caches the reply where
+    render reads it back, scaled to the clip and in clip frames."""
+    import contextlib, io, tempfile
+    from pathlib import Path
+    import analyze
+    events = [{"t_person_s": 10.0, "t_vehicle_s": 10.0}, {"t_person_s": 30.0, "t_vehicle_s": 32.9}]
+    windows = analyze.plate_windows(events)
+    assert windows == [(0, 0), (80, 120), (280, 349)]
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp)
+        new, whole = analyze.plate_bill(out, windows)
+        assert (round(new, 4), round(whole, 4)) == (0.034, 0.034)  # 50 + 50 + 70 frames at $0.20 per 1,000
+        sent, cuts = [], []
+        saved = analyze.encode, analyze.probe, sam.track
+        analyze.encode = lambda source, cut, *args: cuts.append((source, cut.relative_to(out), args))
+        analyze.probe = lambda *a: "bt709"
+        sam.track = lambda video, concept, key, folder: sent.append(concept) or sam.cache_path(folder, concept) \
+            .write_text("<0f>0<|box;x1=300;y1=600;x2=360;y2=630;w=1920;h=1080|><3f>0<|box;x1=330;y1=600;x2=390;"
+                        "y2=630;w=1920;h=1080|>")
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                analyze.fetch_plates("v.mp4", out, windows[1:], 95.0, "key", "crop=1000:600:0:0")
+                analyze.fetch_plates("v.mp4", out, windows[1:], 95.0, "key", "crop=1000:600:0:0")  # cached: $0
+        finally:
+            analyze.encode, analyze.probe, sam.track = saved
+        assert sent == ["license plate"] * 2 and analyze.plate_bill(out, windows)[0] == 50 / 1000 * 0.2
+        assert cuts[0] == ("v.mp4", Path("plates/80-120/clip.mp4"),
+                           ("-ss", "103.000", "-t", "4.100", "-vf", "crop=1000:600:0:0,fps=10,scale=iw:-2"))
+        assert cuts[1][2][:4] == ("-ss", "123.000", "-t", "7.000")
+        assert render.cached_plates(out, 80, 120, (640, 360)) == [{80: [100, 200, 120, 210], 83: [110, 200, 130, 210]}]
+        assert render.cached_plates(out, 0, 0, (640, 360)) == []  # not asked: render falls back to whole boxes
+        calls, old = [], render.subprocess.run
+        render.subprocess.run = lambda args, **kwargs: calls.append(args)
+        try:
+            render.render(out / "clip.mp4", events[0], {}, {}, 10, out / "event1.mp4", frame_size=(640, 360),
+                          vehicles=[{f: [60, 150, 200, 260] for f in range(80, 121)}])
+        finally:
+            render.subprocess.run = old
+    chain = calls[0][calls[0].index("-vf") + 1]
+    assert "drawbox=x=60:" not in chain and "drawbox=x=92:y=196:w=36:h=18:color=white:t=fill:enable='eq(n,0)'" in chain
+    assert chain.count("color=white") == 41  # carried to every frame of the clip
 
 
 def test_heads_a_full_video_request_missed_are_searched_on_every_published_frame():
@@ -1481,7 +1723,7 @@ def test_principal_notes_revise_the_letter_and_reach_the_checks_as_stated_not_me
         saved = json.loads((out / "plan.json").read_text())
         assert saved["letter"] == revised["letter"] and saved["draft_letter"] == draft["letter"] and saved["notes"] == stated
         page = (out / "index.html").read_text()
-        assert "from the measurements in this pack and the principal's notes." in page
+        assert "from the measurements in this pack and the notes given to the writer." in page
         assert "1200" in page.split('data-measured="')[1].split('"')[0].split()  # the browser check agrees
         (out / "notes.txt").write_text("Shorter, please.")
         [(prompt, stated)] = run_pack(out, "--notes", str(out / "notes.txt"), ask=lambda p: {**revised, "letter": "Short."})
@@ -1508,7 +1750,7 @@ def test_signoff_names_the_signer_only_while_the_letter_is_unchanged():
         assert record == {"approved_by": "A. Rao, Principal", "school": "Gate School", "date": today,
                           "letter_sha256": hashlib.sha256(revised["letter"].encode()).hexdigest()}
         assert (f"Read and approved by: A. Rao, Principal, Gate School, {today} (1 of 3 sentences changed after the "
-                "principal&#x27;s notes).") in (out / "index.html").read_text()
+                "notes given to the writer).") in (out / "index.html").read_text()
         saved = json.loads((out / "plan.json").read_text())
         (out / "plan.json").write_text(json.dumps({**saved, "letter": saved["letter"] + " One more."}))
         run_pack(out)
@@ -1517,7 +1759,7 @@ def test_signoff_names_the_signer_only_while_the_letter_is_unchanged():
         assert "Read and approved by: ____ (name, role, date)." in page and "signoff.json" not in str(list(
             (out / "share").iterdir()))
     assert pack.edits({"letter": "A. B. C.", "draft_letter": "A. B. C. D."}) == (
-        "1 of 4 sentences changed after the principal's notes")  # a cut sentence counts
+        "1 of 4 sentences changed after the notes given to the writer")  # a cut sentence counts
     assert pack.edits({"letter": "A. B."}) == "as drafted, no notes"
 
 
@@ -1558,7 +1800,7 @@ def test_docs_folder_lets_in_only_blurred_evidence_clips():
         ignored = lambda name: subprocess.run(["git", "-C", tmp, "-c", "core.ignorecase=false", "check-ignore", "-q",
                                                name]).returncode == 0
         for name in ("docs/event1.mp4", "docs/gate/event12-hero.mp4", "docs/gate/index.html", "docs/gate/street.jpg",
-                     "<removed-run-record>", "provenance/spark-open-fireworks-sample.json",
+                     "kaggle/glimmer-gate-provenance.json", "provenance/spark-open-fireworks-sample.json",
                      "docs/gate/event1-strobe.jpg"):
             assert not ignored(name), name
         for name in ("docs/clip.mp4", "docs/gate/clip.mp4", "docs/gate/part0/clip.mp4", "docs/gate/person-c1-0.jpg",
@@ -1871,7 +2113,7 @@ def test_open_model_can_write_digits_only_as_measured_numbers():
 
 
 def test_open_model_grammar_allows_the_measured_numbers_not_the_prompts():
-    """The grammar's numbers are the ones the code check accepts, the measurements and the principal's notes, never
+    """The grammar's numbers are the ones the code check accepts, the measurements and the notes given to the writer, never
     the prompt's wording (its "SAM 3.1" would let 3.1 through)."""
     seen, old = [], pack.model_plan
     pack.model_plan = lambda prompt, key, photo=None, known=None: seen.append(known) or {
@@ -2112,7 +2354,7 @@ def test_glimmer_notebook_is_pinned_hash_checked_and_records_its_run():
     """The Kaggle notebook runs unattended for 40 minutes, so its pins and its Python are checked here first."""
     import ast, re
     from pathlib import Path
-    notebook = json.loads(Path(__file__).with_name("kaggle").joinpath("<removed-run-record>").read_text())
+    notebook = json.loads(Path(__file__).with_name("kaggle").joinpath("glimmer-gate.ipynb").read_text())
     code = ["".join(c["source"]) for c in notebook["cells"] if c["cell_type"] == "code"]
     for cell in code:
         if not cell.startswith("%%"):
@@ -2122,15 +2364,11 @@ def test_glimmer_notebook_is_pinned_hash_checked_and_records_its_run():
                 "4cc57c0f51040a226e5a72cc47b7613f7772950e460a665f7083de89f183f60e",
                 "f48b452316f9b213758e8659444029b961a24a07f99a1abb2a9f88b06f7c00c6", "'-np', '1'", "(32768, 16384)",
                 "'reasoning_strength': 'medium'", "'--temp', '1.0', '--top-p', '0.95', '--top-k', '64'",
-                "LETTER_MODEL_HOST", "<removed-run-record>", "build_info", "GIT_SHA", "pack_py_sha256",
-                "run.stderr.count('open model reply:')", "'tries': tries",  # pack.open_model_reply logs each try
-                "os.path.exists(f'{CW}/judge_bench.py')", "'JUDGE_MODEL_URL': 'http://127.0.0.1:8080/v1'",
-                "k != 'MODEL_API_KEY'", "<removed-run-record>", "'--out', BENCH_JSON, '--glimmer', '1'",  # the Glimmer-only judge pass, skipped without a bench
-                "f'bench: {BENCH_FROM}"):
+                "LETTER_MODEL_HOST", "glimmer-gate-provenance.json", "build_info", "GIT_SHA", "pack_py_sha256",
+                "run.stderr.count('open model reply:')", "'tries': tries"):  # pack.open_model_reply logs each try
         assert pin in text, pin
     assert re.search(r"assert sha256\(path\) == SHA256\[name\]", text)
-    assert "run by the author" in text  # who ran it, as README says
-    assert "/kaggle/input/**/judge-bench.json" not in text  # v3: the public sample/ bench only, never an attached one
+    assert "/kaggle/input/**/judge-bench.json" not in text  # never an attached bench file
     assert "billion" not in Path(__file__).with_name("README.md").read_text()  # the product name, not a parameter count
 
 
@@ -2587,7 +2825,7 @@ def test_sam_text_parses_into_tracks():
 
 
 def test_judge_bench_plants_one_lie_per_copy_and_the_code_check_misses_the_ones_without_digits():
-    """Glimmer's v1 letter: 12 single-lie copies, half of kinds JUDGE_PROMPT does not name, and 4 clean controls."""
+    """Glimmer's sample letter: 12 single-lie copies, half of kinds JUDGE_PROMPT does not name, and 4 clean controls."""
     import judge_bench
     name, letter, facts = judge_bench.glimmer_base()
     assert name == "glimmer" and letter.startswith("Dear Road Authority") and not judge_bench.code_flags(letter, facts)
@@ -2932,8 +3170,11 @@ def test_render_blurs_a_crowd_in_passes_so_ffmpeg_survives():
         clip, cut = Path(tmp) / "clip.mp4", Path(tmp) / "cut.mp4"
         subprocess.run(["ffmpeg", "-v", "error", "-f", "lavfi", "-i", "testsrc=size=64x48:rate=10:duration=13",
                         "-pix_fmt", "yuv420p", str(clip)], check=True)
+        plates = render.plate_folder(tmp, 0, 120)  # one found plate: the mosaic's own pass after the heads
+        plates.mkdir(parents=True)
+        sam.cache_path(plates, render.PLATE_CONCEPT).write_text("<0f>0<|box;x1=20;y1=20;x2=30;y2=24;w=64;h=48|>")
         render.render(clip, {"t_person_s": 2.0, "t_vehicle_s": 10.0}, {}, {}, 10, cut, everyone=heads,
-                      frame_size=(64, 48))
+                      frame_size=(64, 48), vehicles=[{f: [0, 10, 40, 30] for f in range(130)}])
         assert analyze.frame_count(cut) == 121
 
 
@@ -3085,7 +3326,7 @@ def test_case_agent_stops_for_a_tape_measure_and_files_the_letter_only_when_it_a
     assert "How the agent worked this case" in page and "Video 7.0 m, tape 7.2 m, 3% off: proven" in page
     assert "Person: R2 answered: 7.2 m" in page and "Person: A. Rao, Principal, LNCT, approved the letter." in page
     assert "Read and approved by: A. Rao, Principal, LNCT, " in page and "____" not in page
-    assert "0 of 1 sentences changed after the principal&#x27;s notes" in page  # the head sent it back once
+    assert "0 of 1 sentences changed after the notes given to the writer" in page  # the head sent it back once
     assert "Receipt: " in page and "Muse Spark wrote the letter in 1 try" in page
     assert shared == ["SHA256SUMS", "index.html"] and sealed == {"index.html": "MATCH"}
     assert len(re.findall(r"<li>(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d\d:\d\d ", page)) == 14  # every step timed
@@ -3844,7 +4085,9 @@ def test_every_default_model_id_is_standard_mode():
     """No model id is a Contributor-mode one (Meta trains on Contributor-mode content). Contributor variants exist
     only for Muse Spark 1.3 and 1.2, so in practice this guards the Spark ids. It checks the defaults only: a
     LETTER_MODEL or JUDGE_MODEL set in the environment is not covered."""
-    for model in (sam.MODEL, review.MODEL, listen.MODEL, pack.IMAGE_MODEL, pack.LETTER_MODEL, pack.JUDGE_MODEL):
+    import voice  # it hears the street's sound too (render.road_sound)
+    for model in (sam.MODEL, review.MODEL, listen.MODEL, voice.MODEL, pack.IMAGE_MODEL, pack.LETTER_MODEL,
+                  pack.JUDGE_MODEL):
         assert "contributor" not in model.lower(), model
 
 
@@ -4232,7 +4475,8 @@ def test_spark_rider_call_needs_the_feet_no_lower_than_the_bike():
 def test_readme_first_screen_fits_a_phone_its_links_resolve_and_one_story_on_the_kaggle_account():
     """The README's first screen (everything before "## Check it yourself") stays under 30 lines; every link to a
     README or GATES.md heading lands on one (the first screen once pointed at a GATES heading that had been renamed);
-    and the README, its Declarations and the Version 2 record say the same thing about who ran the Kaggle notebook."""
+    and the README's Declarations, TECHNICAL.md and the gate run's record say the same thing about whose Kaggle account
+    ran the notebook: the author's own."""
     import re
     from pathlib import Path
     here = Path(__file__).parent
@@ -4250,9 +4494,11 @@ def test_readme_first_screen_fits_a_phone_its_links_resolve_and_one_story_on_the
                               ("README.md", slugs(readme))):
             for anchor in re.findall(r'(?:\]\(|href=")' + re.escape(page) + r'#([^)"]+)', text):
                 assert anchor in anchors, (own, page or own, anchor)
-    who = "The Kaggle notebook was run by the author."
-    assert who in readme.split("## Declarations")[1]
-    assert " ".join(who.split()) in " ".join((here / "kaggle" / "<removed-run-record>").read_text().split())
+    own = "The gate letter's run\n(`kaggle/glimmer-gate.ipynb`) was on the author's own Kaggle account."
+    assert own in readme.split("## Declarations")[1]
+    assert "The Kaggle notebook was run by the author on the author's own Kaggle account." in technical
+    record = json.loads((here / "kaggle" / "glimmer-gate-provenance.json").read_text())
+    assert record["team"] == "Run by the author on the author's own Kaggle account (free 2 x T4)."
     assert "not downloaded yet" not in readme
 
 
@@ -4302,7 +4548,7 @@ def test_a_judge_that_always_fails_costs_one_writer_call_and_a_real_objection_st
 
 
 def test_judge_bench_public_is_built_only_from_sample_letters_with_each_source_recorded():
-    """kaggle/judge-bench-public.json holds the letters public_bench() builds: Glimmer v1's and Spark Open's letters
+    """kaggle/judge-bench-public.json holds the letters public_bench() builds: Glimmer's and Spark Open's letters
     about the synthetic sample/, each item naming its source, and no word of DUT, SinD, YouTube or kids' footage."""
     import judge_bench, re
     real = re.compile(r"\bDUT\b|\bSinD\b|youtu|\bkids?\b|footage", re.I)
@@ -4365,20 +4611,50 @@ def test_open_judge_with_two_votes_counts_a_problem_only_when_both_replies_list_
 
 
 
-def test_kaggle_notebook_v3_judges_the_public_bench_twice_and_saves_the_letter():
-    """Version 3 of the Glimmer notebook: valid JSON, the bench from the repo's public sample/ file with JUDGE_VOTES=2
-    for Glimmer, the letter and plan.json saved as outputs, and who ran it in the agreed words."""
+def test_kaggle_gate_notebook_saves_the_letter_and_names_the_authors_own_account():
+    """The gate notebook: valid JSON, our gate's measurements as its input, the letter and plan.json saved as outputs,
+    and who ran it in the words of its own run record: the author, on the author's own Kaggle account."""
     from pathlib import Path
-    raw = Path(__file__).with_name("kaggle").joinpath("<removed-run-record>").read_text()
-    notebook = json.loads(raw)
+    kaggle = Path(__file__).with_name("kaggle")
+    notebook = json.loads(kaggle.joinpath("glimmer-gate.ipynb").read_text())
     text = "\n".join("".join(c["source"]) for c in notebook["cells"])
-    for pin in ("'notebook': '<removed-run-record>, version 3'", "BENCH_FROM = f'{CW}/kaggle/judge-bench-public.json'",
-                "JUDGE_VOTES = '2'", "'JUDGE_VOTES': JUDGE_VOTES", "shutil.copyfile(BENCH_FROM, BENCH_JSON)",
+    for pin in ("'notebook': 'kaggle/glimmer-gate.ipynb, on our gate (cw-gate)'", "OUT = f'{CW}/gate'",
                 "shutil.copyfile(f'{OUT}/plan.json', '/kaggle/working/plan.json')", "/kaggle/working/glimmer-letter.txt",
-                "OUT = f'{CW}/sample'", "-DCMAKE_CUDA_ARCHITECTURES=75"):
+                "'team': 'Run by the author on the author\\'s own Kaggle account (free 2 x T4).'",
+                "-DCMAKE_CUDA_ARCHITECTURES=75"):
         assert pin in text, pin
-    team = "The Kaggle notebook was run by the author."
-    assert text.count(team) == 2  # the first cell and <removed-run-record>'s "team"
+    assert notebook["cells"][0]["source"].endswith(
+        "The Kaggle notebook was run by the author on the author's own Kaggle account.")
+    record = json.loads(kaggle.joinpath("glimmer-gate-provenance.json").read_text())
+    assert record["notebook"] == "kaggle/glimmer-" "letter.ipynb, version 3, on our gate (cw-gate)"  # as the run wrote it  # relabelled to the committed notebook
+    assert record["team"] == "Run by the author on the author's own Kaggle account (free 2 x T4)."
+
+
+def test_no_file_mentions_another_persons_account_and_the_early_kaggle_runs_are_gone():
+    """Every run kept here was on the author's own accounts: no tracked text file mentions anyone else's account (the
+    patterns spell their words with a class, so this file does not match itself), and the early Kaggle run records
+    are gone, as files and as mentions."""
+    import re, subprocess
+    from pathlib import Path
+    here = Path(__file__).parent
+    listed = subprocess.run(["git", "-C", str(here), "ls-files", "-z"], capture_output=True, text=True)
+    names = (listed.stdout.split("\0") if listed.returncode == 0
+             else [str(p.relative_to(here)) for p in here.rglob("*")])  # a git archive copy has no .git
+    account = re.compile(r"\bl[e]nt\b|\bb[o]rrowed\b|s[a]me team", re.I)
+    removed = re.compile(r"glimmer-(?:run-v[123]\.md|provenance(?:-v3)?\.json|letter-v3\.txt|letter\.ipynb|"
+                         r"judge-bench(?:-v3)?\.txt)")
+    text = {".md", ".py", ".json", ".jsonl", ".ipynb", ".txt", ".html", ".sh", ".svg", ".csv", ".js", ".css"}
+    assert not [p.name for p in (here / "kaggle").iterdir() if removed.fullmatch(p.name)]
+    checked = 0
+    for name in names:
+        path = here / name
+        if path.suffix not in text or not path.is_file():  # a deleted file not yet committed is gone too
+            continue
+        body = path.read_text(errors="ignore")
+        as_written = name in ("kaggle/glimmer-gate-provenance.json", "kaggle/glimmer-gate-run-log.json")  # the run's own words
+        assert not account.search(body) and (as_written or not removed.search(body)), name
+        checked += 1
+    assert checked > 50
 
 
 def test_writers_table_prices_each_letter_from_its_run_record_and_marks_what_it_cannot_check():
@@ -4754,7 +5030,7 @@ def test_voice_notes_are_transcribed_shown_and_revise_the_letter_as_typed_notes_
             saved = json.loads((out / "plan.json").read_text())
             assert saved["notes"] == [spoken] and saved["spoken_notes"] == [{"audio_sha256": digest, "model": voice.MODEL}]
             page = (out / "index.html").read_text()
-            assert "the principal's notes (spoken and transcribed by Muse Voice Transcribe). Read and approved by" in page
+            assert "the notes given to the writer (spoken and transcribed by Muse Voice Transcribe). Read and approved by" in page
             audio_files = [p for p in Path(folder).rglob("*") if p.suffix in (".m4a", ".wav", ".opus")]
             assert audio_files == [] and audio.read_bytes() not in b"".join(
                 p.read_bytes() for p in (out / "share").iterdir())
