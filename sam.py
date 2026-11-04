@@ -23,6 +23,7 @@ MAX_OBJECTS = 16  # one video request tracks at most this many objects in all; o
 ENV_FILE = Path(__file__).parent / ".env"
 FRAME = re.compile(r"<(\d+)f>")
 BOX = re.compile(r"(\d+)<\|box;x1=([\d.]+);y1=([\d.]+);x2=([\d.]+);y2=([\d.]+)")
+SIZE = re.compile(r"<\|box;[^|]*;w=(\d+);h=(\d+)")
 
 
 def env_value(name):
@@ -54,6 +55,12 @@ def parse(text):
             if x2 > x1 and y2 > y1:  # SAM sometimes emits empty boxes
                 tracks.setdefault(obj, {})[frame] = [x1, y1, x2, y2]
     return tracks
+
+
+def frame_size(text):
+    """(width, height) of the frame SAM saw, from a reply's first box, or None for a reply with no box."""
+    found = SIZE.search(text)
+    return (int(found[1]), int(found[2])) if found else None
 
 
 def saturation_frame(tracks):
