@@ -1,19 +1,33 @@
 """Evidence clips: a few seconds around each near-miss, with the pedestrian drawn cyan and the vehicle red (as SAM's
 own silhouettes where its masks are cached, else as boxes), the pedestrian's footsteps dotted cyan up to a yellow spot
-where the two met, and every person's head blurred so clips of children can be shared. Then a StroMotion still of
-each clip: the whole near-miss in one picture.
-Captions (PET, gap, speed) are shown by the evidence page, since this ffmpeg build has no text filter."""
+where the two met, every person's head blurred so clips of children can be shared, and every number plate SAM 3.1
+found under a light mosaic that hides it (the vehicle stays a vehicle). Then a StroMotion still of each clip: the
+whole near-miss in one picture.
+Captions (PET, gap, speed) are shown by the evidence page, since this ffmpeg build has no text filter.
+The clip then gets the road's own sound (road_sound), every voice Muse Voice Transcribe hears silenced, so the horn
+Muse Wonder heard can be heard too."""
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 
 import crowd
 import masks
+import sam
+import seal
+import voice
 
 PAD_S = 2.0
 HEAD_SHARE = 0.3   # the top 30% of a person box holds the head
 MIN_BLUR_PX = 3    # heads smaller than this are unrecognisable anyway, and delogo needs room
 MAX_FILTERS = 2000  # ffmpeg 9 died (SIGBUS) on one chain of 5000 delogos (fine at 3000): a crowd is blurred in passes
+MOSAIC_PX = 6      # on the 640 px frame a ~10x5 px plate is ~2 flat blocks, a car stays a car; even for yuv420p
+FALLBACK_MIN_PX = 240  # no plate found: whole box only from here (4.5 m car, 65 mm characters: 240 * 65 / 4500 = 3.5 px)
+FALLBACK_EDGE_MIN_PX = 120  # ...or, cut by the frame edge, from this shorter side (1.8 m wide: 120 * 65 / 1800 = 4.3 px)
+EDGE_PX = 2        # a box this near the frame edge is cut by it: its length is hidden
+PLATE_CONCEPT = "license plate"  # what SAM 3.1 is asked to find, on full-resolution cuts (analyze.fetch_plates)
+PLATE_PAD = 0.4    # a found plate's mosaic reaches this share of its size past each side: SAM's box is tight
+MIN_PLATE_PX = 8   # ...and is at least this many px each way on the 640 px frame (a far plate is a few px)
 TRAIL_STEP = 2     # a footstep dot every 2nd frame
 DOT_PX = 6         # footstep dot size
 SPOT_PX = 14       # the meeting spot, larger than a footstep
@@ -25,6 +39,7 @@ CAR_STEP_S = 1.0   # a car is long: at 0.5 s its copies would pile up
 MAX_IOU = 0.3      # a copy that overlaps the last one kept on its side more than this is left out
 MIN_COPY_PX = 2    # a copy cut thinner than this by the frame edge is left out
 EDGE = "@0.7:t=1"  # each pasted copy gets a thin outline in its colour
+VOICE_PAD_S = 0.25  # a muted voice starts and ends this much wider: Voice Transcribe's turn edges are approximate
 
 
 def box_filters(tracks, first, last):
@@ -55,21 +70,109 @@ def blur_filters(person_tracks, first, last, frame_size):
     return out
 
 
-def plate_filters(vehicle_tracks, first, last, frame_size):
-    """One delogo per vehicle per frame over its whole box, clamped as in blur_filters: seen from above at an angle,
-    a turned vehicle's plate can sit anywhere in its box, so no band of it is safe to leave."""
-    width, height = frame_size
-    out = []
-    for track in vehicle_tracks:
+def plate_filters(vehicle_tracks, first, last, frame_size, plate_tracks=()):
+    """A light mosaic (MOSAIC_PX blocks) over every number plate on frames first..last: each plate SAM found
+    (`plate_tracks`, in clip pixels), and on a frame SAM missed it, the plate carried on its vehicle (plate_boxes),
+    each grown by `padded`. A vehicle with no plate found in first..last gets it over its whole box on the frames a
+    plate on it could be legible (plate_readable): seen from above at an angle, a turned vehicle's plate can sit
+    anywhere in its box. A smaller one is left as filmed. Clamped to the frame; one filtergraph per MAX_FILTERS boxes (see
+    mosaic); none without a box."""
+    plates, found_on = plate_boxes(vehicle_tracks, plate_tracks, first, last)
+    covers = [(f, padded(b)) for f, boxes in plates.items() for b in boxes]
+    covers += [(f, t[f]) for i, t in enumerate(vehicle_tracks) if i not in found_on for f in range(first, last + 1)
+               if f in t and plate_readable(clamped(t[f], frame_size), frame_size)]
+    boxes = [f"drawbox=x={x1}:y={y1}:w={x2 - x1}:h={y2 - y1}:color=white:t=fill:enable='eq(n,{f - first})'"
+             for f, b in covers for x1, y1, x2, y2 in [clamped(b, frame_size)]
+             if x2 - x1 >= MIN_BLUR_PX and y2 - y1 >= MIN_BLUR_PX]
+    return [mosaic(boxes[k:k + MAX_FILTERS]) for k in range(0, len(boxes), MAX_FILTERS)]
+
+
+def clamped(box, frame_size):
+    """(x1, y1, x2, y2) of a box rounded to whole pixels and cut to the frame."""
+    return (max(0, round(box[0])), max(0, round(box[1])), min(frame_size[0], round(box[2])),
+            min(frame_size[1], round(box[3])))
+
+
+def padded(plate):
+    """A found plate grown by PLATE_PAD of its size past each side, and to at least MIN_PLATE_PX each way."""
+    cx, cy = (plate[0] + plate[2]) / 2, (plate[1] + plate[3]) / 2
+    half_w = max((plate[2] - plate[0]) * (0.5 + PLATE_PAD), MIN_PLATE_PX / 2)
+    half_h = max((plate[3] - plate[1]) * (0.5 + PLATE_PAD), MIN_PLATE_PX / 2)
+    return [cx - half_w, cy - half_h, cx + half_w, cy + half_h]
+
+
+def plate_boxes(vehicle_tracks, plate_tracks, first, last):
+    """({frame: [plate box]}, indices of the vehicles a plate was found on) for frames first..last: every plate SAM
+    found, and on each frame it missed a plate on a vehicle it was found on, the plate carried there from the nearest
+    frame it was found on that vehicle, as shares of the vehicle's box (so it grows as the vehicle nears). A plate is
+    on the smallest vehicle box that holds its centre; one on none is hidden where seen and carried nowhere."""
+    out, found_on = {}, set()
+    for plate in plate_tracks:
+        shares = {}  # vehicle index -> {frame: the plate as shares of that vehicle's box}
         for f in range(first, last + 1):
-            b = track.get(f)
-            if not b:
-                continue
-            x1, y1 = max(1, round(b[0])), max(1, round(b[1]))
-            x2, y2 = min(width - 2, round(b[2])), min(height - 2, round(b[3]))
-            if x2 - x1 >= MIN_BLUR_PX and y2 - y1 >= MIN_BLUR_PX:
-                out.append(f"delogo=x={x1}:y={y1}:w={x2 - x1}:h={y2 - y1}:enable='eq(n,{f - first})'")
-    return out
+            if f in plate:
+                out.setdefault(f, []).append(plate[f])
+                v = holder(plate[f], {i: t[f] for i, t in enumerate(vehicle_tracks) if f in t})
+                if v is not None:
+                    shares.setdefault(v, {})[f] = share_of(vehicle_tracks[v][f], plate[f])
+        for v, seen in shares.items():
+            found_on.add(v)
+            for f in range(first, last + 1):
+                if f in vehicle_tracks[v] and f not in plate:
+                    near = min(seen, key=lambda g: abs(g - f))
+                    out.setdefault(f, []).append(share_of(vehicle_tracks[v][f], seen[near], back=True))
+    return out, found_on
+
+
+def holder(plate, vehicles):
+    """The key of the smallest of `vehicles` ({key: box}) holding the plate's centre, or None."""
+    cx, cy = (plate[0] + plate[2]) / 2, (plate[1] + plate[3]) / 2
+    held = [k for k, b in vehicles.items() if b[0] <= cx <= b[2] and b[1] <= cy <= b[3]]
+    return min(held, key=lambda k: (vehicles[k][2] - vehicles[k][0]) * (vehicles[k][3] - vehicles[k][1]), default=None)
+
+
+def share_of(box, plate, back=False):
+    """The plate as shares of the box's width and height; with `back`, shares (`plate`) put back on the box."""
+    x, y, w, h = box[0], box[1], box[2] - box[0], box[3] - box[1]
+    if back:
+        return [x + plate[0] * w, y + plate[1] * h, x + plate[2] * w, y + plate[3] * h]
+    return [(plate[0] - x) / w, (plate[1] - y) / h, (plate[2] - x) / w, (plate[3] - y) / h]
+
+
+def plate_folder(out_dir, first, last):
+    """Where analyze.fetch_plates keeps the full-resolution cut of clip frames first..last and SAM's plate reply."""
+    return Path(out_dir) / "plates" / f"{first}-{last}"
+
+
+def cached_plates(out_dir, first, last, frame_size):
+    """The number plates SAM found on clip frames first..last (analyze.fetch_plates), from the reply cached under
+    `out_dir`, in clip frames and in pixels of a `frame_size` frame: [{frame: box}]. [] when SAM was not asked."""
+    reply = sam.cache_path(plate_folder(out_dir, first, last), PLATE_CONCEPT)
+    text = reply.read_text() if reply.exists() else ""
+    seen = sam.frame_size(text)
+    if not seen:
+        return []
+    scale = lambda b: [b[0] * frame_size[0] / seen[0], b[1] * frame_size[1] / seen[1],
+                       b[2] * frame_size[0] / seen[0], b[3] * frame_size[1] / seen[1]]
+    return [{first + f: scale(b) for f, b in track.items()} for track in sam.parse(text).values()]
+
+
+def plate_readable(box, frame_size):
+    """Whether a plate on a vehicle's box (x1, y1, x2, y2, inside the frame) could be legible: its longer side is
+    FALLBACK_MIN_PX or more, or the box touches the frame edge (within EDGE_PX), which hides the vehicle's length, and
+    its shorter side is FALLBACK_EDGE_MIN_PX or more."""
+    x1, y1, x2, y2 = box
+    width, height = frame_size
+    cut = min(x1, y1) <= EDGE_PX or x2 >= width - EDGE_PX or y2 >= height - EDGE_PX
+    return max(x2 - x1, y2 - y1) >= FALLBACK_MIN_PX or (cut and min(x2 - x1, y2 - y1) >= FALLBACK_EDGE_MIN_PX)
+
+
+def mosaic(boxes):
+    """One input, one output: the frame pixelized, let through only where a mask of white `boxes` (drawbox filters on
+    black) is drawn, so it joins a filter chain like one more filter."""
+    return (f"split=3[mo][mp][mk];[mp]pixelize=w={MOSAIC_PX}:h={MOSAIC_PX}[mq];"
+            f"[mk]drawbox=color=black:t=fill,{','.join(boxes)},lut=y='255*gt(val,128)'[ma];"
+            f"[mq][ma]alphamerge[mv];[mo][mv]overlay")
 
 
 def foot(box, top_down=False):
@@ -164,19 +267,23 @@ def silhouettes(pairs, folder, first, last, frame_size):
 
 def render(clip, event, person_track, vehicle_track, fps, out_path, everyone=(), frame_size=None, vehicles=(),
            top_down=False):
-    """Write the evidence clip for one event, heads of `everyone` and all of `vehicles` (whole boxes) blurred, the two
-    drawn as SAM silhouettes where their masks are cached next to `clip` (else as boxes); returns out_path."""
+    """Write the evidence clip for one event, heads of `everyone` blurred and number plates under a light mosaic
+    (plate_filters: the plates SAM found, cached next to `clip` by analyze.fetch_plates, else every one of `vehicles`
+    near enough for a readable plate), the two drawn as SAM silhouettes where their masks are cached next to `clip`
+    (else as boxes); returns out_path."""
     first, last = window(event, fps)
     pairs = [(vehicle_track, "red"), (person_track, "cyan")]  # the pedestrian drawn last, on top
-    blurs = blur_filters(everyone, first, last, frame_size) + plate_filters(vehicles, first, last, frame_size) \
-        if frame_size else []
+    heads = blur_filters(everyone, first, last, frame_size) if frame_size else []
+    plates = plate_filters(vehicles, first, last, frame_size, cached_plates(Path(clip).parent, first, last,
+                                                                            frame_size)) if frame_size else []
     tint, drawn = (silhouettes(pairs, Path(clip).parent, first, last, frame_size) if frame_size
                    else (b"", [set(), set()]))
     marks = trail_filters(person_track, event, fps, first, last, top_down) + box_filters(
         [({f: b for f, b in track.items() if f not in done}, colour) for (track, colour), done in zip(pairs, drawn)],
         first, last)
     frames = ["-frames:v", str(last - first + 1), "-an"]
-    passes = [blurs[k:k + MAX_FILTERS] for k in range(0, len(blurs), MAX_FILTERS)] or [[]]
+    # each mosaic holds up to MAX_FILTERS drawboxes of its own, so it gets a pass of its own after the heads
+    passes = [heads[k:k + MAX_FILTERS] for k in range(0, len(heads), MAX_FILTERS)] + [[m] for m in plates] or [[]]
     with tempfile.TemporaryDirectory() as tmp:
         source, start = Path(clip), f"{first / fps:.3f}"
         for k, chunk in enumerate(passes[:-1]):  # a crowd: blurred in lossless passes first, the cut's frame numbers
@@ -196,6 +303,42 @@ def render(clip, event, person_track, vehicle_track, fps, out_path, everyone=(),
         subprocess.run(args + frames + ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
                                         str(out_path)], check=True, input=tint or None)
     return out_path
+
+
+def speech_wav(video, start_s, seconds, wav):
+    """The video's first sound track from start_s for `seconds` as Voice Transcribe's WAV (voice.to_wav's format), or
+    None when the video has no sound."""
+    try:
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{start_s:.3f}", "-t", f"{seconds:.3f}", "-i", str(video),
+                        "-map", "0:a:0", "-vn", "-ac", "1", "-ar", str(voice.SAMPLE_RATE), "-c:a", "pcm_s16le",
+                        "-map_metadata", "-1", str(wav)], check=True, capture_output=True)
+    except subprocess.CalledProcessError:
+        return None
+    return wav
+
+
+def road_sound(clip_path, video, event, fps, offset_s, api_key):
+    """Give an evidence clip the video's own sound under its frames (window(); `offset_s`: where clip frame 0 is in
+    `video`), with every stretch Muse Voice Transcribe hears as speech silenced (voice.muted, VOICE_PAD_S wider each
+    side), horns and traffic kept; the picture is copied untouched. Its reply is kept beside the clip (event1.mp4:
+    event1-voices.json) and read again while the sound is the same, so a re-run sends nothing. Returns the silenced
+    [[start, end]] clip seconds, or None, the clip left silent, when the video has no sound or the call failed."""
+    first, last = window(event, fps)
+    start_s, seconds, clip_path = offset_s + first / fps, (last - first + 1) / fps, Path(clip_path)
+    with tempfile.TemporaryDirectory() as tmp:
+        wav = speech_wav(video, start_s, seconds, Path(tmp) / "speech.wav")
+        silenced = None if wav is None else seal.reused(
+            clip_path.with_name(f"{clip_path.stem}-voices.json"), [wav.read_bytes(), voice.MODEL, str(voice.TURNS)],
+            lambda: voice.turns(wav, api_key), lambda text: voice.muted(text, seconds, VOICE_PAD_S))
+        if silenced is None:
+            return None
+        mute = ",".join(f"volume=0:enable='between(t,{a},{b})'" for a, b in silenced) or "anull"
+        out = Path(tmp) / clip_path.name
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(clip_path), "-ss", f"{start_s:.3f}", "-t",
+                        f"{seconds:.3f}", "-i", str(video), "-map", "0:v", "-map", "1:a:0", "-c:v", "copy", "-af", mute,
+                        "-c:a", "aac", "-movflags", "+faststart", str(out)], check=True)
+        shutil.move(out, clip_path)
+    return silenced
 
 
 def copies(track, anchor, step, first, last):
