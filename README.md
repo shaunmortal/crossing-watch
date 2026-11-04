@@ -7,46 +7,55 @@
 ### One phone video in. Proof the road authority can act on, out.
 **सड़क का ख़तरा · नाप के · सबूत के साथ**
 
-**English** · [हिंदी](https://crossingwatch.xyz/?lang=hi) · every page of the website has a हिंदी / English switch
+**English** · [हिंदी](https://crossingwatch.xyz/?lang=hi) · the home page, App, Explorer and Manual have a हिंदी / English switch
 
 <a href="docs/evidence/event1.mp4"><img src="docs/readme/nearmiss.gif" width="100%" alt="Real footage from our college gate, faces and plates blurred: SAM 3.1 tracks a person (cyan) and a motorcycle (red) reaching the same spot"></a>
 <p><b>Real footage from our college gate, faces blurred.</b> A person (cyan) and a motorcycle (red) reach the same spot at the same instant: post-encroachment time <b>0.0 s</b>, motorcycle at <b>18.7 km/h</b>.</p>
 
-<b>▶ Demo video (2:52): GATE-TBD</b>
+<a href="#-demo"><img src="docs/readme/video-thumb.jpg" width="100%" alt="Demo video, 2:53: real footage of our college gate, a person and a motorcycle 0.42 m apart at the same instant"></a>
 
-Near-miss evidence for a dangerous school or college crossing. **Meta SAM 3.1** tracks every person and vehicle,<br>
+<b>▶ Demo video (2:53): GATE-TBD</b>
+
+Near-miss evidence for a dangerous school or college crossing. **Meta SAM 3.1** tracks people and vehicles,<br>
 code measures each near-miss in road metres, and **Muse Spark** writes a letter whose every number is checked.
 
-**Six Meta models:** SAM 3.1 · Muse Spark · Muse Image · Muse Wonder · Muse Glimmer 30B (open weights, fine-tuned by us) · Muse Spark Open (open weights) · [what each one does](#-six-meta-models-each-doing-real-work)
+**Seven Meta models:** SAM 3.1 · Muse Spark · Muse Image · Muse Wonder · Muse Voice Transcribe · Muse Glimmer 30B (open weights, fine-tuned by us) · Muse Spark Open (open weights) · [what each one does](#-seven-meta-models-each-doing-real-work)
 
-<a href="https://crossingwatch.xyz"><img src="https://img.shields.io/badge/Website-crossingwatch.xyz-f5a623?style=for-the-badge&labelColor=121314&logo=googlechrome&logoColor=white" alt="Website: crossingwatch.xyz"></a> <a href="#-demo"><img src="https://img.shields.io/badge/Demo-video-e5482f?style=for-the-badge&labelColor=121314&logo=youtube&logoColor=white" alt="Demo: video"></a> <a href="https://crossingwatch.xyz/manual/"><img src="https://img.shields.io/badge/Manual-7%20steps-2fa36b?style=for-the-badge&labelColor=121314&logo=readthedocs&logoColor=white" alt="Manual: 7 steps"></a> <a href="https://crossingwatch.xyz/app/"><img src="https://img.shields.io/badge/App-4%20steps-e5482f?style=for-the-badge&labelColor=121314&logo=googlechrome&logoColor=white" alt="App: 4 steps"></a> <a href="https://crossingwatch.xyz/explorer/"><img src="https://img.shields.io/badge/Live%20explorer-try%20it-f5a623?style=for-the-badge&labelColor=121314&logo=googlechrome&logoColor=white" alt="Live explorer: try it"></a> <a href="JUDGES.md"><img src="https://img.shields.io/badge/Judges-5--minute%20map-2fa36b?style=for-the-badge&labelColor=121314&logo=readthedocs&logoColor=white" alt="Judges: 5-minute map"></a>
+<a href="https://crossingwatch.xyz"><img src="https://img.shields.io/badge/Website-crossingwatch.xyz-f5a623?style=for-the-badge&labelColor=121314&logo=googlechrome&logoColor=white" alt="Website: crossingwatch.xyz"></a> <a href="https://crossingwatch.xyz/app/"><img src="https://img.shields.io/badge/App-4%20steps-e5482f?style=for-the-badge&labelColor=121314&logo=googlechrome&logoColor=white" alt="App: 4 steps"></a> <a href="https://crossingwatch.xyz/explorer/"><img src="https://img.shields.io/badge/Live%20explorer-try%20it-f5a623?style=for-the-badge&labelColor=121314&logo=googlechrome&logoColor=white" alt="Live explorer: try it"></a> <a href="JUDGES.md"><img src="https://img.shields.io/badge/Judges-5--minute%20map-2fa36b?style=for-the-badge&labelColor=121314&logo=readthedocs&logoColor=white" alt="Judges: 5-minute map"></a>
 
-<img src="docs/readme/card-hackathon.svg" height="76" alt="Meta Global AI Developer Hackathon 2026, Indie track entry"> <a href="OPEN_WEIGHTS.md"><img src="docs/readme/card-openweights.svg" height="76" alt="Open weights: Muse Glimmer 30B fine-tuned, served, 3 blind-test wins"></a> <a href="TECHNICAL.md#end-to-end-against-ground-truth-dut"><img src="docs/readme/card-truth.svg" height="76" alt="Drone ground truth: 47 of 52 near-misses found"></a>
+<img src="docs/readme/card-hackathon.svg" height="76" alt="Meta Global AI Developer Hackathon 2026, Indie track entry"> <a href="OPEN_WEIGHTS.md"><img src="docs/readme/card-openweights.svg" height="76" alt="Open weights: Muse Glimmer 30B fine-tuned, served, 3 blind-test wins on planted errors"></a> <a href="TECHNICAL.md#end-to-end-against-ground-truth-dut"><img src="docs/readme/card-truth.svg" height="76" alt="Drone ground truth: 47 of 52 near-misses found"></a>
 
 <table>
 <tr>
 <td align="center" width="33%">
 
 ### 📱 1. Film
-One phone over the road, a tape measure and 4 bright markers (A4 paper works).
+One phone over the road, a tape measure and 8 bright markers (A4 paper works): 4 corners and a 15 m check line.
 
 </td>
 <td align="center" width="33%">
 
 ### 📏 2. Measure
-SAM 3.1 tracks everyone; code turns pixels into road metres and finds every near-miss.
+SAM 3.1 tracks people and vehicles; code turns pixels into road metres and measures each near-miss.
 
 </td>
 <td align="center" width="33%">
 
 ### 📄 3. Prove
-Muse Spark writes the letter; code and two judges check it; the college certifies the report is genuine.
+Muse Spark writes the letter; code and two AI reviewers check it; the college certifies the report is genuine.
 
 </td>
 </tr>
 </table>
 
-<i>Every line of code, every measurement and every image here was made during the hackathon, from 28 Oct 2026 ([declarations](#declarations)).</i>
+| Judging | Where to look |
+|---|---|
+| **Impact** | A real gate and a real near-miss: **0.0 s**, **0.42 m** apart. Our college certified the report genuine. Any school can repeat it with the [Manual](https://crossingwatch.xyz/manual/) |
+| **Meta AI tooling** | Seven Meta models, one job each ([table](#-seven-meta-models-each-doing-real-work)); Muse Spark's agent asks a person for a tape check; SAM 3.1 also finds plates to hide |
+| **Technical depth** | Tape 15 m vs video **15.0 m**; drone ground truth **47 of 52**; [pre-registered blind tests on planted errors](OPEN_WEIGHTS.md); 242 self-checks |
+| **Demo** | The [video](#-demo), the [Live Explorer](https://crossingwatch.xyz/explorer/), the [live run's full log](provenance/live-run-2026-11-03/README.md) |
+
+<i>Everything here was built during the hackathon, from 28 Oct 2026, on Meta's models; the one ported piece is Meta's SAM mask decoder ([declarations](#declarations)). Built with Muse Spark Open.</i>
 
 </div>
 
@@ -54,7 +63,7 @@ Muse Spark writes the letter; code and two judges check it; the college certifie
 
 ## 📑 Contents
 
-[The problem](#-the-problem) · [Results](#-results-on-our-gate) · [Demo](#-demo) · [Try it in your browser](#-try-it-in-your-browser) · [Pipeline](#-pipeline) · [Six Meta models](#-six-meta-models-each-doing-real-work) · [How we know it's right](#-how-we-know-its-right) · [Screens](#-screens) · [Run it locally](#-run-it-locally) · [Privacy and cost](#-privacy-and-cost) · [Deep dive](#-deep-dive) · [Declarations](#declarations)
+[The problem](#-the-problem) · [Results](#-results-on-our-gate) · [Demo](#-demo) · [Try it in your browser](#-try-it-in-your-browser) · [Pipeline](#-pipeline) · [Seven Meta models](#-seven-meta-models-each-doing-real-work) · [How we know it's right](#-how-we-know-its-right) · [Screens](#-screens) · [Run it locally](#-run-it-locally) · [Privacy and cost](#-privacy-and-cost) · [Deep dive](#-deep-dive) · [Declarations](#declarations)
 
 ## 🚨 The problem
 
@@ -71,7 +80,8 @@ phone video into that proof:** measured near-misses, blurred clips, and a letter
 | Measured | Value |
 |---|---|
 | ⏱️ Video | **8.6 minutes** on a taped 15 m stretch |
-| 🚶 Pedestrian crossings | **80**, by **51** people |
+| 🚶 Crossings | **80** tracked crossings; **51** people crossed on foot after Muse Spark set aside 28 riders and empty boxes, and 1 more was ruled out by eye |
+| 🔎 Near-miss alarms | **75** candidates; Muse Spark set aside **66** (riders SAM saw as people, and empty boxes), **4** more were ruled out by eye; **5** remain (counted per alarm, where the row above counts people) |
 | 🏍️ Moving vehicles | **55** · 85th-percentile speed **23.2 km/h** |
 | 🔴 Serious near-misses (PET < 1.5 s) | **2**: 0.0 s at 18.7 km/h, 0.9 s at 18.3 km/h |
 | 🟠 Close passes (1.5 to 3.0 s) | **3** |
@@ -84,11 +94,11 @@ phone video into that proof:** measured near-misses, blurred clips, and a letter
 
 ## 🎬 Demo
 
-GATE-TBD: the 2:52 demo video link. It opens on our real near-miss (0.0 s), then the problem, the run, the checks, the open models and the fix.
+GATE-TBD: the 2:53 demo video link, narrated by the author. It opens on our real near-miss (0.0 s), the author on camera, then the problem, a live run on our gate (its real log, sped up), a screen capture of the Live Explorer (Muse Spark's review off and on), our team measuring the check line with a tape, a screen capture of the real letter, the open-weights run records and the fix Muse Image drew on our real street. Its full log and commands: [provenance/live-run-2026-11-03](provenance/live-run-2026-11-03/README.md) (Muse Spark request resp_6ae9fb6e…). Video file: [release submission-2026-11-04](https://github.com/shaunmortal/crossing-watch/releases/tag/submission-2026-11-04).
 
 ## 🧪 Try it in your browser
 
-No install, no key. Every page works in a browser and has a हिंदी / English switch.
+No install, no key. Every page works in a browser; the App, Explorer and Manual have a हिंदी / English switch.
 
 | Page | What you can do |
 |---|---|
@@ -109,36 +119,37 @@ No install, no key. Every page works in a browser and has a हिंदी / En
 ```mermaid
 flowchart TD
   A["📱 One phone video<br/>+ 8 A4 sheets, taped"] --> B["SAM 3.1<br/>tracks people and vehicles"]
-  B --> C["Muse Spark<br/>reviews each person"]
+  B --> C["Muse Spark<br/>reviews each person<br/>in a near-miss"]
   C --> D["Road metres<br/>homography from the tape"]
   D --> E["Near-misses<br/>PET · speed · death risk"]
   E --> F["Case agent<br/>asks for the tape check"]
   F --> G["Letter<br/>Muse Spark or Muse Glimmer"]
-  G --> H{"Code check<br/>+ two judges"}
+  G --> H{"Code check<br/>+ two AI reviewers"}
   H --> I["📄 Letter · evidence page<br/>· Muse Image fix"]
   I --> J["🏛️ College certifies<br/>footage and report genuine"]
 ```
 
-## 🧠 Six Meta models, each doing real work
+## 🧠 Seven Meta models, each doing real work
 
 | Model | Job in Crossing Watch | Proof |
 |---|---|---|
-| **SAM 3.1** | Tracks every person and vehicle, frame by frame | 47 of 52 near-misses vs drone truth; speed error 0.16 km/h mean ([DUT](TECHNICAL.md#end-to-end-against-ground-truth-dut)) |
-| **Muse Spark** | Reviews each person, runs the case agent, writes the letter, judges it | flagged 24 of 24 planted lies ([bench](TECHNICAL.md#checking-the-checks)) |
+| **SAM 3.1** | Tracks people and vehicles, frame by frame | 47 of 52 near-misses vs drone truth; speed error 0.16 km/h mean ([DUT](TECHNICAL.md#end-to-end-against-ground-truth-dut)) |
+| **Muse Spark** | Reviews each person in a near-miss, runs the case agent, writes the letter, judges it | flagged 24 of 24 planted lies ([bench](TECHNICAL.md#checking-the-checks)) |
 | **Muse Image** | Draws the fix onto the real, blurred street, only where people crossed | [how](TECHNICAL.md#how-it-works) |
 | **Muse Wonder** | Listens around each near-miss for horns, brakes and shouts | heard horns around 4 of the 5 near-misses at our gate |
-| **Muse Glimmer 30B** · open weights | Wrote a full letter for our real gate on a free Kaggle GPU; our LoRA fine-tune judges letters | letter in **276 s, first try**; tuned judge **wins 3 pre-registered blind tests** vs Muse Spark Open ([one page](OPEN_WEIGHTS.md)) |
-| **Muse Spark Open** · open weights | Second judge of our real letter | 6 of 6 reads of our real letter: no unsupported claim ([record](provenance/spark-open-fireworks-gate.json)) |
+| **Muse Voice Transcribe** | Finds human speech in each clip's sound so it can be silenced before publishing; the horn stays | no speech in our five clips, so every clip keeps its full road sound ([how](TECHNICAL.md#how-it-works)) |
+| **Muse Glimmer 30B** · open weights | Wrote a full letter for our real gate on a free Kaggle GPU; our LoRA fine-tune judges letters; as the crop reviewer it made the same keep/remove call as Muse Spark on all 32 people at our gate ([review](provenance/glimmer-vision-review-2026-11-04/README.md)) | letter in **276 s, first try**; tuned judge **wins 3 pre-registered blind tests on planted errors** vs Muse Spark Open, Muse Spark (closed) still ahead overall ([one page](OPEN_WEIGHTS.md)); served on Fireworks, read our real letter 6 of 6 times, no unsupported claim ([record](provenance/glimmer-judge-lora-v6/live/gate-letter-judge.json)); runs free on Kaggle's 2 x T4 too and beats Spark Open again (81 vs 49, p 0.006, [score](provenance/glimmer-judge-lora-v6/kaggle/score.json)) |
+| **Muse Spark Open** · open weights | Runs every language and vision step of our gate case on open weights (Spark Open review, agent and letter; our tuned Glimmer reviewer); SAM 3.1 tracking, Muse Wonder and Muse Image are not open weights | same 5 near-misses and 51 people as Muse Spark; letter passes every check first try ([run](provenance/open-gate-2026-11-04/README.md)) |
 
 <details>
 <summary><b>Every model's numbers in full</b></summary>
 
 - **SAM 3.1** tracks people and vehicles. Against DUT's top-down drone ground truth: 47 of 52 conflicts found after Muse Spark's review (50 of 52 by geometry alone; crowd mode); speed error 0.16 km/h mean, 0.55 km/h at the 95th percentile (vehicle crowd mode). [DUT](TECHNICAL.md#end-to-end-against-ground-truth-dut), [30 Oct re-score](GATES.md#accuracy-fixes-merged-re-scored-at-0-fri-30-oct-2026)
-- **Muse Spark** reviews each person, writes the fix and the letter, and runs the [case agent](TECHNICAL.md#case-agent-it-stops-to-ask-for-a-tape-measure), which stops to ask for a tape measure (on our gate: "Video 15.0 m, tape 15 m, 0% off: proven"). As judge it flagged 24 of 24 planted lies and only 1 of 8 clean letters (code alone: 4 of 24). [bench](TECHNICAL.md#checking-the-checks)
+- **Muse Spark** reviews each person in a near-miss, writes the fix and the letter, and runs the [case agent](TECHNICAL.md#case-agent-it-stops-to-ask-for-a-tape-measure), which stops to ask for a tape measure (on our gate: "Video 15.0 m, tape 15 m, 0% off: proven"). As judge it flagged 24 of 24 planted lies and only 1 of 8 clean letters (code alone: 4 of 24). [bench](TECHNICAL.md#checking-the-checks)
 - **Muse Image** draws the fix only inside the strip where people were measured crossing; every other pixel stays the real, blurred street (the whole photo when no path was measured). Nothing measured. [how](TECHNICAL.md#how-it-works)
 - **Muse Wonder** listens around each near-miss for horns, brakes and shouts. At our gate it heard horns around 4 of the 5 near-misses, each one timed on its card ("horn 1.0 s after") on the [evidence page](https://crossingwatch.xyz/evidence/).
-- **Muse Glimmer 30B (open weights)**, self-hosted on Kaggle 2 x T4 from sha256-checked weights, wrote **a letter for our real gate in 276 s on the first try**, every number passing the code check ([letter](kaggle/glimmer-gate-letter.txt), [record](kaggle/glimmer-gate-provenance.json); written from our first notes, which asked for a raised crossing; the letter for the authority is Muse Spark's: painted zebra, no hump). Our free LoRA fine-tune of Glimmer **beats Muse Spark Open in three pre-registered blind tests** (p 0.005, 0.029, 0.0006); served on a Fireworks H200 it gives the same verdict on 1,499 of 1,501 rows, at about a quarter of Muse Spark's cost. [open weights, one page](OPEN_WEIGHTS.md)
-- **Muse Spark Open (open weights)** on Fireworks wrote the synthetic sample's letter in one try, 55.5 s, and is the second judge of our crossing's letter. [record](provenance/spark-open-fireworks-sample.json)
+- **Muse Glimmer 30B (open weights)**, self-hosted on Kaggle 2 x T4 from sha256-checked weights, wrote **a letter for our real gate in 276 s on the first try**, every number passing the code check ([letter](kaggle/glimmer-gate-letter.txt), [record](kaggle/glimmer-gate-provenance.json), [Kaggle log](kaggle/glimmer-gate-run-log.json); written from our first notes, which asked for a raised crossing; the letter for the authority is Muse Spark's: painted zebra, no hump). Our free LoRA fine-tune of Glimmer **beats Muse Spark Open in three pre-registered blind tests on planted errors** (p 0.005, 0.029, 0.0006; Muse Spark, closed, stays ahead overall); served on a Fireworks H200 it gives the same verdict on 1,499 of 1,501 rows, at about a quarter of Muse Spark's cost. Downloaded and run over Meta's 4-bit Glimmer on Kaggle's free 2 x T4, **it beats Muse Spark Open again** (81 vs 49, p 0.006; [score](provenance/glimmer-judge-lora-v6/kaggle/score.json)). [open weights, one page](OPEN_WEIGHTS.md)
+- **Muse Spark Open (open weights)** on Fireworks wrote the synthetic sample's letter in one try, 55.5 s, and is the second AI reviewer of our crossing's letter. [record](provenance/spark-open-fireworks-sample.json)
 
 
 
@@ -152,10 +163,10 @@ flowchart TD
 | 🛰️ | Drone ground truth (DUT, top-down) | **47 of 52** near-misses found after Muse Spark's review; speed error **0.16 km/h** mean | [method](TECHNICAL.md#end-to-end-against-ground-truth-dut) |
 | 📏 | Tape check on our gate, a line the maths never used | video **15.0 m**, tape **15 m**, 0% off | [the agent](TECHNICAL.md#case-agent-it-stops-to-ask-for-a-tape-measure) |
 | 🧮 | Near-miss maths on public drone data (SinD) | speed error **0.24 km/h** mean | [validation](TECHNICAL.md#validation-on-ground-truth-trajectories) |
-| 🕵️ | The letter: planted false numbers and claims | Muse Spark flagged **24 of 24**; code checks every number | [bench](TECHNICAL.md#checking-the-checks) |
-| 🔓 | Open weights | tuned Glimmer judge wins **3** pre-registered blind tests over Muse Spark Open; Muse Spark Open read our letter **6 of 6** times, no unsupported claim | [one page](OPEN_WEIGHTS.md) |
+| 🕵️ | The letter: planted false numbers and claims | Muse Spark flagged **24 of 24** (**21 of 23** on the public bench you can re-run at $0); code checks every number | [bench](TECHNICAL.md#checking-the-checks) |
+| 🔓 | Open weights | tuned Glimmer judge wins **3** pre-registered blind tests on planted errors over Muse Spark Open (Muse Spark, closed, stays ahead overall); Muse Spark Open read our letter **6 of 6** times, no unsupported claim | [one page](OPEN_WEIGHTS.md) |
 | 📋 | Pass marks written before the runs | **G1 to G4 passed**: news CCTV, our gate's tape (15.0 m vs 15 m), DUT drone truth, our footage end to end | [GATES](GATES.md#verdict-now) |
-| ✅ | Self-checks | `python3 test_cw.py`, offline, in under a minute | [every claim](TECHNICAL.md#check-it-yourself) |
+| ✅ | Self-checks | **242** self-checks, `python3 test_cw.py`, offline, in under a minute | [every claim](TECHNICAL.md#check-it-yourself) |
 
 ## 📸 Screens
 
@@ -178,7 +189,7 @@ open sample/index.html                    # macOS; elsewhere open the file in a 
 
 ## 🔒 Privacy and cost
 
-- 🙈 Every tracked face and number plate is blurred on every published frame. The raw video stays on the laptop that ran it, apart from the calls to Meta's API, in Standard mode (not used to train models).
+- 🙈 Every tracked face is blurred and every number plate pixelated on every published frame: SAM 3.1 finds the plates at full resolution, so cars and bikes still look like cars and bikes. The raw video stays on the laptop that ran it, apart from the calls to Meta's API, in Standard mode (not used to train models).
 - 💸 About **$12** of SAM for our 8.6-minute gate video at Meta's list prices, plus about **$0.02** for the agent, against about **C$5,000** an intersection for a funded near-miss study ([Scale](TECHNICAL.md#scale)). `--budget` is a hard cap.
 - 🔑 Keys stay in `.env`, never in the repo.
 - 🏫 Filmed with the college's permission; on 3 Nov 2026 the college certified the report genuine.
@@ -187,7 +198,7 @@ open sample/index.html                    # macOS; elsewhere open the file in a 
 
 Everything else is in **[TECHNICAL.md](TECHNICAL.md)**:
 
-- **[Open weights, one page](OPEN_WEIGHTS.md)**: Glimmer's gate letter, our LoRA judge and its three blind wins
+- **[Open weights, one page](OPEN_WEIGHTS.md)**: Glimmer's gate letter, our LoRA judge and its three blind-test wins on planted errors over Muse Spark Open (Muse Spark still ahead)
 - **[Case agent](TECHNICAL.md#case-agent-it-stops-to-ask-for-a-tape-measure)**: the agent that stops to ask for a tape measure
 - **[Check it yourself](TECHNICAL.md#check-it-yourself)**: every claim, the command that re-checks it, and whether a judge can do it for $0
 - **[Files](TECHNICAL.md#files)**: what each script does
@@ -203,24 +214,27 @@ Everything else is in **[TECHNICAL.md](TECHNICAL.md)**:
 ## Declarations
 
 Solo entry by Ayush Kumar, built with Claude Code as a coding assistant. All work here was done during the hackathon,
-from 28 Oct 2026; the one ported piece is the mask decoder below. The Kaggle notebook was run by the author. The gate letter's run
+from 28 Oct 2026; the one ported piece is the mask decoder below. The gate letter's run
 (`kaggle/glimmer-gate.ipynb`) was on the author's own Kaggle account.
 
 - **Licences.** `masks.py` ports the one_bit mask decoder from Meta's meta-sam-parser (`_mask_codec.py`, Copyright (c)
-  Meta Platforms, Inc. and affiliates) under its SAM License, in `LICENSES/SAM-License.txt`; everything else is MIT
-  (`LICENSE`). The letter's check-then-retry, reject-with-notes and one-tool-per-turn agent loop follow the shape of
+  Meta Platforms, Inc. and affiliates) under its SAM License, in `LICENSES/SAM-License.txt`; all other code and the docs
+  are MIT (`LICENSE`). The footage, photos and college documents in `docs/` are not under MIT: they show real people
+  (faces and plates hidden) and are shared only to show this work. The letter's check-then-retry, reject-with-notes and one-tool-per-turn agent loop follow the shape of
   Meta's legal-agent workshop (github.com/meta-models/legal-agent-workshop); no code was copied from it.
-- **What runs.** Python standard library only, plus ffmpeg as a command-line tool (a GPL build with libx264, not
+- **What runs.** Python standard library only (the optional stabiliser, `stabilize.py`, also needs OpenCV and NumPy), plus ffmpeg as a command-line tool (a GPL build with libx264, not
   bundled) and Chrome or any Chromium for the demo's hero shot (`video/split.py`). Inside the Kaggle notebook:
   llama.cpp `b11976` (MIT), huggingface_hub (Apache-2.0) and the Muse Glimmer 30B GGUF weights (Apache-2.0, Hugging
   Face revision `b44f1072`). Built with Muse Spark Open: its open weights are used as served by Fireworks under Meta's Muse Model License, and
   our Glimmer judge adapter is trained partly on letters Spark Open wrote, so it follows that licence too. Models run as
-  services: the Meta Model API, Fireworks for Muse Spark Open, Kaggle's
-  2 x T4 for Glimmer.
+  services: the Meta Model API, Fireworks for Muse Spark Open and our Glimmer LoRA judge (trained and served there),
+  Kaggle's 2 x T4 for Glimmer's letter. The website (`docs/`) loads GSAP 3.12.5 with ScrollTrigger and Lenis 1.1.13
+  from public CDNs, and Google Fonts, each under its own licence.
 - **Datasets, none included.** SinD (github.com/SOTIF-AVLab/SinD; non-commercial, its public sample used only for
   validation; Xu Y. et al., IEEE ITSC 2022, doi:10.1109/ITSC55140.2022.9921959, v1). DUT
-  (github.com/dongfang-steven-yang/vci-dataset-dut; no licence given, used only for internal testing; Yang D. et al.,
-  IEEE IV 2019, arXiv:1902.00487). Two YouTube clips used only for local testing: the schoolchildren CCTV clip
+  (github.com/dongfang-steven-yang/vci-dataset-dut; published openly by its authors with a request to cite, which we do;
+  it has no licence file, so we redistribute none of it, only our scores; Yang D. et al., IEEE IV 2019, arXiv:1902.00487). Two YouTube clips used only for local testing: the schoolchildren CCTV clip
   (https://youtu.be/9YqdnG5Jxnw) and the Indian time-lapse (https://youtu.be/_l99w_CKwCU).
 - **AI assistance.** Code and docs were written with an AI coding assistant, and the reviews named in `GATES.md` were
-  AI-assisted; every model call in the product is to a Meta model.
+  AI-assisted; every model call in the product is to a Meta model. The demo video's voice is the author's own, recorded on
+  his laptop; its AI pictures are labelled on screen.
