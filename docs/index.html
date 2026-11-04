@@ -44,6 +44,16 @@ img { max-width: 100%; }
 .nav .gh { padding: 9px 15px; border: 1px solid #fff; border-radius: 999px; }
 .nav .lang { background: none; color: #fff; font: 500 11px / 1 var(--mono); letter-spacing: .1em; cursor: pointer; }
 @media (max-width: 900px) { .nav .lang { display: inline-block !important; } }
+.nav .links { display: contents; }
+.nav .menu-btn { display: none; background: none; color: #fff; font: 500 11px / 1 var(--mono); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
+@media (max-width: 480px) { .mark { font-size: 17px; } .nav .menu-btn { padding: 8px 11px; } }
+@media (max-width: 1100px) {
+  .nav .menu-btn { display: inline-block; }
+  .nav .links { display: none; position: fixed; top: 64px; left: 0; right: 0; flex-direction: column; padding: 6px 20px 14px; background: rgba(18, 19, 20, .97); border-bottom: 1px solid rgba(255, 255, 255, .12); }
+  .nav.open .links { display: flex; }
+  .nav.open .links a { display: block !important; padding: 15px 0; font-size: 13px; border-bottom: 1px solid rgba(255, 255, 255, .08); }
+  .nav.open .links a:last-child { border-bottom: 0; }
+}
 .cursor { position: fixed; z-index: 70; top: 0; left: 0; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: var(--saffron); pointer-events: none; transition: width .25s, height .25s, margin .25s, background .25s; mix-blend-mode: difference; }
 .cursor.big { width: 46px; height: 46px; margin: -23px 0 0 -23px; background: #fff; }
 @media (pointer: coarse) { .cursor { display: none; } }
@@ -208,7 +218,7 @@ html[lang=hi] * { letter-spacing: 0 !important; }
 <div class="progress" id="progress"></div>
 <div class="cursor" id="cursor" aria-hidden="true"></div>
 <header class="top"><a class="mark" href="#top">Crossing<b>.</b>Watch</a>
-  <nav class="nav"><a href="#nearmiss" data-hi="बाल-बाल बचाव">The near-miss</a><a href="#how" data-hi="कैसे काम करता है">How it works</a><a href="#models" data-hi="मॉडल">Models</a><a href="#open" data-hi="ओपन वेट्स">Open weights</a><a href="app/" data-hi="ऐप">App</a><a href="manual/" data-hi="मैनुअल">Manual</a><a href="explorer/" data-hi="एक्सप्लोरर">Explorer</a><a href="evidence/" data-hi="सबूत">Evidence</a><button class="gh lang" id="lang" type="button" aria-label="Switch language">हिंदी</button><a class="gh" href="https://github.com/shaunmortal/crossing-watch">GitHub</a></nav></header>
+  <nav class="nav"><button class="gh menu-btn" id="menu" type="button" aria-expanded="false" aria-controls="navlinks" data-hi="मेनू">Menu</button><span class="links" id="navlinks"><a href="#nearmiss" data-hi="बाल-बाल बचाव">The near-miss</a><a href="#how" data-hi="कैसे काम करता है">How it works</a><a href="#models" data-hi="मॉडल">Models</a><a href="#open" data-hi="ओपन वेट्स">Open weights</a><a href="app/" data-hi="ऐप">App</a><a href="manual/" data-hi="मैनुअल">Manual</a><a href="explorer/" data-hi="एक्सप्लोरर">Explorer</a><a href="evidence/" data-hi="सबूत">Evidence</a></span><button class="gh lang" id="lang" type="button" aria-label="Switch language">हिंदी</button><a class="gh" href="https://github.com/shaunmortal/crossing-watch">GitHub</a></nav></header>
 
 <section class="hero" id="top" aria-label="Real footage of our college gate, faces and number plates blurred">
   <video src="hero/gate.mp4" poster="hero/poster.jpg" autoplay muted loop playsinline preload="metadata"></video>
@@ -466,5 +476,15 @@ html[lang=hi] * { letter-spacing: 0 !important; }
 })();
 </script>
 <script>(() => { const b = document.getElementById("bot"); const f = () => b && b.classList.toggle("on", scrollY > innerHeight * .8); addEventListener("scroll", f, { passive: true }); f(); })();</script>
+<script>
+(function () {  // the mobile menu: under 1100 px the section links sit behind one button
+  var nav = document.querySelector(".nav"), btn = document.getElementById("menu");
+  if (!nav || !btn) return;
+  function set(open) { nav.classList.toggle("open", open); btn.setAttribute("aria-expanded", String(open)); }
+  btn.addEventListener("click", function () { set(!nav.classList.contains("open")); });
+  nav.querySelectorAll(".links a").forEach(function (a) { a.addEventListener("click", function () { set(false); }); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") set(false); });
+})();
+</script>
 </body>
 </html>
