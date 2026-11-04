@@ -4651,7 +4651,8 @@ def test_no_file_mentions_another_persons_account_and_the_early_kaggle_runs_are_
         if path.suffix not in text or not path.is_file():  # a deleted file not yet committed is gone too
             continue
         body = path.read_text(errors="ignore")
-        as_written = name in ("kaggle/glimmer-gate-provenance.json", "kaggle/glimmer-gate-run-log.json")  # the run's own words
+        as_written = name in ("kaggle/glimmer-gate-provenance.json", "kaggle/glimmer-gate-run-log.json",  # the run's own words
+                              "provenance/glimmer-judge-lora-v6/kaggle/glimmer-judge-lora-bench.json")  # Kaggle ran code 394a797
         assert not account.search(body) and (as_written or not removed.search(body)), name
         checked += 1
     assert checked > 50
