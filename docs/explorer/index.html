@@ -69,8 +69,8 @@ pre { background: #0b0c0d; border: 1px solid var(--line); border-radius: 12px; p
   <div class="stat"><b id="sCand">0</b><span>candidates shown</span></div>
   <div class="stat red"><b id="sSer">0</b><span>serious near-misses</span></div>
   <div class="stat"><b id="sClose">0</b><span>close passes</span></div>
-  <div class="stat green"><b id="sRej">0</b><span>removed by Muse Spark</span></div>
-  <div class="stat"><b>80</b><span>pedestrian crossings · 55 vehicles</span></div>
+  <div class="stat green"><b id="sRej">0</b><span>removed by review</span> <span id="sRejBy">(66 by Muse Spark, 4 by eye)</span></div>
+  <div class="stat"><b>80</b><span>tracked crossings; 51 people crossed on foot · 55 vehicles</span></div>
 </section>
 
 <section class="panel">
@@ -80,7 +80,7 @@ pre { background: #0b0c0d; border: 1px solid var(--line); border-radius: 12px; p
     <label class="switch"><input id="rev" type="checkbox" checked> Muse Spark review</label>
   </div>
   <div class="timeline"><svg id="tl" viewBox="0 0 1000 120" preserveAspectRatio="none" aria-label="Timeline of near-miss candidates"></svg></div>
-  <div class="legend"><span><i style="background:var(--signal)"></i>serious</span><span><i style="background:var(--saffron)"></i>close pass</span><span><i style="background:#555a60"></i>removed by Muse Spark (a rider, or not a person)</span><span>x axis: second of the video · y axis: PET, lower is closer</span></div>
+  <div class="legend"><span><i style="background:var(--signal)"></i>serious</span><span><i style="background:var(--saffron)"></i>close pass</span><span><i style="background:#555a60"></i>removed by review (a rider, or not a person)</span><span>x axis: second of the video · y axis: PET, lower is closer</span></div>
 </section>
 
 <section class="grid2">
@@ -103,7 +103,7 @@ pre { background: #0b0c0d; border: 1px solid var(--line); border-radius: 12px; p
 <pre>git clone https://github.com/shaunmortal/crossing-watch && cd crossing-watch
 python3 test_cw.py                          # self-checks, under a minute
 python3 pack.py sample sample/site.json     # the synthetic sample, no key
-python3 monday.py your-video.mp4 sites/your-site.json --budget 14   # your crossing</pre>
+python3 monday.py your-video.mp4 sites/your-site.json --budget 14 --yes   # your crossing</pre>
   <p class="note">This page replays recorded results; it calls no model. Rules: serious under the threshold you set, close pass under 3.0 s; a track Muse Spark calls a rider or not a person is removed from every event, as <code>pack.confirmed</code> does.</p>
 </section>
 </div>
@@ -123,6 +123,7 @@ function state() {
 function count(id, v) { const b = $(id); if (+b.textContent !== v) { b.textContent = v; b.animate([{ transform: "scale(1.25)" }, { transform: "scale(1)" }], { duration: 300 }); } }
 
 function render() {
+  const by = document.getElementById("sRejBy"); if (by) by.hidden = !document.getElementById("rev").checked;   // the split only means something with review on
   const S = state(), live = S.filter((s) => !s.out && s.tier !== "none");
   $("thrOut").textContent = (+$("thr").value).toFixed(1) + " s";
   count("sCand", live.length); count("sSer", live.filter((s) => s.tier === "serious").length);
@@ -140,7 +141,7 @@ function render() {
   $("rows").replaceChildren(...[...S].sort((a, b) => (a.out - b.out) || (a.e.pet_s - b.e.pet_s)).map((s) => {
     const tr = document.createElement("tr"); tr.className = (s.out ? "out " : "") + (sel === s.i ? "sel" : "");
     const r = s.e.review || {};
-    tr.innerHTML = `<td>${s.i + 1}</td><td>${s.e.t_person_s} s</td><td>${s.out ? "removed" : s.tier}</td><td>${s.e.pet_s.toFixed(1)} s</td><td>${s.e.vehicle.split("#")[0]}</td><td>${s.e.vehicle_kmh} km/h</td><td>${r.road_user || "unreviewed"}</td>`;
+    tr.innerHTML = `<td>${s.i + 1}</td><td>${s.e.t_person_s} s</td><td>${s.out ? "removed" : s.tier}</td><td>${s.e.pet_s.toFixed(1)} s</td><td>${s.e.vehicle.split("#")[0]}</td><td>${s.e.vehicle_kmh} km/h</td><td>${r.road_user || "unreviewed"}${r.by_eye ? " (by eye)" : ""}</td>`;
     tr.addEventListener("click", () => pick(s.i)); return tr;
   }));
   if (sel !== null) detail(S[sel]);
@@ -172,10 +173,10 @@ function detail(s) {
   const e = s.e, r = e.review || {}, color = s.out ? "#555a60" : s.tier === "serious" ? "#e5482f" : "#f5a623";
   $("detail").innerHTML = `<div class="kick">Event #${s.i + 1} · second ${e.t_person_s}</div>
     <h3>${e.vehicle.split("#")[0]} · PET ${e.pet_s.toFixed(1)} s</h3>
-    <span class="tierchip" style="background:${color};color:${s.out ? "#ddd" : "#121314"}">${s.out ? "removed by Muse Spark" : s.tier}</span>
+    <span class="tierchip" style="background:${color};color:${s.out ? "#ddd" : "#121314"}">${s.out ? (r.by_eye ? "removed by eye" : "removed by Muse Spark") : s.tier}</span>
     <dl class="kv"><dt>Vehicle speed</dt><dd>${e.vehicle_kmh} km/h</dd><dt>Gap at the shared spot</dt><dd>${e.gap_m} m</dd>
       <dt>Arrived first</dt><dd>${e.first}</dd><dt>Adult death risk if hit</dt><dd>${e.death_risk_pct}%${e.risk20 !== null && e.risk20 !== undefined && e.vehicle_kmh > 20 ? ` · at a 20 km/h limit: ${e.risk20}%` : ""}</dd></dl>
-    <div class="verdict ${r.is_person === false ? "no" : ""}"><b>Muse Spark:</b> ${r.road_user || "not reviewed"}${r.reason ? ` · “${r.reason}”` : ""}</div>
+    <div class="verdict ${r.is_person === false ? "no" : ""}"><b>${r.by_eye ? "By eye (GATES.md):" : "Muse Spark:"}</b> ${r.by_eye ? "its box rides inside the moving motorcycle's and auto rickshaw's boxes, so it is someone on or in those vehicles; Muse Spark had judged one crop of it as a person standing" : (r.road_user || "not reviewed") + (r.reason ? ` · “${r.reason}”` : "")}</div>
     ${e.clip ? `<video src="../evidence/${e.clip}" controls muted playsinline preload="metadata"></video><p class="note">Real clip, faces and plates blurred.</p>` : `<p class="note" style="margin-top:12px">Clips are kept only for the five events that survive the review.</p>`}`;
 }
 function pick(i) { sel = i; render(); play(); }

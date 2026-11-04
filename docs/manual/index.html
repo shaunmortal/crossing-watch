@@ -45,21 +45,21 @@ pre button { position: absolute; top: 8px; right: 8px; border: 1px solid #d9d1c0
   <h1>Measure the road outside <em>your</em> school.</h1>
   <p class="lede">Seven simple steps. You film the gate once, the tool measures every near-miss, and you get a report and a letter you can send to the road authority.</p>
   <div class="need">
-    <div><b>📱</b>A phone that films</div><div><b>📏</b>A tape measure</div><div><b>🟨</b>4 bright markers: A4 paper, chalk or cloth</div><div><b>💻</b>A laptop with Python 3.11+ and ffmpeg</div><div><b>🔑</b>A Meta Model API key</div>
+    <div><b>📱</b>A phone that films</div><div><b>📏</b>A tape measure</div><div><b>🟨</b>8 bright markers: A4 paper, chalk or cloth</div><div><b>💻</b>A laptop with Python 3.11+ and ffmpeg</div><div><b>🔑</b>A Meta Model API key</div>
   </div>
 </header>
 
 <section class="step"><span class="n">1</span>
   <h2>Ask first</h2>
   <ul><li>Tell the head of your school what you will film, and when.</li><li>Pick the busiest time: when school ends is best.</li></ul>
-  <div class="tip">Everyone in the clips is blurred by the tool, but always ask before you film.</div>
+  <div class="tip">The tool blurs every tracked face and pixelates number plates in the clips, but always ask before you film.</div>
 </section>
 
 <section class="step"><span class="n">2</span>
   <h2>Mark the road</h2>
   <ul><li>With the tape measure, mark a rectangle on the road, for example <b>8 m long and 7 m wide</b>.</li>
     <li>Put a bright marker at each of its 4 corners. Anything works if the camera can see it clearly from above: A4 paper, a chalk mark, a bright cloth, a small cone.</li>
-    <li>Put 2 more markers along the road, exactly <b>15 m apart</b>. This is the <b>check line</b>: the tool never uses it to measure, so it can prove itself later.</li></ul>
+    <li>Put 4 more markers: two lines across the road, A and B, exactly <b>15 m apart</b>, one marker on each kerb. This is the <b>check line</b>: the tool never uses it to measure, so it can prove itself later.</li></ul>
   <figure style="margin:14px 0 6px"><a href="guide-1-tape.jpg" target="_blank" rel="noopener"><img src="guide-1-tape.jpg" alt="Diagram: what to measure with the tape at the gate" style="width:100%;border-radius:10px;border:1px solid var(--line)" loading="lazy"></a><figcaption class="tip" style="margin-top:8px">The plan seen from above: the 4 corner markers (red, N1 N2 F1 F2) and the 15 m check line (blue, A to B). Click to open it full size.</figcaption></figure>
   <p style="margin:8px 0"><a class="btn" href="guide-4-field-sheet.jpg" target="_blank" rel="noopener">📝 Open the field sheet</a></p><p class="tip" style="margin-top:6px">Print this sheet and write each number on it while you measure.</p>
   <div class="tip warn">Only put markers on the road when it is safe, with someone watching the traffic.</div>
@@ -78,7 +78,7 @@ pre button { position: absolute; top: 8px; right: 8px; border: 1px solid #d9d1c0
   <ul><li>Take one picture (frame) from your video:</li></ul>
   <pre><button>Copy</button>ffmpeg -ss 5 -i YOUR-VIDEO.mp4 -frames:v 1 frame.jpg</pre>
   <ul><li>Open <a href="../app/#s1">App, step 1</a>. Load <code>frame.jpg</code>.</li>
-    <li>Click the 4 corner markers on the road, going round in one direction. Type the sizes you measured (8 and 7).</li>
+    <li>Click the 4 corner markers on the road, going round in one direction. Type the sizes you measured (8 and 7). Then click A near, B near, B far, A far, and type 15 in ‘Line A to line B’.</li>
     <li>Copy the text the page makes and save it as <code>site.json</code>.</li></ul>
   <div class="tip">Want to practise first? Open <a href="../app/#s1">App, step 1</a> and press <b>Try it with our gate</b>: it loads our frame and our 4 real corners.</div>
 </section>
@@ -101,7 +101,7 @@ python3 test_cw.py        <span class="c"># checks that everything works, under 
   <h2>Answer the agent's question</h2>
   <ul><li>The agent stops and asks you to measure the <b>check line</b> with the tape.</li>
     <li>Type what the tape says. Use the R number it printed:</li></ul>
-  <pre><button>Copy</button>python3 agent.py YOUR-VIDEO.mp4 site.json --answer R1 "15 m"</pre>
+  <pre><button>Copy</button>python3 agent.py YOUR-VIDEO.mp4 site.json --out out/YOUR-VIDEO-agent --answer R1 "15 m"</pre>
   <div class="tip">If the video and the tape agree, the agent writes the letter. Our gate: video 15.0 m, tape 15 m, 0% off.</div>
 </section>
 
@@ -117,7 +117,7 @@ python3 test_cw.py        <span class="c"># checks that everything works, under 
 <section class="faq" style="margin-top:34px">
   <div class="kick">Questions</div>
   <h3>Do I need to know coding?</h3><p>No. You copy and paste the commands above.</p>
-  <h3>Is it safe to share the clips?</h3><p>Yes. The tool blurs every tracked face and number plate before it makes the clips.</p>
+  <h3>Is it safe to share the clips?</h3><p>Yes. Before it makes the clips, the tool blurs every tracked face and pixelates every number plate: SAM 3.1 finds the plates at full resolution, so cars and bikes still look like cars and bikes. A close vehicle whose plate SAM cannot find is pixelated whole. The clips keep the road's own sound, so you can hear the horn; Muse Voice Transcribe finds where anyone speaks, and those moments are silenced.</p>
   <h3>What is a near-miss?</h3><p>A person and a vehicle reach the same spot within a few seconds. Under 1.5 s is serious; under 3 s is a close pass.</p>
   <h3>Can I try it without a key?</h3><p>Yes: <code>python3 pack.py sample sample/site.json</code> makes a full report from made-up data, and the <a href="../explorer/">Explorer</a> replays our real run in your browser.</p>
 </section>

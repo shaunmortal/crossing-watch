@@ -58,7 +58,7 @@ iframe { width: 100%; height: 760px; border: 1px solid var(--line); border-radiu
 <header style="margin-top:26px">
   <div class="kick">The app · four steps · our real run</div>
   <h1>From one phone video <em>to a checked letter.</em></h1>
-  <p class="lede">New here? Read the <a href="../manual/">7-step manual</a> first. This is Crossing Watch as a school would use it. Step 1 is the real tool, working here in your browser. Steps 2 and 3 show our real run on our college gate on 2 Nov 2026, exactly as it was logged. Step 4 opens the results.</p>
+  <p class="lede">New here? Read the <a href="../manual/">7-step manual</a> first. This is Crossing Watch as a school would use it. Step 1 is the real tool, working here in your browser. Steps 2 and 3 show our real run on our college gate on 2 Nov 2026, as it was logged (long lines shortened). Step 4 opens the results.</p>
   <p class="note">Cost: about $12 of SAM per 8.6-minute video at Meta's list prices, plus about $0.02 for the agent. Faces and number plates are blurred.</p>
 </header>
 
@@ -78,9 +78,9 @@ iframe { width: 100%; height: 760px; border: 1px solid var(--line); border-radiu
 <section class="step" id="s2">
   <div class="kick">Step 2 · needs a Meta Model API key</div>
   <h2>Run it: <em>Meta's models do the seeing.</em></h2>
-  <div class="what"><b>What happens</b>SAM 3.1 tracks every person and vehicle; code measures who reached the same spot how many seconds apart; Muse Spark looks at each person and removes riders and things that are not people. Below are lines from our real run's log, in order (long lines cut where marked ...).</div>
+  <div class="what"><b>What happens</b>SAM 3.1 tracks people and vehicles; code measures who reached the same spot how many seconds apart; Muse Spark looks at each person in a near-miss and removes riders and things that are not people. Below are lines from our real run's log, in order (long lines cut where marked ...).</div>
   <div class="kick" style="margin-bottom:8px">Replay · our run log, 2 Nov 2026</div><div class="term" id="term" aria-label="Real run output"></div>
-  <p class="what" style="margin-top:12px"><b>The funnel</b>75 raw near-miss candidates → Muse Spark checks each person → 5 kept → <b style="color:var(--signal);letter-spacing:0;text-transform:none;font:600 15px var(--sans)">2 serious</b> and 3 close passes. The two highlighted lines are 2 of the ones Muse Spark removed: a person who was riding the bike, and something that was not a person.</p>
+  <p class="what" style="margin-top:12px"><b>The funnel</b>75 raw near-miss candidates → Muse Spark checks each person (one more ruled out by eye) → 5 kept → <b style="color:var(--signal);letter-spacing:0;text-transform:none;font:600 15px var(--sans)">2 serious</b> and 3 close passes. The two highlighted lines are 2 of the ones Muse Spark removed: a person who was riding the bike, and something that was not a person.</p>
   <p class="note">About $12 of SAM for an 8.6-minute video at Meta's list prices. Python 3.11+ and ffmpeg; <a href="https://github.com/shaunmortal/crossing-watch">code on GitHub</a>.</p>
 </section>
 
@@ -89,7 +89,7 @@ iframe { width: 100%; height: 760px; border: 1px solid var(--line); border-radiu
   <h2>The agent checks itself: <em>it asks for a tape measure.</em></h2>
   <div class="what"><b>What happens</b>Before it trusts a single metre, the agent stops and asks a person to measure a second line with a tape, one the maths never used. If the video and the tape agree, the letter goes ahead; then it waits for the head of the school. This is the real log.</div>
   <div class="kick" style="margin-bottom:8px">Replay · the agent's log, 2 Nov 2026</div><div class="chat" id="chat"></div>
-  <p class="note">Five agent turns, about $0.02 in all.</p>
+  <p class="note">Five agent turns, about $0.02 in all. <a href="https://github.com/shaunmortal/crossing-watch/blob/HEAD/provenance/gate-agent-2026-11-02/agent_log.jsonl">The full log</a>.</p>
 </section>
 
 <section class="step" id="s4">
@@ -98,7 +98,7 @@ iframe { width: 100%; height: 760px; border: 1px solid var(--line); border-radiu
   <div class="what"><b>What happens</b>Every near-miss with its blurred clip, a road map in metres, the fix drawn by Muse Image, and a letter whose every number is checked by code. Our college certified this report genuine on 3 Nov 2026.</div>
   <div class="cards">
     <a class="card" href="../explorer/"><span>Interactive</span><b>Replay the decisions →</b><span>Move the threshold, switch the review off and on, replay any near-miss.</span></a>
-    <a class="card" href="../evidence/"><span>The report</span><b>Evidence dashboard →</b><span>Clips, map, fix and the letter, as the tool made them.</span></a>
+    <a class="card" href="../evidence/"><span>The report</span><b>Evidence dashboard →</b><span>Clips, map and the letter as the tool made them; the fix picture redrawn with Muse Image.</span></a>
     <a class="card" href="https://github.com/shaunmortal/crossing-watch"><span>The code</span><b>Run it yourself →</b><span>Self-checks and a synthetic sample run with no key.</span></a>
   </div>
 </section>
@@ -117,7 +117,7 @@ const LOG = [
 const AGENT = [
   ["track", "Tracked people in auto mode and vehicles in video mode: near-misses kept: 5. No request was full.", "", "$0.002"],
   ["review", "Muse Spark reviewed 32 pedestrians and rejected 29; 5 of 75 near-misses kept.", "", "$0.004"],
-  ["measure", "Video reading of the check distance (line A to line B along the wall-side edge): 15.0 m. Serious near-misses: 2, close passes: 3.", "", "$0.009"],
+  ["measure", "Video reading of the check distance (line A to line B along the wall-side edge (the A and B wall-side tape marks)): 15.0 m. Serious near-misses: 2, close passes: 3.", "", "$0.009"],
   ["request_measurement", "Asked a person (R1) to tape-measure line A to line B along the wall-side edge (the A and B wall-side tape marks).", "ask", "$0.014"],
   ["person", "R1 answered: 15 m", "human", ""],
   ["submit_letter", "Video 15.0 m, tape 15 m, 0% off: proven. Letter written by Muse Spark; waiting for the head of the school.", "done", "$0.019"],
