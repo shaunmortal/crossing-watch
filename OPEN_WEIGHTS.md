@@ -143,6 +143,7 @@ python3 writers_table.py         # Glimmer on Kaggle vs Spark Open vs Muse Spark
   `provenance/`. The account id goes to the organizers with the submission, not in the repo.
 
 - One line, every headline number, no key: `python3 judge_v3_score.py v6 && python3 provenance/glimmer-judge-lora-v6/kaggle/score_kaggle.py provenance/glimmer-judge-lora-v6/kaggle/predictions_kaggle.jsonl && python3 provenance/glimmer-judge-lora-v6/base/score_base.py provenance/glimmer-judge-lora-v6/base/predictions_base.jsonl`
+- **Counted per letter, not per row** (post hoc, not pre-registered; rows from one letter are not independent, which McNemar assumes): in v6 the tuned judge is ahead of Muse Spark Open on 67 of the 260 test letters and behind on 29 (exact sign test p 0.00013); a letter-level bootstrap puts its net row wins at 39, 95% interval 17 to 61. `python3 provenance/glimmer-judge-lora-v6/letter_level_check.py`, no key.
 - Through the product's own judge path (`pack.py`, `JUDGE_MODEL_URL`), per planted-lie kind on the 31-prompt public bench: 21 of 23 lies, 0 of 8 false alarms, 0 unreadable replies: [product-bench.md](provenance/glimmer-judge-lora-v6/live/product-bench.md). File map: [provenance/glimmer-judge-lora-v6/README.md](provenance/glimmer-judge-lora-v6/README.md).
 
 ## Run the tuned judge yourself: three commands, no key
