@@ -1,6 +1,7 @@
 """Spoken notes: the principal records the notes on a phone, Muse Voice Transcribe writes them down, and pack.py
 --voice-notes AUDIO hands the text to --notes exactly as typed notes. Only the transcript (notes-<sha8>.txt) and the
-audio's sha256 are kept, beside plan.json; the audio itself is never copied, and its WAV lives in a temporary folder."""
+audio's sha256 are kept, beside plan.json; the audio itself is never copied, and its WAV lives in a temporary folder.
+Also muted(): where people speak in an evidence clip's sound, so render.road_sound can silence them."""
 import hashlib
 import http.client
 import json
@@ -20,6 +21,9 @@ SAMPLE_RATE = 24_000  # the docs' own ffmpeg line
 TIMEOUT_S = 300
 # "languageBias" steers recognition without forcing a language: Hindi and English both, for mixed speech
 REQUEST = {"mode": "PUSH_TO_TALK", "model": MODEL, "audioEncoding": "WAV", "languageBias": ["Hindi", "English"]}
+# ENDPOINTING: "one turn per detected segment", each with startMs and endMs from the clip's start (turn-level, not
+# word-level: https://dev.meta.ai/docs/api-reference/voice/schemas)
+TURNS = {**REQUEST, "mode": "ENDPOINTING"}
 TRANSCRIPT = "notes-{sha8}.txt"  # beside plan.json, named by the first 8 hex digits of the audio's sha256
 
 
@@ -35,23 +39,60 @@ def to_wav(audio, wav):
     return wav
 
 
-def transcribe(wav, api_key):
-    """Muse Voice Transcribe's text for one WAV (stripped, may be ""). The key goes to URL only."""
+def ask(wav, api_key, request=REQUEST):
+    """Muse Voice Transcribe's reply (a dict) for one WAV. The key goes to URL only. OSError, ValueError or
+    http.client.HTTPException when the call fails."""
     boundary = uuid.uuid4().hex
     body = (f'--{boundary}\r\nContent-Disposition: form-data; name="request"\r\nContent-Type: application/json\r\n\r\n'
-            f"{json.dumps(REQUEST)}\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"audio\"; "
+            f"{json.dumps(request)}\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"audio\"; "
             f'filename="notes.wav"\r\nContent-Type: audio/wav\r\n\r\n').encode() + wav.read_bytes() + (
             f"\r\n--{boundary}--\r\n").encode()
     req = urllib.request.Request(URL, data=body, headers={
         "Authorization": f"Bearer {api_key}", "Content-Type": f"multipart/form-data; boundary={boundary}",
         "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=TIMEOUT_S) as response:
+        return json.load(response)
+
+
+def transcribe(wav, api_key):
+    """Muse Voice Transcribe's text for one WAV (stripped, may be "")."""
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT_S) as response:
-            reply = json.load(response)
+        reply = ask(wav, api_key)
     except (OSError, ValueError, http.client.HTTPException) as err:
         raise SystemExit(f"{NAME} failed, nothing was revised: {err}")
     text = reply.get("transcript") if isinstance(reply, dict) else None
     return text.strip() if isinstance(text, str) else ""
+
+
+def turns(wav, api_key):
+    """Muse Voice Transcribe's reply text in ENDPOINTING mode (TURNS) for one WAV, or None without a key or when the
+    call failed."""
+    if not api_key:
+        return None
+    try:
+        return json.dumps(ask(wav, api_key, TURNS))
+    except (OSError, ValueError, http.client.HTTPException) as err:
+        print(f"{NAME} failed for {wav.name}: {err}", flush=True)
+        return None
+
+
+def muted(text, seconds, pad_s):
+    """[[start, end]] seconds to silence in a `seconds`-long clip from a TURNS reply's text: each turn, pad_s wider
+    each side and cut to the clip, even one with no words (cut off by the clip's end, it is still speech). The whole
+    clip when a turn has no usable timing, or words were heard with no turns. None when the reply is unusable."""
+    try:
+        reply = json.loads(text)
+    except ValueError:
+        return None
+    spoken = reply.get("turns", []) if isinstance(reply, dict) else None
+    if not isinstance(spoken, list):
+        return None
+    timed = [(t.get("startMs"), t.get("endMs")) for t in spoken if isinstance(t, dict)]
+    number = lambda v: isinstance(v, (int, float))
+    untimed = len(timed) < len(spoken) or not all(number(a) and number(b) and 0 <= a <= b for a, b in timed)
+    if untimed or (not spoken and str(reply.get("transcript") or "").strip()):
+        return [[0.0, seconds]]
+    return [[round(max(0.0, a / 1000 - pad_s), 3), round(min(seconds, b / 1000 + pad_s), 3)] for a, b in timed]
 
 
 def spoken_notes(audio, out_dir, api_key):
