@@ -183,6 +183,14 @@ python3 pack.py sample sample/site.json   # the synthetic sample (made-up tracks
 open sample/index.html                    # macOS; elsewhere open the file in a browser
 ```
 
+On your own video, with your own key: put `MODEL_API_KEY=...` (Meta Model API) in `.env`, mark the site in `calibrate.html`, then:
+```
+python3 analyze.py VIDEO site.json        # SAM 3.1 tracks, code measures, Muse Spark reviews -> out/VIDEO/events.json
+python3 pack.py out/VIDEO site.json       # the letter, the fix picture and the evidence page -> out/VIDEO/index.html
+python3 agent.py VIDEO site.json          # or let the case agent work the whole case and stop for a person
+```
+Every command and option: [TECHNICAL.md](TECHNICAL.md#run). The open-weights path needs `FIREWORKS_API_KEY` ([OPEN_WEIGHTS.md](OPEN_WEIGHTS.md)).
+
 ## 🧩 Code map
 
 47 flat Python modules in seven groups; the pipeline and every check need only the standard library and ffmpeg. One line per module, and why the root stays flat: [ARCHITECTURE.md](ARCHITECTURE.md).
