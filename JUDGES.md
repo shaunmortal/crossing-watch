@@ -26,7 +26,7 @@ Each claim links to its proof.
    pre-registered blind tests on planted errors, and the same judge on Kaggle's free 2 x T4.
 3. Read [GATES.md, Verdict now](GATES.md#verdict-now): what was pre-registered, what passed, what has not run.
 4. Read [TECHNICAL, Limits, stated](TECHNICAL.md#limits-stated) and the known limits below.
-5. Watch the demo: GATE-TBD (the 2:42 video link). Our gate's evidence page: [crossingwatch.xyz/evidence](https://crossingwatch.xyz/evidence/).
+5. Watch the demo: [youtu.be/mp9p4P14XfE](https://youtu.be/mp9p4P14XfE) (2:42). Our gate's evidence page: [crossingwatch.xyz/evidence](https://crossingwatch.xyz/evidence/).
 
 ## Impact
 
@@ -42,7 +42,7 @@ Each claim links to its proof.
 ## Demo
 
 - Today, at $0: `python3 pack.py sample sample/site.json` builds the page offline (no key, no video).
-- **Evidence page:** [crossingwatch.xyz/evidence](https://crossingwatch.xyz/evidence/), from Monday's footage. Demo video: GATE-TBD (2:42). Live run in the video, full log: [provenance/live-run-2026-11-03](provenance/live-run-2026-11-03/README.md).
+- **Evidence page:** [crossingwatch.xyz/evidence](https://crossingwatch.xyz/evidence/), from Monday's footage. Demo video: [youtu.be/mp9p4P14XfE](https://youtu.be/mp9p4P14XfE) (2:42). Live run in the video, full log: [provenance/live-run-2026-11-03](provenance/live-run-2026-11-03/README.md).
 
 ## Depth
 

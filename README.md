@@ -12,9 +12,9 @@
 <a href="docs/evidence/event1.mp4"><img src="docs/readme/nearmiss.gif" width="100%" alt="Real footage from our college gate, faces and plates blurred: SAM 3.1 tracks a person (cyan) and a motorcycle (red) reaching the same spot"></a>
 <p><b>Real footage from our college gate, faces blurred.</b> A person (cyan) and a motorcycle (red) reach the same spot at the same instant: post-encroachment time <b>0.0 s</b>, motorcycle at <b>18.7 km/h</b>.</p>
 
-<a href="#-demo"><img src="docs/readme/video-thumb.jpg" width="100%" alt="Demo video, 2:42: real footage of our college gate, a person and a motorcycle 0.42 m apart at the same instant"></a>
+<a href="https://youtu.be/mp9p4P14XfE"><img src="docs/readme/video-thumb.jpg" width="100%" alt="Demo video, 2:42: real footage of our college gate, a person and a motorcycle 0.42 m apart at the same instant"></a>
 
-<b>▶ Demo video (2:42): GATE-TBD</b>
+<b>▶ <a href="https://youtu.be/mp9p4P14XfE">Demo video (2:42)</a></b>
 
 Near-miss evidence for a dangerous school or college crossing. **Meta SAM 3.1** tracks people and vehicles,<br>
 code measures each near-miss in road metres, and **Muse Spark** writes a letter whose every number is checked.
@@ -94,7 +94,7 @@ phone video into that proof:** measured near-misses, blurred clips, and a letter
 
 ## 🎬 Demo
 
-GATE-TBD: the 2:42 demo video link, narrated by the author. It opens on our real near-miss (0.0 s), the author on camera, then the problem, a live run on our gate (its real log, sped up), a screen capture of the Live Explorer (Muse Spark's review off and on), our team measuring the check line with a tape, a screen capture of the real letter, the open-weights run records and the fix Muse Image drew on our real street. Its full log and commands: [provenance/live-run-2026-11-03](provenance/live-run-2026-11-03/README.md) (Muse Spark request resp_6ae9fb6e…). Video file: [release submission-2026-11-04](https://github.com/shaunmortal/crossing-watch/releases/tag/submission-2026-11-04).
+[Demo video (2:42)](https://youtu.be/mp9p4P14XfE), narrated by the author. It opens on our real near-miss (0.0 s), the author on camera, then the problem, a live run on our gate (its real log, sped up), a screen capture of the Live Explorer (Muse Spark's review off and on), our team measuring the check line with a tape, a screen capture of the real letter, the open-weights run records and the fix Muse Image drew on our real street. Its full log and commands: [provenance/live-run-2026-11-03](provenance/live-run-2026-11-03/README.md) (Muse Spark request resp_6ae9fb6e…). Video file: [release submission-2026-11-04](https://github.com/shaunmortal/crossing-watch/releases/tag/submission-2026-11-04).
 
 ## 🧪 Try it in your browser
 
