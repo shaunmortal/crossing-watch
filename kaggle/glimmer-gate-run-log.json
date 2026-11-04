@@ -1,0 +1,185 @@
+[{"stream_name":"stderr","time":5.135516421,"data":"/usr/local/lib/python3.13/dist-packages/nbformat/validator.py:434: MissingIDFieldWarning: Cell is missing an id field, this will become a hard error in future nbformat versions. You may want to use `normalize()` on your notebooks before validations (available since nbformat 5.1.4). Previous versions of nbformat are fixing this issue transparently, and will stop doing so in the future.\n"}
+,{"stream_name":"stderr","time":5.135557686,"data":"  _validate(nbdict, ref, version, version_minor, relax_add_props)\n"}
+,{"stream_name":"stderr","time":5.849183541,"data":"0.00s - Debugger warning: It seems that frozen modules are being used, which may\n"}
+,{"stream_name":"stderr","time":5.849207743,"data":"0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off\n"}
+,{"stream_name":"stderr","time":5.849212693,"data":"0.00s - to python to disable frozen modules.\n"}
+,{"stream_name":"stderr","time":5.849216421,"data":"0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.\n"}
+,{"stream_name":"stderr","time":6.378799455,"data":"0.00s - Debugger warning: It seems that frozen modules are being used, which may\n"}
+,{"stream_name":"stderr","time":6.378828056,"data":"0.00s - make the debugger miss breakpoints. Please pass -Xfrozen_modules=off\n"}
+,{"stream_name":"stderr","time":6.378832393,"data":"0.00s - to python to disable frozen modules.\n"}
+,{"stream_name":"stderr","time":6.378844845,"data":"0.00s - Note: Debugging will proceed. Set PYDEVD_DISABLE_FILE_VALIDATION=1 to disable this validation.\n"}
+,{"stream_name":"stdout","time":7.804010832,"data":"Mon Nov  2 13:34:38 2026       \n"}
+,{"stream_name":"stdout","time":7.804041913,"data":"+-----------------------------------------------------------------------------------------+\n"}
+,{"stream_name":"stdout","time":7.804046089,"data":"| NVIDIA-SMI 580.178.04             Driver Version: 580.178.04     CUDA Version: 13.0     |\n"}
+,{"stream_name":"stdout","time":7.804049598,"data":"+-----------------------------------------+------------------------+----------------------+\n"}
+,{"stream_name":"stdout","time":7.804053273,"data":"| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |\n"}
+,{"stream_name":"stdout","time":7.804056718,"data":"| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |\n"}
+,{"stream_name":"stdout","time":7.804060201,"data":"|                                         |                        |               MIG M. |\n"}
+,{"stream_name":"stdout","time":7.804063725,"data":"|=========================================+========================+======================|\n"}
+,{"stream_name":"stdout","time":7.804067088,"data":"|   0  Tesla T4                       Off |   00000000:00:04.0 Off |                    0 |\n"}
+,{"stream_name":"stdout","time":7.804075695,"data":"| N/A   57C    P8             14W /   70W |       0MiB /  15360MiB |      0%      Default |\n"}
+,{"stream_name":"stdout","time":7.8040790829999995,"data":"|                                         |                        |                  N/A |\n"}
+,{"stream_name":"stdout","time":7.804083997,"data":"+-----------------------------------------+------------------------+----------------------+\n"}
+,{"stream_name":"stdout","time":7.804091968,"data":"|   1  Tesla T4                       Off |   00000000:00:05.0 Off |                    0 |\n"}
+,{"stream_name":"stdout","time":7.804095346,"data":"| N/A   62C    P8             13W /   70W |       0MiB /  15360MiB |      0%      Default |\n"}
+,{"stream_name":"stdout","time":7.804097642,"data":"|                                         |                        |                  N/A |\n"}
+,{"stream_name":"stdout","time":7.804108685,"data":"+-----------------------------------------+------------------------+----------------------+\n"}
+,{"stream_name":"stdout","time":7.804111191,"data":"\n"}
+,{"stream_name":"stdout","time":7.804113301,"data":"+-----------------------------------------------------------------------------------------+\n"}
+,{"stream_name":"stdout","time":7.804115555,"data":"| Processes:                                                                              |\n"}
+,{"stream_name":"stdout","time":7.80411785,"data":"|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |\n"}
+,{"stream_name":"stdout","time":7.804120097,"data":"|        ID   ID                                                               Usage      |\n"}
+,{"stream_name":"stdout","time":7.804122313,"data":"|=========================================================================================|\n"}
+,{"stream_name":"stdout","time":7.804124524,"data":"|  No running processes found                                                             |\n"}
+,{"stream_name":"stdout","time":7.804127665,"data":"+-----------------------------------------------------------------------------------------+\n"}
+,{"stream_name":"stdout","time":7.80412999,"data":" Kaggle 2 x T4\n"}
+,{"stream_name":"stdout","time":1685.552978921,"data":"-- Configuring done (5.3s)\n"}
+,{"stream_name":"stdout","time":1685.553036503,"data":"-- Generating done (0.4s)\n"}
+,{"stream_name":"stdout","time":1685.553043747,"data":"-- Build files have been written to: /kaggle/working/llama.cpp/build\n"}
+,{"stream_name":"stdout","time":1685.553048492,"data":"[100%] Linking CXX executable ../../bin/llama-server\n"}
+,{"stream_name":"stdout","time":1685.553052759,"data":"[100%] Built target llama-server\n"}
+,{"stream_name":"stderr","time":1685.554129953,"data":"Cloning into 'llama.cpp'...\n"}
+,{"stream_name":"stderr","time":1685.554154856,"data":"Note: switching to '2e0d86bebc210947680e8f0d67daa79f3260c106'.\n"}
+,{"stream_name":"stderr","time":1685.554166089,"data":"\n"}
+,{"stream_name":"stderr","time":1685.554171417,"data":"You are in 'detached HEAD' state. You can look around, make experimental\n"}
+,{"stream_name":"stderr","time":1685.554175915,"data":"changes and commit them, and you can discard any commits you make in this\n"}
+,{"stream_name":"stderr","time":1685.554180178,"data":"state without impacting any branches by switching back to a branch.\n"}
+,{"stream_name":"stderr","time":1685.554185,"data":"\n"}
+,{"stream_name":"stderr","time":1685.554189659,"data":"If you want to create a new branch to retain commits you create, you may\n"}
+,{"stream_name":"stderr","time":1685.554194972,"data":"do so (now or later) by using -c with the switch command. Example:\n"}
+,{"stream_name":"stderr","time":1685.554199849,"data":"\n"}
+,{"stream_name":"stderr","time":1685.554204526,"data":"  git switch -c \u003cnew-branch-name\u003e\n"}
+,{"stream_name":"stderr","time":1685.554209351,"data":"\n"}
+,{"stream_name":"stderr","time":1685.554213594,"data":"Or undo this operation with:\n"}
+,{"stream_name":"stderr","time":1685.554217821,"data":"\n"}
+,{"stream_name":"stderr","time":1685.554222148,"data":"  git switch -\n"}
+,{"stream_name":"stderr","time":1685.554227257,"data":"\n"}
+,{"stream_name":"stderr","time":1685.554231691,"data":"Turn off this advice by setting config variable advice.detachedHead to false\n"}
+,{"stream_name":"stderr","time":1685.554236205,"data":"\n"}
+,{"stream_name":"stderr","time":1685.55424065,"data":"CMAKE_BUILD_TYPE=Release\n"}
+,{"stream_name":"stderr","time":1685.554245486,"data":"\n"}
+,{"stream_name":"stderr","time":1685.55424985,"data":"Cloning into 'llama.cpp'...\n"}
+,{"stream_name":"stderr","time":1685.554262967,"data":"Note: switching to '2e0d86bebc210947680e8f0d67daa79f3260c106'.\n"}
+,{"stream_name":"stderr","time":1685.554266869,"data":"\n"}
+,{"stream_name":"stderr","time":1685.5542704,"data":"You are in 'detached HEAD' state. You can look around, make experimental\n"}
+,{"stream_name":"stderr","time":1685.554274553,"data":"changes and commit them, and you can discard any commits you make in this\n"}
+,{"stream_name":"stderr","time":1685.554278259,"data":"state without impacting any branches by switching back to a branch.\n"}
+,{"stream_name":"stderr","time":1685.554282228,"data":"\n"}
+,{"stream_name":"stderr","time":1685.554285723,"data":"If you want to create a new branch to retain commits you create, you may\n"}
+,{"stream_name":"stderr","time":1685.554289911,"data":"do so (now or later) by using -c with the switch command. Example:\n"}
+,{"stream_name":"stderr","time":1685.554293419,"data":"\n"}
+,{"stream_name":"stderr","time":1685.554296861,"data":"  git switch -c \u003cnew-branch-name\u003e\n"}
+,{"stream_name":"stderr","time":1685.554300672,"data":"\n"}
+,{"stream_name":"stderr","time":1685.554304347,"data":"Or undo this operation with:\n"}
+,{"stream_name":"stderr","time":1685.554307824,"data":"\n"}
+,{"stream_name":"stderr","time":1685.554311369,"data":"  git switch -\n"}
+,{"stream_name":"stderr","time":1685.554314895,"data":"\n"}
+,{"stream_name":"stderr","time":1685.554318459,"data":"Turn off this advice by setting config variable advice.detachedHead to false\n"}
+,{"stream_name":"stderr","time":1685.554322243,"data":"\n"}
+,{"stream_name":"stderr","time":1685.554325473,"data":"CMAKE_BUILD_TYPE=Release\n"}
+,{"stream_name":"stderr","time":1686.585971391,"data":"Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.\n"}
+,{"stream_name":"stderr","time":1686.585992133,"data":"\n"}
+,{"stream_name":"stderr","time":1686.586011757,"data":"Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.\n"}
+,{"stream_name":"stdout","time":1939.450976365,"data":"server ready: b1-2e0d86b -c 32768\n"}
+,{"stream_name":"stdout","time":1966.716637139,"data":"no MODEL_API_KEY secret: Glimmer writes the letter, no Spark review, Muse Image is skipped\n"}
+,{"stream_name":"stdout","time":2244.98365915,"data":"CompletedProcess(args=['python3', 'pack.py', '/kaggle/working/cw/gate', '/kaggle/working/cw/gate/site.json'], returncode=0, stdout='wrote /kaggle/working/cw/gate/index.html: 2 serious, 3 close passes, fix: raised zebra crossing with guardrails leading to the crossing\\n', stderr='no street photo: no person tracks for /kaggle/working/cw/gate/clip.mp4; not showing an unblurred street photo\\nopen model reply: finish_reason stop, 3672 tokens\\n')\n"}
+,{"stream_name":"stdout","time":2244.983711478,"data":"276 s, 1 replies from Glimmer (0 retries)\n"}
+,{"stream_name":"stdout","time":2245.01781785,"data":"{\n"}
+,{"stream_name":"stdout","time":2245.017854149,"data":" \"team\": \"Run by the author on the author's own Kaggle account (free 2 x T4).\",\n"}
+,{"stream_name":"stdout","time":2245.017859154,"data":" \"notebook\": \"kaggle/glimmer-letter.ipynb, version 3, on our gate (cw-gate)\",\n"}
+,{"stream_name":"stdout","time":2245.017862429,"data":" \"code\": {\n"}
+,{"stream_name":"stdout","time":2245.017878798,"data":"  \"git_sha\": \"394a79729e3e469c5a4d405fbe252d850cc8b8b5\",\n"}
+,{"stream_name":"stdout","time":2245.017884343,"data":"  \"pack_py_sha256\": \"cbed9c14cdad6f1ca776449aa77847b05fccf0153e0f1c988901054ecea7123b\"\n"}
+,{"stream_name":"stdout","time":2245.017889471,"data":" },\n"}
+,{"stream_name":"stdout","time":2245.017907629,"data":" \"nvidia_smi\": \"Mon Nov  2 13:34:38 2026       \\n+-----------------------------------------------------------------------------------------+\\n| NVIDIA-SMI 580.178.04             Driver Version: 580.178.04     CUDA Version: 13.0     |\\n+-----------------------------------------+------------------------+----------------------+\\n| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |\\n| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |\\n|                                         |                        |               MIG M. |\\n|=========================================+========================+======================|\\n|   0  Tesla T4                       Off |   00000000:00:04.0 Off |                    0 |\\n| N/A   57C    P8             14W /   70W |       0MiB /  15360MiB |      0%      Default |\\n|                                         |                        |                  N/A |\\n+-----------------------------------------+------------------------+----------------------+\\n|   1  Tesla T4                       Off |   00000000:00:05.0 Off |                    0 |\\n| N/A   62C    P8             13W /   70W |       0MiB /  15360MiB |      0%      Default |\\n|                                         |                        |                  N/A |\\n+-----------------------------------------+------------------------+----------------------+\\n\\n+-----------------------------------------------------------------------------------------+\\n| Processes:                                                                              |\\n|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |\\n|        ID   ID                                                               Usage      |\\n|=========================================================================================|\\n|  No running processes found                                                             |\\n+-----------------------------------------------------------------------------------------+\\n\",\n"}
+,{"stream_name":"stdout","time":2245.017931208,"data":" \"llama_cpp\": {\n"}
+,{"stream_name":"stdout","time":2245.017934851,"data":"  \"build_info\": \"b1-2e0d86b\",\n"}
+,{"stream_name":"stdout","time":2245.017938278,"data":"  \"args\": [\n"}
+,{"stream_name":"stdout","time":2245.017941456,"data":"   \"-m\",\n"}
+,{"stream_name":"stdout","time":2245.017958063,"data":"   \"/tmp/glimmer/Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf\",\n"}
+,{"stream_name":"stdout","time":2245.01796209,"data":"   \"--mmproj\",\n"}
+,{"stream_name":"stdout","time":2245.01796599,"data":"   \"/tmp/glimmer/mmproj-Muse-Glimmer-30B-Q4_K_M.gguf\",\n"}
+,{"stream_name":"stdout","time":2245.017970109,"data":"   \"-ngl\",\n"}
+,{"stream_name":"stdout","time":2245.017973422,"data":"   \"99\",\n"}
+,{"stream_name":"stdout","time":2245.017976654,"data":"   \"--split-mode\",\n"}
+,{"stream_name":"stdout","time":2245.017979811,"data":"   \"layer\",\n"}
+,{"stream_name":"stdout","time":2245.017983046,"data":"   \"--jinja\",\n"}
+,{"stream_name":"stdout","time":2245.017986194,"data":"   \"--port\",\n"}
+,{"stream_name":"stdout","time":2245.017989426,"data":"   \"8080\",\n"}
+,{"stream_name":"stdout","time":2245.01799256,"data":"   \"-np\",\n"}
+,{"stream_name":"stdout","time":2245.017995674,"data":"   \"1\",\n"}
+,{"stream_name":"stdout","time":2245.017999314,"data":"   \"--chat-template-kwargs\",\n"}
+,{"stream_name":"stdout","time":2245.018003399,"data":"   \"{\\\"reasoning_strength\\\": \\\"medium\\\"}\",\n"}
+,{"stream_name":"stdout","time":2245.018007086,"data":"   \"--temp\",\n"}
+,{"stream_name":"stdout","time":2245.018010028,"data":"   \"1.0\",\n"}
+,{"stream_name":"stdout","time":2245.018017947,"data":"   \"--top-p\",\n"}
+,{"stream_name":"stdout","time":2245.018021617,"data":"   \"0.95\",\n"}
+,{"stream_name":"stdout","time":2245.018024696,"data":"   \"--top-k\",\n"}
+,{"stream_name":"stdout","time":2245.018027814,"data":"   \"64\",\n"}
+,{"stream_name":"stdout","time":2245.018030688,"data":"   \"--min-p\",\n"}
+,{"stream_name":"stdout","time":2245.018033724,"data":"   \"0\",\n"}
+,{"stream_name":"stdout","time":2245.018036988,"data":"   \"-c\",\n"}
+,{"stream_name":"stdout","time":2245.018040678,"data":"   \"32768\"\n"}
+,{"stream_name":"stdout","time":2245.01804455,"data":"  ],\n"}
+,{"stream_name":"stdout","time":2245.018047873,"data":"  \"n_ctx_slot\": 32768,\n"}
+,{"stream_name":"stdout","time":2245.018051143,"data":"  \"sampling\": {\n"}
+,{"stream_name":"stdout","time":2245.018054676,"data":"   \"temperature\": 1.0,\n"}
+,{"stream_name":"stdout","time":2245.018058281,"data":"   \"top_k\": 64,\n"}
+,{"stream_name":"stdout","time":2245.018062102,"data":"   \"top_p\": 0.949999988079071,\n"}
+,{"stream_name":"stdout","time":2245.018065329,"data":"   \"min_p\": 0.0\n"}
+,{"stream_name":"stdout","time":2245.018068601,"data":"  }\n"}
+,{"stream_name":"stdout","time":2245.018072445,"data":" },\n"}
+,{"stream_name":"stdout","time":2245.018076218,"data":" \"model\": {\n"}
+,{"stream_name":"stdout","time":2245.018080099,"data":"  \"repo\": \"meta-models/Muse-Glimmer-30B-GGUF\",\n"}
+,{"stream_name":"stdout","time":2245.018083623,"data":"  \"revision\": \"b44f1072cf75e918a1b82a3a17b45c4389b076e7\",\n"}
+,{"stream_name":"stdout","time":2245.018087847,"data":"  \"sha256_checked\": {\n"}
+,{"stream_name":"stdout","time":2245.018091559,"data":"   \"Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf\": \"4cc57c0f51040a226e5a72cc47b7613f7772950e460a665f7083de89f183f60e\",\n"}
+,{"stream_name":"stdout","time":2245.018095479,"data":"   \"mmproj-Muse-Glimmer-30B-Q4_K_M.gguf\": \"f48b452316f9b213758e8659444029b961a24a07f99a1abb2a9f88b06f7c00c6\"\n"}
+,{"stream_name":"stdout","time":2245.018099533,"data":"  }\n"}
+,{"stream_name":"stdout","time":2245.018102569,"data":" },\n"}
+,{"stream_name":"stdout","time":2245.018105541,"data":" \"elapsed_s\": {\n"}
+,{"stream_name":"stdout","time":2245.018108769,"data":"  \"built\": 1679,\n"}
+,{"stream_name":"stdout","time":2245.018112656,"data":"  \"downloaded\": 1852,\n"}
+,{"stream_name":"stdout","time":2245.018115942,"data":"  \"server_ready\": 1932,\n"}
+,{"stream_name":"stdout","time":2245.018119667,"data":"  \"letter_written\": 2238\n"}
+,{"stream_name":"stdout","time":2245.018122986,"data":" },\n"}
+,{"stream_name":"stdout","time":2245.018126147,"data":" \"pack_py_s\": 276,\n"}
+,{"stream_name":"stdout","time":2245.01812914,"data":" \"street_photo_sent\": false,\n"}
+,{"stream_name":"stdout","time":2245.018132933,"data":" \"letter\": {\n"}
+,{"stream_name":"stdout","time":2245.018136449,"data":"  \"writer\": \"Muse Glimmer 30B (open weights, self-hosted)\",\n"}
+,{"stream_name":"stdout","time":2245.018140171,"data":"  \"fix\": \"raised zebra crossing with guardrails leading to the crossing\",\n"}
+,{"stream_name":"stdout","time":2245.018144336,"data":"  \"sha256\": \"a49a4c70e4049fe5a811ee016a1ed0f5388be2861d954bd61c94c10b335aed69\",\n"}
+,{"stream_name":"stdout","time":2245.01814815,"data":"  \"timings\": {\n"}
+,{"stream_name":"stdout","time":2245.018151298,"data":"   \"cache_n\": 0,\n"}
+,{"stream_name":"stdout","time":2245.018154768,"data":"   \"prompt_n\": 1572,\n"}
+,{"stream_name":"stdout","time":2245.018158513,"data":"   \"prompt_ms\": 4272.494,\n"}
+,{"stream_name":"stdout","time":2245.01816236,"data":"   \"prompt_per_token_ms\": 2.7178715012722643,\n"}
+,{"stream_name":"stdout","time":2245.018171373,"data":"   \"prompt_per_second\": 367.93498130131957,\n"}
+,{"stream_name":"stdout","time":2245.018175514,"data":"   \"predicted_n\": 3672,\n"}
+,{"stream_name":"stdout","time":2245.018179438,"data":"   \"predicted_ms\": 271085.952,\n"}
+,{"stream_name":"stdout","time":2245.018183048,"data":"   \"predicted_per_token_ms\": 73.84526069190956,\n"}
+,{"stream_name":"stdout","time":2245.018188767,"data":"   \"predicted_per_second\": 13.541830452357784\n"}
+,{"stream_name":"stdout","time":2245.018193231,"data":"  },\n"}
+,{"stream_name":"stdout","time":2245.018196509,"data":"  \"usage\": {\n"}
+,{"stream_name":"stdout","time":2245.018200088,"data":"   \"completion_tokens\": 3672,\n"}
+,{"stream_name":"stdout","time":2245.018203726,"data":"   \"prompt_tokens\": 1572,\n"}
+,{"stream_name":"stdout","time":2245.018207558,"data":"   \"total_tokens\": 5244,\n"}
+,{"stream_name":"stdout","time":2245.018211164,"data":"   \"prompt_tokens_details\": {\n"}
+,{"stream_name":"stdout","time":2245.018215327,"data":"    \"cached_tokens\": 0\n"}
+,{"stream_name":"stdout","time":2245.018218463,"data":"   }\n"}
+,{"stream_name":"stdout","time":2245.018222143,"data":"  },\n"}
+,{"stream_name":"stdout","time":2245.018225766,"data":"  \"judged_by\": null,\n"}
+,{"stream_name":"stdout","time":2245.018229974,"data":"  \"tries\": 1,\n"}
+,{"stream_name":"stdout","time":2245.018233799,"data":"  \"unmeasured\": [],\n"}
+,{"stream_name":"stdout","time":2245.018237189,"data":"  \"unsupported\": []\n"}
+,{"stream_name":"stdout","time":2245.018241117,"data":" }\n"}
+,{"stream_name":"stdout","time":2245.018244774,"data":"}\n"}
+,{"stream_name":"stderr","time":2249.932582832,"data":"/usr/local/lib/python3.13/dist-packages/mistune.py:435: SyntaxWarning: invalid escape sequence '\\|'\n"}
+,{"stream_name":"stderr","time":2249.932613338,"data":"  cells[i][c] = re.sub('\\\\\\\\\\|', '|', cell)\n"}
+,{"stream_name":"stderr","time":2250.103793271,"data":"/usr/local/lib/python3.13/dist-packages/nbconvert/filters/filter_links.py:36: SyntaxWarning: invalid escape sequence '\\_'\n"}
+,{"stream_name":"stderr","time":2250.103840273,"data":"  text = re.sub(r'_', '\\_', text) # Escape underscores in display text\n"}
+,{"stream_name":"stderr","time":2250.843988582,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to notebook\n"}
+,{"stream_name":"stderr","time":2250.931595916,"data":"[NbConvertApp] Writing 129187 bytes to __notebook__.ipynb\n"}
+,{"stream_name":"stderr","time":2253.434037889,"data":"[NbConvertApp] Converting notebook __notebook__.ipynb to html\n"}
+,{"stream_name":"stderr","time":2254.000355475,"data":"[NbConvertApp] Writing 415106 bytes to __results__.html\n"}
+]
