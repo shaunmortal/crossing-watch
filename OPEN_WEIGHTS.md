@@ -3,6 +3,16 @@
 One page for the Open Weights review. Every open-weights call runs on our own (Kaggle) hardware or on partner inference
 (Fireworks), never on Meta's hosted API. Every judge number below re-scores at $0 from committed files.
 
+**At a glance: what our LoRA does to Muse Glimmer 30B**
+
+| | Base Muse Glimmer 30B | Glimmer + our LoRA |
+|---|---|---|
+| Verdicts finished under a 256-token cap (v6 test, 1,545 prompts) | 0 (still reasoning when cut off) | **1,545 of 1,545**, about 34 tokens each |
+| Right on v6's 1,501 blind test rows (labels frozen before any tuned reply) | none to score | **1,442**; Muse Spark Open 1,403; Muse Spark 1,467 |
+| Against Muse Spark Open, three pre-registered blind tests (v4, v5, v6) | – | **wins all three** (p 0.005, 0.029, 0.0006) |
+| v6 self-hosted on Kaggle's free 2 x T4 (Meta's 4-bit base) | – | **1,435 right; 81 vs 49 against Muse Spark Open, p 0.006** |
+| Our real gate case, every reasoning step on open weights (with Muse Spark Open) | – | the same 5 near-misses and 51 people as Muse Spark; letter passed the code check and the tuned judge first try; about $0.62 |
+
 **Lead result (4 Nov 2026): our real gate case, every reasoning step on open weights.** Muse Spark Open (Fireworks) reviewed the people, ran the case agent and wrote the letter; our LoRA-tuned Muse Glimmer reviewer, served on a Fireworks deployment for 4 minutes, read the letter. No Meta API key was set and every host except api.fireworks.ai went to a dead proxy. Same 5 near-misses and the same 51 people as the hosted run; the letter passed the code check and the tuned reviewer on the first try; about $0.62. SAM 3.1's and Muse Wonder's replies came from the hosted run's cache; Muse Image, which has no open-weights equivalent, was not called. Run log, request and response ids: [provenance/open-gate-2026-11-04](provenance/open-gate-2026-11-04/README.md).
 
 **Our tuned judge runs free (4 Nov 2026).** The v6 adapter, downloaded from Fireworks and converted to GGUF, ran over Meta's 4-bit Glimmer on Kaggle's free 2 x T4 and beat Muse Spark Open again on v6's 1,501 test rows: 1,435 right, **81 vs 49, p 0.006**, with the pass bar written before the run. It gave the same verdict as the Fireworks deployment on 1,492 rows. [score](provenance/glimmer-judge-lora-v6/kaggle/score.json), [notebook](kaggle/glimmer-judge-lora.ipynb), [run record](provenance/glimmer-judge-lora-v6/kaggle/glimmer-judge-lora-provenance.json).
