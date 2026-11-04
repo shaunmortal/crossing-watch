@@ -7,7 +7,20 @@ from math import comb
 from pathlib import Path
 HERE = Path(__file__).parent
 row = json.loads(subprocess.check_output([sys.executable, str(HERE / "score_ext.py"), *sys.argv[1:4]], text=True))
-sys.path.insert(0, str(HERE)); from score_ext import flags  # noqa: E402
+import re  # flags() as in score_ext.py (importing score_ext would run its own scoring and print twice)
+
+
+def problems(text):
+    m = re.search(r"\{.*\}", text or "", re.S)
+    try:
+        d = json.loads(m[0]) if m else None
+    except json.JSONDecodeError:
+        return None
+    return [x for x in d["problems"] if isinstance(x, str) and x.strip()] if isinstance(d, dict) and isinstance(d.get("problems"), list) else None
+
+
+def flags(path):
+    return {r["index"]: bool(problems(r["reply"])) for r in map(json.loads, open(path))}
 rows = {r["index"]: r for r in map(json.loads, open(sys.argv[1]))}
 t, s = flags(sys.argv[2]), flags(sys.argv[3])
 right = lambda f, i: f.get(i, False) == (rows[i]["label"] == 0)

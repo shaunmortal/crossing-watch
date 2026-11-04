@@ -1,0 +1,88 @@
+{
+ "rows": 1200,
+ "answered": {
+  "tuned": 1200,
+  "spark_open": 1200
+ },
+ "unreadable": {
+  "tuned": 2,
+  "spark_open": 0
+ },
+ "right": {
+  "tuned": 1008,
+  "spark_open": 924
+ },
+ "balanced_accuracy_pct": {
+  "tuned": 84.0,
+  "spark_open": 77.0
+ },
+ "tuned_vs_spark_open": {
+  "wins": 164,
+  "losses": 80,
+  "p": 0.0
+ },
+ "per_domain_right_tuned_spark_open_of": {
+  "billsum": [
+   78,
+   72,
+   120
+  ],
+  "ectsum": [
+   105,
+   92,
+   120
+  ],
+  "news": [
+   100,
+   92,
+   120
+  ],
+  "podcast": [
+   103,
+   100,
+   120
+  ],
+  "qmsumm": [
+   100,
+   90,
+   120
+  ],
+  "sales_call": [
+   108,
+   92,
+   120
+  ],
+  "sales_email": [
+   99,
+   97,
+   120
+  ],
+  "samsum": [
+   101,
+   94,
+   120
+  ],
+  "scitldr": [
+   105,
+   94,
+   120
+  ],
+  "shakespeare": [
+   109,
+   101,
+   120
+  ]
+ },
+ "pass_bar_met": true,
+ "document_level": {
+  "documents": 198,
+  "tuned_ahead": 62,
+  "behind": 24,
+  "p": 5e-05,
+  "net_row_wins": 84,
+  "bootstrap_95": [
+   49,
+   120
+  ]
+ }
+}

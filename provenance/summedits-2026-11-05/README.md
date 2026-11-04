@@ -13,6 +13,12 @@ SummEdits: Laban et al. 2023, Salesforce, CC-BY-4.0, https://huggingface.co/data
 | `ask_ext.py`, `ext_run.sh`, `ext_run.log` | the run as it was done: deployment created 18:38 UTC, ready 18:40, deleted 18:42 UTC (4 Nov), about 4 GPU-minutes |
 | `score_ext.py`, `score.json` | the pre-registered score |
 
-Result: the tuned judge right on 340 of 400, Muse Spark Open 322 (balanced accuracy 85.0% vs 80.5%); head to head 50
+**Replication (pre-registered before it ran), 1,200 fresh rows:** `make_rep.py` builds `rep.jsonl`; `rep-tuned.jsonl` and
+`rep-spark-open.jsonl` are the replies with request ids; `rep_run.sh`/`rep_run.log` and `rep-spark-open.log` the run;
+`score_rep.py` and `rep-score.json` the score. The tuned judge right on 1,008, Muse Spark Open on 924 (balanced
+accuracy 84.0% vs 77.0%); head to head 164 vs 80, p < 0.0001; ahead in all 10 domains; by document 62 vs 24,
+p 0.00005. Re-score: `python3 score_rep.py rep.jsonl rep-tuned.jsonl rep-spark-open.jsonl`.
+
+First test: the tuned judge right on 340 of 400, Muse Spark Open 322 (balanced accuracy 85.0% vs 80.5%); head to head 50
 vs 32, exact sign test p 0.060, so the pre-registered bar (p < 0.05) is not met. The tuned judge is ahead in 8 of
 the 10 domains. Re-score at $0 from this folder: `python3 score_ext.py test.jsonl test-tuned.jsonl test-spark-open.jsonl`.

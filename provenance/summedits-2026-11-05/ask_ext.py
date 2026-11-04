@@ -38,7 +38,8 @@ def main():
                 "reply": a["choices"][0]["message"].get("content") or "", "finish": a["choices"][0].get("finish_reason"),
                 "usage": a.get("usage"), "wall_s": round(time.monotonic() - t, 2)}
         with lock, out.open("a") as f: f.write(json.dumps(line) + "\n")
-    todo = [r for r in rows if r["index"] not in done]
+    lo, hi = (int(x) for x in os.environ.get("SLICE", "0,1000000").split(","))  # SLICE=lo,hi: this process's rows
+    todo = [r for r in rows if r["index"] not in done and lo <= r["index"] < hi]
     print(f"{judge}: asking {len(todo)} of {len(rows)}", flush=True)
     with ThreadPoolExecutor(16) as pool: list(pool.map(one, todo))
     print(f"{judge}: saved {len(out.read_text().splitlines()) if out.exists() else 0} of {len(rows)}", flush=True)

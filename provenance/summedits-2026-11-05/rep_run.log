@@ -1,0 +1,11 @@
+create 2026-11-04T18:55:20Z
+READY accounts/<fireworks-account>/deployments/cw-judge-summedits-rep
+ready 2026-11-04T18:59:00Z
+tuned: asking 1200 of 1200
+tuned: saved 1200 of 1200
+tuned: asking 0 of 1200
+tuned: saved 1200 of 1200
+asked 2026-11-04T19:01:19Z
+deleting cw-judge-summedits-rep (2026-11-04T19:01:19Z)
+deployments listed now: [('accounts/<fireworks-account>/deployments/cw-judge-summedits-rep', 'DELETING')]
+EXIT 0 2026-11-04T19:01:47Z

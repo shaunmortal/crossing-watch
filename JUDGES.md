@@ -18,6 +18,7 @@ The App, Explorer and Manual have a हिंदी / English switch. Every gate
   signed in support). On 3 Nov 2026 the college certified in writing that the footage was filmed at its gate with permission and that the report is genuine.
 - **Measured against ground truth:** drone-tracked DUT clips, 47 of 52 near-misses found after Muse Spark's review
   (50 of 52 by geometry alone); SinD, speed error 0.24 km/h mean, PET within 0.5 s of a textbook method on 53 of 66 conflicts.
+- **On public, human-labelled data too:** on SummEdits (10 domains it never saw, 1,200 fresh rows, pre-registered), the tuned judge beats Muse Spark Open, 1,008 vs 924 right, 164 vs 80, p < 0.0001: [result](GATES.md#summedits-replication-result-thu-5-nov-2026-run-0025-0116-ist).
 - **Our open-weights judge beats Muse Spark Open in three blind tests on planted errors:** a LoRA on Muse Glimmer, protocols written
   down first: p 0.005 (1,016 rows), 0.029 (1,278), 0.0006 (1,501), at a quarter of Spark's cost. Muse Spark (closed)
   leads overall (v6: 1,467 vs 1,445 right).

@@ -1271,6 +1271,27 @@ certified letter stays as written.
   per-domain counts. The two tests are reported separately, never pooled.
 - **Cost cap:** about $10; the deployment is deleted at the end (2-hour expiry as a backstop).
 
+## SummEdits replication: result (Thu 5 Nov 2026, run 00:25-01:16 IST)
+
+- **Run as pre-registered.** Deployment `cw-judge-summedits-rep` (1 x H200) created 00:25 IST, ready 00:29, deleted
+  00:31: about 6 GPU-minutes. Muse Spark Open on Fireworks serverless; to finish in time its rows were asked by two
+  processes in parallel (rows 0-599 and 600-1,199, same settings), merged by row index. Both judges answered all 1,200
+  rows; unreadable replies: tuned 2, Spark Open 0 (counted as "no problem", as pre-registered).
+- **Outcome by the pre-registered rule: met.** The tuned judge right on **1,008** of 1,200, Muse Spark Open on **924**
+  (balanced accuracy **84.0% vs 77.0%**). Head to head **164 vs 80**, exact sign test **p < 0.0001** (8.1e-8). Ahead in
+  all 10 domains.
+- **Document level (secondary, as pre-registered):** over the 198 documents, the tuned judge is ahead on 62 and behind
+  on 24 (p 0.00005); net row wins 84, bootstrap 95% interval 49 to 120.
+- **Speed:** a median of 9 output tokens and 1.6 s a verdict for the tuned judge, 567 tokens and 35 s for Spark Open.
+- **Scorer fix, before the score was read:** `score_rep.py` imported `score_ext.py`, which runs its own scoring on
+  import and printed a second JSON; it now carries the same `flags()` itself. The rule is unchanged.
+- **Reading, with the first test:** the judge was trained only on our synthetic road-safety letters; on public,
+  human-labelled summaries from 10 other domains it is ahead of Muse Spark Open in both tests (340 vs 322, p 0.060,
+  not significant; then 1,008 vs 924, p < 0.0001 on 1,200 fresh rows). The two tests are reported separately.
+- **Files:** [`provenance/summedits-2026-11-05/`](provenance/summedits-2026-11-05/): `rep.jsonl`, both judges' replies
+  with request ids, `rep-score.json`; re-score with `python3 score_rep.py rep.jsonl rep-tuned.jsonl rep-spark-open.jsonl`
+  from that folder.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
@@ -1307,3 +1328,4 @@ certified letter stays as written.
 - Thu 5 Nov 2026, 00:25 IST: the SummEdits result section added above. No pre-registered text changed.
 - Thu 5 Nov 2026, 00:25 IST: a pre-registration for a SummEdits replication on fresh rows added above, before its
   deployment was created. No pre-registered text changed.
+- Thu 5 Nov 2026, 01:20 IST: the SummEdits replication's result section added above. No pre-registered text changed.

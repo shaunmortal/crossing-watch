@@ -3,6 +3,8 @@
 One page for the Open Weights review. Every open-weights call runs on our own (Kaggle) hardware or on partner inference
 (Fireworks), never on Meta's hosted API. Every judge number below re-scores at $0 from committed files.
 
+**On public data too (5 Nov 2026, pre-registered):** on SummEdits, a public benchmark of document and summary pairs labelled by people in 10 domains the judge never saw, our tuned Glimmer judge beats Muse Spark Open on 1,200 fresh rows: **1,008 vs 924 right** (balanced accuracy 84.0% vs 77.0%; head to head 164 vs 80, **p < 0.0001**; ahead in all 10 domains), at a median of 9 output tokens and 1.6 s a verdict against 567 tokens and 35 s. A first, smaller test had it ahead too but short of the bar (340 vs 322 of 400, p 0.060); both are reported ([result](GATES.md#summedits-replication-result-thu-5-nov-2026-run-0025-0116-ist), [files](provenance/summedits-2026-11-05/)).
+
 ## For the Open Weights verifier: the five things asked for, one link each
 
 | Asked for (organizers, 1 Nov 2026) | Where it is |
@@ -24,6 +26,7 @@ Served on Fireworks on 2, 3 and 4 Nov 2026 with a response id on every row; self
 | Right on v6's blind test rows (labels frozen before any tuned reply) | **781** of the 1,210 it was given (8,192-token cap) | **1,442** of 1,501; on the same 1,210 rows **1,163** (there, Muse Spark Open 1,128 and Muse Spark 1,181) |
 | Against Muse Spark Open, three pre-registered blind tests (v4, v5, v6) | – | **wins all three** (p 0.005, 0.029, 0.0006) |
 | v6 self-hosted on Kaggle's free 2 x T4 (Meta's 4-bit base) | – | **1,435 right; 81 vs 49 against Muse Spark Open, p 0.006** |
+| Public, human-labelled benchmark: SummEdits, 10 domains it never saw, 1,200 fresh rows (pre-registered, 5 Nov) | – | **1,008 right vs Muse Spark Open 924; 164 vs 80, p < 0.0001**; ahead in all 10 domains |
 | Our real gate case, every reasoning step on open weights (with Muse Spark Open) | – | the same 5 near-misses and 51 people as Muse Spark; letter passed the code check and the tuned judge first try; about $0.62 |
 
 Head-to-head on the 1,210 rows, tuned vs base: 402 vs 20 (p < 0.0001). Where base finished (437 rows, mostly planted) it was right on 429 against the tuned judge's 418: the LoRA buys finishing, not caution ([pre-registered run and sensitivity](GATES.md#base-glimmer-against-the-tuned-judge-result-wed-4-nov-2026-run-2013-2127-ist)).
