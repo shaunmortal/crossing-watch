@@ -37,6 +37,18 @@ G2's due date (Wed 28 Oct 22:00) passed without a run, and G4's and G6's (Sun 1 
 Mon 2 Nov, because the gate recording moved to Mon 2 Nov: the college asked for Monday. Their pass conditions do not
 change. G5 and G8 keep Tue 3 Nov 22:00; G7's mark is still written on Mon 2 Nov night.
 
+### Known limits (moved here word for word from JUDGES.md, 4 Nov 2026)
+
+- Our gate was filmed hand-held from the highway and stabilized before analysis; counts cover the taped 15 m stretch
+  (GATES.md). G5, G6 and G8 have not run; G7 has no verdict before submission.
+- All ground truth (DUT, SinD) is top-down drone footage: no one is hidden. Phone-angle numbers are simulations.
+- The open-weights judge is tested on synthetic letters; on the letters as written it is slightly behind Spark Open (3 fewer right in each test; pooled p 0.049).
+- A Muse judge reading Muse letters is not independent. The tuned judge missed all six real slips the letter writers
+  made themselves in v4 (Spark caught six); a code check added afterwards (`pack.slips`, GATES.md) now catches 11 of
+  the 12 slip rows with no false alarm, but it was built from those rows, so that is not a blind result.
+- The Kaggle notebook is not public yet. Muse Image measures nothing, and
+  Muse Wonder's sound check is not ground truth.
+
 ## G6 pre-registration (written Thu 29 Oct 2026, before the taped lines are filmed)
 
 - **Lines.** Four tape marks, two on each kerb, make two lines across the road 15 m apart, centred on the crossing.

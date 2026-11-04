@@ -19,7 +19,7 @@
 |---|---|
 | **Impact** | A real gate, real near-misses: closest **0.0 s, 0.42 m apart**. Our college certified the report genuine (3 Nov 2026). Any school can repeat it with the [Manual](https://crossingwatch.xyz/manual/), for about **$12** of SAM for our 8.6-minute video against about **C$5,000** an intersection for a funded near-miss study |
 | **Meta AI tooling** | Seven Meta models, one job each ([table](#-seven-meta-models-each-doing-real-work)): **SAM 3.1** tracks and finds plates to hide; **Muse Spark** sets aside 66 of 75 alarms, runs the case agent and writes the letter; **Muse Image** draws the fix; **Muse Wonder** hears the horns; **Muse Voice Transcribe** finds speech to silence; **Muse Glimmer 30B** (LoRA-tuned by us) and **Muse Spark Open** run every reasoning step of the case on open weights |
-| **Technical depth** | Tape 15 m vs video **15.0 m**, on a line the maths never used; drone ground truth **47 of 52**; [3 pre-registered blind-test wins](OPEN_WEIGHTS.md); **242** self-checks |
+| **Technical depth** | Tape 15 m vs video **15.0 m**, on a line the maths never used; drone ground truth **47 of 52**; [3 pre-registered blind-test wins](OPEN_WEIGHTS.md); **243** self-checks |
 | **Demo** | The [2:42 video](https://youtu.be/mp9p4P14XfE); the [Live Explorer](https://crossingwatch.xyz/explorer/): switch Muse Spark's review off and on and watch 75 alarms become 5; the [live run's full log](provenance/live-run-2026-11-03/README.md) |
 | **Open Weights** | Every reasoning step of our gate case on open weights, same 5 near-misses and 51 people ([run](provenance/open-gate-2026-11-04/README.md)); our LoRA-tuned Glimmer judge beats Muse Spark Open on Kaggle's free 2 x T4, **81 vs 49, p 0.006** ([one page](OPEN_WEIGHTS.md)) |
 | **Agentic** | The case agent works 5 tools, stops to ask a person for a tape measure, and refuses the letter until video and tape agree ([log](provenance/gate-agent-2026-11-02/agent_log.jsonl), [replay](https://crossingwatch.xyz/app/#s3)) |
@@ -142,7 +142,7 @@ flowchart TD
 | 🕵️ | The letter: planted false numbers and claims | Muse Spark flagged **24 of 24** (**21 of 23** on the public bench you can re-run at $0); code checks every number | [bench](TECHNICAL.md#checking-the-checks) |
 | 🔓 | Open weights | tuned Glimmer judge wins **3** pre-registered blind tests on planted errors over Muse Spark Open (Muse Spark, closed, stays ahead overall); Muse Spark Open read our letter **6 of 6** times, no unsupported claim | [one page](OPEN_WEIGHTS.md) |
 | 📋 | Pass marks written before the runs | **G1 to G4 passed**: news CCTV, our gate's tape (15.0 m vs 15 m), DUT drone truth, our footage end to end | [GATES](GATES.md#verdict-now) |
-| ✅ | Self-checks | **242** self-checks, `python3 test_cw.py`, offline, in under a minute | [every claim](TECHNICAL.md#check-it-yourself) |
+| ✅ | Self-checks | **243** self-checks, `python3 test_cw.py`, offline, in under a minute | [every claim](TECHNICAL.md#check-it-yourself) |
 
 ## 📸 Screens
 

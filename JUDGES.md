@@ -1,9 +1,16 @@
 # For judges: where each claim is proved
 
-Solo Indie entry: one phone video of a dangerous crossing becomes near-miss evidence and a code-checked letter to the road authority.
+Solo Indie entry from Bhopal, India: one phone video of our college gate becomes measured near-misses and a code-checked letter to the road authority, and our college certified the report genuine.
 
-**Try it in a browser, no key:** [App](https://crossingwatch.xyz/app/) (press *Try it with our gate*) · [Explorer](https://crossingwatch.xyz/explorer/) · [Manual](https://crossingwatch.xyz/manual/) · [Evidence dashboard](https://crossingwatch.xyz/evidence/). The App, Explorer and Manual have a हिंदी / English switch.
-Each claim links to its proof.
+## 5-minute path
+
+1. **Watch the demo (2:42):** [youtu.be/mp9p4P14XfE](https://youtu.be/mp9p4P14XfE). Real footage of our gate, in the author's own voice.
+2. **Open the [Live Explorer](https://crossingwatch.xyz/explorer/)** (no key, no install): switch Muse Spark's review off and on and watch 75 alarms become 5; click the 0.0 s near-miss to replay it on the road map.
+3. **Open the [App, step 3](https://crossingwatch.xyz/app/#s3):** the case agent stops and asks a person for a tape measure: video 15.0 m, tape 15 m.
+4. **Read [OPEN_WEIGHTS.md](OPEN_WEIGHTS.md):** every reasoning step of our gate case on open weights, and our LoRA-tuned Muse Glimmer judge beating Muse Spark Open on Kaggle's free 2 x T4 (81 vs 49, p 0.006).
+5. **Run the checks (1 minute, optional):** `python3 test_cw.py` (243 checks; Python 3.11+ and ffmpeg; no key, no video), then `python3 pack.py sample sample/site.json` and open `sample/index.html`.
+
+The App, Explorer and Manual have a हिंदी / English switch. Every limit, and what has not run yet: [GATES.md, Verdict now](GATES.md#verdict-now).
 
 ## Only in Crossing Watch
 - **The whole loop, on our real gate:** a phone video becomes measured near-misses and a code-checked
@@ -15,18 +22,6 @@ Each claim links to its proof.
   down first: p 0.005 (1,016 rows), 0.029 (1,278), 0.0006 (1,501), at a quarter of Spark's cost. Muse Spark is still
   ahead overall (v6: 1,467 vs 1,445 right).
 - **Built for India:** a Hindi copy of the letter, notes the college can speak in Hindi or English (`--voice-notes`), Supreme Court and IRC references.
-
-## 5-minute path
-
-1. `python3 test_cw.py` (242 checks; Python 3.11+ and ffmpeg; about 30 s, no key, no video) and `python3 pack.py sample
-   sample/site.json`, then open `sample/index.html`: the measurements page built offline from a synthetic sample.
-   Without a key it has no letter ("letter failed" is expected); the sample's letter is in
-   `provenance/spark-open-sample-letter.txt`.
-2. Read [OPEN_WEIGHTS.md](OPEN_WEIGHTS.md): our fine-tuned open-weights judge against both Muse models in four
-   pre-registered blind tests on planted errors, and the same judge on Kaggle's free 2 x T4.
-3. Read [GATES.md, Verdict now](GATES.md#verdict-now): what was pre-registered, what passed, what has not run.
-4. Read [TECHNICAL, Limits, stated](TECHNICAL.md#limits-stated) and the known limits below.
-5. Watch the demo: [youtu.be/mp9p4P14XfE](https://youtu.be/mp9p4P14XfE) (2:42). Our gate's evidence page: [crossingwatch.xyz/evidence](https://crossingwatch.xyz/evidence/).
 
 ## Impact
 
@@ -99,15 +94,3 @@ Each claim links to its proof.
 - Muse Image draws the fix only inside the strip where people were measured crossing; every other pixel stays the
   real, blurred street. Muse Wonder listens around each near-miss for horns, brakes and shouts. At our gate it heard horns around 4 of the 5 near-misses, each timed on its card. `fixband.py`,
   `ailabel.py`, `listen.py`. On our gate: [the fix](docs/story/09-fix.jpg) (a full AI illustration; the people are not real), a painted zebra crossing and College Zone 20 km/h signs.
-
-## Known limits
-
-- Our gate was filmed hand-held from the highway and stabilized before analysis; counts cover the taped 15 m stretch
-  (GATES.md). G5, G6 and G8 have not run; G7 has no verdict before submission.
-- All ground truth (DUT, SinD) is top-down drone footage: no one is hidden. Phone-angle numbers are simulations.
-- The open-weights judge is tested on synthetic letters; on the letters as written it is slightly behind Spark Open (3 fewer right in each test; pooled p 0.049).
-- A Muse judge reading Muse letters is not independent. The tuned judge missed all six real slips the letter writers
-  made themselves in v4 (Spark caught six); a code check added afterwards (`pack.slips`, GATES.md) now catches 11 of
-  the 12 slip rows with no false alarm, but it was built from those rows, so that is not a blind result.
-- The Kaggle notebook is not public yet. Muse Image measures nothing, and
-  Muse Wonder's sound check is not ground truth.
