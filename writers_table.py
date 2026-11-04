@@ -1,11 +1,12 @@
-"""Writers table: who wrote the letter for the synthetic sample/, from each run's record, as one Markdown table:
+"""Writers table: who wrote each letter, from each run's record, as one Markdown table:
 open weights or not, where it ran, wall seconds, tokens, tries, the checks and the cost of the letter. Offline: it
 reads the records and the prices below, never an API.
 
 Run: python3 writers_table.py [RECORD.json ...]
-Default records: <removed-run-record> (the Kaggle notebook's) and provenance/spark-open-fireworks-sample.json
-(pack.py's letter-provenance.json). A Muse Spark run on the Meta API is read the same way: pack.py's record of it has
-"model", "host" ("api.meta.ai"), the Responses API "usage" and the reply's "wall_s".
+Default records: kaggle/glimmer-gate-provenance.json (the Kaggle notebook's, our gate's letter) and
+provenance/spark-open-fireworks-sample.json (pack.py's letter-provenance.json, the synthetic sample/'s letter). A
+Muse Spark run on the Meta API is read the same way: pack.py's record of it has "model", "host" ("api.meta.ai"), the
+Responses API "usage" and the reply's "wall_s".
 """
 import json
 import sys
@@ -15,7 +16,7 @@ import openweights
 import pack
 
 HERE = Path(__file__).parent
-RECORDS = (HERE / "kaggle" / "<removed-run-record>", HERE / "provenance" / "spark-open-fireworks-sample.json",
+RECORDS = (HERE / "kaggle" / "glimmer-gate-provenance.json", HERE / "provenance" / "spark-open-fireworks-sample.json",
            HERE / "provenance" / "spark-api-sample.json")
 META_HOST = "api.meta.ai"
 NAMES = {**openweights.NAMES, "muse-spark-1.3": "Muse Spark"}  # API model id -> product name

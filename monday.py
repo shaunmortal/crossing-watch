@@ -119,16 +119,14 @@ def by_eye(args):
 def kaggle_steps(args):
     gate = "~/cw-footage/kaggle-gate"
     return f"""
-Glimmer on the gate pack (Kaggle, notebook <removed-run-record> Version 3; never v2):
+Glimmer on the gate pack (Kaggle, on your own account, notebook kaggle/glimmer-gate.ipynb):
  1. mkdir -p {gate} && cp {shlex.quote(f"{args.out}/events.json")} {gate}/ && cp {shlex.quote(args.site)} {gate}/site.json
     (only these two: never clip.mp4, frames or person crops)
  2. Kaggle > Datasets > New, name it cw-gate, PRIVATE, upload the two files.
- 3. Open the v3 notebook > Add Input > cw-gate. In cell "4. Write the evidence pack" replace the OUT line with:
-    OUT = f'{{CW}}/gate'; os.makedirs(OUT, exist_ok=True); [shutil.copy(p, OUT) for p in glob.glob('/kaggle/input/**/cw-gate/*.json', recursive=True)]
- 4. GPU T4 x2, Internet on, secret MODEL_API_KEY attached if Spark should judge. Delete the last two cells, section
-    "6. Glimmer as the judge on the public planted-lies bench" (about 3 h); keep "5. Run record" above them.
+ 3. Open kaggle/glimmer-gate.ipynb > Add Input > the crossing-watch zip and cw-gate.
+ 4. GPU T4 x2, Internet on, secret MODEL_API_KEY attached if Spark should judge.
     Save Version > Save & Run All. Keep the version PRIVATE.
- 5. Download glimmer-letter.txt, plan.json and <removed-run-record>; keep them outside the repo until checked."""
+ 5. Download glimmer-letter.txt, plan.json and glimmer-gate-provenance.json; keep them outside the repo until checked."""
 
 
 def run(step, cmds, env, args):

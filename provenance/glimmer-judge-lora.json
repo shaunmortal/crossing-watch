@@ -39,8 +39,7 @@
    "spark-open/number in words",
    "spark-open/km/h written as mph"
   ],
-  "base_in_session": "not comparable: 78 of 79 base replies hit the 4096-token cap while reasoning (template 'Reasoning strength: high'), so the starter's exact-match delta and McNemar p are NOT quoted",
-  "base_reference": "Glimmer self-hosted on Kaggle (medium reasoning, 2 votes), kaggle/judge-bench-public.json: 23/23 lies, 5/8 clean letters flagged"
+  "base_in_session": "not comparable: 78 of 79 base replies hit the 4096-token cap while reasoning (template 'Reasoning strength: high'), so the starter's exact-match delta and McNemar p are NOT quoted"
  },
  "cost": {
   "training": "$0 (promotional LoRA SFT)",

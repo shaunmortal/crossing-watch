@@ -8,7 +8,7 @@ Run: python3 judge_bench.py --out FILE [--spark N] [--glimmer N]
 --public builds the bench only from letters written from the synthetic sample/, safe to publish.
 FILE keeps the letters and every verdict: when it exists the bench reads its letters from it (so a Kaggle run needs
 only FILE), re-scores the code check and asks each judge only for the runs it still lacks. --glimmer needs
-LETTER_MODEL_URL (an OpenAI-compatible server, as in <removed-run-record>). With JUDGE_VOTES=2 each Glimmer
+LETTER_MODEL_URL (an OpenAI-compatible server, as in kaggle/glimmer-gate.ipynb). With JUDGE_VOTES=2 each Glimmer
 run asks it twice and flags only when both replies list a problem (pack.vote); FILE keeps both raw replies and the vote
 under "glimmer_votes". Muse Spark is always asked once.
 """
@@ -25,12 +25,12 @@ import sam
 from score_humans import wilson
 
 HERE = Path(__file__).parent
-GLIMMER_RUN = HERE / "kaggle" / "<removed-run-record>"  # Glimmer's v1 letter, written from sample/
+GLIMMER_LETTER = HERE / "kaggle" / "glimmer-sample-letter.txt"  # Glimmer's letter, written from sample/
 SPARK_OPEN_LETTER = HERE / "provenance" / "spark-open-sample-letter.txt"  # Spark Open's letter, written from sample/
 SPARK_OPEN_RECORD = HERE / "provenance" / "spark-open-fireworks-sample.json"  # its run: request id, tokens, sha256
 PUBLIC = HERE / "kaggle" / "judge-bench-public.json"
-SOURCES = {"glimmer": "Muse Glimmer 30B (open weights, self-hosted on Kaggle 2 x T4), v1 letter quoted in "
-                      "<removed-run-record>, written from the synthetic sample/ (made-up tracks, no video)",
+SOURCES = {"glimmer": "Muse Glimmer 30B (open weights), letter in kaggle/glimmer-sample-letter.txt, written during "
+                      "development from the synthetic sample/ (made-up tracks, no video)",
            "spark-open": "Muse Spark Open (open weights, on Fireworks), letter in provenance/spark-open-sample-letter.txt, "
                          "its run in provenance/spark-open-fireworks-sample.json, written from the synthetic sample/ "
                          "(made-up tracks, no video)"}  # every base of the public bench, by its id prefix
@@ -120,11 +120,11 @@ def measurements(events_file, site):
 
 
 def glimmer_base():
-    """("glimmer", letter, facts): Glimmer's v1 letter from its run record, and the facts of sample/ it came from."""
-    record = GLIMMER_RUN.read_text()
-    quoted = re.search(r"\*\*Letter to the road authority\*\*.*?\n\n((?:> .*\n?)+)", record)[1]
+    """("glimmer", letter, facts): Glimmer's letter (the text after the file's header line), and the facts of sample/
+    it came from."""
+    letter = GLIMMER_LETTER.read_text().split("\n\n", 1)[1].rstrip("\n")
     site = json.loads((HERE / "sample" / "site.json").read_text())
-    return "glimmer", " ".join(line[2:] for line in quoted.splitlines()), measurements(HERE / "sample" / "events.json", site)
+    return "glimmer", letter, measurements(HERE / "sample" / "events.json", site)
 
 
 def spark_open_base():
