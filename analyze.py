@@ -163,8 +163,7 @@ def prepare(video, out_dir, extra_filter="", window=None):
     if clip.exists():
         return clip
     partial = out_dir / "clip.part.mp4"
-    hdr = probe(video, "stream=color_transfer") in filmcheck.HDR_TRANSFERS
-    filters = ",".join(f for f in (extra_filter, f"fps={FPS}", f"scale={WIDTH}:-2" + (TO_SDR if hdr else "")) if f)
+    filters = prep_filters(video, extra_filter, WIDTH)
     cut = ["-ss", f"{window[0]:.3f}", "-t", f"{window[1] - window[0]:.3f}"] if window else []
     try:
         subprocess.run(["ffmpeg", "-v", "error", "-y", *cut, "-i", str(video), "-vf", filters, "-an", "-c:v", "libx264",
@@ -173,6 +172,13 @@ def prepare(video, out_dir, extra_filter="", window=None):
     finally:
         partial.unlink(missing_ok=True)
     return clip
+
+
+def prep_filters(video, extra_filter, width):
+    """ffmpeg's filters from `video` to the analysed frames: the site's prep_filter, FPS frames a second, `width`
+    ("iw" keeps the full resolution), an HDR source mapped to SDR."""
+    hdr = probe(video, "stream=color_transfer") in filmcheck.HDR_TRANSFERS
+    return ",".join(f for f in (extra_filter, f"fps={FPS}", f"scale={width}:-2" + (TO_SDR if hdr else "")) if f)
 
 
 def camera_check(clip, total, window=None):
@@ -276,11 +282,46 @@ def check_cost(pieces, plan, frame_size, total, cap, images=0, all_images=0):
     print(f"{total / FPS / 60:.1f} min of video, {len(pieces)} part(s), {len(units)} SAM video request(s), "
           f"{images} image request(s); "
           f"SAM cost about ${usd:.2f}", flush=True)
-    if round(usd, 2) > cap:  # in whole cents, as printed
+    within_cap(usd, cap)
+    return usd, usd_for(sum(n for n, _, _ in units), all_images)
+
+
+def within_cap(usd, cap):
+    """Stop before paying when an estimate, in whole cents as printed, is over `cap` dollars (spend_cap)."""
+    if round(usd, 2) > cap:
         raise SystemExit(f"estimated SAM cost ${usd:.2f} is over the ${cap:.2f} this run may still spend; pass a larger "
                          f"--budget USD (without one the cap is ${MAX_COST_USD:.0f}, lifted by --allow-cost). Replies "
                          "already received are cached and not paid for again")
-    return usd, usd_for(sum(n for n, _, _ in units), all_images)
+
+
+def plate_windows(events):
+    """(first, last) clip frames searched for number plates: frame 0 (pack's street photo), then each evidence clip's
+    window."""
+    return [(0, 0), *(render.window(e, FPS) for e in evidence_events(events))]
+
+
+def plate_bill(out_dir, windows):
+    """(SAM's bill for the plate requests of `windows` not cached yet, for all of them): one video request each,
+    billed at least SAM_MIN_FRAMES."""
+    usd = lambda ws: sum(max(SAM_MIN_FRAMES, last - first + 1) for first, last in ws) / 1000 * SAM_USD_PER_1K_FRAMES
+    new = [w for w in windows if not sam.cache_path(render.plate_folder(out_dir, *w), render.PLATE_CONCEPT).exists()]
+    return usd(new), usd(windows)
+
+
+def fetch_plates(video, out_dir, windows, offset_s, key, prep_filter=""):
+    """SAM 3.1's "license plate" for each of `windows` not cached yet, on a cut of `video` at full resolution (at
+    WIDTH px a plate is ~10 px wide, too small to find), frame for frame with the clip (`offset_s`: the video's second
+    at clip frame 0). Cached in render.plate_folder, where render reads it (render.cached_plates)."""
+    for first, last in windows:
+        folder = render.plate_folder(out_dir, first, last)
+        if sam.cache_path(folder, render.PLATE_CONCEPT).exists():
+            continue
+        folder.mkdir(parents=True, exist_ok=True)
+        cut = folder / "clip.mp4"
+        if not cut.exists():  # the unblurred video at full resolution: it stays in out_dir, never shared
+            encode(video, cut, "-ss", f"{offset_s + first / FPS:.3f}", "-t", f"{(last - first + 1) / FPS:.3f}", "-vf",
+                   prep_filters(video, prep_filter, "iw"))
+        sam.track(cut, render.PLATE_CONCEPT, key, folder)
 
 
 
@@ -628,8 +669,9 @@ def add_evidence(video, clip, out_dir, events, people, vehicles, person_boxes, v
                  everyone, offset_s=0.0):
     """Evidence clip and sound check for evidence_events; one failure costs that event's evidence, not the run. Only
     the frames of the track piece that made the event are drawn (SAM silhouettes, boxes where no mask is cached); the
-    heads of `everyone` and every number plate are blurred. Each clip's frames are also saved in road metres, for
-    video/split.py. `offset_s`: where the clip starts in the video (window_s), as the sound is cut from the video."""
+    heads of `everyone` are blurred and the number plates SAM found (fetch_plates) hidden. Each clip's frames are also
+    saved in road metres, for video/split.py. `offset_s`: where the clip starts in the video (window_s), as the sound
+    is cut from the video: each clip gets the road's own sound, every voice muted (render.road_sound)."""
     shown = evidence_events(events)
     for i, e in enumerate(shown):
         pair = piece_boxes(person_boxes, people, e["person"]), vehicle_boxes[e["vehicle"]]
@@ -640,6 +682,7 @@ def add_evidence(video, clip, out_dir, events, people, vehicles, person_boxes, v
             e["heard"] = listen.listen(video, e, out_dir / f"event{i + 1}.wav", key, offset_s)
             e["strobe"] = render.strobe(out_dir / e["clip"], e, *pair, FPS, frame_size,
                                         out_dir / f"event{i + 1}-strobe.jpg")  # the whole near-miss in one picture
+            render.road_sound(out_dir / e["clip"], video, e, FPS, offset_s, key)  # last: a failure costs only the sound
             print(f"evidence clip {i + 1} of {len(shown)} written", flush=True)
         except (subprocess.CalledProcessError, OSError) as err:
             print(f"evidence for event {i + 1} failed: {err}", flush=True)
@@ -759,6 +802,13 @@ def main():
                            "by_eye": True}
     if by_eye:
         print(f"checked by eye, not pedestrians: {', '.join(sorted(by_eye))}", flush=True)
+    windows = plate_windows(events)
+    new_plates, plates_usd = plate_bill(out_dir, windows)
+    print(f"number plates: {len(windows)} SAM video request(s) at full resolution; SAM cost about ${new_plates:.2f}",
+          flush=True)
+    within_cap(new_plates, cap - spent)
+    fetch_plates(args.video, out_dir, windows, (window or [0.0])[0], key, site.get("prep_filter", ""))
+    spent, sam_usd = spent + new_plates, sam_usd + plates_usd
     everyone, privacy, searched = list(person_boxes.values()), None, []
     # with no events this searches frame 0 only (one image): the street photo is still shown for the desire lines
     if person_concept not in crowded + list(switched) and full_requests(pieces, [(person_concept, grid)], frame_size)[0]:
