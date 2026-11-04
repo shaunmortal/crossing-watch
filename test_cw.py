@@ -4630,6 +4630,22 @@ def test_kaggle_gate_notebook_saves_the_letter_and_names_the_authors_own_account
     assert record["team"] == "Run by the author on the author's own Kaggle account (free 2 x T4)."
 
 
+def test_removed_note_lists_a_piece_ruled_out_by_eye_apart_from_muse_sparks_removals():
+    """A piece a person ruled out by eye is not counted as Muse Spark's, and Spark's own reason (it had called the
+    piece a person) is not shown next to it."""
+    import pack
+    events = [{"person": "c1/0", "review": {"is_person": False, "road_user": "rider", "reason": "on a bike"}},
+              {"person": "c9/0", "review": {"is_person": False, "road_user": "not a pedestrian", "by_eye": True,
+                                            "reason": "a person standing on the road"}},
+              {"person": "c5/0", "review": {"is_person": True, "road_user": "adult"}}]
+    note = pack.removed_note(events)
+    assert note.startswith('Removed by Muse Spark: 1 track (track c1/0, rider')
+    assert "Ruled out by eye: track c9/0 (see GATES.md). Spark can be wrong." in note
+    assert "standing" not in note and "c5/0" not in note
+    only_eye = pack.removed_note(events[1:])
+    assert only_eye == "Ruled out by eye: track c9/0 (see GATES.md). Spark can be wrong."
+
+
 def test_no_file_mentions_another_persons_account_and_the_early_kaggle_runs_are_gone():
     """Every run kept here was on the author's own accounts: no tracked text file mentions anyone else's account (the
     patterns spell their words with a class, so this file does not match itself), and the early Kaggle run records

@@ -1085,16 +1085,19 @@ def camera_note(camera, start_s=0):
 
 
 def removed_note(events):
-    """The tracks Muse Spark's review removed, the same ones confirmed() and real_crossers() leave out: each track,
-    what Spark called it and its reason as review.public_reason shows it (never a crop); "" when none was."""
+    """The tracks the review removed, the same ones confirmed() and real_crossers() leave out: each track Muse Spark
+    removed, what Spark called it and its reason as review.public_reason shows it (never a crop); then any piece a
+    person ruled out by eye (analyze.py marks it by_eye), listed apart and without Spark's reason; "" when none was."""
     removed = {}
     for e in events:
         if (e.get("review") or {}).get("is_person") is False:
             removed.setdefault(e["person"], e["review"])
     said = [f"track {pid}, {v['road_user']}" + (f' ("{why}")' if (why := review.public_reason(v.get("reason"))) else "")
-            for pid, v in removed.items()]
-    return (f"Removed by Muse Spark: {len(said)} track{'' if len(said) == 1 else 's'} ({'; '.join(said)}). Spark can "
-            "be wrong." if said else "")
+            for pid, v in removed.items() if not v.get("by_eye")]
+    eye = [f"track {pid}" for pid, v in removed.items() if v.get("by_eye")]
+    parts = ([f"Removed by Muse Spark: {len(said)} track{'' if len(said) == 1 else 's'} ({'; '.join(said)})."] if said else []) \
+        + ([f"Ruled out by eye: {', '.join(eye)} (see GATES.md)."] if eye else [])
+    return " ".join(parts + ["Spark can be wrong."]) if parts else ""
 
 
 def window_line(window, recording_s=None):
