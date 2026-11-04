@@ -227,6 +227,7 @@ Solo entry by Ayush Kumar, built with Claude Code as a coding assistant. All wor
 from 28 Oct 2026; the one ported piece is the mask decoder below. The gate letter's run
 (`kaggle/glimmer-gate.ipynb`) was on the author's own Kaggle account.
 
+- **Development history.** Before the author had any GPU time, a friend gave free Kaggle GPU hours for early Muse Glimmer test runs (29 Oct 2026). The friend wrote no code and is not a team member, as the organizers confirmed on Discord (5 Nov 2026). One output of those runs is used here: `kaggle/glimmer-sample-letter.txt`, Glimmer's letter for the synthetic `sample/`, one of the two base letters of the judge bench (`judge_bench.py`, `kaggle/judge-bench-public.json`). Every other Kaggle run cited here, including the gate letter and the tuned judge's replication, ran on the author's own account.
 - **Licences.** `masks.py` ports the one_bit mask decoder from Meta's meta-sam-parser (`_mask_codec.py`, Copyright (c)
   Meta Platforms, Inc. and affiliates) under its SAM License, in `LICENSES/SAM-License.txt`; all other code and the docs
   are MIT (`LICENSE`). The footage, photos and college documents in `docs/` are not under MIT: they show real people

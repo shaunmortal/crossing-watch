@@ -4649,9 +4649,10 @@ def test_removed_note_lists_a_piece_ruled_out_by_eye_apart_from_muse_sparks_remo
 
 
 def test_no_file_mentions_another_persons_account_and_the_early_kaggle_runs_are_gone():
-    """Every run kept here was on the author's own accounts: no tracked text file mentions anyone else's account (the
-    patterns spell their words with a class, so this file does not match itself), and the early Kaggle run records
-    are gone, as files and as mentions."""
+    """Every run kept here was on the author's own accounts, apart from the one output the README's Development history
+    names (Glimmer's sample letter, from an early run on a friend's GPU hours): no tracked text file mentions anyone
+    else's account (the patterns spell their words with a class, so this file does not match itself), and the early
+    Kaggle run records are gone, as files and as mentions."""
     import re, subprocess
     from pathlib import Path
     here = Path(__file__).parent
