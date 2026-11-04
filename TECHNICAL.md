@@ -53,7 +53,7 @@ Crossing Watch turns one phone video of a school or college crossing into measur
 
 ## Run
 
-Needs Python 3.11+ and ffmpeg. No other dependencies. Put `MODEL_API_KEY=...` (Meta Model API) in `.env`.
+Needs Python 3.11+ and ffmpeg 7.1 or newer. No other dependencies. Put `MODEL_API_KEY=...` (Meta Model API) in `.env`.
 
 ```
 open calibrate.html                      # tape-measured rectangle, or no tape: match 4 points to a satellite view;

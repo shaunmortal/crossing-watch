@@ -8,7 +8,7 @@ Solo Indie entry from Bhopal, India: one phone video of our college gate becomes
 2. **Open the [Live Explorer](https://crossingwatch.xyz/explorer/)** (no key, no install): switch Muse Spark's review off and on and watch 75 alarms become 5; click the 0.0 s near-miss to replay it on the road map.
 3. **Open the [App, step 3](https://crossingwatch.xyz/app/#s3):** the case agent stops and asks a person for a tape measure: video 15.0 m, tape 15 m.
 4. **Read [OPEN_WEIGHTS.md](OPEN_WEIGHTS.md):** every reasoning step of our gate case on open weights, and our LoRA-tuned Muse Glimmer judge beating Muse Spark Open on Kaggle's free 2 x T4 (81 vs 49, p 0.006).
-5. **Run the checks (1 minute, optional):** `python3 test_cw.py` (243 checks; Python 3.11+ and ffmpeg; no key, no video), then `python3 pack.py sample sample/site.json` and open `sample/index.html`.
+5. **Run the checks (1 minute, optional):** `python3 test_cw.py` (243 checks; Python 3.11+ and ffmpeg 7.1 or newer; no key, no video), then `python3 pack.py sample sample/site.json` and open `sample/index.html`.
 
 The App, Explorer and Manual have a हिंदी / English switch. Every gate's verdict, with pass marks written before the runs: [GATES.md, Verdict now](GATES.md#verdict-now).
 

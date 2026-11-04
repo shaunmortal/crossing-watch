@@ -216,7 +216,7 @@ behind on the 20 real slips the writers made themselves (8 vs 20). Re-score: `py
 
 Training added model-written slip edits and 32 real writer slips; `pack.slips` widened (a270d6d) and frozen; fresh
 test of 260 letters, 1,501 rows (GATES.md "v6"). **Beats Muse Spark Open** (1,445 vs 1,403 right, p 0.00023) and
-beats Muse Spark on model-written slips (225 vs 214 of 230, p 0.027); **Muse Spark is ahead overall** (1,467, p 0.023),
+catches more model-written slips than Muse Spark (225 vs 214 of 230, p 0.027); **Muse Spark is ahead overall** (1,467, p 0.023),
 mainly on model-written lies (243 vs 214 of 245). Pre-registered as the last judge run before submission.
 
 On 4 Nov 2026 the v6 adapter ran over Meta's 4-bit Glimmer on Kaggle's free 2 x T4 (`kaggle/glimmer-judge-lora.ipynb`,

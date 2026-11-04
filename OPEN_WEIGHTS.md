@@ -69,7 +69,7 @@ letters written by Muse Spark and Muse Spark Open, with lies and slips planted b
   (GATES.md). v4's and v5's wins are broad (v4 model-written rows 19 vs 4).
 - **The LoRA turns Glimmer into a concise judge:** with the same 256-token cap, base Glimmer finished 0 of 1,545
   verdicts in v6's evaluation (still reasoning when cut off); tuned Glimmer finished every one in about 34 tokens
-  (1,167 vs 0 replies matching the label exactly). Base Glimmer with a longer cap was not measured.
+  (1,167 vs 0 replies matching the label exactly). Given an 8,192-token cap on 4 Nov, base Glimmer finished 437 of 1,210 verdicts and was right on 781 against the tuned judge's 1,163 (the glance table above; [run](GATES.md#base-glimmer-against-the-tuned-judge-result-wed-4-nov-2026-run-2013-2127-ist)).
 - **Served, not just trained:** on 2 Nov 2026 we deployed the v6 adapter on Fireworks (1 x H200, live merge) and
   replayed all 1,545 v6 prompts: same verdict as the training session on 1,499 of 1,501 test rows, the same 1,442
   right, the same 82 vs 43 against Spark Open; every reply finished, median 2.1 s. Through the product's own judge path

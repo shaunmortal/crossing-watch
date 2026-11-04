@@ -17,7 +17,7 @@
 
 | Judging | Where to look |
 |---|---|
-| **Impact** | A real gate, real near-misses: closest **0.0 s, 0.42 m apart**. Our college certified the report genuine (3 Nov 2026), and its Head of CSE (Data Science) writes of "several close calls" with "no documented evidence" until now ([his statement](#from-the-college-in-its-own-words)). Any school can repeat it with a phone, a tape and the [Manual](https://crossingwatch.xyz/manual/), for about **$12** of SAM for our 8.6-minute video |
+| **Impact** | A real gate, real near-misses: closest **0.0 s, 0.42 m apart**. Our college certified the report genuine (3 Nov 2026), and its Head of CSE (Data Science) writes of "several close calls" and that until now the college "did not have any documented evidence" ([his statement](#from-the-college-in-its-own-words)). Any school can repeat it with a phone, a tape and the [Manual](https://crossingwatch.xyz/manual/), for about **$12** of SAM for our 8.6-minute video |
 | **Meta AI tooling** | Seven Meta models, one job each ([table](#-seven-meta-models-each-doing-real-work)). Core: **SAM 3.1** tracks people and vehicles and finds plates to hide; **Muse Spark** sets aside 66 of 75 alarms, runs the case agent and writes the letter; **Muse Spark Open** and **Muse Glimmer 30B** (LoRA-tuned by us) run every reasoning step of the case on open weights. Supporting: **Muse Wonder** hears the horns, **Muse Voice Transcribe** finds speech to silence, **Muse Image** draws the fix |
 | **Technical depth** | Tape 15 m vs video **15.0 m**, on a line the maths never used; drone ground truth **47 of 52**; [3 pre-registered blind-test wins](OPEN_WEIGHTS.md); **243** self-checks |
 | **Demo** | The [2:45 video](https://youtu.be/9QSc-Urqpr4); the [Live Explorer](https://crossingwatch.xyz/explorer/): switch Muse Spark's review off and on and watch 75 alarms become 5; the [live run's full log](provenance/live-run-2026-11-03/README.md); the [case agent live on camera](provenance/agent-live-2026-11-04/README.md) |
@@ -163,7 +163,7 @@ flowchart TD
 
 ## 🚀 Run it locally
 
-Needs Python 3.11+ and ffmpeg; no key, no video. With `MODEL_API_KEY` or `LETTER_MODEL_URL` set, the sample also gets the fix and the letter.
+Needs Python 3.11+ and ffmpeg 7.1 or newer; no key, no video. With `MODEL_API_KEY` or `LETTER_MODEL_URL` set, the sample also gets the fix and the letter.
 ```
 python3 test_cw.py                        # self-checks, under a minute
 python3 pack.py sample sample/site.json   # the synthetic sample (made-up tracks) -> sample/index.html
@@ -205,7 +205,7 @@ from 28 Oct 2026; the one ported piece is the mask decoder below. The gate lette
   are MIT (`LICENSE`). The footage, photos and college documents in `docs/` are not under MIT: they show real people
   (faces and plates hidden) and are shared only to show this work. The letter's check-then-retry, reject-with-notes and one-tool-per-turn agent loop follow the shape of
   Meta's legal-agent workshop (github.com/meta-models/legal-agent-workshop); no code was copied from it.
-- **What runs.** Python standard library only (the optional stabiliser, `stabilize.py`, also needs OpenCV and NumPy), plus ffmpeg as a command-line tool (a GPL build with libx264, not
+- **What runs.** Python standard library only (the optional stabiliser, `stabilize.py`, also needs OpenCV (Apache-2.0) and NumPy (BSD-3-Clause)), plus ffmpeg as a command-line tool (a GPL build with libx264, not
   bundled) and Chrome or any Chromium for the demo's hero shot (`video/split.py`). Inside the Kaggle notebook:
   llama.cpp `b11976` (MIT), huggingface_hub (Apache-2.0) and the Muse Glimmer 30B GGUF weights (Apache-2.0, Hugging
   Face revision `b44f1072`). Built with Muse Spark Open: its open weights are used as served by Fireworks under Meta's Muse Model License, and
@@ -213,8 +213,8 @@ from 28 Oct 2026; the one ported piece is the mask decoder below. The gate lette
   services: the Meta Model API, Fireworks for Muse Spark Open and our Glimmer LoRA judge (trained and served there),
   Kaggle's 2 x T4 for Glimmer's letter. The Glimmer LoRA was trained through Fireworks with the open-source fw-ai/cookbook
   (commit 57968a2, its `muse_glimmer_starter` script, Apache-2.0); `judge_v6.py` and `judge_v7.py` optionally use it and
-  Hugging Face transformers (Apache-2.0) only to count tokens. The website (`docs/`) loads GSAP 3.12.5 with ScrollTrigger and Lenis 1.1.13
-  from public CDNs, and Google Fonts, each under its own licence.
+  Hugging Face transformers (Apache-2.0) only to count tokens. The website (`docs/`) loads GSAP 3.12.5 with ScrollTrigger (GreenSock standard licence) and Lenis 1.1.13 (MIT)
+  from public CDNs, and Google Fonts (SIL Open Font License 1.1).
 - **Datasets, none included.** SinD (github.com/SOTIF-AVLab/SinD; non-commercial, its public sample used only for
   validation; Xu Y. et al., IEEE ITSC 2022, doi:10.1109/ITSC55140.2022.9921959, v1). DUT
   (github.com/dongfang-steven-yang/vci-dataset-dut; published openly by its authors with a request to cite, which we do;
