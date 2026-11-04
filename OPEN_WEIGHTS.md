@@ -8,10 +8,13 @@ One page for the Open Weights review. Every open-weights call runs on our own (K
 | | Base Muse Glimmer 30B | Glimmer + our LoRA |
 |---|---|---|
 | Verdicts finished under a 256-token cap (v6 test, 1,545 prompts) | 0 (still reasoning when cut off) | **1,545 of 1,545**, about 34 tokens each |
-| Right on v6's 1,501 blind test rows (labels frozen before any tuned reply) | none to score | **1,442**; Muse Spark Open 1,403; Muse Spark 1,467 |
+| Verdicts finished under an 8,192-token cap, JSON mode (4 Nov, 1,210 scored rows) | 437 of 1,210; median 8,192 output tokens and 56 s a verdict | all; median 37 tokens, 2.1 s |
+| Right on v6's blind test rows (labels frozen before any tuned reply) | **781** of the 1,210 it was given (8,192-token cap) | **1,442** of 1,501; on the same 1,210 rows **1,163** (there, Muse Spark Open 1,128 and Muse Spark 1,181) |
 | Against Muse Spark Open, three pre-registered blind tests (v4, v5, v6) | – | **wins all three** (p 0.005, 0.029, 0.0006) |
 | v6 self-hosted on Kaggle's free 2 x T4 (Meta's 4-bit base) | – | **1,435 right; 81 vs 49 against Muse Spark Open, p 0.006** |
 | Our real gate case, every reasoning step on open weights (with Muse Spark Open) | – | the same 5 near-misses and 51 people as Muse Spark; letter passed the code check and the tuned judge first try; about $0.62 |
+
+Head-to-head on the 1,210 rows, tuned vs base: 402 vs 20 (p < 0.0001). Where base finished (437 rows, mostly planted) it was right on 429 against the tuned judge's 418: the LoRA buys finishing, not caution ([pre-registered run and sensitivity](GATES.md#base-glimmer-against-the-tuned-judge-result-wed-4-nov-2026-run-2013-2127-ist)).
 
 The adapter itself: [huggingface.co/shaunmortal/crossing-watch-glimmer-judge-v6](https://huggingface.co/shaunmortal/crossing-watch-glimmer-judge-v6) (PEFT safetensors, a GGUF for llama.cpp, and the model card with both sha256s).
 

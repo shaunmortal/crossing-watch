@@ -1,0 +1,10 @@
+create 2026-11-04T14:43:39Z
+READY accounts/<fireworks-account>/deployments/cw-glimmer-base-judge
+ready 2026-11-04T14:46:20Z
+asking up to 1545 of 1545 (cap 8192 tokens, wall 4200 s)
+replies saved: 1246 of 1545 in 4243 s
+replay done 2026-11-04T15:57:04Z
+deleting cw-glimmer-base-judge (2026-11-04T15:57:04Z)
+deployments listed now: [('accounts/<fireworks-account>/deployments/cw-glimmer-base-judge', 'DELETING')]
+deleted-check done (2026-11-04T15:57:33Z)
+EXIT 0 2026-11-04T15:57:33Z

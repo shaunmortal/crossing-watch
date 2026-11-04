@@ -1,0 +1,56 @@
+{
+ "file": "provenance/glimmer-judge-lora-v6/base/predictions_base.jsonl",
+ "rows_scored": 1210,
+ "of": 1501,
+ "right": {
+  "base": 781,
+  "tuned_served": 1163,
+  "spark_open": 1128,
+  "spark": 1181
+ },
+ "base_lies_flagged": "386/810",
+ "base_clean_flagged": "5/400",
+ "tuned_vs_base": {
+  "wins": 402,
+  "losses": 20,
+  "p": 0.0
+ },
+ "base_vs_spark_open": {
+  "wins": 16,
+  "losses": 363,
+  "p": 0.0
+ },
+ "base_vs_spark": {
+  "wins": 12,
+  "losses": 412,
+  "p": 0.0
+ },
+ "base_finished_stop": 437,
+ "base_cut_by_cap": 773,
+ "base_unreadable": 773,
+ "base": {
+  "median_completion_tokens": 8192.0,
+  "mean_completion_tokens": 7582.4,
+  "median_wall_s": 55.66
+ },
+ "tuned_served": {
+  "median_completion_tokens": 37.0,
+  "mean_completion_tokens": 35.0,
+  "median_wall_s": 2.07
+ },
+ "finished_rows_only": {
+  "rows": 437,
+  "right": {
+   "base": 429,
+   "tuned_served": 418
+  },
+  "base_lies_flagged": "386/389",
+  "base_clean_flagged": "5/48",
+  "tuned_vs_base": {
+   "wins": 7,
+   "losses": 18,
+   "p": 0.04329
+  }
+ },
+ "outcome_by_prereg": "tuned ahead (p < 0.05): the LoRA adds accuracy"
+}

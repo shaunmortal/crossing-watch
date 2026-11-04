@@ -1198,6 +1198,26 @@ certified letter stays as written.
   format and cost adapter and OPEN_WEIGHTS.md says so. None of these changes the three blind-test results against
   Muse Spark Open, which stand as recorded.
 
+## Base Glimmer against the tuned judge: result (Wed 4 Nov 2026, run 20:13-21:27 IST)
+
+- **Run as pre-registered.** Fireworks deployment `cw-glimmer-base-judge` (1 x H200, BF16) created 20:13 IST, ready
+  20:16, deleted 21:27: about 71 GPU-minutes, about $9.5. 1,246 prompts answered in the 70 minutes; 1,210 of them are
+  scored test rows (the rest are public-bench or excluded rows).
+- **Outcome by the pre-registered rule: tuned ahead.** On the same 1,210 rows: base **781** right, tuned **1,163**
+  (Muse Spark Open 1,128; Muse Spark 1,181). Head-to-head tuned vs base **402 vs 20**, p < 0.0001. Base flagged 386
+  of 810 planted rows and 5 of 400 clean ones.
+- **Why base loses: it does not finish.** 773 of its 1,210 replies (64%) were still reasoning at the 8,192-token cap,
+  so they count as "no problem found" (the rule). Base used a median of 8,192 output tokens and 56 s a verdict; the
+  tuned judge 37 tokens and 2.1 s.
+- **Sensitivity, not pre-registered: on the 437 rows base finished,** it is a strong judge: **429** right (386 of 389
+  planted flagged, 5 of 48 clean flagged) against the tuned judge's **418** on those rows (base ahead 18 vs 7,
+  p 0.043). That subset is planted-heavy (389 of 437): the base model finishes sooner when it finds a lie.
+- **Reading.** The LoRA's gain is in finishing: it turns a careful judge that needs thousands of reasoning tokens,
+  often more than 8,192, into one that gives a verdict in about 35 tokens, at about the same accuracy where both
+  finish and far higher under any practical cap. The three blind tests against Muse Spark Open stand as recorded.
+- **Files:** [`provenance/glimmer-judge-lora-v6/base/`](provenance/glimmer-judge-lora-v6/base/): replies with
+  response ids, `score.json`, the scorer, the run scripts and log.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
@@ -1224,3 +1244,4 @@ certified letter stays as written.
   Each was written before or at its commit; no pre-registered text changed.
 - Wed 4 Nov 2026, 20:13 IST: a pre-registration for the base-Glimmer run added above, before its deployment was
   created. No pre-registered text changed.
+- Wed 4 Nov 2026, 21:40 IST: the base-Glimmer run's result section added above. No pre-registered text changed.
