@@ -1,0 +1,25 @@
+{
+ "model": "accounts/fireworks/models/muse-spark-open",
+ "host": "api.fireworks.ai",
+ "request_id": "chatcmpl-45c5ea24b9654c75bdbc9b1617c586c2",
+ "usage": {
+  "prompt_tokens": 1889,
+  "total_tokens": 4182,
+  "completion_tokens": 2293,
+  "prompt_tokens_details": {
+   "cached_tokens": 0
+  },
+  "completion_tokens_details": {
+   "reasoning_tokens": 1496
+  },
+  "output_tokens_details": {
+   "reasoning_tokens": 1496
+  }
+ },
+ "wall_s": 51.8,
+ "timings": null,
+ "response_format": "json_schema",
+ "tries": 1,
+ "judged_by": "accounts/<fireworks-account>/models/muse-starter-sl-judge-v6-main#accounts/<fireworks-account>/deployments/cw-judge-open-gate (open weights, on Fireworks)",
+ "letter_sha256": "b6fcc858d3fc3eafe138fe669f2767fa9f24c6d05eddea9af15864b1b1f1f423"
+}

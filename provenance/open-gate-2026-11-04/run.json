@@ -1,0 +1,110 @@
+{
+ "what": "Our real gate case (LNCT Excellence main gate, Bhopal; 8.6 min analysed) worked end to end with every language and vision step on Meta open-weights models, 4 Nov 2026 (IST), on a frozen copy of the repo and a copy of out/gate. No Meta API key was set for the review, agent or letter steps, and every host except api.fireworks.ai was sent to a dead proxy for the whole run, so no Meta API call could succeed.",
+ "steps": [
+  {
+   "step": "person review (is each tracked near-miss pedestrian a person?)",
+   "model": "accounts/fireworks/models/muse-spark-open",
+   "where": "api.fireworks.ai (Fireworks serverless)",
+   "how": "analyze.py --budget 0 with REVIEW_MODEL_URL; same prompt and crops as Muse Spark; reasoning_effort low",
+   "calls": 32,
+   "prompt_tokens": 14496,
+   "completion_tokens": 7025,
+   "wall_s_whole_analyze_run": 243.8,
+   "usd": 0.048,
+   "request_ids": "not kept by review.py (it saves the reply text beside each crop); per-crop tokens in review.json"
+  },
+  {
+   "step": "case agent (chooses tools, asks a person for the tape, files the letter)",
+   "model": "accounts/fireworks/models/muse-spark-open",
+   "where": "api.fireworks.ai (Fireworks serverless), tool calling, tool_choice required",
+   "how": "agent.py with AGENT_MODEL_URL",
+   "turns": 5,
+   "tools_called": [
+    "track",
+    "measure",
+    "review",
+    "request_measurement",
+    "submit_letter"
+   ],
+   "person": "R1 answered: 15 m (the taped check distance)",
+   "prompt_tokens": 13212,
+   "completion_tokens": 1601,
+   "usd": 0.0233,
+   "log": "agent_log.jsonl"
+  },
+  {
+   "step": "letter to the road authority",
+   "model": "accounts/fireworks/models/muse-spark-open",
+   "where": "api.fireworks.ai (Fireworks serverless)",
+   "how": "pack.ask_plan through the agent's submit_letter, LETTER_MODEL_URL, json_schema",
+   "request_id": "chatcmpl-45c5ea24b9654c75bdbc9b1617c586c2",
+   "tries": 1,
+   "wall_s": 51.8,
+   "prompt_tokens": 1889,
+   "completion_tokens": 2293,
+   "usd": 0.0121,
+   "letter": "letter.txt",
+   "letter_sha256": "b6fcc858d3fc3eafe138fe669f2767fa9f24c6d05eddea9af15864b1b1f1f423"
+  },
+  {
+   "step": "letter judge (unsupported claims)",
+   "model": "accounts/<fireworks-account>/models/muse-starter-sl-judge-v6-main (Muse Glimmer 30B + our v6 LoRA)",
+   "where": "Fireworks on-demand deployment cw-judge-open-gate, live merge",
+   "how": "pack.ask_plan's JUDGE_MODEL_URL call, the only judge (no Meta key); then 3 re-reads through the same call (judge_case.py)",
+   "verdicts": "no unsupported claim, in product and in all 3 re-reads",
+   "response_ids": [
+    "chatcmpl-2e42ca1618a44114a038430f4b844c9b",
+    "chatcmpl-499c83a98cfb4108b94a9da5e3cbdcea",
+    "chatcmpl-0dc63694072946c2a499c0083d94dbe5"
+   ],
+   "completion_tokens_per_verdict": 9,
+   "detail": "judge.json"
+  }
+ ],
+ "deployment": {
+  "name": "accounts/<fireworks-account>/deployments/cw-judge-open-gate",
+  "base_model": "accounts/<fireworks-account>/models/muse-starter-sl-judge-v6-main",
+  "shape": "accounts/fireworks/deploymentShapes/dkuwotf7/versions/vtcy28lv: 1 x NVIDIA_H200_141GB, BF16, 1 replica",
+  "create_time_utc": "2026-11-03T19:47:42Z",
+  "delete_time_utc": "2026-11-03T19:51:43Z",
+  "state_after": "DELETED",
+  "log_ist": [
+   "create Wed Nov  4 01:17:40 IST 2026",
+   "READY accounts/<fireworks-account>/deployments/cw-judge-open-gate",
+   "ready Wed Nov  4 01:20:20 IST 2026",
+   "submit_letter: Video 15.0 m, tape 15 m, 0% off: proven. Letter written by Muse Spark Open (open weights, on Fireworks); waiting for the head of the school.",
+   "agent done Wed Nov  4 01:21:33 IST 2026",
+   "judge reads done Wed Nov  4 01:21:42 IST 2026",
+   "deleting cw-judge-open-gate (Wed Nov  4 01:21:42 IST 2026)",
+   "deployments now: []"
+  ],
+  "checked_again": "Wed 04 Nov 2026 01:22:28 IST: deployments listed: []; get cw-judge-open-gate: state DELETED",
+  "safety": "trap on EXIT deletes it; expire_time 1 h as a backstop",
+  "gpu_seconds_create_to_delete": 241,
+  "price": "$8.00 per GPU-hour, billed per second (fireworks.ai/pricing, read 2 Nov 2026)",
+  "usd": 0.54,
+  "usd_upper_bound": 0.6
+ },
+ "not_open_weights": {
+  "SAM 3.1": "no open-weights equivalent used: every tracking reply (200 video requests, crowd-mode images, 6 number-plate requests) re-read from the hosted run's cache; $0 new",
+  "Muse Wonder": "no open-weights equivalent: the 5 cached listening replies reused (same audio bytes); no new call",
+  "Muse Image": "no open-weights equivalent: not called, so this run has no new picture of the fix"
+ },
+ "gaps": [
+  "analyze.py stops without MODEL_API_KEY even when it calls no Meta model (every SAM reply cached, review on REVIEW_MODEL_URL). For the tracking steps it got a placeholder that is not a key, behind the network guard; the letter step ran with no MODEL_API_KEY at all, so Muse Spark could not judge.",
+  "Labels: agent.py's review tool says \"Muse Spark reviewed 32 pedestrians\" and analyze.py prints \"Spark verdicts\" / \"[Spark: ...]\" even when Muse Spark Open reviewed; wording only.",
+  "review.py keeps no response id, and pack.py keeps none for the judge; the judge's 3 re-reads in judge.json carry them."
+ ],
+ "spend_usd": {
+  "muse_spark_open_tokens": 0.083,
+  "judge_deployment": 0.54,
+  "total": 0.62,
+  "total_upper_bound": 0.68,
+  "approved": 3.0,
+  "hard_cap": 5.0
+ },
+ "scripts": [
+  "run_open_gate.sh",
+  "judge_case.py"
+ ]
+}
