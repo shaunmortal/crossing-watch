@@ -1311,6 +1311,27 @@ certified letter stays as written.
   cost. The SummEdits replication result stands either way.
 - **Cost cap:** about $12.
 
+## Base Glimmer on the SummEdits replication rows: result (Thu 5 Nov 2026, run 01:46-02:21 IST)
+
+- **Run as pre-registered.** Deployment `cw-glimmer-base-summedits` (1 x H200) created 01:46 IST, ready 01:49, deleted
+  02:21: about 31 GPU-minutes, about $4. Both arms answered all 1,200 rows.
+- **cap256** (asked exactly as the tuned judge): base Glimmer finished 0 of 1,200 verdicts (all still reasoning at 256
+  tokens), so it is right only on the 600 consistent rows: 600 right. Tuned vs base 458 vs 50.
+- **cap8192, the fair arm: outcome by the pre-registered rule, tuned ahead of base.** Base Glimmer finished 1,198 of
+  1,200 verdicts (median 2,543 output tokens, 41 s) and was right on **748**; the tuned judge on **1,008**; Muse Spark
+  Open on 924. Head to head tuned vs base **369 vs 109, p < 10^-33**; base vs Spark Open 45 vs 221. On the 1,198 rows
+  base finished: base 746, tuned 1,008 (369 vs 107).
+- **How they differ** (not pre-registered, from the same replies): base caught 565 of the 600 inconsistent summaries
+  but passed only 183 of the 600 consistent ones (balanced accuracy 62.3%); Muse Spark Open caught 532 and passed 392
+  (77.0%); the tuned judge caught 458 and passed 550 (84.0%). The LoRA makes Glimmer flag far fewer correct summaries,
+  and it misses more of the wrong ones than either.
+- **Reading.** Out of domain, on public data, the LoRA adds accuracy and not only brevity: given room to finish, base
+  Glimmer is well behind both the tuned judge and Muse Spark Open. (On our own letters, where base also finished,
+  base was slightly ahead: 429 vs 418, above.)
+- **Files:** [`provenance/summedits-2026-11-05/`](provenance/summedits-2026-11-05/): `rep-base-cap256.jsonl`,
+  `rep-base-cap8192.jsonl` (request ids, account masked), `base_ext_run.sh`, `base_ext_run.log`, `ask_base_ext.py`,
+  `score_base_ext.py`, `base-score.json`.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
@@ -1350,3 +1371,4 @@ certified letter stays as written.
 - Thu 5 Nov 2026, 01:20 IST: the SummEdits replication's result section added above. No pre-registered text changed.
 - Thu 5 Nov 2026, 01:46 IST: a pre-registration for base Glimmer on the SummEdits replication rows added above,
   before its deployment was created. No pre-registered text changed.
+- Thu 5 Nov 2026, 02:30 IST: the base-Glimmer SummEdits result section added above. No pre-registered text changed.

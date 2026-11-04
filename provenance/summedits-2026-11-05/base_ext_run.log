@@ -1,0 +1,11 @@
+create 2026-11-04T20:16:38Z
+READY accounts/<fireworks-account>/deployments/cw-glimmer-base-summedits
+ready 2026-11-04T20:19:52Z
+base cap256: asking up to 1200 of 1200 (wall 1200 s)
+base cap256: saved 1200 of 1200 in 131 s
+base cap8192: asking up to 1200 of 1200 (wall 4500 s)
+base cap8192: saved 1200 of 1200 in 1710 s
+asked 2026-11-04T20:50:34Z
+deleting cw-glimmer-base-summedits (2026-11-04T20:50:34Z)
+deployments listed now: [('accounts/<fireworks-account>/deployments/cw-glimmer-base-summedits', 'DELETING')]
+EXIT 0 2026-11-04T20:51:04Z
