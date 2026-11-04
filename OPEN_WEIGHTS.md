@@ -3,6 +3,18 @@
 One page for the Open Weights review. Every open-weights call runs on our own (Kaggle) hardware or on partner inference
 (Fireworks), never on Meta's hosted API. Every judge number below re-scores at $0 from committed files.
 
+## For the Open Weights verifier: the five things asked for, one link each
+
+| Asked for (organizers, 1 Nov 2026) | Where it is |
+|---|---|
+| Committed model ids | Fireworks training sessions `ts-aeb58db486cb4952a49bb9855fca40ed` (v3), `ts-b74ec0f3fc214bbd8eee34f89ffe35ff` (v4), `ts-13675bf5ae7840e8b90fa4fa70a249ee` (v5), `ts-17bf2de281bb4cbe8424de262befb01b` (v6); promoted model `muse-starter-sl-judge-v6-main`; deployments `cw-judge-v6` (2 Nov), `cw-judge-gate` (3 Nov), `cw-judge-open-gate` and `cw-glimmer-base-judge` (4 Nov). The account id goes to the organizers with the submission, not in the repo |
+| Training logs | [`main/metrics.jsonl`](provenance/glimmer-judge-lora-v6/main/metrics.jsonl) (512 logged steps: loss, grad norms), [`main/command.txt`](provenance/glimmer-judge-lora-v6/main/command.txt) (the launch command), [`main/summary.json`](provenance/glimmer-judge-lora-v6/main/summary.json); the same for v3, v4 and v5 in their folders |
+| Eval outputs | every served reply with its Fireworks response id: [`live/predictions_served.jsonl`](provenance/glimmer-judge-lora-v6/live/predictions_served.jsonl) (1,545 rows, 2 Nov), [`base/predictions_base.jsonl`](provenance/glimmer-judge-lora-v6/base/predictions_base.jsonl) (base Glimmer, 8,192-token cap, 4 Nov), [`kaggle/predictions_kaggle.jsonl`](provenance/glimmer-judge-lora-v6/kaggle/predictions_kaggle.jsonl) (free 2 x T4, 4 Nov), the training session's own [`main/predictions_tuned.jsonl`](provenance/glimmer-judge-lora-v6/main/predictions_tuned.jsonl) and [`main/predictions_base.jsonl`](provenance/glimmer-judge-lora-v6/main/predictions_base.jsonl); labels frozen first in [`labels-frozen.json`](provenance/glimmer-judge-lora-v6/labels-frozen.json) |
+| Re-score script | from the repo root, no key, standard library, under a second each: `python3 judge_v3_score.py v6` (1,442 of 1,501; 82 vs 43), `python3 provenance/glimmer-judge-lora-v6/kaggle/score_kaggle.py provenance/glimmer-judge-lora-v6/kaggle/predictions_kaggle.jsonl` (1,435; 81 vs 49), `python3 provenance/glimmer-judge-lora-v6/base/score_base.py provenance/glimmer-judge-lora-v6/base/predictions_base.jsonl` (781 vs 1,163) |
+| Downloadable adapter | [huggingface.co/shaunmortal/crossing-watch-glimmer-judge-v6](https://huggingface.co/shaunmortal/crossing-watch-glimmer-judge-v6): PEFT safetensors, a GGUF for llama.cpp, sha256 of every file and of the base weights on the card; training data [`kaggle/glimmer-judge-train-v6.jsonl`](kaggle/glimmer-judge-train-v6.jsonl) |
+
+Served on Fireworks on 2, 3 and 4 Nov 2026 with a response id on every row; self-hosted on Kaggle's free 2 x T4 ([notebook](kaggle/glimmer-judge-lora.ipynb), Kaggle's own [run log](provenance/glimmer-judge-lora-v6/kaggle/kaggle-run.log)); re-serve script [`live/live_v6.sh`](provenance/glimmer-judge-lora-v6/live/live_v6.sh). Each test was pre-registered in git before any run and labels were frozen before any tuned reply was read. File map: [provenance/glimmer-judge-lora-v6/README.md](provenance/glimmer-judge-lora-v6/README.md). Commit ids quoted in GATES.md are from before the history was cleaned; [COMMIT_IDS.md](COMMIT_IDS.md) maps them.
+
 **At a glance: what our LoRA does to Muse Glimmer 30B**
 
 | | Base Muse Glimmer 30B | Glimmer + our LoRA |
@@ -26,6 +38,18 @@ The adapter itself: [huggingface.co/shaunmortal/crossing-watch-glimmer-judge-v6]
 and clean letters alike) is scored right or wrong against labels frozen before any tuned reply was read; the two models
 are compared on the rows where exactly one is right (exact two-sided sign test). Tuned Glimmer wins v4, v5 and v6 this
 way (p 0.005, 0.029, 0.0006); Muse Spark (closed) stays ahead overall.
+
+**Same 1,210 blind rows, same prompts, same frozen labels (4 Nov 2026, pre-registered; [`base/score.json`](provenance/glimmer-judge-lora-v6/base/score.json))**
+
+| | Base Muse Glimmer 30B (8,192-token cap, JSON mode) | Glimmer + our LoRA (served) |
+|---|---|---|
+| Right | 781 | **1,163** |
+| Finished a verdict | 437 of 1,210 | 1,210 of 1,210 |
+| Median output tokens / wall time a verdict | 8,192 / 55.7 s | 37 / 2.1 s |
+| Head-to-head, rows where exactly one is right | 20 | **402** (p < 0.0001) |
+| On the 437 rows base finished (389 of them planted) | 429 | 418 (7 vs 18, p 0.043) |
+
+Read plainly: base Glimmer can judge a letter when it finishes, and under this cap it finished about a third of the time; the LoRA makes it finish every time in about 37 tokens, which is what a letter check inside a product needs, and keeps 1,163 of the rows right. Where base finished it was right on 429 against the tuned judge's 418: the LoRA buys finishing, not caution ([pre-registered run and sensitivity](GATES.md#base-glimmer-against-the-tuned-judge-result-wed-4-nov-2026-run-2013-2127-ist)).
 
 ## What the open-weights models do here
 
@@ -88,6 +112,14 @@ letters written by Muse Spark and Muse Spark Open, with lies and slips planted b
   symmetric audit of the 46 rows only the tuned judge disagreed with (v5, v6), mixed blind with 26 controls, changed
   0 of 72 labels.
 
+- **Our real letter, the only real-data rows we have:**
+
+| Letter and measurements | Where the judge ran | Reads | Found |
+|---|---|---|---|
+| The certified gate letter on the 3 Nov measurements | Fireworks H200, 3 Nov | 6 of 6 (3 plain, 3 with the product's JSON schema) | no unsupported claim; response ids in [`live/gate-letter-judge.json`](provenance/glimmer-judge-lora-v6/live/gate-letter-judge.json) |
+| The same letter and measurements | Kaggle free 2 x T4, Meta's 4-bit base, 4 Nov | 6 of 6 | no unsupported claim ([`kaggle/gate-letter-judge-kaggle.json`](provenance/glimmer-judge-lora-v6/kaggle/gate-letter-judge-kaggle.json), `served_3nov`) |
+| The same letter against the 4 Nov measurements, which count 51 people on foot where the certified letter's 80 counts tracked crossings | Kaggle free 2 x T4, 4 Nov | 6 of 6 | untold, it flagged the mismatch in every read ("the measurements give crossings 51, not 80", `product_today`); the certified letter is kept word for word |
+
 ## Check it yourself ($0, no key)
 
 ```
@@ -108,7 +140,20 @@ python3 writers_table.py         # Glimmer on Kaggle vs Spark Open vs Muse Spark
   `ts-b74ec0f3fc214bbd8eee34f89ffe35ff` (v4), `ts-13675bf5ae7840e8b90fa4fa70a249ee` (v5),
   `ts-17bf2de281bb4cbe8424de262befb01b` (v6); deployments `cw-judge-v6` (2 Nov 2026, 08:04-08:16 IST) and
   `cw-judge-gate` (3 Nov), then `cw-judge-open-gate` (4 Nov, 01:17-01:21 IST); Spark Open request `chatcmpl-9e68cb0170d84c348eb29b1687354a4f`; every response id is in
-  `provenance/`. Account id on request.
+  `provenance/`. The account id goes to the organizers with the submission, not in the repo.
+
+- One line, every headline number, no key: `python3 judge_v3_score.py v6 && python3 provenance/glimmer-judge-lora-v6/kaggle/score_kaggle.py provenance/glimmer-judge-lora-v6/kaggle/predictions_kaggle.jsonl && python3 provenance/glimmer-judge-lora-v6/base/score_base.py provenance/glimmer-judge-lora-v6/base/predictions_base.jsonl`
+- Through the product's own judge path (`pack.py`, `JUDGE_MODEL_URL`), per planted-lie kind on the 31-prompt public bench: 21 of 23 lies, 0 of 8 false alarms, 0 unreadable replies: [product-bench.md](provenance/glimmer-judge-lora-v6/live/product-bench.md). File map: [provenance/glimmer-judge-lora-v6/README.md](provenance/glimmer-judge-lora-v6/README.md).
+
+## Run the tuned judge yourself: three commands, no key
+
+```bash
+curl -L -o Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf https://huggingface.co/meta-models/Muse-Glimmer-30B-GGUF/resolve/b44f1072cf75e918a1b82a3a17b45c4389b076e7/Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf   # 16.76 GB; sha256 4cc57c0f51040a226e5a72cc47b7613f7772950e460a665f7083de89f183f60e
+curl -L -o glimmer-judge-lora-f16.gguf https://huggingface.co/shaunmortal/crossing-watch-glimmer-judge-v6/resolve/main/glimmer-judge-lora-f16.gguf   # 419 MB; sha256 bafc1117805a6918659d7c821e3c8e4ad2f809438e4aed3b04e44053958edd66
+llama-server -m Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf --lora glimmer-judge-lora-f16.gguf -ngl 99 --split-mode layer --jinja --port 8080 -np 4 -c 16384 --chat-template-kwargs '{"reasoning_strength": "high", "current_date": "2026-11-01"}' --temp 0
+```
+
+Then `JUDGE_MODEL_URL=http://127.0.0.1:8080/v1` makes `pack.py` use it as the letter's reviewer, exactly as the Kaggle notebook does for our real letter. Measured on Kaggle's free 2 x T4: 4.3 s a reply on the bench; 1,545 verdicts in 2 h 58 min at 4 concurrent. Needs about 24 GB of RAM or a 24 GB GPU for the 16.76 GB base; laptop speed not measured.
 
 ## Serving, scope and licence
 

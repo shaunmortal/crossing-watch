@@ -1245,3 +1245,7 @@ certified letter stays as written.
 - Wed 4 Nov 2026, 20:13 IST: a pre-registration for the base-Glimmer run added above, before its deployment was
   created. No pre-registered text changed.
 - Wed 4 Nov 2026, 21:40 IST: the base-Glimmer run's result section added above. No pre-registered text changed.
+- Thu 5 Nov 2026, 00:40 IST: decision recorded. The tuned judge was served three times with logs (2, 3 and 4 Nov;
+  provenance/glimmer-judge-lora-v6/live/); the organizers said on 1 Nov that committed model ids, training logs, eval
+  outputs and a re-score script are the reviewable material, so no standing endpoint is kept up during judging;
+  provenance/glimmer-judge-lora-v6/live/live_v6.sh re-serves it. No pre-registered text changed.

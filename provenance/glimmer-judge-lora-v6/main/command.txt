@@ -1,0 +1,2 @@
+python -m examples.sft.muse_glimmer_starter launch --surface serverless --file judge_v6.jsonl --run-id judge-v6-main --n-eval 1545 --max-seq-len 3072 --max-eval-tokens 256 --lora-rank 32 --epochs 2 --learning-rate 1e-4
+# run from the Fireworks cookbook's training/ folder (fw-ai/cookbook 57968a2); session ts-17bf2de281bb4cbe8424de262befb01b; account id masked
