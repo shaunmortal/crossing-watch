@@ -37,7 +37,7 @@ The App, Explorer and Manual have a हिंदी / English switch. Every gate
 ## Demo
 
 - Today, at $0: `python3 pack.py sample sample/site.json` builds the page offline (no key, no video).
-- **Evidence page:** [crossingwatch.xyz/evidence](https://crossingwatch.xyz/evidence/), from the 2 Nov footage. Demo video: [youtu.be/9QSc-Urqpr4](https://youtu.be/9QSc-Urqpr4) (2:45). Live run in the video, full log: [provenance/live-run-2026-11-03](provenance/live-run-2026-11-03/README.md).
+- **Evidence page:** [crossingwatch.xyz/evidence](https://crossingwatch.xyz/evidence/), from the 2 Nov footage. Demo video: [youtu.be/9QSc-Urqpr4](https://youtu.be/9QSc-Urqpr4) (2:45). Live run in the video, full log: [provenance/live-run-2026-11-03](provenance/live-run-2026-11-03/README.md); the case agent live on camera: [provenance/agent-live-2026-11-04](provenance/agent-live-2026-11-04/README.md).
 
 ## Depth
 

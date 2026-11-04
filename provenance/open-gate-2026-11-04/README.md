@@ -8,7 +8,7 @@ api.fireworks.ai went to a dead proxy for the whole run, so no Meta API call cou
 
 | Step | Open-weights model | Where | Result |
 |---|---|---|---|
-| Is each tracked near-miss pedestrian a person? | Muse Spark Open | Fireworks serverless | 32 people reviewed, 29 rejected: **the same keep-or-reject as Muse Spark on all 32** |
+| Is each tracked near-miss pedestrian a person? | Muse Spark Open | Fireworks serverless | 32 people reviewed, 29 rejected (28 by the model, 1 ruled out by eye in `sites/gate.json`): **the same keep-or-reject as Muse Spark on all 32** |
 | Case agent (tools, asks a person for the tape) | Muse Spark Open | Fireworks serverless, tool calling | 5 turns: track, measure, review, request_measurement, then submit_letter after the tape (15 m; video 15.0 m, 0% off) |
 | Letter to the road authority | Muse Spark Open | Fireworks serverless | written on the first try in 51.8 s, request `chatcmpl-45c5ea24b9654c75bdbc9b1617c586c2` ([letter](letter.txt)) |
 | Letter judge | Muse Glimmer 30B + our v6 LoRA | Fireworks on-demand, 1 x H200 | no unsupported claim, in the product and in 3 more reads with response ids ([judge.json](judge.json)) |

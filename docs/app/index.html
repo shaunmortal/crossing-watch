@@ -86,7 +86,7 @@ iframe { width: 100%; height: 760px; border: 1px solid var(--line); border-radiu
   <div class="what"><b>What happens</b>SAM 3.1 tracks people and vehicles; code measures who reached the same spot how many seconds apart; Muse Spark looks at each person in a near-miss and removes riders and things that are not people. Below are lines from our real run's log, in order (long lines cut where marked ...).</div>
   <div class="kick" style="margin-bottom:8px">Replay · our run log, 2 Nov 2026</div><div class="term" id="term" aria-label="Real run output"></div>
   <p class="what" style="margin-top:12px"><b>The funnel</b>75 raw near-miss candidates → Muse Spark checks each person (one more ruled out by eye) → 5 kept → <b style="color:var(--signal);letter-spacing:0;text-transform:none;font:600 15px var(--sans)">2 serious</b> and 3 close passes. The two highlighted lines are 2 of the ones Muse Spark removed: a person who was riding the bike, and something that was not a person.</p>
-  <p class="note">About $12 of SAM for an 8.6-minute video at Meta's list prices. Python 3.11+ and ffmpeg; <a href="https://github.com/shaunmortal/crossing-watch">code on GitHub</a>.</p>
+  <p class="note">The run's first count is all 75 raw alarms; of the 29 people the review rejected, 28 were set aside by Muse Spark and 1 was ruled out by eye. About $12 of SAM for an 8.6-minute video at Meta's list prices. Python 3.11+ and ffmpeg; <a href="https://github.com/shaunmortal/crossing-watch">code on GitHub</a>.</p>
 </section>
 
 <section class="step" id="s3">
@@ -94,7 +94,7 @@ iframe { width: 100%; height: 760px; border: 1px solid var(--line); border-radiu
   <h2>The agent checks itself: <em>it asks for a tape measure.</em></h2>
   <div class="what"><b>What happens</b>Before it trusts a single metre, the agent stops and asks a person to measure a second line with a tape, one the maths never used. If the video and the tape agree, the letter goes ahead; then it waits for the head of the school. This is the real log.</div>
   <div class="kick" style="margin-bottom:8px">Replay · the agent's log, 2 Nov 2026</div><div class="chat" id="chat"></div>
-  <p class="note">Five agent turns, about $0.02 in all. <a href="https://github.com/shaunmortal/crossing-watch/blob/HEAD/provenance/gate-agent-2026-11-02/agent_log.jsonl">The full log</a>.</p>
+  <p class="note">Five agent turns, about $0.02 in all; the 29 rejected are 28 set aside by Muse Spark and 1 ruled out by eye. <a href="https://github.com/shaunmortal/crossing-watch/blob/HEAD/provenance/gate-agent-2026-11-02/agent_log.jsonl">The full log</a>.</p>
 </section>
 
 <section class="step" id="s4">

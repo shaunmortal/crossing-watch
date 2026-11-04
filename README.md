@@ -70,7 +70,7 @@ phone video into that proof:** measured near-misses, blurred clips, and a letter
 
 ## 🎬 Demo
 
-[Demo video (2:45)](https://youtu.be/9QSc-Urqpr4), narrated by the author. It opens on our real near-miss (0.0 s), the author on camera, then the problem, a live run on our gate (its real log, sped up), a screen capture of the Live Explorer (Muse Spark's review off and on), our team measuring the check line with a tape, a screen capture of the real letter, the open-weights run records and the fix Muse Image drew on our real street. Its full log and commands: [provenance/live-run-2026-11-03](provenance/live-run-2026-11-03/README.md) (Muse Spark request resp_6ae9fb6e…). Video file: [release submission-2026-11-04](https://github.com/shaunmortal/crossing-watch/releases/tag/submission-2026-11-04).
+[Demo video (2:45)](https://youtu.be/9QSc-Urqpr4), narrated by the author. It opens on our real near-miss (0.0 s), the author on camera, then the problem, a live run on our gate (its real log, sped up), a screen capture of the Live Explorer (Muse Spark's review off and on), our team measuring the check line with a tape, a screen capture of the real letter, the open-weights run records and the fix Muse Image drew on our real street. Its full log and commands: [provenance/live-run-2026-11-03](provenance/live-run-2026-11-03/README.md) (Muse Spark request resp_6ae9fb6e…). The case agent live in the film (tape 15 m: proven; 12 m, typed on purpose: refused): [provenance/agent-live-2026-11-04](provenance/agent-live-2026-11-04/README.md). Video file: [release submission-2026-11-04](https://github.com/shaunmortal/crossing-watch/releases/tag/submission-2026-11-04).
 
 ## 🧪 Try it in your browser
 
@@ -204,7 +204,9 @@ from 28 Oct 2026; the one ported piece is the mask decoder below. The gate lette
   Face revision `b44f1072`). Built with Muse Spark Open: its open weights are used as served by Fireworks under Meta's Muse Model License, and
   our Glimmer judge adapter is trained partly on letters Spark Open wrote, so it follows that licence too. Models run as
   services: the Meta Model API, Fireworks for Muse Spark Open and our Glimmer LoRA judge (trained and served there),
-  Kaggle's 2 x T4 for Glimmer's letter. The website (`docs/`) loads GSAP 3.12.5 with ScrollTrigger and Lenis 1.1.13
+  Kaggle's 2 x T4 for Glimmer's letter. The Glimmer LoRA was trained through Fireworks with the open-source fw-ai/cookbook
+  (commit 57968a2, its `muse_glimmer_starter` script, Apache-2.0); `judge_v6.py` and `judge_v7.py` optionally use it and
+  Hugging Face transformers (Apache-2.0) only to count tokens. The website (`docs/`) loads GSAP 3.12.5 with ScrollTrigger and Lenis 1.1.13
   from public CDNs, and Google Fonts, each under its own licence.
 - **Datasets, none included.** SinD (github.com/SOTIF-AVLab/SinD; non-commercial, its public sample used only for
   validation; Xu Y. et al., IEEE ITSC 2022, doi:10.1109/ITSC55140.2022.9921959, v1). DUT
