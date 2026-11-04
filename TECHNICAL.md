@@ -13,7 +13,7 @@ Crossing Watch turns one phone video of a school or college crossing into measur
 | Near-miss maths: speed error 0.24 / 0.91 km/h, 37 of 63 crossings within 3 s (SinD) | `python3 validate_sind.py data/sind` | SinD public sample (github.com/SOTIF-AVLab/SinD; download it; non-commercial) | yes, after the download |
 | SAM 3.1 end to end: 47 of 52 after Muse Spark's review (50 of 52 by geometry alone), crowd mode; 48 of 52, vehicle crowd mode; speed 0.16 / 0.55 km/h (DUT, top-down) | `python3 validate_offline.py DUT_REPO out/dut-15s out/dut-vcrowd` | not public: DUT has no licence and `out/` is our paid cache; run recorded in [GATES.md](GATES.md#accuracy-fixes-merged-re-scored-at-0-fri-30-oct-2026) | no: read the record |
 | Public judge bench: code 4 of 23, Muse Spark 21 of 23 and 0 of 8 (its replies cached) | `python3 judge_bench.py --public` | `kaggle/judge-bench-public.json` | yes, $0 |
-| Muse Glimmer 30B wrote the sample's letter on Kaggle 2 x T4 (313 s, 2 tries) and judged 24 of 24 / 6 of 8 | re-run the public notebook, GATE-TBD | `<removed-run-record>`, `<removed-run-record>`, `<removed-run-record>` | yes, on Kaggle's free GPUs; without our DUT-derived bench file it judges Glimmer's letter only (12 lies, 4 controls) |
+| Muse Glimmer 30B wrote a letter for our real gate on Kaggle 2 x T4 (276 s, first try, every number passing the code check) | read the run record; the notebook is `kaggle/glimmer-gate.ipynb` | `kaggle/glimmer-gate-letter.txt`, `kaggle/glimmer-gate-provenance.json` | yes, read; a re-run needs our gate's events.json, which stays private |
 | Muse Spark Open wrote the sample's letter on Fireworks in 55.5 s, one try | `LETTER_MODEL_URL=https://api.fireworks.ai/inference/v1 LETTER_MODEL=accounts/fireworks/models/muse-spark-open python3 pack.py sample sample/site.json` | `provenance/spark-open-fireworks-sample.json` | yes, read; a re-run needs a Fireworks key |
 
 ## Files
@@ -41,13 +41,14 @@ Crossing Watch turns one phone video of a school or college crossing into measur
 | Numbers road engineers use | Pedestrians and vehicles an hour, PV² (IRC:103-2012), 85th-percentile speed, and gaps in traffic of 6 s and 12 s where people actually crossed (UK Traffic Signs Manual ch. 6); for a site in India, how many moving vehicles passed faster than 25 km/h, the speed reg. 16(5) of the Motor Vehicles (Driving) Regulations 2017 sets past schools and hospitals where signed (0 is printed too) | `road.py`, `pack.py` |
 | Second look | **Muse Spark** checks each clip: is that a person, and who (child, elderly, wheelchair user...) | `review.py` |
 | Ear witness | **Muse Wonder** listens to the original audio around each near-miss for horns, screeching brakes and shouts | `listen.py` |
+| Sound in the clips, voices muted | Each evidence clip keeps the road's own sound under its frames, so a viewer hears the horn Muse Wonder heard. **Muse Voice Transcribe** (ENDPOINTING mode: one turn per stretch of speech, with its start and end) finds where anyone speaks in that window; each stretch, 0.25 s wider each side, becomes silence (not a beep), and words with no timing silence the whole clip. Horns, engines and traffic stay; the picture is copied untouched. No sound, no key or a failed call: the clip stays silent | `render.py`, `voice.py` |
 | One number | Of the people who crossed, how many had a moving vehicle through the same spot within 3 s (and 1.5 s), each person once however many vehicles or track pieces: "k of n crossings (1 in N)", with exact 95% ranges (Clopper-Pearson for the share, Garwood's Poisson range for the count, so 0 seen still reads "up to 3.7"). It is the page's first line and the letter's first fact. With `"school_days"` and `"dismissal_minutes"` in the site file and 15 minutes of video or more, one more line: "If every dismissal is like this one: about X crossings a school year..." | `pack.py`, `road.py` |
 | Safety pyramid | The headline's people drawn as a pyramid, not to scale (Laureshyn, Svensson & Hydén 2010): who crossed, within 3 s, within 1.5 s, and collisions at the tip, which nothing here measures: even 0 of n leaves the exact 95% bound ("up to 5.7% of crossings" for SinD's 63), so a short recording never reads as safe | `pack.py` |
 | Where it happened | A bird's-eye map in road metres: each near-miss where it happened, with both paths 2 s either side | `roadmap.py` |
-| Evidence clips | ffmpeg, SAM silhouettes (boxes where no mask is cached): pedestrian cyan, vehicle red, every tracked person's head and the whole box of every tracked vehicle blurred on every frame (seen from above at an angle, a turned vehicle's number plate can sit anywhere in its box) so clips of children can be shared; when a SAM video request for people is full, SAM image search finds the people it missed every 0.2 s of every published clip, with boxes filled in between, and the page says how many (check every public frame by eye) | `render.py`, `masks.py`, `analyze.py` |
+| Evidence clips | ffmpeg, SAM silhouettes (boxes where no mask is cached): pedestrian cyan, vehicle red, every tracked person's head blurred so clips of children can be shared, and every number plate under a light mosaic (6 px blocks) while the vehicle keeps its shape and colour: **SAM 3.1** finds the plates ("license plate"), one request per published window (each evidence clip, and frame 0 for the street photo) on a cut of the video at full resolution, as at 640 px a plate is ~10 px wide (about $0.01 a clip, cached, so a re-run pays nothing); each plate's mosaic reaches 40% of its size past each side (at least 8 px), and on a frame SAM missed it the plate is carried on its vehicle from the nearest frame it was found there; a vehicle with no plate found in the whole clip gets the mosaic over its whole box (seen from above at an angle, its plate can sit anywhere in it) only when a plate on it could be legible: its box 240 px long or more on the 640 px frame, where a 4.5 m car's 65 mm characters reach ~3.5 px, or, cut by the frame edge, 120 px across or more (a 1.8 m wide car: ~4.3 px); a smaller one is left as filmed; when a SAM video request for people is full, SAM image search finds the people it missed every 0.2 s of every published clip, with boxes filled in between, and the page says how many (check every public frame by eye) | `render.py`, `masks.py`, `analyze.py` |
 | The near-miss in one picture | A StroMotion still cut from the blurred clip: copies of the vehicle, then the pedestrian, every 0.5 s (1 s for a car), so wider spacing means faster | `render.py` |
 | Hero shot for the video | The blurred clip beside the same frames seen from above in road metres: footsteps, the vehicle's footprint, the 1 m ring and the gap clock. One SVG tile per frame, screenshotted once by headless Chrome, stepped through by ffmpeg | `video/split.py` |
-| Fix and letter | **Muse Spark** (JSON mode) picks a physical fix and writes the letter from the measurements only; verified in two layers before use: code checks every number against the measurements (and sends back numbers in words, speeds in mph, a sentence that puts one near-miss's speed beside another's time gap, and a sentence of the letter or its reason that says someone broke a rule: illegal, unlawful, violat-, breach or broke, which a video cannot show), then **Muse Spark as a separate reviewer** (LLM as judge) lists unsupported claims (a warrant said to be met, a death risk for a child); the judge is asked only when code has no objection; either objection sends the letter back with the reason, and after 3 tries what remains is shown for a person to check (a sentence still saying someone broke a rule is flagged "which a video cannot show"), and code adds an AI-draft line for a named person to sign; **Muse Image** draws the fix onto the real street, kept only inside the strip where people were measured crossing (every other pixel stays the real, blurred street), or on the whole photo when no path was measured (there, for a raised crossing, code adds the IRC size: 4 m wide, a speed hump 10-20 m before it) | `pack.py`, `ailabel.py`, `openweights.py` |
+| Fix and letter | **Muse Spark** (JSON mode) picks a physical fix and writes the letter from the measurements and the principal's notes, if any; verified in two layers before use: code checks every number against the measurements (and sends back numbers in words, speeds in mph, a sentence that puts one near-miss's speed beside another's time gap, and a sentence of the letter or its reason that says someone broke a rule: illegal, unlawful, violat-, breach or broke, which a video cannot show), then **Muse Spark as a separate reviewer** (LLM as judge) lists unsupported claims (a warrant said to be met, a death risk for a child); the judge is asked only when code has no objection; either objection sends the letter back with the reason, and after 3 tries what remains is shown for a person to check (a sentence still saying someone broke a rule is flagged "which a video cannot show"), and code adds an AI-draft line for a named person to sign; **Muse Image** draws the fix onto the real street, kept only inside the strip where people were measured crossing (every other pixel stays the real, blurred street), or on the whole photo when no path was measured (there, for a raised crossing, code adds the IRC size: 4 m wide, a speed hump 10-20 m before it) | `pack.py`, `ailabel.py`, `openweights.py` |
 | Why the authority can act (India) | With `"country": "IN"` in the site file, code (never a model) quotes the Supreme Court's order of 7 Oct 2025, 2025 INSC 1189: para 35.5 (in school zones, identify high-risk stretches "using accident data") and para 35.11 (an online grievance mechanism that takes "suggestions for pedestrian crossing"), each linked to its page. Para 35.6 is added when the site's `"city"` is one of the 50 in Annexure 46 of MoRTH's Road Accidents in India 2023. The page says near-misses are not accident data. Code also quotes the Motor Vehicles (Driving) Regulations 2017 word for word: reg. 16(5) with "This rule applies where signs show it; we do not say any driver broke it.", plus reg. 39(1) when the site sets `zebra_m` | `pack.py`, `gazette.py` |
 
 ## Run
@@ -117,9 +118,12 @@ original; it is untested on a real iPhone HLG file, and it may clip a bright sky
 photo, the Muse Image picture). Publish that folder and nothing else. The unblurred `clip.mp4` and the person crops
 Spark looked at never go in, even if a page names them; a self-check proves it. In `docs/` (GitHub Pages), git
 ignores every video except `eventN.mp4` and `eventN-hero.mp4`, and the person crops and blind clips too. Before
-anything is published, the unblurred video goes to SAM, crops of people to Muse Spark and the sound to Muse Wonder,
-through Meta's API; the unblurred files stay in `out/VIDEO/` on the machine that ran it until deleted (`FILMING.md`
-gives the command).
+anything is published, the unblurred video goes to SAM, crops of people to Muse Spark and the sound to Muse Wonder
+and Muse Voice Transcribe, through Meta's API; the unblurred files stay in `out/VIDEO/` on the machine that ran it
+until deleted (`FILMING.md` gives the command). The published clips carry the road's own sound with every voice
+Muse Voice Transcribe hears silenced. On our gate it found no speech in the five clips' windows, and each
+published clip's sound, sent back to it whole (PUSH_TO_TALK), returned no words; a voice mixed into the same road
+sound as a test was found, silenced, and returned no words after.
 
 **Standard mode only.** Meta's Model API pricing page (https://dev.meta.ai/docs/pricing-rate-limits.md, fetched 29 Oct 2026) says: "Contributor mode
 offers discounted pricing or more usage in exchange for permission to use your content — the prompts, code, files,
@@ -144,6 +148,8 @@ largest shift, or that the camera moved (positions after that are off), or that 
 given for SAM only. Under it, the tracks Muse Spark's review removed, each with what Spark called it and its reason
 (cut to 70 characters, left out if it holds a digit, as a number plate could; never the crop), and "Spark can be
 wrong". analyze.py prints one line for each removal as it happens.
+On our gate, the college-certified letter's "measured 80 pedestrian crossings" counts tracked crossings before Muse
+Spark's review; 51 were people on foot. `pack.py` is fixed for future letters.
 
 Even the AI picture keeps Meta's made-by-AI tag: Muse Image's .webp is shipped exactly as it came, captioned
 "AI-drawn proposal by Muse Image, not a photo", with "AI-generated by Muse Image" on the picture itself. Any image
@@ -157,8 +163,9 @@ moment (on paper it reads "(see clip N)"). The letter can be edited on the page 
 re-checked in the browser against the same measurements, and a number that is not there, a number in words or a
 speed in mph gets a red underline.
 
-SAM replies are cached per output folder, and so are Muse Spark's and Muse Wonder's: each raw reply is saved beside
-its crop or sound clip (person-<id>.json, event<N>-heard.json) under the SHA-256 of what was sent, and read again
+SAM replies are cached per output folder, and so are Muse Spark's, Muse Wonder's and Muse Voice Transcribe's: each
+raw reply is saved beside its crop, sound clip or evidence clip (person-<id>.json, event<N>-heard.json,
+event<N>-voices.json) under the SHA-256 of what was sent, and read again
 while that is unchanged. Same footage, same numbers: a re-run neither pays again nor changes the counts a signed
 letter quotes, and analyze.py prints "Spark verdicts reused: N of M". Delete those files to make Spark or Wonder look
 again, and keep the same ffmpeg between a run and its re-run. An output folder knows its video by SHA-256: it refuses
@@ -199,29 +206,18 @@ its bottom): a scooter rider, or feet hidden by a nearer vehicle. People only.
 ### Open weights: Muse Glimmer writes the letter
 
 Set `LETTER_MODEL_URL` to any OpenAI-compatible server and the fix and letter come from that model instead of Muse
-Spark, with the same number check. `<removed-run-record>` runs Meta's official 4-bit **Muse Glimmer 30B**
+Spark, with the same number check. `kaggle/glimmer-gate.ipynb` runs Meta's official 4-bit **Muse Glimmer 30B**
 (`meta-models/Muse-Glimmer-30B-GGUF`, Apache 2.0) with llama.cpp on Kaggle's free 2 x T4 and writes the evidence
 page; when the pack has a blurred street photo, Glimmer is shown it too. The notebook pins llama.cpp `b11976` and
 the Hugging Face revision, checks both files against their published sha256 before use, runs one 32,768-token slot
 with medium reasoning and the model card's sampling, stops with a clear error if Glimmer runs out of context, and
-writes `<removed-run-record>` (llama.cpp build, GPUs, timings, the letter's sha256, the git commit and pack.py's
-sha256). The page then says "Muse Glimmer 30B wrote this in N s on Kaggle 2 x T4", with N from the server's own
-timings. On our real gate, Glimmer wrote a letter in 276 s on the first try, every number passing the code check ([`kaggle/glimmer-gate-letter.txt`](kaggle/glimmer-gate-letter.txt), record [`kaggle/glimmer-gate-provenance.json`](kaggle/glimmer-gate-provenance.json), notebook [`kaggle/glimmer-gate.ipynb`](kaggle/glimmer-gate.ipynb); no street photo was sent; the server log stays with the raw video, off the repo). Three runs on the synthetic sample have a record here (the sample has no person tracks and so no photo):
-- [`<removed-run-record>`](<removed-run-record>), with llama-server's default sampling and the template's
-  default "high" reasoning: Glimmer's part took 592 s; it proposed a raised zebra crossing and wrote a letter whose
-  every number passed the code check. The letter was correct but stiff.
-- [`<removed-run-record>`](<removed-run-record>), 29 Oct, the notebook at commit 3ed3c6e: both
-  sha256 checks passed and pack.py took 313 s. Glimmer needed two tries (the log does not say why the first went
-  back); the letter kept, 2,263 tokens at 13.6 tokens a second, proposes a raised zebra crossing with entry deflection
-  and passed the code check. No judge read it: the run had no Meta key. The same run then judged the planted-lies
-  bench (below): every lie flagged, but also 6 of 8 clean letters. Its output files were downloaded and checked
-  against the log: `<removed-run-record>` and `<removed-run-record>` are committed in `kaggle/`; the server log
-  and the bench file are not (the bench file holds a letter written from DUT footage).
-
-**The public run.** Version 2's dataset and outputs carry that DUT-derived bench file, and DUT has no licence, so Versions 1 and 2 and their dataset stay private. Version 3 is the clean run: a dataset made from one commit (`0a1bbea`) with nothing attached, the bench `kaggle/judge-bench-public.json` (synthetic `sample/` letters only), any bench file kept in `/tmp` so it never becomes a saved output. Its record is [`<removed-run-record>`](<removed-run-record>). Glimmer's 24 of 24 and 6 of 8 as judge stay Version 2's figures, from the committed record.
+writes a run record (llama.cpp build, GPUs, timings, the letter's sha256, the git commit and pack.py's sha256). The
+page then says "Muse Glimmer 30B wrote this in N s on Kaggle 2 x T4", with N from the server's own timings. On our real gate, Glimmer wrote a letter in 276 s on the first try, every number passing the code check ([`kaggle/glimmer-gate-letter.txt`](kaggle/glimmer-gate-letter.txt), record [`kaggle/glimmer-gate-provenance.json`](kaggle/glimmer-gate-provenance.json), notebook [`kaggle/glimmer-gate.ipynb`](kaggle/glimmer-gate.ipynb) (the record and Kaggle's own log, [`kaggle/glimmer-gate-run-log.json`](kaggle/glimmer-gate-run-log.json), name the notebook by its earlier file name and are kept exactly as the run wrote them; the notebook that ran is this one, Kaggle notebook cw-glimmer-gate on the author's own account); no street photo was sent; the server log stays with the raw video, off the repo).
+The record holds llama.cpp `b1-2e0d86b`, both sha256 checks passed, the git commit `394a797` and pack.py's sha256, and
+the kept reply: 3,672 tokens at 13.5 tokens a second, proposing a raised zebra crossing with guardrails leading to it.
 
 No Glimmer run has been sent a street photo yet, and Muse Spark stays the default writer.
-The Kaggle notebook was run by the author.
+The Kaggle notebook was run by the author on the author's own Kaggle account.
 The open-weights model is sent a JSON schema that gives the plan's shape only. A number lock is opt-in:
 `LETTER_MODEL_NUMBER_LOCK=1` also holds every string to a pattern that allows digits only as the measured numbers.
 On Fireworks (29 Oct) that pattern trapped Muse Spark Open in "a0a0a0…" in every field. The text held no unmeasured
@@ -232,8 +228,7 @@ check and the reviewer still run after that, and the run record counts the model
 server runs on the same machine. Every `LETTER_MODEL_*` and `JUDGE_MODEL_*` setting is read from the shell, else from
 `.env`.
 `JUDGE_MODEL_URL` makes the open-weights model a judge too: it reviews the letter beside Muse Spark, or alone without a
-Meta key, and the page names only the judges that ran. As a judge on the planted-lies bench, Glimmer objected to
-6 of 8 clean letters (below).
+Meta key, and the page names only the judges that ran.
 `sample/` is a synthetic example (made-up tracks, no video) for trying the letter step anywhere.
 
 ```
@@ -242,13 +237,14 @@ LETTER_MODEL_URL=http://127.0.0.1:8080/v1 python3 pack.py out/VIDEO site.json
 
 #### Open weights: two paths
 
-Same facts, three writers (`python3 writers_table.py`; details in [`kaggle/open-weights.md`](kaggle/open-weights.md)):
-Muse Glimmer 30B on Kaggle's free 2 x T4 wrote the sample letter for $0 in 313 s; Muse Spark Open on Fireworks in
-55.5 s for about $0.012; Muse Spark on the Meta API in one try. All three letters passed the number check.
+Three writers, each with a run record (`python3 writers_table.py`; details in [`kaggle/open-weights.md`](kaggle/open-weights.md)):
+Muse Glimmer 30B on Kaggle's free 2 x T4 wrote a letter for our real gate for $0 in 276 s; Muse Spark Open on Fireworks
+wrote the sample letter in 55.5 s for about $0.012; Muse Spark on the Meta API in one try. All three letters passed
+the number check.
 The judge bench that can be published is [`kaggle/judge-bench-public.json`](kaggle/judge-bench-public.json), built only
 from letters about the synthetic `sample/`: Muse Spark flagged 21 of 23 planted lies and 0 of 8 clean letters.
-`JUDGE_VOTES=2` asks an open-weights judge twice and counts a problem only when both replies list it, because Glimmer,
-asked once, flagged 6 of 8 clean letters. With two votes on the public bench (Kaggle Version 3) Glimmer flagged all 23 planted lies, two more than Spark, and 5 of 8 clean letters, so Spark stays the default judge ([`<removed-run-record>`](<removed-run-record>)).
+`JUDGE_VOTES=2` asks an open-weights judge twice and counts a problem only when both replies list it, so a stray flag
+from a model sampling at temperature 1.0 has to come up twice.
 
 `LETTER_MODEL` is the model id sent to the server; the page shows the product name and where it ran. A self-hosted
 server is named "self-hosted" only when it runs on the machine that ran pack.py, and Fireworks' API "on Fireworks".
@@ -343,27 +339,22 @@ case stays on the model it started with. First run, 30 Oct, on a copy of the syn
 
 ## Checking the checks
 
-**Judge bench: planted lies.** `judge_bench.py` plants one lie at a time in two real letters, Glimmer's v1 letter and
-a Muse Spark letter from our cache, and scores each letter check on them: 24 copies with 12 kinds of lie, half of
-them kinds the judge's prompt does not name (a near-miss called a collision, "every school day", two near-misses'
-speeds swapped...), and 8 clean controls. The 18 added sentences have no digit, and the 2 swaps use only measured
-numbers. Results on 29 Oct (Wilson 95% ranges; the full table is in [`GATES.md`](GATES.md)):
+**Judge bench: planted lies.** `judge_bench.py` plants one lie at a time in two real letters, Glimmer's sample letter
+(`kaggle/glimmer-sample-letter.txt`) and a Muse Spark letter from our cache, and scores each letter check on them:
+24 copies with 12 kinds of lie, half of them kinds the judge's prompt does not name (a near-miss called a collision,
+"every school day", two near-misses' speeds swapped...), and 8 clean controls. The 18 added sentences have no digit,
+and the 2 swaps use only measured numbers. Results on 29 Oct (Wilson 95% ranges; the full table is in [`GATES.md`](GATES.md)):
 
 | Letter check | Letters with a planted lie flagged | Clean letters flagged |
 |---|---|---|
 | Code alone, offline | 4 of 24 (7-36%): the numbers in words and the speeds in mph | 0 of 8 (0-32%) |
 | Muse Spark as judge, two runs a letter | 24 of 24 (86-100%) | 1 of 8 (2-47%) |
-| Muse Glimmer 30B as judge, one run a letter on Kaggle | 24 of 24 (86-100%) | 6 of 8 (41-93%) |
 
 Muse Spark flagged every planted lie, the six kinds its prompt never names too, and objected to one clean letter of
-eight. Glimmer also flagged every lie but objected to six clean letters of eight: as a judge it objects to nearly
-everything, so its 24 of 24 shows little, and Muse Spark stays the default judge. "Flagged" means the judge listed a
-problem; whether it named the planted one is not checked. Both are Muse models, so neither is an independent judge of
-Muse letters, and 8 controls are few. No reply was unreadable (0 of 64 from Spark, 0 of 32 from Glimmer); one that
-cannot be read is counted on its own, never as a catch. Glimmer's figures are from the Kaggle log
-([`<removed-run-record>`](<removed-run-record>)), checked against its downloaded output files. Code's
-rule-broken check came after these runs; neither base letter nor any added sentence has its words, and the judge's
-prompt is unchanged, so the numbers stand as measured.
+eight. "Flagged" means the judge listed a problem; whether it named the planted one is not checked. A Muse model is
+not an independent judge of Muse letters, and 8 controls are few. No reply was unreadable (0 of 64); one that
+cannot be read is counted on its own, never as a catch. Code's rule-broken check came after these runs; neither base
+letter nor any added sentence has its words, and the judge's prompt is unchanged, so the numbers stand as measured.
 
 ```
 python3 judge_bench.py --out out/judge-bench.json             # build the letters, score the code check
@@ -371,11 +362,9 @@ python3 judge_bench.py --out out/judge-bench.json --spark 2   # Muse Spark judge
 LETTER_MODEL_URL=http://127.0.0.1:8080/v1 python3 judge_bench.py --out out/judge-bench.json --glimmer 1
 ```
 
-The bench file keeps every letter and verdict, so a later run only asks for what is missing. For the notebook's
-Glimmer pass on Kaggle, attach a bench file built from our own pack with Add Input, never one built from DUT: the
-local `out/judge-bench.json` takes its Spark letter from the DUT cache. The Spark letter lives in `out/`, which the
-repo zip leaves out, so without the file the notebook benches Glimmer's letter alone (12 lies and 4 controls) and
-its record says so. The notebook keeps the attached file out of its saved outputs.
+The bench file keeps every letter and verdict, so a later run only asks for what is missing. The local
+`out/judge-bench.json` takes its Spark letter from the DUT cache, so it stays off the repo; the public bench
+(`python3 judge_bench.py --public`) is built from `sample/` letters only.
 
 **Blind check (G5).** `blind_set.py` mixes the pipeline's near-misses with decoys (a pedestrian and a moving vehicle
 on the same spot 5 to 8 s apart, each pedestrian checked by Spark to be a person), cuts every clip to the same 12 s,
@@ -610,8 +599,12 @@ python3 vehicle_test.py out/indian-crowd --spend   # 60 cached crowd frames, abo
   (one image request per 0.2 s). Dense traffic fills even a 15-second part: on our Indian intersection clip every
   vehicle concept hit the limit within 2 s, so there vehicle counts are a minimum. For people it did not track,
   SAM image search looks again on the clips and the street photo (one image request per 0.2 s of published
-  video) and blurs those it finds; check every public frame by eye. Number plates are blurred only on vehicles
-  SAM tracked.
+  video) and blurs those it finds; check every public frame by eye. Number plates are found by SAM 3.1 on
+  full-resolution cuts of the published windows; a plate it misses through a whole clip is hidden only on a vehicle
+  SAM tracked, by a mosaic over its whole box where that box is 240 px long or more, or 120 px across when cut by the
+  frame edge (smaller, a plate's characters are under ~3.5 px). On our gate no vehicle without a found plate is that
+  close: the 5 two-wheelers and the parked car (whose front plate is seen edge-on) that SAM found no plate on were
+  checked by eye at full resolution, and none shows a legible plate.
 - Crowd mode fills in a box across up to 1 s of missed detections, so a near-miss can sit on an inferred position
   rather than a seen one. Each card says which: "Seen at the moment", or how long SAM did not detect the person or
   the vehicle when that was 0.5 s or more ("position inferred"). Re-scored at $0 from the cached replies on 29 Oct,
