@@ -17,7 +17,7 @@
 
 | Judging | Where to look |
 |---|---|
-| **Impact** | A real gate, real near-misses: closest **0.0 s, 0.42 m apart**. Our college certified the report genuine (3 Nov 2026). Any school can repeat it with a phone, a tape and the [Manual](https://crossingwatch.xyz/manual/), for about **$12** of SAM for our 8.6-minute video |
+| **Impact** | A real gate, real near-misses: closest **0.0 s, 0.42 m apart**. Our college certified the report genuine (3 Nov 2026), and its Head of CSE (Data Science) writes of "several close calls" with "no documented evidence" until now ([his statement](#from-the-college-in-its-own-words)). Any school can repeat it with a phone, a tape and the [Manual](https://crossingwatch.xyz/manual/), for about **$12** of SAM for our 8.6-minute video |
 | **Meta AI tooling** | Seven Meta models, one job each ([table](#-seven-meta-models-each-doing-real-work)). Core: **SAM 3.1** tracks people and vehicles and finds plates to hide; **Muse Spark** sets aside 66 of 75 alarms, runs the case agent and writes the letter; **Muse Spark Open** and **Muse Glimmer 30B** (LoRA-tuned by us) run every reasoning step of the case on open weights. Supporting: **Muse Wonder** hears the horns, **Muse Voice Transcribe** finds speech to silence, **Muse Image** draws the fix |
 | **Technical depth** | Tape 15 m vs video **15.0 m**, on a line the maths never used; drone ground truth **47 of 52**; [3 pre-registered blind-test wins](OPEN_WEIGHTS.md); **243** self-checks |
 | **Demo** | The [2:45 video](https://youtu.be/9QSc-Urqpr4); the [Live Explorer](https://crossingwatch.xyz/explorer/): switch Muse Spark's review off and on and watch 75 alarms become 5; the [live run's full log](provenance/live-run-2026-11-03/README.md); the [case agent live on camera](provenance/agent-live-2026-11-04/README.md) |
@@ -64,6 +64,14 @@ phone video into that proof:** measured near-misses, blurred clips, and a letter
 | 📏 Tape check (never used to calibrate) | video **15.0 m** · tape **15 m** |
 | 🏛️ The college | certified in writing (3 Nov 2026): filmed at its gate with permission, **the report is genuine** |
 | 📄 The ask | a **painted zebra crossing** (no hump: college buses use this road) and **"College Zone 20 km/h"** signs |
+
+### From the college, in its own words
+
+> Every day, especially during dismissal, I notice a large number of our students crossing the main road at the college gate. The traffic on this stretch is usually fast and heavy, and the absence of proper speed control or a safe pedestrian crossing makes the situation quite risky.
+>
+> We have had several close calls, and it has been a persistent concern for the department and the college administration. Until now, we did not have any documented evidence to formally highlight this issue to the concerned road authorities.
+>
+> — **Dr. Neetesh Kumar Gupta, Head, Department of CSE (Data Science), LNCT Excellence, Bhopal** (4 Nov 2026, in his own words)
 
 <img src="docs/evidence/event1-strobe.jpg" width="100%" alt="Time-lapse still of the 0.0 s near-miss: SAM 3.1 tracks the motorcycle (red) and the person (cyan)">
 <p><b>The 0.0 s near-miss in one picture.</b> SAM 3.1 tracks the motorcycle (red) and the person (cyan); one copy every 0.5 s, so wider spacing means faster. Faces and plates blurred.</p>
@@ -114,7 +122,7 @@ flowchart TD
 | **Muse Image** | Draws the fix onto the real, blurred street, only where people crossed | [how](TECHNICAL.md#how-it-works) |
 | **Muse Wonder** | Listens around each near-miss for horns, brakes and shouts | heard horns around 4 of the 5 near-misses at our gate |
 | **Muse Voice Transcribe** | Finds human speech in each clip's sound so it can be silenced before publishing; the horn stays | no speech in our five clips, so every clip keeps its full road sound ([how](TECHNICAL.md#how-it-works)) |
-| **Muse Glimmer 30B** · open weights | Wrote a full letter for our real gate on a free Kaggle GPU; our LoRA fine-tune judges letters; as the crop reviewer it made the same keep/remove call as Muse Spark on all 32 people at our gate ([review](provenance/glimmer-vision-review-2026-11-04/README.md)) | letter in **276 s, first try**; tuned judge **wins 3 pre-registered blind tests on planted errors** vs Muse Spark Open, Muse Spark (closed) leads overall ([one page](OPEN_WEIGHTS.md)); served on Fireworks, read our real letter 6 of 6 times, no unsupported claim ([record](provenance/glimmer-judge-lora-v6/live/gate-letter-judge.json)); runs free on Kaggle's 2 x T4 too and beats Spark Open again (81 vs 49, p 0.006, [score](provenance/glimmer-judge-lora-v6/kaggle/score.json)) |
+| **Muse Glimmer 30B** · open weights | Wrote a full letter for our real gate on a free Kaggle GPU; our LoRA fine-tune judges letters ([adapter on Hugging Face](https://huggingface.co/shaunmortal/crossing-watch-glimmer-judge-v6)); as the crop reviewer it made the same keep/remove call as Muse Spark on all 32 people at our gate ([review](provenance/glimmer-vision-review-2026-11-04/README.md)) | letter in **276 s, first try**; tuned judge **wins 3 pre-registered blind tests on planted errors** vs Muse Spark Open, Muse Spark (closed) leads overall ([one page](OPEN_WEIGHTS.md)); served on Fireworks, read our real letter 6 of 6 times, no unsupported claim ([record](provenance/glimmer-judge-lora-v6/live/gate-letter-judge.json)); runs free on Kaggle's 2 x T4 too and beats Spark Open again (81 vs 49, p 0.006, [score](provenance/glimmer-judge-lora-v6/kaggle/score.json)) |
 | **Muse Spark Open** · open weights | Runs every reasoning step of our gate case on open weights (Spark Open review, agent and letter; our tuned Glimmer reviewer); SAM 3.1 and Muse Wonder replies reused from the hosted run | same 5 near-misses and 51 people as Muse Spark; letter passes every check first try ([run](provenance/open-gate-2026-11-04/README.md)) |
 
 <details>
@@ -140,7 +148,7 @@ flowchart TD
 | 📏 | Tape check on our gate, a line the maths never used | video **15.0 m**, tape **15 m**, 0% off | [the agent](TECHNICAL.md#case-agent-it-stops-to-ask-for-a-tape-measure) |
 | 🧮 | Near-miss maths on public drone data (SinD) | speed error **0.24 km/h** mean | [validation](TECHNICAL.md#validation-on-ground-truth-trajectories) |
 | 🕵️ | The letter: planted false numbers and claims | Muse Spark flagged **24 of 24** (**21 of 23** on the public bench you can re-run at $0); code checks every number | [bench](TECHNICAL.md#checking-the-checks) |
-| 🔓 | Open weights | tuned Glimmer judge wins **3** pre-registered blind tests on planted errors over Muse Spark Open (Muse Spark, closed, leads overall); Muse Spark Open read our letter **6 of 6** times, no unsupported claim | [one page](OPEN_WEIGHTS.md) |
+| 🔓 | Open weights | tuned Glimmer judge wins **3** pre-registered blind tests on planted errors over Muse Spark Open (Muse Spark, closed, leads overall); Muse Spark Open read our letter **6 of 6** times, no unsupported claim | [one page](OPEN_WEIGHTS.md) · [adapter](https://huggingface.co/shaunmortal/crossing-watch-glimmer-judge-v6) |
 | 📋 | Pass marks written before the runs | **G1 to G4 passed**: news CCTV, our gate's tape (15.0 m vs 15 m), DUT drone truth, our footage end to end | [GATES](GATES.md#verdict-now) |
 | ✅ | Self-checks | **243** self-checks, `python3 test_cw.py`, offline, in under a minute | [every claim](TECHNICAL.md#check-it-yourself) |
 

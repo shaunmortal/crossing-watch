@@ -28,6 +28,7 @@ The App, Explorer and Manual have a हिंदी / English switch. Every gate
 - A real institution is behind it: on 31 Oct 2026 the Principal and the HOD (CSE-DS) of LNCT Excellence, Bhopal
   signed and sealed the application (filming on Mon 2 Nov approved; on 3 Nov the college certified the report genuine), and
   19 teachers signed a support sheet (18 agreed to be named publicly). The signed paper stays off the repo.
+- **The college, in its own words (4 Nov 2026):** "We have had several close calls, and it has been a persistent concern for the department and the college administration. Until now, we did not have any documented evidence to formally highlight this issue to the concerned road authorities." — Dr. Neetesh Kumar Gupta, Head, Department of CSE (Data Science), LNCT Excellence, Bhopal. Full statement: [README](README.md#from-the-college-in-its-own-words).
 - The output is something an authority can act on: a letter where code checks every number, plus legal quotes added
   by code, never a model (2025 INSC 1189). [TECHNICAL, How it works](TECHNICAL.md#how-it-works), `gazette.py`.
 - **Our gate (Mon 2 Nov):** In 8.6 minutes of our gate's dismissal, among 55 moving vehicles: 80 tracked crossings; 51 people crossed on foot after Muse Spark set aside 28 riders and empty boxes, and 1 more was ruled out by eye; 2 serious near-misses (one person and motorcycle on the same spot at the same instant) and 3 close passes; the video's 15.0 m matched the tape's 15 m. [README](README.md), [GATES](GATES.md#verdict-now).
@@ -64,7 +65,7 @@ The App, Explorer and Manual have a हिंदी / English switch. Every gate
 - One page for the review, with $0 checks: [OPEN_WEIGHTS.md](OPEN_WEIGHTS.md).
 - Every reasoning step of our gate case on open weights (Spark Open review, agent and letter; our tuned Glimmer reviewer): [run](provenance/open-gate-2026-11-04/README.md). SAM 3.1 tracking and Muse Wonder were reused from the hosted run. Glimmer 30B as the crop reviewer: the same keep/remove call as Muse Spark on all 32 people at our gate ([review](provenance/glimmer-vision-review-2026-11-04/README.md)).
 
-- Fine-tuned Muse Glimmer judge (LoRA, training $0), pre-registered blind tests on planted errors, labels frozen before any tuned reply
+- Fine-tuned Muse Glimmer judge (LoRA, training $0; [the adapter on Hugging Face](https://huggingface.co/shaunmortal/crossing-watch-glimmer-judge-v6)), pre-registered blind tests on planted errors, labels frozen before any tuned reply
   was read. **v4, 1,016 rows from 260 synthetic letters: 998 right vs Muse Spark Open 980 (28 vs 10, p 0.0051)**,
   mostly lies Spark Open missed; clean rows flagged 5/491 vs Spark Open 4/491. Test letters come from the same distribution as the training letters.
 - Muse Spark (closed) leads overall in v5 (p 0.043)
