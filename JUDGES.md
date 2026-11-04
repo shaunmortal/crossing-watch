@@ -4,7 +4,7 @@ Solo Indie entry from Bhopal, India: one phone video of our college gate becomes
 
 ## 5-minute path
 
-1. **Watch the demo (2:45):** [youtu.be/XGxNWmFr_Ro](https://youtu.be/XGxNWmFr_Ro). Real footage of our gate, in the author's own voice.
+1. **Watch the demo (2:45):** [youtu.be/9QSc-Urqpr4](https://youtu.be/9QSc-Urqpr4). Real footage of our gate, in the author's own voice.
 2. **Open the [Live Explorer](https://crossingwatch.xyz/explorer/)** (no key, no install): switch Muse Spark's review off and on and watch 75 alarms become 5; click the 0.0 s near-miss to replay it on the road map.
 3. **Open the [App, step 3](https://crossingwatch.xyz/app/#s3):** the case agent stops and asks a person for a tape measure: video 15.0 m, tape 15 m.
 4. **Read [OPEN_WEIGHTS.md](OPEN_WEIGHTS.md):** every reasoning step of our gate case on open weights, and our LoRA-tuned Muse Glimmer judge beating Muse Spark Open on Kaggle's free 2 x T4 (81 vs 49, p 0.006).
@@ -37,7 +37,7 @@ The App, Explorer and Manual have a हिंदी / English switch. Every limi
 ## Demo
 
 - Today, at $0: `python3 pack.py sample sample/site.json` builds the page offline (no key, no video).
-- **Evidence page:** [crossingwatch.xyz/evidence](https://crossingwatch.xyz/evidence/), from Monday's footage. Demo video: [youtu.be/XGxNWmFr_Ro](https://youtu.be/XGxNWmFr_Ro) (2:45). Live run in the video, full log: [provenance/live-run-2026-11-03](provenance/live-run-2026-11-03/README.md).
+- **Evidence page:** [crossingwatch.xyz/evidence](https://crossingwatch.xyz/evidence/), from Monday's footage. Demo video: [youtu.be/9QSc-Urqpr4](https://youtu.be/9QSc-Urqpr4) (2:45). Live run in the video, full log: [provenance/live-run-2026-11-03](provenance/live-run-2026-11-03/README.md).
 
 ## Depth
 
