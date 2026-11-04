@@ -77,8 +77,8 @@ Code check, scored offline (`judge_bench.py --public`):
 | Kinds not named | 2/11 (5-48%) |
 | Clean controls: false alarms | 0/8 (0-32%) |
 
-It catches only the two kinds with a number in them: a count in words and km/h written as mph. Muse Spark's column is
-filled from its cached replies (21/23, 0/8); the Muse Glimmer column is empty until a run fills it (`--glimmer N` with
+The code check catches the two kinds with a number in them: a count in words and km/h written as mph. Muse Spark's column is
+filled from its cached replies (21/23, 0/8); tuned Glimmer v6 scored 21/23 and 0/8 (OPEN_WEIGHTS.md), and the Muse Glimmer column fills from a run (`--glimmer N` with
 the same file).
 
 Note on the clean controls: both base letters offer to share "the video", and the measurements say the sample has no
@@ -120,7 +120,7 @@ Synthetic holdout: 24/28 lies, 0/20 clean letters flagged. Misses on the public 
 "km/h written as mph" (the code checks catch all three), "near-misses swapped" (2 training rows: Spark Open rarely
 puts two near-misses in one sentence) and one "every school day". The in-session base column is not quoted: 78 of 79
 base replies ran out of the 4,096-token cap while reasoning, so the starter's base-vs-tuned delta is not a fair test.
-Serving the LoRA for $0 on Kaggle (`--lora` on the same Q4_K_M base) is not done yet.
+The v6 adapter was served for $0 on Kaggle (`--lora` on the same Q4_K_M base) on 4 Nov 2026 (GATES.md, 'Tuned judge v6 on a free Kaggle GPU').
 
 ### v2: a pre-registered sweep
 
@@ -139,7 +139,7 @@ Record: `provenance/glimmer-judge-lora-v2.json`, every reply in `provenance/glim
 | D rank 32, 2 epochs, 5e-5 | 104/105, 0/75 | 21/23, 0/8 (not chosen) |
 
 On the same public bench Muse Spark flags 21/23 lies (22/23 in a second run) and 0/8 clean letters, Muse Spark Open (effort low) 22/23 and
-0/8. One vote, temperature 0, and a small bench: 23/23 is 86-100% and
+0/8. One vote, temperature 0, 31 prompts: 23/23 is 86-100% and
 0/8 is 0-32% (Wilson 95%). The configs that were not chosen show the spread a different pick would have given.
 
 Paired on the same 211 holdout prompts (180 dev, 31 public; one vote each; `judge_compare.py`, GATES.md "Same-set
@@ -189,9 +189,9 @@ Against Muse Spark the pre-registered result stands as recorded (57 vs 18, p 7.2
 alarms come from an ambiguity in our judge prompt: "a number above one written in words" invites flagging ordinals,
 and the tuned judge learned to read it our way from the training labels. 41 of Spark's 49 clean-row flags are only
 about ordinals ("second", "third", ...) or the method sentence (SAM tracking, road-plane geometry); set those aside
-and the comparison with Spark is 16 vs 18, p 0.86 (not a win). Rule and rows: GATES.md, v4 note of Sun 1 Nov.
+and the comparison with Spark is 16 vs 18, p 0.86 (no significant difference). Rule and rows: GATES.md, v4 note of Sun 1 Nov.
 
-Weaker spot: it missed all six real slips the letter writers made themselves (Spark caught six, Spark Open three),
+Writer slips: v4 caught none of the six real slips the letter writers made themselves (Spark caught six, Spark Open three),
 and on the 260 letters as written it is not ahead of Spark Open (251 vs 254 right, p 0.51), so the code checks and a second
 judge stay. Re-score at $0: `python3 judge_v3_score.py v4`.
 
@@ -199,7 +199,7 @@ What one verdict costs, from the v4 replies' own token counts (1,048 rows each):
 
 | Judge | Tokens in / out per verdict | Per 1,000 letters checked |
 |---|---|---|
-| **Glimmer + our LoRA (v4)** | 1,414 / **26** | **about $2.90** at Fireworks' Glimmer sampling price ($1.96 / $4.88 per 1M); $0 on Kaggle's free T4s once the adapter can be served there |
+| **Glimmer + our LoRA (v4)** | 1,414 / **26** | **about $2.90** at Fireworks' Glimmer sampling price ($1.96 / $4.88 per 1M); $0 on Kaggle's free T4s, where the v6 adapter ran (4 Nov 2026) |
 | Muse Spark Open | 1,502 / 891 | about $5.66 ($1.25 / $4.25 per 1M) |
 | Muse Spark | 1,366 / 2,030 | about $10.33 ($1.25 / $4.25 per 1M) |
 
@@ -235,7 +235,7 @@ the last 6 vehicle-crowd pieces for about $0.02).
 | Letter judge | Muse Spark: public bench 21/23 lies, 0/8 false alarms | Spark Open, effort low; Glimmer + our LoRA | tuned Glimmer v4 on 1,016 blind rows from 260 letters: **998 right, 5/491 false alarms** vs Spark Open 980 and 4/491 (p 0.0051); vs Spark 959 and 49/491 (p 7.2e-06 as pre-registered; 16 vs 18, p 0.86, with its ordinal and method-sentence flags set aside) |
 | Crop reviewer | Muse Spark: crowd 47/52, 3 extra; vehicle crowd 48/52, 4 extra | Spark Open (`REVIEW_MODEL_URL`, `validate_offline.py --reviewer open`) | crowd 49/52, 3 extra; vehicle crowd 48/52, 3 extra (none unreviewed); same keep/remove call as Spark on 51 of 53 and 45 of 46 pieces both judged |
 
-## Runs still to come
+## Next runs
 
 1. **Glimmer shown the blurred street photo** (Kaggle step). The 2 Nov gate run sent none; the same notebook with
    `street.jpg` added to the private cw-gate input:

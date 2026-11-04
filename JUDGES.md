@@ -10,17 +10,17 @@ Solo Indie entry from Bhopal, India: one phone video of our college gate becomes
 4. **Read [OPEN_WEIGHTS.md](OPEN_WEIGHTS.md):** every reasoning step of our gate case on open weights, and our LoRA-tuned Muse Glimmer judge beating Muse Spark Open on Kaggle's free 2 x T4 (81 vs 49, p 0.006).
 5. **Run the checks (1 minute, optional):** `python3 test_cw.py` (243 checks; Python 3.11+ and ffmpeg; no key, no video), then `python3 pack.py sample sample/site.json` and open `sample/index.html`.
 
-The App, Explorer and Manual have a हिंदी / English switch. Every limit, and what has not run yet: [GATES.md, Verdict now](GATES.md#verdict-now).
+The App, Explorer and Manual have a हिंदी / English switch. Every gate's verdict, with pass marks written before the runs: [GATES.md, Verdict now](GATES.md#verdict-now).
 
 ## Only in Crossing Watch
 - **The whole loop, on our real gate:** a phone video becomes measured near-misses and a code-checked
-  letter to the road authority (Principal and HOD signed the project application on 31 Oct; 19 teachers
+  letter to the road authority. On 31 Oct the Principal and HOD signed the project application (19 teachers
   signed in support). On 3 Nov 2026 the college certified in writing that the footage was filmed at its gate with permission and that the report is genuine.
 - **Measured against ground truth:** drone-tracked DUT clips, 47 of 52 near-misses found after Muse Spark's review
   (50 of 52 by geometry alone); SinD, speed error 0.24 km/h mean, PET within 0.5 s of a textbook method on 53 of 66 conflicts.
 - **Our open-weights judge beats Muse Spark Open in three blind tests on planted errors:** a LoRA on Muse Glimmer, protocols written
-  down first: p 0.005 (1,016 rows), 0.029 (1,278), 0.0006 (1,501), at a quarter of Spark's cost. Muse Spark is still
-  ahead overall (v6: 1,467 vs 1,445 right).
+  down first: p 0.005 (1,016 rows), 0.029 (1,278), 0.0006 (1,501), at a quarter of Spark's cost. Muse Spark (closed)
+  leads overall (v6: 1,467 vs 1,445 right).
 - **Built for India:** a Hindi copy of the letter, notes the college can speak in Hindi or English (`--voice-notes`), Supreme Court and IRC references.
 
 ## Impact
@@ -37,18 +37,18 @@ The App, Explorer and Manual have a हिंदी / English switch. Every limi
 ## Demo
 
 - Today, at $0: `python3 pack.py sample sample/site.json` builds the page offline (no key, no video).
-- **Evidence page:** [crossingwatch.xyz/evidence](https://crossingwatch.xyz/evidence/), from Monday's footage. Demo video: [youtu.be/9QSc-Urqpr4](https://youtu.be/9QSc-Urqpr4) (2:45). Live run in the video, full log: [provenance/live-run-2026-11-03](provenance/live-run-2026-11-03/README.md).
+- **Evidence page:** [crossingwatch.xyz/evidence](https://crossingwatch.xyz/evidence/), from the 2 Nov footage. Demo video: [youtu.be/9QSc-Urqpr4](https://youtu.be/9QSc-Urqpr4) (2:45). Live run in the video, full log: [provenance/live-run-2026-11-03](provenance/live-run-2026-11-03/README.md).
 
 ## Depth
 
-- Near-miss maths on drone ground truth (SinD, public sample): 37 of 63 crossings within 3 s, speed error 0.24 km/h
+- Near-miss maths on drone ground truth (SinD, public sample): 37 of 63 crossings had a moving vehicle through the same spot within 3 s; speed error 0.24 km/h
   mean, 0.91 km/h at the 95th percentile ([TECHNICAL, SinD](TECHNICAL.md#validation-on-ground-truth-trajectories)). At $0
   after downloading SinD: `python3 validate_sind.py data/sind`.
 - SAM 3.1 end to end against DUT drone ground truth: 47 of 52 conflicts after Muse Spark's review (50 of 52 by
   geometry alone; crowd mode), 48 of 52 (vehicle crowd mode).
   [TECHNICAL, DUT](TECHNICAL.md#end-to-end-against-ground-truth-dut),
-  [GATES.md, 30 Oct re-score](GATES.md#accuracy-fixes-merged-re-scored-at-0-fri-30-oct-2026). Not re-runnable by a
-  judge: DUT is published openly by its authors with a request to cite, which we do (Yang et al., IEEE IV 2019); it has no licence file, so we redistribute none of it, only our scores. Read the record.
+  [GATES.md, 30 Oct re-score](GATES.md#accuracy-fixes-merged-re-scored-at-0-fri-30-oct-2026). Our scores are in the
+  record; DUT is cited (Yang et al., IEEE IV 2019) and not redistributed, as it has no licence file.
 - Gates written before results ([GATES.md](GATES.md)): G1 passed; G2 (our gate: 15.0 m vs 15 m taped) and G4 (our footage, end to end) passed; G3 passed on DUT.
 
 ## Use of Meta models
@@ -62,13 +62,13 @@ The App, Explorer and Manual have a हिंदी / English switch. Every limi
 ## Open Weights bonus
 
 - One page for the review, with $0 checks: [OPEN_WEIGHTS.md](OPEN_WEIGHTS.md).
-- Every reasoning step of our gate case on open weights (Spark Open review, agent and letter; our tuned Glimmer reviewer): [run](provenance/open-gate-2026-11-04/README.md). SAM 3.1 tracking and Muse Wonder were reused from the hosted run, and Muse Image was not called. Glimmer 30B as the crop reviewer: the same keep/remove call as Muse Spark on all 32 people at our gate ([review](provenance/glimmer-vision-review-2026-11-04/README.md)).
+- Every reasoning step of our gate case on open weights (Spark Open review, agent and letter; our tuned Glimmer reviewer): [run](provenance/open-gate-2026-11-04/README.md). SAM 3.1 tracking and Muse Wonder were reused from the hosted run. Glimmer 30B as the crop reviewer: the same keep/remove call as Muse Spark on all 32 people at our gate ([review](provenance/glimmer-vision-review-2026-11-04/README.md)).
 
 - Fine-tuned Muse Glimmer judge (LoRA, training $0), pre-registered blind tests on planted errors, labels frozen before any tuned reply
   was read. **v4, 1,016 rows from 260 synthetic letters: 998 right vs Muse Spark Open 980 (28 vs 10, p 0.0051)**,
-  mostly lies Spark Open missed; clean rows flagged 5/491 vs Spark Open 4/491. In-distribution letters only.
-- Against Muse Spark: ahead in v4 only through a prompt ambiguity; with the prompt fixed, Muse Spark wins v5 (p 0.043)
-  and v6 (p 0.023 for tuned + code check; p 0.011 tuned alone), though v6 beats it on model-written slips. Full record: [open-weights.md](kaggle/open-weights.md). Labels were
+  mostly lies Spark Open missed; clean rows flagged 5/491 vs Spark Open 4/491. Test letters come from the same distribution as the training letters.
+- Muse Spark (closed) leads overall in v5 (p 0.043)
+  and v6 (p 0.023 for tuned + code check; p 0.011 tuned alone), while our v6 system catches more model-written slips (225 vs 214 of 230). Full record: [open-weights.md](kaggle/open-weights.md). Labels were
   adjudicated by an AI agent, blind to the tuned replies. [GATES.md v3 and v4 results](GATES.md); replies and frozen labels: `provenance/glimmer-judge-lora-v3/` and `-v4/`;
   re-score: `python3 judge_v3_score.py v4`.
 - Muse Glimmer 30B self-hosted on Kaggle's free 2 x T4 from sha256-checked weights wrote a letter for our real gate in
@@ -85,7 +85,7 @@ The App, Explorer and Manual have a हिंदी / English switch. Every limi
   to tape-measure a distance; the letter is refused until video and tape agree within 15% ([TECHNICAL, Case
   agent](TECHNICAL.md#case-agent-it-stops-to-ask-for-a-tape-measure)).
 - One run, Spark Open on a copy of the sample: `provenance/spark-open-agent-sample.json`; a scripted-model test is in
-  `test_cw.py`. On our gate: "Video 15.0 m, tape 15 m, 0% off: proven", then it stopped at needs_review.
+  `test_cw.py`. On our gate: "Video 15.0 m, tape 15 m, 0% off: proven", then it handed the letter to a person to approve or reject (needs_review).
   Its log: [provenance/gate-agent-2026-11-02/agent_log.jsonl](provenance/gate-agent-2026-11-02/agent_log.jsonl) (5 turns, about $0.02); replayed in the [App](https://crossingwatch.xyz/app/#s3).
   Re-check the video side at $0: `python3 -c 'import json,agent; print(round(agent.check_distance(json.load(open("sites/gate.json"))),1))'` prints 15.0.
 
