@@ -1,0 +1,16 @@
+create 2026-11-03T20:01:06Z
+created accounts/<account>/deployments/cw-glimmer-vision CREATING
+READY accounts/<account>/deployments/cw-glimmer-vision shape: accounts/fireworks/deploymentShapes/dkuwotf7/versions/vtcy28lv accelerator: NVIDIA_H200_141GB 1 precision: BF16
+ready 2026-11-03T20:04:47Z
+smoke: {'is_person': False, 'road_user': 'not a person'}
+A start 2026-11-03T20:04:50Z
+set A: 32 crops asked
+B start 2026-11-03T20:06:32Z
+dut-15s {"conflicts": 52, "matched": 50, "missed": 2, "missed_by_review": 0, "missed_at_threshold": 2, "extra": 4, "extra_at_threshold": 2, "unreviewed": 0, "found_before_review": 50}
+dut-vcrowd {"conflicts": 52, "matched": 49, "missed": 3, "missed_by_review": 0, "missed_at_threshold": 3, "extra": 4, "extra_at_threshold": 2, "unreviewed": 0, "found_before_review": 49}
+done 2026-11-03T20:11:27Z
+deleting cw-glimmer-vision 2026-11-03T20:11:27Z
+{}
+after delete: HTTP 200, state DELETING 2026-11-03T20:11:29Z
+after delete: HTTP 200, state DELETED 2026-11-03T20:12:00Z
+deployments listed now: []
