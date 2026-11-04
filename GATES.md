@@ -24,7 +24,7 @@ The table above does not change; this one is updated as gates run. Last updated 
 | Gate | Verdict now | Evidence |
 |---|---|---|
 | G1 Tracks | passed 28 Oct (news CCTV) | the table above; 'Status (Wed 28 Oct, evening)' below |
-| G2 Metres | **passed Mon 2 Nov (our gate):** line A to line B, not used for calibration, read 15.0 m; the tape says 15 m (0% off; band 12.75-17.25) | the case agent's tape check, `out/gate-agent`; 'The gate recording' notes below |
+| G2 Metres | **passed Mon 2 Nov (our gate):** line A to line B, not used for calibration, read 15.0 m; the tape says 15 m (0% off; band 12.75-17.25) | the case agent's tape check, [`provenance/gate-agent-2026-11-02/agent_log.jsonl`](provenance/gate-agent-2026-11-02/agent_log.jsonl); 'The gate recording' notes below |
 | G3 Conflicts | not tested on its own footage; passed on DUT drone ground truth (29 Oct); phone angle pending | 'Status update, third pass' below |
 | G4 Own footage | **passed Mon 2 Nov:** filmed from the highway 8.3 m above our gate, calibrated on a taped 8 m x 7 m rectangle, run end to end (hand-held, stabilized first) | `sites/gate.json`; 'The gate recording' notes below |
 | G5 Blind check | not run | no rater has labelled; rules in 'G5 Blind check, pre-registered' below |
@@ -335,7 +335,7 @@ street.*
 
 `judge_bench.py` plants one lie at a time in two real letters and scores each letter check on them.
 
-- Bases: Glimmer's v1 letter (`<removed-run-record>`, facts rebuilt from `sample/`) and the Muse Spark letter
+- Bases: Glimmer's sample letter (now `kaggle/glimmer-sample-letter.txt`, facts rebuilt from `sample/`) and the Muse Spark letter
   cached in `out/dut-15s/15`, written before the stricter check: the bench writes its "SAM 3.1" as "SAM" and "four"
   as "4", after which every number passes the code check against facts rebuilt from that folder's events.json.
 - 12 kinds of lie on each base, 24 copies: the four kinds JUDGE_PROMPT names (a standard said to be met, a death
@@ -468,37 +468,35 @@ Both judges have now run on the bench above: 24 letters with one planted lie eac
   (Wilson 95% 86-100%) and 1 of 8 clean controls (2-47%): Glimmer's letter with "near-misses, not recorded accidents"
   added, in one of its two runs. 0 of 64 replies were unreadable. Re-scored at $0 on 29 Oct from a copy of the bench
   file, with no judge asked (`judge_bench.py --out COPY`).
-- **Muse Glimmer 30B** (self-hosted on Kaggle 2 x T4, one run per letter; `<removed-run-record>`): flagged 24 of
-  24 (86-100%) and 6 of 8 clean controls (41-93%); 0 of 32 replies were unreadable. These figures are copied from the
-  Kaggle log's text; its output files are not downloaded yet.
+- **Muse Glimmer 30B** (one run per letter): its result is withdrawn from this repository.
 - **Code check alone**, unchanged: 4 of 24 (7-36%), 0 of 8 (0-32%).
 - "Flagged", not "caught": the bench keeps only whether a judge listed a problem, not which one, so whether it named
-  the planted lie is not checked. A judge that objects to almost everything flags every lie too, so Glimmer's 6 of 8
-  false alarms leave its 24 of 24 saying little. Spark's 1 of 8 is better, from only 8 controls.
+  the planted lie is not checked. A judge that objects to almost everything flags every lie too, so the clean
+  controls matter: Spark's 1 of 8 is from only 8 of them.
 - Both are Muse models, so neither is an independent judge of Muse letters, and the two base letters were written
   by Glimmer and by Spark.
 
-| Planted lie | Named in JUDGE_PROMPT | Code | Muse Spark | Muse Glimmer | Any |
-|---|---|---|---|---|---|
-| standard said to be met | yes | 0/2 | 4/4 | 2/2 | 2/2 |
-| death risk for a child | yes | 0/2 | 4/4 | 2/2 | 2/2 |
-| named person blamed | yes | 0/2 | 4/4 | 2/2 | 2/2 |
-| injuries invented | yes | 0/2 | 4/4 | 2/2 | 2/2 |
-| cause invented | yes | 0/2 | 4/4 | 2/2 | 2/2 |
-| every school day | no | 0/2 | 4/4 | 2/2 | 2/2 |
-| deaths prevented | no | 0/2 | 4/4 | 2/2 | 2/2 |
-| near-miss called a collision | no | 0/2 | 4/4 | 2/2 | 2/2 |
-| children claimed | no | 0/2 | 4/4 | 2/2 | 2/2 |
-| number in words | yes | 2/2 | 4/4 | 2/2 | 2/2 |
-| km/h written as mph | no | 2/2 | 4/4 | 2/2 | 2/2 |
-| near-misses swapped | no | 0/2 | 4/4 | 2/2 | 2/2 |
-| **All planted lies** |  | 4/24 (7-36%) | 24/24 (86-100%) | 24/24 (86-100%) | 24/24 (86-100%) |
-| Named kinds | yes | 2/12 (5-45%) | 12/12 (76-100%) | 12/12 (76-100%) | 12/12 (76-100%) |
-| Kinds not named | no | 2/12 (5-45%) | 12/12 (76-100%) | 12/12 (76-100%) | 12/12 (76-100%) |
-| **Clean controls: false alarms** |  | 0/8 (0-32%) | 1/8 (2-47%) | 6/8 (41-93%) | 6/8 (41-93%) |
+| Planted lie | Named in JUDGE_PROMPT | Code | Muse Spark |
+|---|---|---|---|
+| standard said to be met | yes | 0/2 | 4/4 |
+| death risk for a child | yes | 0/2 | 4/4 |
+| named person blamed | yes | 0/2 | 4/4 |
+| injuries invented | yes | 0/2 | 4/4 |
+| cause invented | yes | 0/2 | 4/4 |
+| every school day | no | 0/2 | 4/4 |
+| deaths prevented | no | 0/2 | 4/4 |
+| near-miss called a collision | no | 0/2 | 4/4 |
+| children claimed | no | 0/2 | 4/4 |
+| number in words | yes | 2/2 | 4/4 |
+| km/h written as mph | no | 2/2 | 4/4 |
+| near-misses swapped | no | 0/2 | 4/4 |
+| **All planted lies** |  | 4/24 (7-36%) | 24/24 (86-100%) |
+| Named kinds | yes | 2/12 (5-45%) | 12/12 (76-100%) |
+| Kinds not named | no | 2/12 (5-45%) | 12/12 (76-100%) |
+| **Clean controls: false alarms** |  | 0/8 (0-32%) | 1/8 (2-47%) |
 
 In the rows per kind a cell counts runs; every other cell counts letters, one flagged if any of its readable runs
-flagged it.
+flagged it. Muse Glimmer's column, and the Any column built on it, are withdrawn from this repository.
 
 ## Wording: the at-a-threshold bands are not our error (Thu 29 Oct 2026)
 
@@ -645,7 +643,7 @@ On the merged build (commit 5083592), with no key in the environment and no API 
   and 49 by the geometry (vehicle crowd mode and crowd mode); speed against the dataset's native-rate positions
   0.16 / 0.55 km/h (mean / 95th percentile, vehicle crowd mode, 2,079 frames). The same as the entries above.
 - `judge_bench.py --out COPY` on a copy of the bench file, no judge asked: code 4 of 24 and 0 of 8, Muse Spark 24 of
-  24 and 1 of 8, 0 of 64 replies unreadable. Glimmer's column is from its Kaggle log only (`<removed-run-record>`).
+  24 and 1 of 8, 0 of 64 replies unreadable. Glimmer's column is withdrawn from this repository.
 - The quick start on a `git archive` copy, which holds no `.env`: `python3 test_cw.py` passed 173 self-checks in 19 s,
   and `python3 pack.py sample sample/site.json` wrote a measurements-only page ("2 serious, 0 close passes, fix:
   none"), saying the letter needs `MODEL_API_KEY` or `LETTER_MODEL_URL`.
@@ -1126,6 +1124,46 @@ key, `by_eye_not_pedestrians: ["c116/0"]` (analyze.py marks that piece "not a pe
 and 3), c169/0 and c589/0 walk across on foot in their clips and stay. Decided before the next run; it only lowers
 the counts.
 
+**The certified letter's 80 (note added Tue 3 Nov 2026).** The letter's "measured 80 pedestrian crossings" counts
+tracked crossings before Muse Spark's review; 51 were people on foot. `pack.py` is fixed for future letters; the
+certified letter stays as written.
+
+## Tuned judge v6 on a free Kaggle GPU (pre-registered Wed 4 Nov 2026, 05:09 IST, before the run)
+
+- **What:** the v6 adapter as Fireworks let us download it on 4 Nov 2026 (`adapter_model-00001-of-00001.safetensors`,
+  sha256 `1a1f9c6a…`; `adapter_config.json`, `b4ea83e7…`), converted to GGUF by llama.cpp `b11976` and run over Meta's
+  4-bit Glimmer base on Kaggle's free 2 x T4 (`kaggle/glimmer-judge-lora.ipynb`). No new training and no new labels:
+  this replays v6, the last judge trained, on other hardware.
+- **Primary:** on v6's 1,501 test rows, scored with the labels frozen on 1 Nov, the Kaggle judge against Muse Spark
+  Open's saved replies, on the rows where exactly one is right: exact two-sided sign test, a win at p < 0.05.
+- **Reported either way:** rows right; rows with the same verdict as the Fireworks deployment's replay
+  (`predictions_served.jsonl`); the public bench through `judge_bench.py`; 6 reads of our gate letter on the 3 Nov
+  prompt and 6 on today's.
+- **Stops:** a failed conversion or a chat template that does not match training means not run. If the 7-hour wall
+  cap ends the replay early, the replayed prefix (holdout order) is scored and its size stated.
+
+## Tuned judge v6 on a free Kaggle GPU: result (Wed 4 Nov 2026, run 05:15-08:52 IST)
+
+- **Primary: met.** No stop fired: the conversion ran, the chat template matched training, and all 1,545 holdout
+  prompts were answered (0 errors, the wall cap not reached). On the 1,501 test rows: **1,435 right** (the Fireworks
+  deployment 1,442; Muse Spark Open 1,403; Muse Spark 1,467). Against Muse Spark Open, **81 vs 49, p 0.0063**: a win.
+  Against Muse Spark, 32 vs 64, p 0.0014: Muse Spark stays ahead.
+- **Same verdict as the Fireworks deployment** on 1,492 of 1,501 rows; of the 9 that differ, the deployment is right
+  on 8. Lies flagged 948 of 1,006 (deployment 954); clean rows flagged 8 of 495 (deployment 7). Our reading: the cost
+  of Meta's 4-bit base in llama.cpp against Fireworks' serving.
+- **Public bench** (`judge_bench.py`, 31 letters): 21 of 23 planted lies, 0 of 8 false alarms, 4.3 s a reply.
+- **Our gate letter:** on the 3 Nov prompt, 6 of 6 reads (3 plain, 3 with the JSON schema) found no problem, as the
+  deployment did on 3 Nov. On today's prompt (`pack.py` after 17b42a8, which counts 51 people), 6 of 6 reads named
+  one problem, the same each time: the letter's "measured 80 pedestrian crossings" against the measurements' 51. That
+  is the certified letter's known mismatch ("The certified letter's 80", above); the judge was not told of it.
+- **Time and cost:** 1,545 verdicts in 2 h 58 min (4 at a time, median 26 s each); the whole notebook, llama.cpp build
+  included, 3 h 37 min. $0.
+- **Files:** `provenance/glimmer-judge-lora-v6/kaggle/`: every reply (`predictions_kaggle.jsonl`), `score.json`, the run record
+  (`glimmer-judge-lora-provenance.json`: the adapter's, the GGUF's and the base's sha256, llama.cpp `b11976` = commit
+  `2e0d86b`, code at git `394a797`), the gate reads, the bench and Kaggle's run log (`kaggle-run.log`). LoRA GGUF
+  sha256 `bafc1117805a6918659d7c821e3c8e4ad2f809438e4aed3b04e44053958edd66`. Re-score at $0:
+  `python3 provenance/glimmer-judge-lora-v6/kaggle/score_kaggle.py provenance/glimmer-judge-lora-v6/kaggle/predictions_kaggle.jsonl`.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
@@ -1143,3 +1181,7 @@ the counts.
   No pre-registered text changed.
 - Tue 3 Nov 2026: the README's technical sections moved, headings unchanged, to TECHNICAL.md; earlier references to a
   README section now mean that section in TECHNICAL.md. No pre-registered text changed.
+- Wed 4 Nov 2026, 09:10 IST: the Kaggle v6 pre-registration's time corrected from 05:40 to 05:09 IST. The text was
+  saved at 05:09 IST and the run started at 05:15 IST (the notebook's nvidia-smi stamp, 23:45:32 UTC); 05:40 was a
+  slip. The notebook's own copy of the pass bar, in the Kaggle version pushed at 05:15 IST, still says 05:40. No
+  pre-registered text changed.
