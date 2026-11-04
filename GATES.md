@@ -1218,6 +1218,28 @@ certified letter stays as written.
 - **Files:** [`provenance/glimmer-judge-lora-v6/base/`](provenance/glimmer-judge-lora-v6/base/): replies with
   response ids, `score.json`, the scorer, the run scripts and log.
 
+## The tuned judge on a public benchmark: SummEdits (pre-registered Thu 5 Nov 2026, 00:07 IST, before the deployment is created and before any test row is asked)
+
+- **Question.** Our judge's tests so far use our own synthetic letters. Does it beat Muse Spark Open on public data with
+  human labels, outside its training domain?
+- **Data.** SummEdits (Laban et al. 2023, Salesforce, CC-BY-4.0; `summedits.json` sha256 `21e34593…`): document and
+  summary pairs in 10 domains, each labelled consistent or not by people. Test: 400 rows, 20 consistent and 20
+  inconsistent per domain, drawn with seed 20261105 from items whose prompt is at most 9,000 characters (the LoRA was
+  trained on prompts of at most 3,072 tokens); `test.jsonl` sha256 `6d3c50a0…`. A disjoint dev set of 20 rows was used
+  only to check that replies parse (5 Muse Spark Open replies); no tuned reply was read before this text.
+- **Prompt, the same for both judges.** The judge's own MEASUREMENTS / LETTER layout with one rule: "List every
+  problem: a claim or number the measurements do not support. Tone, wording and style are not problems." The document
+  goes under MEASUREMENTS and the summary under LETTER.
+- **Settings, as in v6.** Tuned judge (v6 adapter on a Fireworks on-demand deployment, 1 x H200): temperature 0, 256
+  tokens, as the served v6 replay. Muse Spark Open (Fireworks serverless): the product's judge settings, json_schema
+  `{"problems": [...]}`, reasoning_effort low.
+- **Scoring.** A verdict is right when it lists a problem exactly for the inconsistent summaries; an unreadable reply
+  or a missing row counts as "no problem", as in v6. Primary: exact two-sided sign test on the rows where exactly one
+  judge is right. Also reported: balanced accuracy and per-domain counts.
+- **Pass:** the tuned judge right on more rows than Muse Spark Open, p < 0.05. **Fail:** anything else. Either way the
+  result is reported here with every reply and request id; the three blind-test results stand as recorded.
+- **Cost cap:** the deployment is deleted at the end (2-hour expiry as a backstop); at most about $20.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
@@ -1249,3 +1271,5 @@ certified letter stays as written.
   provenance/glimmer-judge-lora-v6/live/); the organizers said on 1 Nov that committed model ids, training logs, eval
   outputs and a re-score script are the reviewable material, so no standing endpoint is kept up during judging;
   provenance/glimmer-judge-lora-v6/live/live_v6.sh re-serves it. No pre-registered text changed.
+- Thu 5 Nov 2026, 00:07 IST: a pre-registration for the tuned judge on SummEdits added above, before its deployment
+  was created. No pre-registered text changed.
