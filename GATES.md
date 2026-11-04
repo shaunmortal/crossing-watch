@@ -1292,6 +1292,25 @@ certified letter stays as written.
   with request ids, `rep-score.json`; re-score with `python3 score_rep.py rep.jsonl rep-tuned.jsonl rep-spark-open.jsonl`
   from that folder.
 
+## Base Glimmer on the SummEdits replication rows (pre-registered Thu 5 Nov 2026, 01:46 IST, before the deployment is created)
+
+- **Question.** On SummEdits, is the tuned judge's lead over Muse Spark Open the LoRA's doing, or does base Muse Glimmer
+  30B already judge as well out of domain?
+- **Run.** Base `accounts/fireworks/models/muse-glimmer-30b` on a fresh Fireworks on-demand deployment (1 x H200,
+  2-hour expiry, deleted at the end), on the same 1,200 replication rows (`rep.jsonl`), same prompt. Two arms:
+  **cap256**, exactly as the tuned judge was asked (temperature 0, 256 tokens, no response_format), every row; and
+  **cap8192** (temperature 0, 8,192 tokens, JSON mode, default reasoning), rows in a seeded shuffle (seed 20261107,
+  32 at a time) until 75 minutes have passed, every answered row scored.
+- **Scoring.** The SummEdits rule (a problem listed exactly for the inconsistent summaries; an unreadable or cut-off
+  reply counts as "no problem"). For each arm, on the rows it answered: right for base, the tuned judge and Muse Spark
+  Open (their replies already recorded); exact sign tests tuned vs base and base vs Spark Open; finished and cut-off
+  counts; median tokens and seconds a verdict. As in the v6 base run, a sensitivity on the rows base finished.
+- **What each outcome means, fixed now.** Tuned ahead of base in cap8192 at p < 0.05: the LoRA adds accuracy out of
+  domain. No significant difference: the LoRA gives the same judgement in far fewer tokens. Base ahead at p < 0.05:
+  reported as it is; the out-of-domain gain over Spark Open then belongs to Glimmer, and the LoRA's part is format and
+  cost. The SummEdits replication result stands either way.
+- **Cost cap:** about $12.
+
 ## Log
 
 - Edited Thu 29 Oct 2026, before the rehearsal or the main recording was filmed: wording and references only; no
@@ -1329,3 +1348,5 @@ certified letter stays as written.
 - Thu 5 Nov 2026, 00:25 IST: a pre-registration for a SummEdits replication on fresh rows added above, before its
   deployment was created. No pre-registered text changed.
 - Thu 5 Nov 2026, 01:20 IST: the SummEdits replication's result section added above. No pre-registered text changed.
+- Thu 5 Nov 2026, 01:46 IST: a pre-registration for base Glimmer on the SummEdits replication rows added above,
+  before its deployment was created. No pre-registered text changed.
