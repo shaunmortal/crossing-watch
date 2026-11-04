@@ -21,7 +21,7 @@ replies.txt
 guess.svg
 # the phone's originals (both cases, for case-sensitive clones), sound, the raw calibration and test-clip frames,
 # the filmer's notes, raters' answers (they hold names) and a replaced letter. Not TRAP.csv: hand-logged line times
-# are G6 evidence.
+# are speed-check evidence.
 *.mov
 *.MOV
 *.m4v

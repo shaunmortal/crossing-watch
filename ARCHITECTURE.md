@@ -39,7 +39,7 @@ flowchart LR
 | 4. Case agent | 3 | 850 | `agent.py` |
 | 5. Ground truth and human checks | 9 | 1,280 | `validate_dut.py` |
 | 6. Letter judge and open weights | 10 | 2,860 | `judge_v3_score.py` |
-| 7. Self-checks | 1 | 5,477 | `test_cw.py` |
+| 7. Self-checks | 1 | 5,478 | `test_cw.py` |
 
 **1. Measure** (`python3 analyze.py VIDEO SITE.json`)
 - `analyze.py`: the entry point; tracks, measures, reviews and writes `events.json`, most dangerous first.
@@ -81,7 +81,7 @@ flowchart LR
 - `validate_sind.py`: our PET and speed against SinD's drone trajectories and the textbook PET; `--oblique` simulates a phone's angle.
 - `validate_dut.py`: the whole pipeline on DUT drone clips, scored against the dataset's own trajectories.
 - `validate_offline.py`: the DUT score re-run at $0 from cached replies with today's code.
-- `validate_gate.py`: G6, each vehicle's speed against two taped lines timed by hand.
+- `validate_gate.py`: each vehicle's speed against two taped lines timed by hand.
 - `vehicle_test.py`: does SAM's one concept "vehicle" find what three concepts find.
 - `feet_overlap.py`: how often feet sit on a vehicle's box at an angle, from a cached run.
 - `blind_set.py`: G5's blind set, the pipeline's near-misses shuffled among decoys for a rater.
@@ -141,7 +141,7 @@ from its record.
 | Road metres on our gate (G2) | a tape measure on line A to B, a line the calibration never used | video 15.0 m, tape 15 m; pass mark ±15%, written 28 Oct | `python3 -c 'import json,agent; print(round(agent.check_distance(json.load(open("sites/gate.json"))),1))'` prints 15.0 | $0 |
 | PET and speed maths | SinD drone trajectories; the textbook conflict-zone PET (Allen et al. 1978) | speed error 0.24 km/h mean, 0.91 km/h at the 95th percentile; PET within 0.5 s on 53 of 66 conflicts | `python3 validate_sind.py data/sind` | $0 after the SinD download |
 | The whole pipeline, SAM 3.1 to near-misses | DUT drone trajectories of a campus crosswalk | 47 of 52 near-misses after Muse Spark's review (50 of 52 by geometry); speed error 0.16 km/h mean, 0.55 km/h at the 95th percentile | `python3 validate_offline.py DUT_REPO out/dut-15s out/dut-vcrowd` | not public (DUT has no licence; `out/` is our paid SAM cache): read the [record](GATES.md#accuracy-fixes-merged-re-scored-at-0-fri-30-oct-2026) |
-| Letter checks against planted lies | 23 lies planted by code in real letters, and 8 clean controls | code alone 4 of 23; Muse Spark 21 of 23, 0 of 8 false alarms | `python3 judge_bench.py --public` | $0, replies cached |
+| Letter checks against planted lies | 23 lies planted by code in model-written letters about the synthetic sample, and 8 clean controls | code alone 4 of 23; Muse Spark 21 of 23, 0 of 8 false alarms | `python3 judge_bench.py --public` | $0, replies cached |
 | Tuned Glimmer judge against Muse Spark Open, three blind tests (v4, v5, v6) | planted errors in synthetic letters; each protocol committed before its run, labels frozen before any tuned reply was read | wins all three: p 0.005, 0.029, 0.0006 (exact test on the rows where exactly one judge is right) | `python3 judge_v3_score.py v4`, then `v5` and `v6` | $0 |
 | The same judge on Kaggle's free 2 x T4 | v6's frozen labels, 1,501 rows | 1,435 right; 81 vs 49 against Muse Spark Open, p 0.006; the same verdict as the Fireworks deployment on 1,492 | `python3 provenance/glimmer-judge-lora-v6/kaggle/score_kaggle.py provenance/glimmer-judge-lora-v6/kaggle/predictions_kaggle.jsonl` | $0 |
 | What the LoRA adds | base Glimmer 30B on the same 1,210 rows and labels, pre-registered | base 781 right, tuned 1,163; 402 vs 20 head to head | `python3 provenance/glimmer-judge-lora-v6/base/score_base.py provenance/glimmer-judge-lora-v6/base/predictions_base.jsonl` | $0 |

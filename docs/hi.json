@@ -68,7 +68,7 @@
  "Get the code and put your key in a file called <code>.env</code>:": "Code लें और अपनी key <code>.env</code> नाम की file में डालें:",
  "First run it for free: it only checks your video and tells you the cost.": "पहले इसे मुफ़्त में चलाएँ: यह सिर्फ़ आपका video जाँचता है और खर्च बताता है।",
  "Then the real run, with a spending limit (here, 14 dollars):": "फिर असली रन, खर्च की सीमा के साथ (यहाँ, 14 डॉलर):",
- "About $12 for an 8-minute video. It never spends more than your <code>--budget</code>.": "8 मिनट के video के लिए लगभग $12। यह आपके <code>--budget</code> से ज़्यादा कभी खर्च नहीं करता।",
+ "About $12 for an 8.6-minute video. It never spends more than your <code>--budget</code>.": "8.6 मिनट के video के लिए लगभग $12। यह आपके <code>--budget</code> से ज़्यादा कभी खर्च नहीं करता।",
  "Answer the agent's question": "Agent के सवाल का जवाब दें",
  "The agent stops and asks you to measure the <b>check line</b> with the tape.": "Agent रुककर आपसे फ़ीते से <b>जाँच लाइन</b> नापने को कहता है।",
  "Type what the tape says. Use the R number it printed:": "फ़ीता जो बताए वह लिखें। जो R नंबर उसने print किया है वही इस्तेमाल करें:",

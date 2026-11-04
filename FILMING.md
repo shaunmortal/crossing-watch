@@ -57,7 +57,7 @@ Why 30 fps, locked: `analyze.py` resamples every clip to 10 frames a second. Fro
 spaced frames. From 24 fps it keeps uneven steps of 2, 2, 3, 2, 3 source frames. The old median-of-steps speed read a
 steady car there at 0.834 times its true speed (17% slow); today's least-squares speed in `road.speeds()` reads the
 true speed at 24 fps too (a self-check in `test_cw.py`). We still ask for 30 fps locked, so every clip is treated
-alike and the G6 speed check is timed on a 30 fps original.
+alike and the speed check is timed on a 30 fps original.
 
 ## Position and framing
 
@@ -89,10 +89,10 @@ Validation). Measure the kerb height once and write it in `notes.txt`. Put the r
    can be the rectangle.
 3. **Two speed lines, 15 m apart.** Four more tape marks, two on EACH kerb, making two lines across the road 15 m
    apart and centred on the crossing (7.5 m either side). Not the rectangle's corners. Vehicles timed between them
-   check our speeds (G6). Stand a tall marker on the kerb at each of the 4 marks: the moment a front wheel reaches
+   check our speeds. Stand a tall marker on the kerb at each of the 4 marks: the moment a front wheel reaches
    a line is then easy to see in the video.
    - **This 15 m is the held-out distance, and it must never enter any fit.** calibrate.html writes it as the
-     site's `check` from the A near and B near clicks; G2, G6 and the agent's tape-measure question rely on it.
+     site's `check` from the A near and B near clicks; G2, the speed check and the agent's tape-measure question rely on it.
    - Never use the kerb-to-kerb width as the check: it is a calibration input, so it can never fail.
 4. Carriageway width where students queue.
 5. One parked car, one auto rickshaw and one motorcycle: length and width. A college bus too if one is there; with

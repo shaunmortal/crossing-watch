@@ -49,7 +49,7 @@ Needs Python 3.11+ and ffmpeg 7.1 or newer. No other dependencies. Put `MODEL_AP
 
 ```
 open calibrate.html                      # tape-measured rectangle, or no tape: match 4 points to a satellite view;
-                                         # 4 optional speed-line clicks add G6's "trap" and the agent's "check"
+                                         # 4 optional speed-line clicks add the speed check's "trap" and the agent's "check"
 python3 analyze.py VIDEO site.json       # tracks, near-misses, clips, Spark review -> out/VIDEO/events.json
 python3 pack.py out/VIDEO site.json      # letter, fix image, evidence page -> out/VIDEO/index.html
 python3 pack.py out/VIDEO site.json --notes notes.txt                                  # the principal's notes

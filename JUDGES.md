@@ -21,7 +21,7 @@ The App, Explorer and Manual have a हिंदी / English switch. Every gate
 - **On public, human-labelled data too:** on SummEdits (10 domains it never saw, 1,200 fresh rows, pre-registered), the tuned judge beats Muse Spark Open, 1,008 vs 924 right, 164 vs 80, p < 0.0001, and base Glimmer given 8,192 tokens gets 748: [result](GATES.md#summedits-replication-result-thu-5-nov-2026-run-0025-0116-ist).
 - **Our open-weights judge beats Muse Spark Open in three blind tests on planted errors:** a LoRA on Muse Glimmer, protocols written
   down first: p 0.005 (1,016 rows), 0.029 (1,278), 0.0006 (1,501), at a quarter of Spark's cost. Muse Spark (closed)
-  leads overall (v6: 1,467 vs 1,445 right).
+  leads overall (v6: 1,467 vs 1,442 right).
 - **Built for India:** a Hindi copy of the letter, notes the college can speak in Hindi or English (`--voice-notes`), Supreme Court and IRC references.
 
 ## Impact
