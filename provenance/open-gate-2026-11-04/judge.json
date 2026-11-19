@@ -1,0 +1,93 @@
+{
+ "what": "The letter's checks as the product ran them (pack.ask_plan: code check first, then the JUDGE_MODEL_URL judge, here the tuned Glimmer v6 adapter alone, no Meta key), then the same judge call 3 more times so each verdict has a response id (judge_case.py)",
+ "judge_model": "accounts/<fireworks-account>/models/muse-starter-sl-judge-v6-main#accounts/<fireworks-account>/deployments/cw-judge-open-gate",
+ "in_product": {
+  "tries": 1,
+  "judged_by": "accounts/<fireworks-account>/models/muse-starter-sl-judge-v6-main#accounts/<fireworks-account>/deployments/cw-judge-open-gate (open weights, on Fireworks)",
+  "left_for_a_person": {
+   "unmeasured": [],
+   "mixed": [],
+   "unsupported": [],
+   "slips": [],
+   "accuses": []
+  },
+  "judge_completion_tokens": 9,
+  "note": "pack.py keeps no judge reply or response id; a letter is returned on its first try only when the judge listed no problem"
+ },
+ "letter_sha256": "b6fcc858d3fc3eafe138fe669f2767fa9f24c6d05eddea9af15864b1b1f1f423",
+ "prompt_sha256": "a6de5f0a754fca43543f1d867cd628eb7643c0ea1c36b7b1b80bd145ac11d01b",
+ "code_check": {
+  "unmeasured": [],
+  "mixed": [],
+  "accuses": [],
+  "slips": []
+ },
+ "rereads": [
+  {
+   "reply": "{\"problems\": []}",
+   "problems": [],
+   "timings": null,
+   "usage": {
+    "prompt_tokens": 1947,
+    "total_tokens": 1956,
+    "completion_tokens": 9,
+    "prompt_tokens_details": {
+     "cached_tokens": 1920
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0
+    },
+    "output_tokens_details": {
+     "reasoning_tokens": 0
+    }
+   },
+   "request_id": "chatcmpl-2e42ca1618a44114a038430f4b844c9b",
+   "wall_s": 3.6,
+   "response_format": "json_schema"
+  },
+  {
+   "reply": "{\"problems\": []}",
+   "problems": [],
+   "timings": null,
+   "usage": {
+    "prompt_tokens": 1947,
+    "total_tokens": 1956,
+    "completion_tokens": 9,
+    "prompt_tokens_details": {
+     "cached_tokens": 1920
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0
+    },
+    "output_tokens_details": {
+     "reasoning_tokens": 0
+    }
+   },
+   "request_id": "chatcmpl-499c83a98cfb4108b94a9da5e3cbdcea",
+   "wall_s": 3.6,
+   "response_format": "json_schema"
+  },
+  {
+   "reply": "{\"problems\": []}",
+   "problems": [],
+   "timings": null,
+   "usage": {
+    "prompt_tokens": 1947,
+    "total_tokens": 1956,
+    "completion_tokens": 9,
+    "prompt_tokens_details": {
+     "cached_tokens": 1920
+    },
+    "completion_tokens_details": {
+     "reasoning_tokens": 0
+    },
+    "output_tokens_details": {
+     "reasoning_tokens": 0
+    }
+   },
+   "request_id": "chatcmpl-0dc63694072946c2a499c0083d94dbe5",
+   "wall_s": 1.3,
+   "response_format": "json_schema"
+  }
+ ]
+}

@@ -1,0 +1,175 @@
+{
+ "notebook": "kaggle/glimmer-judge-lora.ipynb",
+ "team": "Run by the author on the author's own Kaggle account (free 2 x T4).",
+ "promoted_model": "accounts/<fireworks-account>/models/muse-starter-sl-judge-v6-main",
+ "training_session": "ts-17bf2de281bb4cbe8424de262befb01b",
+ "code": {
+  "git_sha": "394a79729e3e469c5a4d405fbe252d850cc8b8b5"
+ },
+ "nvidia_smi": "Tue Nov  3 23:45:32 2026       \n+-----------------------------------------------------------------------------------------+\n| NVIDIA-SMI 580.178.04             Driver Version: 580.178.04     CUDA Version: 13.0     |\n+-----------------------------------------+------------------------+----------------------+\n| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |\n| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |\n|                                         |                        |               MIG M. |\n|=========================================+========================+======================|\n|   0  Tesla T4                       Off |   00000000:00:04.0 Off |                    0 |\n| N/A   38C    P8             10W /   70W |       0MiB /  15360MiB |      0%      Default |\n|                                         |                        |                  N/A |\n+-----------------------------------------+------------------------+----------------------+\n|   1  Tesla T4                       Off |   00000000:00:05.0 Off |                    0 |\n| N/A   40C    P8             12W /   70W |       0MiB /  15360MiB |      0%      Default |\n|                                         |                        |                  N/A |\n+-----------------------------------------+------------------------+----------------------+\n\n+-----------------------------------------------------------------------------------------+\n| Processes:                                                                              |\n|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |\n|        ID   ID                                                               Usage      |\n|=========================================================================================|\n|  No running processes found                                                             |\n+-----------------------------------------------------------------------------------------+\n",
+ "adapter": {
+  "files_sha256": {
+   "adapter_config.json": "b4ea83e72337afda1793d60eb78960fc864663faa4f0f5fa37756df8396b2ef1",
+   "adapter_model-00001-of-00001.safetensors": "1a1f9c6ab8159141591b73d6b35ee257656843f9b3f13a9e43ce89bea045af1e"
+  },
+  "fw_checkpoint": {
+   "checkpoint_format": "HF_LORA_ADAPTER",
+   "checkpoint_kind": "SAMPLING_CHECKPOINT",
+   "commit_time": 1793540571.1418767,
+   "commit_time_iso": "2026-11-01T13:42:51.141877Z",
+   "format_version": 1,
+   "trainer_image": "us-chicago-1.ocir.io/axhaeqbjwexc/serving/train-firetitan:0.638.662-arm"
+  },
+  "r": 32,
+  "lora_alpha": 32,
+  "target_modules": [
+   "down_proj",
+   "gate_proj",
+   "k_proj",
+   "o_proj",
+   "q_proj",
+   "up_proj",
+   "v_proj"
+  ],
+  "tensors": 832,
+  "params": 209584128,
+  "layers": 52,
+  "base_architectures": [
+   "MuseGlimmerForConditionalGeneration"
+  ],
+  "lm_head_trained": false,
+  "first_tensors": {
+   "base_model.model.model.language_model.layers.0.mlp.down_proj.lora_A.weight": [
+    32,
+    19968
+   ],
+   "base_model.model.model.language_model.layers.0.mlp.down_proj.lora_B.weight": [
+    6656,
+    32
+   ],
+   "base_model.model.model.language_model.layers.0.mlp.gate_proj.lora_A.weight": [
+    32,
+    6656
+   ],
+   "base_model.model.model.language_model.layers.0.mlp.gate_proj.lora_B.weight": [
+    19968,
+    32
+   ]
+  },
+  "gguf": {
+   "sha256": "bafc1117805a6918659d7c821e3c8e4ad2f809438e4aed3b04e44053958edd66",
+   "bytes": 419284512
+  }
+ },
+ "base": {
+  "repo": "meta-models/Muse-Glimmer-30B-GGUF",
+  "revision": "b44f1072cf75e918a1b82a3a17b45c4389b076e7",
+  "file": "Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf",
+  "sha256_checked": "4cc57c0f51040a226e5a72cc47b7613f7772950e460a665f7083de89f183f60e",
+  "config": "meta-models/Muse-Glimmer-30B@cec94fcfd6512f2cfe708138c32533b346ea4f69"
+ },
+ "llama_cpp": {
+  "build_info": "b1-2e0d86b",
+  "args": [
+   "-m",
+   "/tmp/glimmer/Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf",
+   "--lora",
+   "/kaggle/working/glimmer-judge-lora-f16.gguf",
+   "-ngl",
+   "99",
+   "--split-mode",
+   "layer",
+   "--jinja",
+   "--port",
+   "8080",
+   "-np",
+   "4",
+   "-c",
+   "16384",
+   "--chat-template-kwargs",
+   "{\"reasoning_strength\": \"high\", \"current_date\": \"2026-11-01\"}",
+   "--temp",
+   "0"
+  ],
+  "lora_adapters": [
+   {
+    "id": 0,
+    "path": "/kaggle/working/glimmer-judge-lora-f16.gguf",
+    "scale": 1.0,
+    "task_name": "",
+    "prompt_prefix": ""
+   }
+  ],
+  "converter_fix": "LoraTorchTensor.ndim added (sed, cell 3)"
+ },
+ "template": {
+  "kwargs": {
+   "reasoning_strength": "high",
+   "current_date": "2026-11-01"
+  },
+  "matches_training_renderer": true
+ },
+ "bench": {
+  "file": "kaggle/judge-bench-public.json",
+  "exit": 0,
+  "seconds": 132,
+  "replies": 31,
+  "s_per_reply": 4.3,
+  "lies_flagged": "21/23",
+  "clean_flagged": "0/8",
+  "unreadable": 0
+ },
+ "gate_letter": {
+  "served_3nov": [
+   [],
+   [],
+   [],
+   [],
+   [],
+   []
+  ],
+  "product_today": [
+   [
+    "\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\": the measurements give crossings 51, not 80."
+   ],
+   [
+    "\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\": the measurements give crossings 51, not 80."
+   ],
+   [
+    "\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\": the measurements give crossings 51, not 80."
+   ],
+   [
+    "\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\": the measurements give crossings 51, not 80."
+   ],
+   [
+    "\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\": the measurements give crossings 51, not 80."
+   ],
+   [
+    "\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\": the measurements give crossings 51, not 80."
+   ]
+  ]
+ },
+ "replay": {
+  "asked": 1545,
+  "of": 1545,
+  "answered": 1545,
+  "errors": 0,
+  "stopped_by_wall_cap": false,
+  "seconds": 10663,
+  "finish_stop": 1545,
+  "readable": 1544,
+  "flagged": 981,
+  "prompt_tokens": 2234586,
+  "completion_tokens": 53060,
+  "median_wall_s": 26.3
+ },
+ "elapsed_s": {
+  "built": 1827,
+  "downloaded": 2020,
+  "converted": 2051,
+  "server_ready": 2131,
+  "benched": 2264,
+  "gate_read": 2329,
+  "replayed": 12995
+ }
+}

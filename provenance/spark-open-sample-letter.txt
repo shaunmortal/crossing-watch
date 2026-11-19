@@ -1,0 +1,27 @@
+[School name]
+[Date]
+
+To the Road Authority
+
+Subject: Request for safer crossing outside school
+
+Dear Sir/Madam,
+
+We write to request a raised zebra crossing with a speed table and 20 km/h zone signs outside our school.
+
+A 2.0 minute (120.0 s) video at the Synthetic example crossing (made-up tracks, no video) recorded 3 pedestrian crossings and 3 moving vehicles. The 85th percentile speed was 45.0 km/h. Per the definition used, serious means pedestrian and moving vehicle on the same spot less than 1.5 s apart.
+
+In that period there were 2 serious near-misses and 0 close passes (1.5-3.0 s). One serious near-miss involved a car at 38.0 km/h with a post-encroachment time of 0.0 s. The other serious near-miss involved a car at 29.0 km/h with a post-encroachment time of 0.0 s.
+
+For an adult hit by a car front, the death-risk figures are from Rosén & Sander 2009, adults 15+, car fronts. For an adult hit at 38.0 km/h the death risk is 3.0%. For an adult hit at 29.0 km/h the death risk is 1.4%. At a 20.0 km/h impact the risk would be 0.6%.
+
+Engineering context with caveats: PV² and hourly rates need at least 15 minutes of video; this one is 2.0. Counted: 3 pedestrian crossings, 3 moving vehicles. 99.0% of the time was inside gaps of 6 s or more with no moving vehicle where people crossed: 4 gaps, 4 of them 12 s or more, longest 48.3 s (the first and last are cut short by the video).
+
+We request the raised zebra crossing with a speed table and 20 km/h zone signs to reduce vehicle speeds and increase gaps for pedestrians.
+
+We are willing to share the video and measurement data for your review.
+
+Yours faithfully,
+
+Head Teacher
+[School name]

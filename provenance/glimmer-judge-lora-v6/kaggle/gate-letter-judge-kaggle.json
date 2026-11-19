@@ -1,0 +1,209 @@
+{
+ "letter_sha256": "8c6d7768825ecca3bc27fbe804177631f2f135316a23929c818fe0b9ad52326f",
+ "host": "Kaggle 2 x T4",
+ "lora_gguf_sha256": "bafc1117805a6918659d7c821e3c8e4ad2f809438e4aed3b04e44053958edd66",
+ "served_3nov": {
+  "prompt_sha256": "3d9bf4a1dc55d2f7faa9f8034383391da90f525059ed71309befea6368eacdea",
+  "built_with": "pack.py at 17b42a8^ (before the 51-people fix), as provenance/glimmer-judge-lora-v6/live/gate-letter-judge.json",
+  "reads": [
+   {
+    "schema": false,
+    "reply": "{\"problems\": []}",
+    "problems": [],
+    "finish": "stop",
+    "usage": {
+     "completion_tokens": 9,
+     "prompt_tokens": 2229,
+     "total_tokens": 2238,
+     "prompt_tokens_details": {
+      "cached_tokens": 0
+     }
+    },
+    "wall_s": 8.51
+   },
+   {
+    "schema": false,
+    "reply": "{\"problems\": []}",
+    "problems": [],
+    "finish": "stop",
+    "usage": {
+     "completion_tokens": 9,
+     "prompt_tokens": 2229,
+     "total_tokens": 2238,
+     "prompt_tokens_details": {
+      "cached_tokens": 2228
+     }
+    },
+    "wall_s": 0.88
+   },
+   {
+    "schema": false,
+    "reply": "{\"problems\": []}",
+    "problems": [],
+    "finish": "stop",
+    "usage": {
+     "completion_tokens": 9,
+     "prompt_tokens": 2229,
+     "total_tokens": 2238,
+     "prompt_tokens_details": {
+      "cached_tokens": 2228
+     }
+    },
+    "wall_s": 0.9
+   },
+   {
+    "schema": true,
+    "reply": "{\"problems\": []}",
+    "problems": [],
+    "finish": "stop",
+    "usage": {
+     "completion_tokens": 9,
+     "prompt_tokens": 2229,
+     "total_tokens": 2238,
+     "prompt_tokens_details": {
+      "cached_tokens": 2228
+     }
+    },
+    "wall_s": 0.89
+   },
+   {
+    "schema": true,
+    "reply": "{\"problems\": []}",
+    "problems": [],
+    "finish": "stop",
+    "usage": {
+     "completion_tokens": 9,
+     "prompt_tokens": 2229,
+     "total_tokens": 2238,
+     "prompt_tokens_details": {
+      "cached_tokens": 2228
+     }
+    },
+    "wall_s": 0.9
+   },
+   {
+    "schema": true,
+    "reply": "{\"problems\": []}",
+    "problems": [],
+    "finish": "stop",
+    "usage": {
+     "completion_tokens": 9,
+     "prompt_tokens": 2229,
+     "total_tokens": 2238,
+     "prompt_tokens_details": {
+      "cached_tokens": 2228
+     }
+    },
+    "wall_s": 0.9
+   }
+  ]
+ },
+ "product_today": {
+  "prompt_sha256": "76314e0ca29295e25c6976f6fda96341bf778fc225171cad0c5c3703f3ad0021",
+  "built_with": "pack.py now (after 17b42a8)",
+  "reads": [
+   {
+    "schema": false,
+    "reply": "{\"problems\": [\"\\\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\\\": the measurements give crossings 51, not 80.\"]}",
+    "problems": [
+     "\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\": the measurements give crossings 51, not 80."
+    ],
+    "finish": "stop",
+    "usage": {
+     "completion_tokens": 77,
+     "prompt_tokens": 2232,
+     "total_tokens": 2309,
+     "prompt_tokens_details": {
+      "cached_tokens": 0
+     }
+    },
+    "wall_s": 14.38
+   },
+   {
+    "schema": false,
+    "reply": "{\"problems\": [\"\\\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\\\": the measurements give crossings 51, not 80.\"]}",
+    "problems": [
+     "\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\": the measurements give crossings 51, not 80."
+    ],
+    "finish": "stop",
+    "usage": {
+     "completion_tokens": 77,
+     "prompt_tokens": 2232,
+     "total_tokens": 2309,
+     "prompt_tokens_details": {
+      "cached_tokens": 2231
+     }
+    },
+    "wall_s": 6.75
+   },
+   {
+    "schema": false,
+    "reply": "{\"problems\": [\"\\\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\\\": the measurements give crossings 51, not 80.\"]}",
+    "problems": [
+     "\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\": the measurements give crossings 51, not 80."
+    ],
+    "finish": "stop",
+    "usage": {
+     "completion_tokens": 77,
+     "prompt_tokens": 2232,
+     "total_tokens": 2309,
+     "prompt_tokens_details": {
+      "cached_tokens": 2231
+     }
+    },
+    "wall_s": 6.75
+   },
+   {
+    "schema": true,
+    "reply": "{\"problems\": [\"\\\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\\\": the measurements give crossings 51, not 80.\"]}",
+    "problems": [
+     "\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\": the measurements give crossings 51, not 80."
+    ],
+    "finish": "stop",
+    "usage": {
+     "completion_tokens": 77,
+     "prompt_tokens": 2232,
+     "total_tokens": 2309,
+     "prompt_tokens_details": {
+      "cached_tokens": 2231
+     }
+    },
+    "wall_s": 6.78
+   },
+   {
+    "schema": true,
+    "reply": "{\"problems\": [\"\\\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\\\": the measurements give crossings 51, not 80.\"]}",
+    "problems": [
+     "\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\": the measurements give crossings 51, not 80."
+    ],
+    "finish": "stop",
+    "usage": {
+     "completion_tokens": 77,
+     "prompt_tokens": 2232,
+     "total_tokens": 2309,
+     "prompt_tokens_details": {
+      "cached_tokens": 2231
+     }
+    },
+    "wall_s": 6.81
+   },
+   {
+    "schema": true,
+    "reply": "{\"problems\": [\"\\\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\\\": the measurements give crossings 51, not 80.\"]}",
+    "problems": [
+     "\"In 8.6 minutes (514.0 s) of video, Crossing Watch measured 80 pedestrian crossings and 55 moving vehicles, with 85th speed of 23.2 km/h and 7 of 55 moving vehicles faster than 25 km/h.\": the measurements give crossings 51, not 80."
+    ],
+    "finish": "stop",
+    "usage": {
+     "completion_tokens": 77,
+     "prompt_tokens": 2232,
+     "total_tokens": 2309,
+     "prompt_tokens_details": {
+      "cached_tokens": 2231
+     }
+    },
+    "wall_s": 6.81
+   }
+  ]
+ }
+}

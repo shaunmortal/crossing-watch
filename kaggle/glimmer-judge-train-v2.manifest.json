@@ -1,0 +1,206 @@
+{
+ "file": "judge_v2.jsonl",
+ "sha256": "690e4f7479674ffa0e780de6596fe95b1470f001334af2fff91ad7a541b8c4f3",
+ "rows": 1800,
+ "planted": 1050,
+ "clean": 750,
+ "clean_share": 0.417,
+ "kinds": {
+  "death risk for a child": 96,
+  "deaths prevented": 98,
+  "cause invented": 87,
+  "named person blamed": 91,
+  "near-misses swapped": 62,
+  "injuries invented": 97,
+  "number in words": 91,
+  "clean: as written": 150,
+  "clean: pairs restated": 54,
+  "clean: one recording": 72,
+  "clean: adult risk source": 84,
+  "clean: not recorded accidents": 79,
+  "every school day": 96,
+  "children claimed": 88,
+  "clean: meeting offered": 84,
+  "clean: fastest restated": 84,
+  "clean: counts restated": 71,
+  "standard said to be met": 71,
+  "km/h written as mph": 84,
+  "clean: recording length": 72,
+  "near-miss called a collision": 89
+ },
+ "letters": 150,
+ "rejected_letters": {
+  "0": "shares 4 spans with the public bench, e.g. 'gaps cut short by the video we request a raised zebra crossing'",
+  "1": "drop: states as fact that the crossing is used by our pupils, which nothing measured shows: an unclear label",
+  "7": "shares 4 spans with the public bench, e.g. 'are willing to share the video and measurement data for your review'",
+  "11": "shares 1 spans with the public bench, e.g. 'gaps cut short by the video we request a raised zebra crossing'",
+  "13": "code check: ['Two']",
+  "14": "shares 2 spans with the public bench, e.g. 'are willing to share the video and measurement data for your review'",
+  "31": "shares 1 spans with the public bench, e.g. 'to share the video and measurement data for your review yours faithfully'",
+  "34": "shares 1 spans with the public bench, e.g. 'cut short by the video we request the raised zebra crossing with'",
+  "35": "shares 2 spans with the public bench, e.g. 'raised zebra crossing with a speed table and 20 km h zone'",
+  "40": "code check: ['Two']",
+  "43": "shares 2 spans with the public bench, e.g. 'cut short by the video we request a raised zebra crossing to'",
+  "44": "shares 3 spans with the public bench, e.g. 'request a raised zebra crossing with a speed table and 20 km'",
+  "46": "shares 1 spans with the public bench, e.g. 'cut short by the video we request the raised zebra crossing with'",
+  "48": "shares 1 spans with the public bench, e.g. 'a raised zebra crossing with a speed table and 20 km h'",
+  "59": "shares 4 spans with the public bench, e.g. 'are willing to share the video and measurement data for your review'",
+  "67": "shares 9 spans with the public bench, e.g. 'request a raised zebra crossing with a speed table and 20 km'",
+  "68": "shares 3 spans with the public bench, e.g. 'a 20 km h limit the impact would be 20.0 km h'",
+  "70": "shares 4 spans with the public bench, e.g. 'the impact would be 20.0 km h with adult death risk 0.6'",
+  "73": "shares 3 spans with the public bench, e.g. 'a 20 km h limit the impact would be 20.0 km h'",
+  "74": "shares 1 spans with the public bench, e.g. 'cut short by the video we request the raised zebra crossing with'",
+  "77": "shares 1 spans with the public bench, e.g. 'to share the video and measurement data for your review yours faithfully'",
+  "82": "shares 4 spans with the public bench, e.g. 'gaps cut short by the video we request a raised zebra crossing'",
+  "89": "shares 1 spans with the public bench, e.g. 'cut short by the video we request the raised zebra crossing with'",
+  "90": "shares 4 spans with the public bench, e.g. 'are willing to share the video and measurement data for your review'",
+  "95": "shares 3 spans with the public bench, e.g. 'request a raised zebra crossing with a speed table and 20 km'",
+  "100": "code check: ['At a 20 km/h limit the 0.8 s event would have an impact speed of 0.0 km/h and adult death risk of 0.0%.']",
+  "103": "shares 2 spans with the public bench, e.g. 'risk would be 0.6 engineering context with caveats pv and hourly rates'",
+  "107": "shares 1 spans with the public bench, e.g. 'a car at 38.0 km h with adult death risk if hit'",
+  "108": "shares 4 spans with the public bench, e.g. 'zebra crossing with a speed table and 20 km h zone signs'",
+  "109": "drop: 'the crossing used by our pupils' states as fact who uses the crossing, which nothing measured shows (as v1's pack 1)",
+  "111": "drop: 'the crossing used by our pupils' states as fact who uses the crossing, which nothing measured shows (as v1's pack 1)",
+  "117": "shares 7 spans with the public bench, e.g. 'to share the video and measurement data for your review yours faithfully'",
+  "119": "shares 4 spans with the public bench, e.g. 'are willing to share the video and measurement data for your review'",
+  "121": "code check: ['two']",
+  "124": "shares 1 spans with the public bench, e.g. 'we write to request a raised zebra crossing with a speed table'",
+  "126": "shares 1 spans with the public bench, e.g. 'we write to request a raised zebra crossing with a speed table'",
+  "127": "shares 1 spans with the public bench, e.g. 'gaps cut short by the video we request a raised zebra crossing'",
+  "128": "shares 3 spans with the public bench, e.g. 'a 20 km h limit the impact would be 20.0 km h'",
+  "133": "shares 1 spans with the public bench, e.g. 'to share the video and measurement data for your review yours faithfully'",
+  "135": "shares 1 spans with the public bench, e.g. 'dear sir madam we write to request a raised zebra crossing with'",
+  "10012": "shares 1 spans with the public bench, e.g. 'gaps cut short by the video we request a raised zebra crossing'",
+  "10024": "shares 2 spans with the public bench, e.g. 'gaps cut short by the video we request a raised zebra crossing'",
+  "10039": "shares 1 spans with the public bench, e.g. 'gaps cut short by the video we request a raised zebra crossing'",
+  "10042": "shares 1 spans with the public bench, e.g. 'cut short by the video we request a raised zebra crossing to'",
+  "10048": "shares 2 spans with the public bench, e.g. 'gaps cut short by the video we request a raised zebra crossing'",
+  "10049": "shares 2 spans with the public bench, e.g. 'gaps cut short by the video we request a raised zebra crossing'",
+  "10052": "shares 1 spans with the public bench, e.g. 'gaps cut short by the video we request a raised zebra crossing'"
+ },
+ "letters_by_writer": {
+  "spark-open": 100,
+  "spark": 50
+ },
+ "letter_writer": {
+  "spark-open": "accounts/fireworks/models/muse-spark-open on https://api.fireworks.ai/inference/v1",
+  "spark": "muse-spark-1.3 on the Meta API (https://api.meta.ai/v1/responses)"
+ },
+ "letter_cost_usd": 3.0624,
+ "public_bench_overlap": {
+  "rows_checked": 1800,
+  "exact_copies": 0,
+  "rows_sharing_a_12_word_span": 0,
+  "rule": "a 12-word span shared with any public-bench letter (its measurements' spans left out), unless half or more of its words are quoted from the row's measurements (4-word runs)"
+ },
+ "longest_judge_prompt": {
+  "chars": 6528,
+  "tokens_est": 2282,
+  "how": "chars x Spark Open's prompt tokens per char on these letters' prompts"
+ },
+ "data": "synthetic packs only (finetune_judge.synthetic_pack): no real video, no DUT, no SinD, no out/",
+ "reviewed": {
+  "4": "keep: 'We are not stating that any standard is met.' denies the claim, it does not make it",
+  "17": "keep: 'provide priority for pupils crossing' is why the fix is asked for, not a claim about who was measured",
+  "25": "keep: 'protect children and adults crossing' is why the fix is asked for, not a claim about who was measured",
+  "33": "keep: 'We do not state that any standard is met.' denies the claim, it does not make it",
+  "39": "keep: 'protect children crossing' is why the fix is asked for, not a claim about who was measured",
+  "45": "keep: 'give priority to pupils crossing' is why the fix is asked for, not a claim about who was measured",
+  "52": "keep: 'protect children crossing' is why the fix is asked for, not a claim about who was measured",
+  "53": "keep: 'protect children crossing' is why the fix is asked for, not a claim about who was measured",
+  "58": "keep: 'a protected crossing for pupils' is why the fix is asked for, not a claim about who was measured",
+  "64": "keep: 'to protect children crossing' is why the fix is asked for, not a claim about who was measured",
+  "75": "keep: 'protect children crossing' is why the fix is asked for, not a claim about who was measured; the 'Approved by The Principal' line is a sign-off, not a measured claim",
+  "84": "keep: 'give priority to pupils crossing' is why the fix is asked for, not a claim about who was measured",
+  "85": "keep: 'protect children crossing' is why the fix is asked for, not a claim about who was measured",
+  "129": "keep: 'provide priority for children crossing' is why the fix is asked for, not a claim about who was measured; '1.3x ... drone test' is quoted from the measurements",
+  "131": "keep: 'provide protected priority for pupils crossing' is why the fix is asked for, not a claim about who was measured",
+  "10004": "keep: 'give pupils a protected place to cross' is why the fix is asked for, not a claim about who was measured",
+  "10019": "keep: 'give priority to crossing pupils' is why the fix is asked for, not a claim about who was measured"
+ },
+ "n_eval": 211,
+ "train_rows": 1620,
+ "sets": {
+  "train": {
+   "rows": 1620,
+   "planted": 945,
+   "clean": 675,
+   "swapped": 57
+  },
+  "dev": {
+   "rows": 180,
+   "planted": 105,
+   "clean": 75,
+   "swapped": 5
+  },
+  "public": {
+   "rows": 31,
+   "planted": 23,
+   "clean": 8,
+   "swapped": 1
+  }
+ },
+ "dev_letters": [
+  {
+   "seed": 2,
+   "writer": "spark-open"
+  },
+  {
+   "seed": 24,
+   "writer": "spark-open"
+  },
+  {
+   "seed": 29,
+   "writer": "spark-open"
+  },
+  {
+   "seed": 45,
+   "writer": "spark-open"
+  },
+  {
+   "seed": 51,
+   "writer": "spark-open"
+  },
+  {
+   "seed": 64,
+   "writer": "spark-open"
+  },
+  {
+   "seed": 81,
+   "writer": "spark-open"
+  },
+  {
+   "seed": 110,
+   "writer": "spark-open"
+  },
+  {
+   "seed": 10006,
+   "writer": "spark"
+  },
+  {
+   "seed": 10015,
+   "writer": "spark"
+  },
+  {
+   "seed": 10020,
+   "writer": "spark"
+  },
+  {
+   "seed": 10028,
+   "writer": "spark"
+  },
+  {
+   "seed": 10031,
+   "writer": "spark"
+  },
+  {
+   "seed": 10033,
+   "writer": "spark"
+  },
+  {
+   "seed": 10053,
+   "writer": "spark"
+  }
+ ],
+ "file_rows": 1831
+}

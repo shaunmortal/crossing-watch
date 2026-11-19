@@ -1,0 +1,10 @@
+{
+ "name": "Signalised crossing, schoolchildren near-miss (news CCTV, testing only)",
+ "source": "https://youtu.be/9YqdnG5Jxnw",
+ "prep_filter": "crop=iw*0.72:ih:iw*0.14:0",
+ "image_points": [[197, 327], [292, 335], [252, 379], [160, 364]],
+ "world_points": [[0, 0], [3.5, 0], [3.5, 3.0], [0, 3.0]],
+ "calibration_note": "Where two lane lines cross the two crossing lines. Lane width 3.5 m and crossing width 3.0 m are assumed, not measured.",
+ "person": "person",
+ "vehicles": ["car"]
+}

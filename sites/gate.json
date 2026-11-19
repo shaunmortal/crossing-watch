@@ -1,0 +1,120 @@
+{
+ "name": "LNCT Excellence main gate, Bhopal (service road below NH 146)",
+ "country": "IN",
+ "city": "Bhopal",
+ "frame_size": [
+  640,
+  360
+ ],
+ "image_points": [
+  [
+   339.67,
+   323.33
+  ],
+  [
+   117.33,
+   328.17
+  ],
+  [
+   219.33,
+   160.33
+  ],
+  [
+   407.33,
+   94.0
+  ]
+ ],
+ "world_points": [
+  [
+   3.5,
+   0
+  ],
+  [
+   11.5,
+   0
+  ],
+  [
+   11.5,
+   7
+  ],
+  [
+   3.5,
+   7
+  ]
+ ],
+ "calibration_note": "Taped 8 m x 7 m rectangle (F1-F2 on the wall-side edge, N1-N2 on the gate-side edge), clicked on the stabilized frame at 300 s (F2 on the frame at 990 s, after a parked car left it). Camera 8.3 m above the road, hand-held; stabilize.py locks every frame to the 300 s frame.",
+ "trap": {
+  "image_points": [
+   [
+    603.33,
+    327.0
+   ],
+   [
+    79.33,
+    321.33
+   ],
+   [
+    171.33,
+    176.67
+   ],
+   [
+    631.67,
+    7.0
+   ]
+  ],
+  "distance_m": 15
+ },
+ "check": {
+  "what": "line A to line B along the wall-side edge (the A and B wall-side tape marks)",
+  "points": [
+   [
+    603.33,
+    327.0
+   ],
+   [
+    79.33,
+    321.33
+   ]
+  ]
+ },
+ "roadway_m": [
+  [
+   -40,
+   0
+  ],
+  [
+   40,
+   0
+  ],
+  [
+   40,
+   7
+  ],
+  [
+   -40,
+   7
+  ]
+ ],
+ "window_s": [
+  95,
+  609
+ ],
+ "person": "person",
+ "person_mode": "auto",
+ "vehicle_mode": "video",
+ "vehicles": [
+  "car",
+  "motorcycle",
+  "auto rickshaw",
+  "bus"
+ ],
+ "zone_m": [
+  0,
+  0,
+  15,
+  7
+ ],
+ "by_eye_not_pedestrians": [
+  "c116/0"
+ ]
+}

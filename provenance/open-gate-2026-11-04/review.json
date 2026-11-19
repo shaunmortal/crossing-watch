@@ -1,0 +1,629 @@
+{
+ "what": "Who is a pedestrian in each tracked near-miss: the hosted run's Muse Spark (muse-spark-1.3) replies vs Muse Spark Open's, on the same 32 person crops (analyze.py, REVIEW_MODEL_URL). Crops and reply texts stay with the private outputs.",
+ "reviewed": 32,
+ "same_keep_or_reject": 32,
+ "rejected": {
+  "muse_spark": 29,
+  "muse_spark_open": 29
+ },
+ "label_differences": [
+  {
+   "person": "c479/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "not a person"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    564
+   ]
+  }
+ ],
+ "near_misses": {
+  "events_tracked": [
+   75,
+   75
+  ],
+  "kept_hosted": [
+   {
+    "person": "c483/0",
+    "vehicle": "motorcycle",
+    "tier": "serious",
+    "pet_s": 0.0,
+    "t_person_s": 374.0
+   },
+   {
+    "person": "c483/0",
+    "vehicle": "motorcycle",
+    "tier": "serious",
+    "pet_s": 0.9,
+    "t_person_s": 377.6
+   },
+   {
+    "person": "c169/0",
+    "vehicle": "motorcycle",
+    "tier": "close pass",
+    "pet_s": 1.9,
+    "t_person_s": 150.0
+   },
+   {
+    "person": "c483/0",
+    "vehicle": "motorcycle",
+    "tier": "close pass",
+    "pet_s": 2.1,
+    "t_person_s": 376.6
+   },
+   {
+    "person": "c589/0",
+    "vehicle": "motorcycle",
+    "tier": "close pass",
+    "pet_s": 2.4,
+    "t_person_s": 450.0
+   }
+  ],
+  "kept_open": [
+   {
+    "person": "c483/0",
+    "vehicle": "motorcycle",
+    "tier": "serious",
+    "pet_s": 0.0,
+    "t_person_s": 374.0
+   },
+   {
+    "person": "c483/0",
+    "vehicle": "motorcycle",
+    "tier": "serious",
+    "pet_s": 0.9,
+    "t_person_s": 377.6
+   },
+   {
+    "person": "c169/0",
+    "vehicle": "motorcycle",
+    "tier": "close pass",
+    "pet_s": 1.9,
+    "t_person_s": 150.0
+   },
+   {
+    "person": "c483/0",
+    "vehicle": "motorcycle",
+    "tier": "close pass",
+    "pet_s": 2.1,
+    "t_person_s": 376.6
+   },
+   {
+    "person": "c589/0",
+    "vehicle": "motorcycle",
+    "tier": "close pass",
+    "pet_s": 2.4,
+    "t_person_s": 450.0
+   }
+  ],
+  "same_kept": true
+ },
+ "people_who_crossed": {
+  "hosted": 51,
+  "open": 51,
+  "same_people": true
+ },
+ "letter_facts_identical": true,
+ "by_eye": "c116/0 is ruled out by the site file (by_eye_not_pedestrians) in both runs",
+ "rows": [
+  {
+   "person": "c100/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    200
+   ]
+  },
+  {
+   "person": "c107/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    191
+   ]
+  },
+  {
+   "person": "c113/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    200
+   ]
+  },
+  {
+   "person": "c116/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "not a pedestrian"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "not a pedestrian"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    232
+   ]
+  },
+  {
+   "person": "c117/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    261
+   ]
+  },
+  {
+   "person": "c121/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    170
+   ]
+  },
+  {
+   "person": "c122/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    253
+   ]
+  },
+  {
+   "person": "c123/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    169
+   ]
+  },
+  {
+   "person": "c124/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    266
+   ]
+  },
+  {
+   "person": "c127/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    161
+   ]
+  },
+  {
+   "person": "c128/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "not a person"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "not a person"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    202
+   ]
+  },
+  {
+   "person": "c141/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    233
+   ]
+  },
+  {
+   "person": "c169/0",
+   "muse_spark": {
+    "is_person": true,
+    "road_user": "adult"
+   },
+   "muse_spark_open": {
+    "is_person": true,
+    "road_user": "adult"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    238
+   ]
+  },
+  {
+   "person": "c180/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    154
+   ]
+  },
+  {
+   "person": "c389/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    158
+   ]
+  },
+  {
+   "person": "c396/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    237
+   ]
+  },
+  {
+   "person": "c418/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    363
+   ]
+  },
+  {
+   "person": "c479/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "not a person"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    564
+   ]
+  },
+  {
+   "person": "c482/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "not a person"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "not a person"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    168
+   ]
+  },
+  {
+   "person": "c483/0",
+   "muse_spark": {
+    "is_person": true,
+    "road_user": "adult"
+   },
+   "muse_spark_open": {
+    "is_person": true,
+    "road_user": "adult"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    127
+   ]
+  },
+  {
+   "person": "c508/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    168
+   ]
+  },
+  {
+   "person": "c512/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    294
+   ]
+  },
+  {
+   "person": "c516/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "not a person"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "not a person"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    245
+   ]
+  },
+  {
+   "person": "c532/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    145
+   ]
+  },
+  {
+   "person": "c535/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    251
+   ]
+  },
+  {
+   "person": "c541/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    169
+   ]
+  },
+  {
+   "person": "c589/0",
+   "muse_spark": {
+    "is_person": true,
+    "road_user": "adult"
+   },
+   "muse_spark_open": {
+    "is_person": true,
+    "road_user": "adult"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    233
+   ]
+  },
+  {
+   "person": "c591/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    212
+   ]
+  },
+  {
+   "person": "c609/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    171
+   ]
+  },
+  {
+   "person": "c623/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    170
+   ]
+  },
+  {
+   "person": "c629/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "rider"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    232
+   ]
+  },
+  {
+   "person": "c715/0",
+   "muse_spark": {
+    "is_person": false,
+    "road_user": "not a person"
+   },
+   "muse_spark_open": {
+    "is_person": false,
+    "road_user": "not a person"
+   },
+   "same_keep_or_reject": true,
+   "open_tokens_in_out": [
+    453,
+    188
+   ]
+  }
+ ]
+}

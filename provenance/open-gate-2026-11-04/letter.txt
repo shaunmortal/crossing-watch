@@ -1,0 +1,22 @@
+To the Road Authority
+
+Subject: Request for safer crossing outside LNCT Excellence main gate, Bhopal (service road below NH 146)
+
+Dear Sir/Madam,
+
+We write to request a raised zebra crossing outside our school gate.
+
+A video survey of 8.6 minutes (514.0 s) recorded 51 pedestrian crossings and 55 moving vehicles. In that time 3 of 51 people who crossed (1 in 17) had a moving vehicle through the same spot within 3 s of them. 1 of 51 (1 in 51) was within 1.5 s. If this recording is typical, the exact 95% ranges are 1.2-16.2% and 0.0-10.4% of people who crossed (Clopper-Pearson), or 0.6-8.8 and 0.0-5.6 people in a recording this long (Poisson).
+
+There were 2 serious near-misses (less than 1.5 s apart) and 3 close passes (1.5-3.0 s apart). The most serious incident had a gap of 0.0 s between pedestrian and motorcycle. The motorcycle speed was 18.7 km/h with an adult death risk if hit of 0.5% (Rosén & Sander 2009, adults 15+, car fronts). A second serious incident had a gap of 0.9 s between pedestrian and motorcycle. The motorcycle speed was 18.3 km/h with an adult death risk if hit of 0.5%.
+
+There were also 3 close passes. One had a gap of 1.9 s with a motorcycle at 14.7 km/h. Another had a gap of 2.1 s with a motorcycle at 14.8 km/h. Another had a gap of 2.4 s with a motorcycle at 10.2 km/h.
+
+The 85th percentile speed was 23.2 km/h and 7 of 55 moving vehicles passed faster than 25 km/h, the speed India's Motor Vehicles (Driving) Regulations 2017 (reg. 16(5)) set past schools and hospitals where signed.
+
+For context, PV² and hourly rates need at least 15 minutes of video and this recording is 8.6 minutes, so PV² cannot be assessed from this sample. 69.6% of the time was inside gaps of 6 s or more with no moving vehicle where people crossed, based on 24 gaps of which 9 were 12 s or more, longest 63.2 s, with the caveat that the first and last gaps are cut short by the video.
+
+We request you install a raised zebra crossing at the main gate to reduce speeds and give pedestrians priority. We are willing to share the video and calibration check (15.0 m on video versus 15.0 m on tape, 0% off) for your review.
+
+Yours faithfully,
+The Principal

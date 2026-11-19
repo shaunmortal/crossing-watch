@@ -1,0 +1,16 @@
+Dear Road Authority,
+
+Crossing Watch recorded 8.6 minutes, 514.0 s at LNCT Excellence main gate, Bhopal (service road below NH 146). The recording captured 80 pedestrian crossings and 55 moving vehicles. The 85th percentile speed was 23.2 km/h and 7 of 55 moving vehicles passed faster than 25 km/h. 3 of 51 crossings had a moving vehicle through the same spot within 3 s of the person and 1 of 51 within 1.5 s.
+
+Serious near-misses were 2. One serious near-miss had post-encroachment time 0.0 s with a motorcycle at 18.7 km/h. The adult death risk if hit is 0.5%. One serious near-miss had post-encroachment time 0.9 s with a motorcycle at 18.3 km/h. The adult death risk if hit is 0.5%. Close passes were 3. One close pass had post-encroachment time 1.9 s with a motorcycle at 14.7 km/h. One close pass had post-encroachment time 2.1 s with a motorcycle at 14.8 km/h. One close pass had post-encroachment time 2.4 s with a motorcycle at 10.2 km/h.
+
+PV² and hourly rates need at least 15 minutes of video; this one is 8.6. Counted: 80 pedestrian crossings, 55 moving vehicles. 69.6% of the time was inside gaps of 6 s or more with no moving vehicle where people crossed: 24 gaps, 9 of them 12 s or more, longest 63.2 s, with the first and last cut short by the video.
+
+Where people crossed: 8 people walked 2 m or more, mostly across the road; 3 of them within the busiest 2 m stretch of road. IRC:103-2012 cl. 6.7.1: "Pedestrian must be given the shortest possible direct route to cross the street". Cl. 6.1.9.2 (iii), schools and colleges: "Provision of guard-rails near schools where children would other-wise run straight into the road is essential. If there is a pedestrian crossing or a school crossing nearby, the guard-rails must be extended up to it."
+
+We request a raised zebra crossing with guardrails leading to it.
+
+We can share the video for your review.
+
+Sincerely,
+The Principal

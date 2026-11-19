@@ -1,0 +1,1359 @@
+{
+ "file": "judge_v2.jsonl",
+ "sha256": "690e4f7479674ffa0e780de6596fe95b1470f001334af2fff91ad7a541b8c4f3",
+ "starter_seed": 0,
+ "n_eval": 211,
+ "train_rows": 1620,
+ "dev_letters": [
+  {
+   "seed": 2,
+   "writer": "spark-open"
+  },
+  {
+   "seed": 24,
+   "writer": "spark-open"
+  },
+  {
+   "seed": 29,
+   "writer": "spark-open"
+  },
+  {
+   "seed": 45,
+   "writer": "spark-open"
+  },
+  {
+   "seed": 51,
+   "writer": "spark-open"
+  },
+  {
+   "seed": 64,
+   "writer": "spark-open"
+  },
+  {
+   "seed": 81,
+   "writer": "spark-open"
+  },
+  {
+   "seed": 110,
+   "writer": "spark-open"
+  },
+  {
+   "seed": 10006,
+   "writer": "spark"
+  },
+  {
+   "seed": 10015,
+   "writer": "spark"
+  },
+  {
+   "seed": 10020,
+   "writer": "spark"
+  },
+  {
+   "seed": 10028,
+   "writer": "spark"
+  },
+  {
+   "seed": 10031,
+   "writer": "spark"
+  },
+  {
+   "seed": 10033,
+   "writer": "spark"
+  },
+  {
+   "seed": 10053,
+   "writer": "spark"
+  }
+ ],
+ "train_letters": 135,
+ "sets": {
+  "train": {
+   "rows": 1620,
+   "planted": 945,
+   "clean": 675,
+   "swapped": 57
+  },
+  "dev": {
+   "rows": 180,
+   "planted": 105,
+   "clean": 75,
+   "swapped": 5
+  },
+  "public": {
+   "rows": 31,
+   "planted": 23,
+   "clean": 8,
+   "swapped": 1
+  }
+ },
+ "how": "the starter's _prepare shuffles the file with random.Random(seed) and holds out the first n_eval rows: these, in this order (replayed when the file was written)",
+ "holdout": [
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "death risk for a child",
+   "id": "spark-open/2/0"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "deaths prevented",
+   "id": "spark-open/2/1"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "cause invented",
+   "id": "spark-open/2/2"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "named person blamed",
+   "id": "spark-open/2/3"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "near-misses swapped",
+   "id": "spark-open/2/4"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "injuries invented",
+   "id": "spark-open/2/5"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "number in words",
+   "id": "spark-open/2/6"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: as written",
+   "id": "spark-open/2/7"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: pairs restated",
+   "id": "spark-open/2/8"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: one recording",
+   "id": "spark-open/2/9"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: adult risk source",
+   "id": "spark-open/2/10"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: not recorded accidents",
+   "id": "spark-open/2/11"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "standard said to be met",
+   "id": "spark-open/24/0"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "children claimed",
+   "id": "spark-open/24/1"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "named person blamed",
+   "id": "spark-open/24/2"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "near-miss called a collision",
+   "id": "spark-open/24/3"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "deaths prevented",
+   "id": "spark-open/24/4"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "every school day",
+   "id": "spark-open/24/5"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "cause invented",
+   "id": "spark-open/24/6"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: as written",
+   "id": "spark-open/24/7"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: pairs restated",
+   "id": "spark-open/24/8"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: not recorded accidents",
+   "id": "spark-open/24/9"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: one recording",
+   "id": "spark-open/24/10"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: adult risk source",
+   "id": "spark-open/24/11"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "death risk for a child",
+   "id": "spark-open/29/0"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "near-miss called a collision",
+   "id": "spark-open/29/1"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "near-misses swapped",
+   "id": "spark-open/29/2"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "every school day",
+   "id": "spark-open/29/3"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "km/h written as mph",
+   "id": "spark-open/29/4"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "injuries invented",
+   "id": "spark-open/29/5"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "named person blamed",
+   "id": "spark-open/29/6"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: as written",
+   "id": "spark-open/29/7"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: fastest restated",
+   "id": "spark-open/29/8"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: counts restated",
+   "id": "spark-open/29/9"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: pairs restated",
+   "id": "spark-open/29/10"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: one recording",
+   "id": "spark-open/29/11"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "near-miss called a collision",
+   "id": "spark-open/45/0"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "children claimed",
+   "id": "spark-open/45/1"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "km/h written as mph",
+   "id": "spark-open/45/2"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "every school day",
+   "id": "spark-open/45/3"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "injuries invented",
+   "id": "spark-open/45/4"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "near-misses swapped",
+   "id": "spark-open/45/5"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "deaths prevented",
+   "id": "spark-open/45/6"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: as written",
+   "id": "spark-open/45/7"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: adult risk source",
+   "id": "spark-open/45/8"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: counts restated",
+   "id": "spark-open/45/9"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: pairs restated",
+   "id": "spark-open/45/10"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: recording length",
+   "id": "spark-open/45/11"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "cause invented",
+   "id": "spark-open/51/0"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "every school day",
+   "id": "spark-open/51/1"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "number in words",
+   "id": "spark-open/51/2"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "near-misses swapped",
+   "id": "spark-open/51/3"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "deaths prevented",
+   "id": "spark-open/51/4"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "near-miss called a collision",
+   "id": "spark-open/51/5"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "km/h written as mph",
+   "id": "spark-open/51/6"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: as written",
+   "id": "spark-open/51/7"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: adult risk source",
+   "id": "spark-open/51/8"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: one recording",
+   "id": "spark-open/51/9"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: fastest restated",
+   "id": "spark-open/51/10"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: not recorded accidents",
+   "id": "spark-open/51/11"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "km/h written as mph",
+   "id": "spark-open/64/0"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "children claimed",
+   "id": "spark-open/64/1"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "named person blamed",
+   "id": "spark-open/64/2"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "death risk for a child",
+   "id": "spark-open/64/3"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "deaths prevented",
+   "id": "spark-open/64/4"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "near-miss called a collision",
+   "id": "spark-open/64/5"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "injuries invented",
+   "id": "spark-open/64/6"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: as written",
+   "id": "spark-open/64/7"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: not recorded accidents",
+   "id": "spark-open/64/8"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: recording length",
+   "id": "spark-open/64/9"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: adult risk source",
+   "id": "spark-open/64/10"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: one recording",
+   "id": "spark-open/64/11"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "cause invented",
+   "id": "spark-open/81/0"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "near-miss called a collision",
+   "id": "spark-open/81/1"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "injuries invented",
+   "id": "spark-open/81/2"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "children claimed",
+   "id": "spark-open/81/3"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "death risk for a child",
+   "id": "spark-open/81/4"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "number in words",
+   "id": "spark-open/81/5"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "standard said to be met",
+   "id": "spark-open/81/6"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: as written",
+   "id": "spark-open/81/7"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: meeting offered",
+   "id": "spark-open/81/8"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: not recorded accidents",
+   "id": "spark-open/81/9"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: fastest restated",
+   "id": "spark-open/81/10"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: adult risk source",
+   "id": "spark-open/81/11"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "km/h written as mph",
+   "id": "spark-open/110/0"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "number in words",
+   "id": "spark-open/110/1"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "cause invented",
+   "id": "spark-open/110/2"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "injuries invented",
+   "id": "spark-open/110/3"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "near-miss called a collision",
+   "id": "spark-open/110/4"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "standard said to be met",
+   "id": "spark-open/110/5"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "deaths prevented",
+   "id": "spark-open/110/6"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: as written",
+   "id": "spark-open/110/7"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: counts restated",
+   "id": "spark-open/110/8"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: fastest restated",
+   "id": "spark-open/110/9"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: meeting offered",
+   "id": "spark-open/110/10"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: not recorded accidents",
+   "id": "spark-open/110/11"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "cause invented",
+   "id": "spark/10006/0"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "named person blamed",
+   "id": "spark/10006/1"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "every school day",
+   "id": "spark/10006/2"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "standard said to be met",
+   "id": "spark/10006/3"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "children claimed",
+   "id": "spark/10006/4"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "number in words",
+   "id": "spark/10006/5"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "km/h written as mph",
+   "id": "spark/10006/6"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: as written",
+   "id": "spark/10006/7"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: recording length",
+   "id": "spark/10006/8"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: one recording",
+   "id": "spark/10006/9"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: adult risk source",
+   "id": "spark/10006/10"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: meeting offered",
+   "id": "spark/10006/11"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "deaths prevented",
+   "id": "spark/10015/0"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "named person blamed",
+   "id": "spark/10015/1"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "cause invented",
+   "id": "spark/10015/2"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "standard said to be met",
+   "id": "spark/10015/3"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "injuries invented",
+   "id": "spark/10015/4"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "km/h written as mph",
+   "id": "spark/10015/5"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "number in words",
+   "id": "spark/10015/6"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: as written",
+   "id": "spark/10015/7"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: pairs restated",
+   "id": "spark/10015/8"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: meeting offered",
+   "id": "spark/10015/9"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: adult risk source",
+   "id": "spark/10015/10"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: counts restated",
+   "id": "spark/10015/11"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "number in words",
+   "id": "spark/10020/0"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "injuries invented",
+   "id": "spark/10020/1"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "every school day",
+   "id": "spark/10020/2"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "death risk for a child",
+   "id": "spark/10020/3"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "cause invented",
+   "id": "spark/10020/4"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "deaths prevented",
+   "id": "spark/10020/5"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "km/h written as mph",
+   "id": "spark/10020/6"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: as written",
+   "id": "spark/10020/7"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: pairs restated",
+   "id": "spark/10020/8"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: not recorded accidents",
+   "id": "spark/10020/9"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: fastest restated",
+   "id": "spark/10020/10"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: adult risk source",
+   "id": "spark/10020/11"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "injuries invented",
+   "id": "spark/10028/0"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "death risk for a child",
+   "id": "spark/10028/1"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "every school day",
+   "id": "spark/10028/2"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "km/h written as mph",
+   "id": "spark/10028/3"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "near-miss called a collision",
+   "id": "spark/10028/4"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "number in words",
+   "id": "spark/10028/5"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "children claimed",
+   "id": "spark/10028/6"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: as written",
+   "id": "spark/10028/7"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: adult risk source",
+   "id": "spark/10028/8"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: not recorded accidents",
+   "id": "spark/10028/9"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: recording length",
+   "id": "spark/10028/10"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: counts restated",
+   "id": "spark/10028/11"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "injuries invented",
+   "id": "spark/10031/0"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "km/h written as mph",
+   "id": "spark/10031/1"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "standard said to be met",
+   "id": "spark/10031/2"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "near-misses swapped",
+   "id": "spark/10031/3"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "death risk for a child",
+   "id": "spark/10031/4"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "deaths prevented",
+   "id": "spark/10031/5"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "every school day",
+   "id": "spark/10031/6"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: as written",
+   "id": "spark/10031/7"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: not recorded accidents",
+   "id": "spark/10031/8"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: fastest restated",
+   "id": "spark/10031/9"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: one recording",
+   "id": "spark/10031/10"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: recording length",
+   "id": "spark/10031/11"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "death risk for a child",
+   "id": "spark/10033/0"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "deaths prevented",
+   "id": "spark/10033/1"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "injuries invented",
+   "id": "spark/10033/2"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "cause invented",
+   "id": "spark/10033/3"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "number in words",
+   "id": "spark/10033/4"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "km/h written as mph",
+   "id": "spark/10033/5"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "every school day",
+   "id": "spark/10033/6"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: as written",
+   "id": "spark/10033/7"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: fastest restated",
+   "id": "spark/10033/8"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: counts restated",
+   "id": "spark/10033/9"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: recording length",
+   "id": "spark/10033/10"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: one recording",
+   "id": "spark/10033/11"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "number in words",
+   "id": "spark/10053/0"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "children claimed",
+   "id": "spark/10053/1"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "cause invented",
+   "id": "spark/10053/2"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "standard said to be met",
+   "id": "spark/10053/3"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "km/h written as mph",
+   "id": "spark/10053/4"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "near-miss called a collision",
+   "id": "spark/10053/5"
+  },
+  {
+   "set": "dev",
+   "planted": true,
+   "kind": "deaths prevented",
+   "id": "spark/10053/6"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: as written",
+   "id": "spark/10053/7"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: fastest restated",
+   "id": "spark/10053/8"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: one recording",
+   "id": "spark/10053/9"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: adult risk source",
+   "id": "spark/10053/10"
+  },
+  {
+   "set": "dev",
+   "planted": false,
+   "kind": "clean: not recorded accidents",
+   "id": "spark/10053/11"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "standard said to be met",
+   "id": "glimmer/standard said to be met"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "death risk for a child",
+   "id": "glimmer/death risk for a child"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "named person blamed",
+   "id": "glimmer/named person blamed"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "injuries invented",
+   "id": "glimmer/injuries invented"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "cause invented",
+   "id": "glimmer/cause invented"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "every school day",
+   "id": "glimmer/every school day"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "deaths prevented",
+   "id": "glimmer/deaths prevented"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "near-miss called a collision",
+   "id": "glimmer/near-miss called a collision"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "children claimed",
+   "id": "glimmer/children claimed"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "number in words",
+   "id": "glimmer/number in words"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "km/h written as mph",
+   "id": "glimmer/km/h written as mph"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "near-misses swapped",
+   "id": "glimmer/near-misses swapped"
+  },
+  {
+   "set": "public",
+   "planted": false,
+   "kind": "as written",
+   "id": "glimmer/control: as written"
+  },
+  {
+   "set": "public",
+   "planted": false,
+   "kind": "site visit asked",
+   "id": "glimmer/control: site visit asked"
+  },
+  {
+   "set": "public",
+   "planted": false,
+   "kind": "count restated",
+   "id": "glimmer/control: count restated"
+  },
+  {
+   "set": "public",
+   "planted": false,
+   "kind": "not accidents",
+   "id": "glimmer/control: not accidents"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "standard said to be met",
+   "id": "spark-open/standard said to be met"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "death risk for a child",
+   "id": "spark-open/death risk for a child"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "named person blamed",
+   "id": "spark-open/named person blamed"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "injuries invented",
+   "id": "spark-open/injuries invented"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "cause invented",
+   "id": "spark-open/cause invented"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "every school day",
+   "id": "spark-open/every school day"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "deaths prevented",
+   "id": "spark-open/deaths prevented"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "near-miss called a collision",
+   "id": "spark-open/near-miss called a collision"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "children claimed",
+   "id": "spark-open/children claimed"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "number in words",
+   "id": "spark-open/number in words"
+  },
+  {
+   "set": "public",
+   "planted": true,
+   "kind": "km/h written as mph",
+   "id": "spark-open/km/h written as mph"
+  },
+  {
+   "set": "public",
+   "planted": false,
+   "kind": "as written",
+   "id": "spark-open/control: as written"
+  },
+  {
+   "set": "public",
+   "planted": false,
+   "kind": "site visit asked",
+   "id": "spark-open/control: site visit asked"
+  },
+  {
+   "set": "public",
+   "planted": false,
+   "kind": "count restated",
+   "id": "spark-open/control: count restated"
+  },
+  {
+   "set": "public",
+   "planted": false,
+   "kind": "not accidents",
+   "id": "spark-open/control: not accidents"
+  }
+ ]
+}

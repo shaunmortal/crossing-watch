@@ -1,0 +1,76 @@
+{
+ "rep-base-cap256.jsonl": {
+  "rows_answered": 1200,
+  "finished": 0,
+  "cut_off": 1200,
+  "unreadable": 1200,
+  "right": {
+   "base": 600,
+   "tuned": 1008,
+   "spark_open": 924
+  },
+  "tuned_vs_base": {
+   "wins": 458,
+   "losses": 50,
+   "p": 1.4282629963718057e-83
+  },
+  "base_vs_spark_open": {
+   "wins": 208,
+   "losses": 532,
+   "p": 1.4294421811698295e-33
+  },
+  "base_median_tokens": 256.0,
+  "base_median_wall_s": 3.37,
+  "finished_rows_only": {
+   "rows": 0,
+   "right": {
+    "base": 0,
+    "tuned": 0,
+    "spark_open": 0
+   },
+   "tuned_vs_base": {
+    "wins": 0,
+    "losses": 0,
+    "p": 1.0
+   }
+  },
+  "outcome_by_prereg": "tuned ahead of base (p < 0.05)"
+ },
+ "rep-base-cap8192.jsonl": {
+  "rows_answered": 1200,
+  "finished": 1198,
+  "cut_off": 2,
+  "unreadable": 2,
+  "right": {
+   "base": 748,
+   "tuned": 1008,
+   "spark_open": 924
+  },
+  "tuned_vs_base": {
+   "wins": 369,
+   "losses": 109,
+   "p": 4.484680478061006e-34
+  },
+  "base_vs_spark_open": {
+   "wins": 45,
+   "losses": 221,
+   "p": 4.484094206129117e-29
+  },
+  "base_median_tokens": 2542.5,
+  "base_median_wall_s": 41.345,
+  "finished_rows_only": {
+   "rows": 1198,
+   "right": {
+    "base": 746,
+    "tuned": 1008,
+    "spark_open": 924
+   },
+   "tuned_vs_base": {
+    "wins": 369,
+    "losses": 107,
+    "p": 9.192059019801219e-35
+   }
+  },
+  "outcome_by_prereg": "tuned ahead of base (p < 0.05)"
+ }
+}

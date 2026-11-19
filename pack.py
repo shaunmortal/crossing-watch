@@ -1,0 +1,1715 @@
+"""Evidence pack: one page a school can send to the road authority. Muse Spark picks the fix and writes the
+letter from the measured events only; Muse Image draws that fix onto the real street.
+
+Run after analyze.py: python3 pack.py OUT_DIR SITE.json
+Writes OUT_DIR/index.html next to the clips (open it in a browser), and OUT_DIR/share/: the page and only the files it
+shows, the one folder to publish, with their SHA256SUMS. The letter is kept in OUT_DIR/plan.json, so a re-run pays
+nothing; --notes FILE (or --voice-notes AUDIO, spoken) revises it, and --approved-by NAME --school SCHOOL signs it
+(OUT_DIR/signoff.json).
+A signed letter is replaced only with --new-letter, and kept as plan-<sha>.json.
+python3 pack.py --verify FOLDER checks a shared folder: MATCH, CHANGED or MISSING per file.
+"""
+import argparse
+import base64
+import datetime
+import difflib
+import hashlib
+import html
+import http.client
+import json
+import math
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+import unicodedata
+import urllib.request
+import uuid
+import zlib
+from pathlib import Path
+
+import ailabel
+import crowd
+import filmcheck
+import fixband
+import gazette
+import hindi
+import openweights
+import overlay
+import pace
+import passmark
+import render
+import review
+import roadmap
+import road
+import sam
+import seal
+import summary
+import voice
+
+IMAGE_EDIT_URL = "https://api.meta.ai/v1/images/edits"
+IMAGE_MODEL = "muse-image-1.0"
+TIMEOUT_S = 300
+SHOWN_EVENTS = 5
+MIN_RATE_MINUTES = 15  # shortest video scaled to hourly rates (MUTCD Warrant 4 counts 15-minute periods)
+ALPHA = 0.05      # exact two-sided 95% ranges
+BISECTIONS = 50   # halvings to find a range's end: 1e-15 of the span, and a share never rounds up to exactly 1
+SCHOOL_YEAR = ("school_days", "dismissal_minutes")  # optional site keys: the "if every dismissal" line needs both
+# each setting from the shell's export, else from .env (sam.env_value), so a forgotten export on the day still runs
+LETTER_URL = sam.env_value("LETTER_MODEL_URL")  # an OpenAI-compatible server, e.g. llama-server with Muse
+LETTER_MODEL = sam.env_value("LETTER_MODEL") or "Muse Glimmer 30B"  # its API model id, shown as openweights.name()
+LETTER_KEY = sam.env_value("LETTER_MODEL_KEY")  # Bearer token for the letter server (Fireworks: FIREWORKS_API_KEY)
+JUDGE_URL = sam.env_value("JUDGE_MODEL_URL")  # an OpenAI-compatible server whose model also judges the letter
+JUDGE_MODEL = sam.env_value("JUDGE_MODEL") or LETTER_MODEL  # the judge server's API model id
+JUDGE_KEY = sam.env_value("JUDGE_MODEL_KEY")  # Bearer token for the judge server only (Fireworks: as above)
+
+
+def writer_label(url, model=LETTER_MODEL):
+    """Who runs at `url`, the letter's writer or its open-weights judge (openweights.label), or Muse Spark."""
+    return openweights.label(url, model) if url else "Muse Spark"
+
+
+WRITER = writer_label(LETTER_URL)
+LETTER_HOST = sam.env_value("LETTER_MODEL_HOST")  # where it ran, e.g. "Kaggle 2 x T4" (the notebook reads nvidia-smi)
+PROVENANCE = "letter-provenance.json"  # beside plan.json: what the letter's model ran, measured; never a key
+RUN_KEYS = ("request_id", "usage", "wall_s", "timings", "response_format")  # openweights.reply's record
+CHECK_KEYS = ("unmeasured", "mixed", "unsupported", "slips")  # what ask_plan's checks left on a letter kept after the last try
+JUDGE = "Muse Spark (a separate reviewer)"
+JUDGE_PROMPT = """You review a letter before a school sends it to its road authority. MEASUREMENTS are the only facts.
+List every problem: a claim or number the measurements do not support; a number above one written in words, not in
+digits; saying a standard or warrant is met; a death risk stated for a child; blaming a named person. Tone, wording
+and the choice of fix are not problems. Ordinals ("first", "second", "third") and descriptions of how the measurement
+was made (tracking, road-plane geometry, the definitions) are not problems either.
+Reply JSON only: {{"problems": ["<one short sentence each>"]}}, with [] if there are none.
+
+MEASUREMENTS:
+{facts}
+
+LETTER:
+{letter}"""
+JUDGE_FAILED = "The reviewer's reply could not be read."  # a judge that failed or answered no list: never a pass
+JUDGE_ERRORS = (OSError, http.client.HTTPException, ValueError, KeyError, IndexError, TypeError)  # URLError, 503,
+# timeout, a reply of the wrong shape: the judge objects instead, so the paid letter is kept with the point to check
+PROBLEMS_SCHEMA = {"type": "object", "properties": {"problems": {"type": "array", "items": {"type": "string"}}},
+                   "required": ["problems"], "additionalProperties": False}  # the judge's reply, for a JUDGE_MODEL_URL server
+LETTER_TRIES = 3     # Spark gets this many tries at a letter whose every number was measured
+NUMBER = re.compile(r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?")  # 1,200 is one number
+WORDS = ("two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|"
+         "eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundreds?|thousands?|dozens?")
+# a number in words, which code cannot check: "one" is too common to flag, and a two-wheeler is a vehicle
+NUMBER_WORD = re.compile(rf"\b(?:{WORDS})(?:-(?:{WORDS}))?\b(?![- ]wheel)", re.I)
+MPH = re.compile(rf"(?:(?:{NUMBER.pattern})\s?)?(?<![a-z])(?:mph|miles (?:per|an) hour)\b", re.I)  # measured in km/h
+# a number with the unit of an event's speed, PET or death risk ("s" never matches "12 schools")
+WITH_UNIT = re.compile(rf"({NUMBER.pattern})\s?(km/h|kmph|s(?:ec(?:ond)?s?)?|%|per ?cent)(?![\w/])", re.I)
+UNIT_FIELD = {"k": "vehicle_kmh", "s": "pet_s", "%": "death_risk_pct", "p": "death_risk_pct"}  # unit's 1st letter
+SENTENCE = re.compile(r"(?<=[.!?])\s+|\n")
+PLACEHOLDER = re.compile(r"\[[^\[\]\n]{1,60}\]|\{[^{}\n]{1,60}\}|_{3,}")  # [School name], {Date}, ____: never signed
+ACCUSES = re.compile(r"\b(?:illegal|unlawful|violat|breach|broke\b)", re.I)  # a rule broken: no video can show that
+SHOWN_FILE = re.compile(r'\b(?:src|poster)="([^"#?]+)')  # a file the page shows (clip, poster, picture), no #t=...
+UNSHAREABLE = re.compile(r"clip\.mp4|person-.*\.jpg")  # the unblurred video and the unblurred crops Spark saw
+PLAN_KEYS = ("fix", "why", "image_prompt", "letter")
+UNSURE = "pedestrian (Spark unsure; kept)"  # review.gated kept someone Spark called "unclear" (review_unclear)
+PLAN_SCHEMA = {"type": "object", "properties": {k: {"type": "string"} for k in PLAN_KEYS}, "required": list(PLAN_KEYS),
+               "additionalProperties": False}  # the plan's shape only, for an open-weights server
+NUMBER_LOCK = sam.env_value("LETTER_MODEL_NUMBER_LOCK") == "1"  # opt-in: on Fireworks (29 Oct) the number
+# pattern trapped Muse Spark Open in "a0a0a0..." text that held no unmeasured number and so passed both checks
+MIN_TEXT_RATIO = 0.2       # compressed / raw size: prose stays near 0.4, one short piece repeated falls under 0.1
+REPEAT_CHECK_BYTES = 200   # shorter text compresses badly whatever it says, so it is not judged this way
+WORDLESS_CHARS = 20        # a field this long with no word of two letters is stuck ("a0a0a0..."), not terse
+JSON_ESCAPE = r'\\["\\/bfnrt]'  # an escape inside a JSON string, but never \u: "\u0032" is a hidden 2
+LETTER_PROMPT = """You help a school ask its road authority to make the crossing outside it safer.
+Below are measurements from a video of the crossing, made by Crossing Watch (SAM tracking, road-plane geometry,
+post-encroachment time). Use ONLY these facts; never invent numbers, names, places or dates.
+Write every number in digits, exactly as given (speeds in km/h), and never put one near-miss's speed in a sentence
+with another near-miss's time gap.
+Death-risk figures are for adults hit by a car front: never state a death risk for a child.
+From the engineering lines, mention at most PV² and the share of time in gaps, briefly, with their main caveat;
+never say a standard is met. If desire_lines is given, you may say where people crossed and quote its IRC:103-2012 words.
+
+{facts}
+
+Reply with JSON only:
+{{"fix": "<one specific physical fix, e.g. raised zebra crossing, speed table, 20 km/h zone with signs>",
+  "why": "<one sentence linking the fix to the measurements>",
+  "image_prompt": "<an instruction to edit a photo of this street so it shows the fix; keep people and buildings unchanged>",
+  "letter": "<a short formal letter in {language} from the head of the school to the road authority: what was measured,
+             the worst near-misses, the requested fix, and an offer to share the video. Sign it from "The Principal";
+             write no date and nothing in square brackets: the principal's sign-off adds who approved it and when.>"}}"""
+# --notes: appended to LETTER_PROMPT with the letter being revised (Meta's legal-agent workshop: "Reject with notes")
+REVISE = """
+
+The head of the school read your letter below and wrote the notes under it. Reply with the same JSON, the letter
+revised: change only the sentences the notes ask for and keep every other sentence word for word. The notes are stated
+by the principal, not measured: anything taken from them is the school's own statement, never a measurement.
+
+YOUR LETTER:
+{letter}
+
+NOTES:
+{notes}"""
+# the notes given to the writer as both letter checks read them, after the measurements: the judge must neither
+# reject the school's own facts nor take them as measured
+STATED = "\n\nSTATED BY THE PRINCIPAL, NOT MEASURED (a letter may give these as the school's own statements):\n"
+SIGNOFF_KEYS = ("approved_by", "school", "date", "letter_sha256")  # signoff.json
+PLAN_BACKUP = "plan-{sha8}.json"  # a replaced plan.json, named by the first 8 hex digits of its signed_sha
+FILED_KEYS = ("to", "channel", "date", "reference")  # the site's "submitted" record, once the pack is filed
+TCT_TOOLKIT = "https://www.childhealthinitiative.org/media/v5bntgmp/tct-toolkit__one-pager_final_508_updated.pdf"
+PRINTED_CARDS = 3  # on paper only the worst 3 near-misses, so the letter's own sheet comes soon
+PYRAMID_WIDTHS = (20, 45, 70, 100)  # % of its column, tip to base: not to scale, the labels give the counts
+# Muse Image only: IRC 103-2022 as the Supreme Court quotes it (order para 21 and its footnote 1). Never in
+# LETTER_PROMPT, where 4, 10 and 20 would count as measured numbers.
+RAISED_SPEC = ("Draw the crossing raised to the level of the footpath and 4 m wide, with a speed hump 10-20 m before it "
+               "on each approach.")
+RAISED = re.compile(r"raised|\btable", re.I)  # fixes RAISED_SPEC fits: raised zebra, tabletop crossing, speed table
+ORDER_PDF = "https://www.livelaw.in/pdf_upload/2037620122025-10-07-624635.pdf"  # the signed order, 41 pages
+ORDER = ("Supreme Court of India, S. Rajaseekaran v. Union of India, Writ Petition (Civil) No. 295 of 2012, "
+         "reportable order of 7 October 2025, 2025 INSC 1189")
+# (paragraph, PDF page, the Court's words verbatim): written by code, so no model ever writes a paragraph number
+SCHOOL_ZONES = ("35.5", 33, "In school zones and other vulnerable corridors, authorities shall systematically identify "
+                "high-risk stretches using accident data, and implement context-specific measures such as raised "
+                "crossings, zebra markings, traffic calming features, and deployment of trained crossing guards.")
+SURVEY = ("35.6", 34, "We, therefore, direct the road owning agencies in the 50 cities mentioned in Annexure 46 of the "
+          "Report on Road Accidents, 2023 and the NHAI to draw up an action plan and start phase-wise survey to assess "
+          "the requirement of additional pedestrian crossing facilities.")
+GRIEVANCE = ("35.11", 37, "State Governments/Municipal Authorities/NHAI are directed to create an online grievance "
+             "redressal mechanism regarding footpaths which would include complaints of encroachments on footpaths, "
+             "maintenance of footpaths and also suggestions for pedestrian crossing.")
+LEGAL_NOTE = ("Paragraph 35.5 asks authorities to identify high-risk stretches using accident data. The near-misses "
+              "measured here are not accidents: they are offered as further evidence about this crossing, alongside "
+              "that data. Where the road authority has set up the online mechanism of paragraph 35.11, this pack can "
+              "be filed there as a suggestion for a pedestrian crossing.")
+# the 50 million-plus cities of Annexure 46 in MoRTH's Road Accidents in India 2023 (paragraph 35.6 binds them), and
+# common other names. Exact names only: a misspelt city loses paragraph 35.6, it never gains it
+ANNEXURE_46 = {
+    "agra", "ahmedabad", "allahabad", "prayagraj", "amritsar", "asansol durgapur", "asansol", "durgapur", "aurangabad",
+    "bengaluru", "bhopal", "chandigarh", "coimbatore", "chennai", "delhi", "dhanbad", "faridabad", "ghaziabad",
+    "gwalior", "hyderabad", "indore", "jabalpur", "jaipur", "jamshedpur", "jodhpur", "kannur", "kanpur", "kozhikode",
+    "kochi", "kolkata", "kollam", "kota", "lucknow", "ludhiana", "madurai", "malappuram", "meerut", "mumbai", "nagpur",
+    "nashik", "patna", "pune", "raipur", "rajkot", "srinagar", "surat", "thiruvananthapuram", "thrissur",
+    "tiruchirappalli", "vadodara", "varanasi", "vijayawada", "visakhapatnam",
+    "bangalore", "bombay", "calcutta", "madras", "cochin", "calicut", "trivandrum", "trichy", "baroda", "vizag",
+    "new delhi"}
+
+
+def confirmed(events):
+    """Events whose track Spark did not reject as 'not a person' in any reviewed event (unreviewed ones stay,
+    marked as such): one rejected pole must not come back through its unreviewed pairings with other vehicles."""
+    rejected = {e["person"] for e in events if (e.get("review") or {}).get("is_person") is False}
+    return [e for e in events if e["person"] not in rejected]
+
+
+def real_crossers(events, seen):
+    """exposure without the crossers Spark rejected as 'not a person', so the headline's n holds the same people as
+    its k (a rider or a moved pole must not count as a crossing nobody was hit in), and so does `crossings`, which
+    road.exposure counts once per crosser. By person, not piece: one with any piece left in confirmed(events) stays."""
+    if not seen.get("crossers"):
+        return seen
+    kept = {e["person"].split("/")[0] for e in confirmed(events)}
+    rejected = {e["person"].split("/")[0] for e in events if (e.get("review") or {}).get("is_person") is False} - kept
+    crossers = [c for c in seen["crossers"] if c not in rejected]
+    return {**seen, "crossers": crossers, "crossings": len(crossers)}
+
+
+def serious(events):
+    return [e for e in events if e.get("tier", "serious") == "serious"]
+
+
+def facts(site, events, seen, paths=None):
+    """The measurements a letter may quote, as JSON. Arrays (paths, spans, replays) never enter: they are not facts
+    for a letter, and their many numbers would let almost any number in a letter pass the measured-number check.
+    The desire lines (`paths`) enter only as roadmap.desire_lines()' counts."""
+    worst, lines, desire = events[:SHOWN_EVENTS], headline(events, seen, site), roadmap.desire_lines(paths, site)
+    return json.dumps({
+        **({"headline": " ".join(lines)} if lines else {}),
+        "site": site.get("name", ""), "observed": {k: v for k, v in seen.items() if not isinstance(v, (list, tuple, set))},
+        "serious_near_misses": len(serious(events)), "close_passes": len(events) - len(serious(events)),
+        **road.first_counts(events),
+        "definition": f"serious: pedestrian and moving vehicle on the same spot less than {road.PET_MAX_S} s apart; "
+                      f"close pass: {road.PET_MAX_S}-{road.CLOSE_PASS_S} s",
+        "worst": [{"tier": e.get("tier", "serious"), "pet_s": e["pet_s"], "vehicle": e["vehicle"].split("#")[0], "vehicle_kmh": e["vehicle_kmh"],
+                   "adult_death_risk_if_hit_pct": e["death_risk_pct"], "at_20_kmh_limit": e["with_limit"]["20"],
+                   "road_user": review.unconfirmed_rider(e.get("review"))
+                   or (e.get("review") or {}).get("road_user", "not reviewed")} for e in worst],
+        "risk_source": "Rosén & Sander 2009, adults 15+, car fronts",
+        "engineering": engineering_lines(seen, None, site),
+        **({"desire_lines": " ".join(desire)} if desire else {}),
+    }, indent=1, ensure_ascii=False)  # \u escapes would add digits the number check counts as measured
+
+
+def watched_minutes(seen):
+    """Minutes of video, exact from duration_s when there (minutes is rounded to 0.1)."""
+    return seen["duration_s"] / 60 if seen.get("duration_s") else seen.get("minutes") or 0
+
+
+def falling_root(f, hi):
+    """Where f, positive near 0 and falling, crosses 0 in [0, hi] (hi when it never does)."""
+    lo = 0.0
+    for _ in range(BISECTIONS):
+        mid = (lo + hi) / 2
+        lo, hi = (mid, hi) if f(mid) > 0 else (lo, mid)
+    return (lo + hi) / 2
+
+
+def exact_range(cdf, k, hi):
+    """Exact two-sided 95% range for a count seen k times; cdf(j, x) = P(count <= j), falling as x grows."""
+    upper = falling_root(lambda x: cdf(k, x) - ALPHA / 2, hi)
+    lower = falling_root(lambda x: cdf(k - 1, x) - (1 - ALPHA / 2), hi) if k else 0.0
+    return lower, upper
+
+
+def poisson_range(k):
+    """Garwood's exact 95% range for the mean of a count seen k times: 0 gives 0 to 3.69, so 0 never reads as safe."""
+    cdf = lambda j, mu: sum(math.exp(i * math.log(mu) - mu - math.lgamma(i + 1)) for i in range(j + 1))
+    return exact_range(cdf, k, 10 * k + 10)
+
+
+def share_range(k, n):
+    """Clopper-Pearson's exact 95% range for a share seen k times in n."""
+    cdf = lambda j, p: sum(math.exp(math.lgamma(n + 1) - math.lgamma(i + 1) - math.lgamma(n - i + 1) + i * math.log(p)
+                                    + (n - i) * math.log1p(-p)) for i in range(j + 1))
+    return exact_range(cdf, k, 1.0)
+
+
+def people_hit(events, crossers):
+    """Distinct people who crossed among these events' pedestrians: one split into pieces, or passed by several
+    vehicles, counts once; one exposure never counted as crossing does not count."""
+    return len({e["person"].split("/")[0] for e in events} & crossers)
+
+
+def headline(events, seen, site):
+    """The one number, as natural frequencies (Gigerenzer & Hoffrage 1995): k of the n people who crossed had a moving
+    vehicle through their spot within CLOSE_PASS_S, and within PET_MAX_S, with exact 95% ranges. Lines; none without
+    exposure's crosser list (an older events.json), the only way to keep k inside n."""
+    if not seen.get("crossers"):
+        return []
+    crossers = set(seen["crossers"])
+    n, tiers = len(crossers), [(people_hit(events, crossers), road.CLOSE_PASS_S),
+                               (people_hit(serious(events), crossers), road.PET_MAX_S)]
+    one_in = lambda k: f" (1 in {round(n / k, 0 if n >= 10 * k else 1):g})" if k else ""
+    (k3, s3), (k15, s15) = tiers
+    shares = " and ".join(f"{100 * lo:.1f}-{100 * hi:.1f}%" for lo, hi in (share_range(k, n) for k, _ in tiers))
+    counts = " and ".join(f"{lo:.1f}-{hi:.1f}" for lo, hi in (poisson_range(k) for k, _ in tiers))
+    lines = [f"{k3} of {n} people who crossed{one_in(k3)} had a moving vehicle through the same spot within {s3:g} s "
+             f"of them; {k15} of {n}{one_in(k15)} within {s15:g} s.",
+             f"Exact 95% ranges, if this recording is typical: {shares} of people who crossed (Clopper-Pearson); {counts} people "
+             f"in a recording this long (Poisson)."]
+    days, length = (site.get(key) for key in SCHOOL_YEAR)
+    minutes = watched_minutes(seen)
+    if all(isinstance(v, (int, float)) and v > 0 for v in (days, length)) and minutes >= MIN_RATE_MINUTES:
+        capped = seen.get("window_s") and length > minutes  # a window_s on the rush is never scaled to the dismissal
+        length, dismissals = ((minutes, f"the {round(minutes, 1):g} analysed minutes of each dismissal") if capped
+                              else (length, f"{length:g}-minute dismissals"))
+        scaled = lambda count: f"{float(f'{count * length / minutes * days:.2g}'):,.0f}"  # 2 significant figures
+        # 0 seen is never 0 a year: Poisson's upper bound, scaled the same way
+        per_year = lambda k: f"about {scaled(k)}" if k else f"up to {scaled(poisson_range(0)[1])}"
+        lines.append(f"If every dismissal is like this one: {per_year(k3)} crossings a school year with a moving "
+                     f"vehicle through the same spot within {s3:g} s, {per_year(k15)} within {s15:g} s ({days:g} school "
+                     f"days, {dismissals}).")
+    return lines
+
+
+
+def engineering_lines(seen, cost, site=None):
+    """The numbers road engineers already use, from the same tracks: PV^2 (IRC:103-2012) and gaps in traffic
+    (UK Traffic Signs Manual ch. 6), plus what the tracking cost. Rates from a short video are scaled, and say so.
+    For a site in India, the moving vehicles over India's limit past a school or hospital where signs show it, also
+    when none was (older events.json files have no over_25_kmh, so their facts stay the same)."""
+    minutes = watched_minutes(seen)
+    if not minutes:
+        return []
+    lines = []
+    if "crossings" in seen and "vehicles" in seen and minutes < MIN_RATE_MINUTES:
+        lines.append(f"PV² and hourly rates need at least {MIN_RATE_MINUTES} minutes of video; this one is "
+                     f"{minutes:.1f}. Counted: {seen['crossings']} pedestrian crossings, {seen['vehicles']} moving vehicles.")
+    elif "crossings" in seen and "vehicles" in seen:
+        shown = round(minutes, 1)
+        source = (f"scaled from {shown:g} minutes of video; a formal check counts the full peak hour" if minutes < 60
+                  else f"from {shown:g} minutes of video")
+        lines.append(f"PV² = {road.pv2(seen['crossings'], seen['vehicles'], minutes) / 1e8:.1f} x 10^8: "
+                     f"{round(seen['crossings'] * 60 / minutes)} pedestrians and {round(seen['vehicles'] * 60 / minutes)} "
+                     f"moving vehicles an hour ({source}; pedestrians are people who walked 2 m or more on the marked carriageway, or "
+                     f"anywhere in view if none is marked, and broken tracks can count one twice: 1.3x the true count "
+                     f"in our drone test). IRC:103-2012 cl. 6.7.4.1.2: a controlled crossing may be "
+                     f"warranted above {road.PV2_UNDIVIDED / 1e8:g} x 10^8 on an undivided road, "
+                     f"{road.PV2_DIVIDED / 1e8:g} x 10^8 on a divided road (the Union has told the Supreme Court "
+                     f"that a Second Revision, IRC 103-2022, exists).")
+    if "gaps_6s" in seen:
+        lines.append(f"{seen.get('gap_6s_share_pct', '?')}% of the time was inside gaps of {road.GAP_ADULT_S:g} s or "
+                     f"more with no moving vehicle where people crossed: {seen['gaps_6s']} "
+                     f"gap{'' if seen['gaps_6s'] == 1 else 's'}, {seen['gaps_12s']} of them {road.GAP_SLOW_S:g} s or "
+                     f"more, longest {seen['longest_gap_s']} s (the first and last are cut short by the video). "
+                     f"UK Traffic Signs Manual ch. 6 (13.5.2): 4-6 s is an "
+                     f"acceptable gap at urban speeds; other groups, such as children, may need 10-12 s or longer.")
+    if site and in_india(site) and "over_25_kmh" in seen and seen.get("vehicles"):  # "0 of 0" says nothing
+        lines.append(f"{seen['over_25_kmh']} of {seen['vehicles']} moving vehicles passed faster than "
+                     f"{road.IN_SCHOOL_KMH} km/h, the speed India's Motor Vehicles (Driving) Regulations 2017 "
+                     "(reg. 16(5)) set past schools and hospitals where signed.")
+    if cost and cost.get("sam_usd") is not None:
+        images = f" (about ${cost['image_usd']:.2f} of it image detection)" if cost.get("image_usd") else ""
+        lines.append(f"SAM cost for this pack: about ${cost['sam_usd']:.2f} at Meta's list prices{images}, so about "
+                     f"${cost['sam_usd'] * 60 / minutes:.2f} per hour of footage.")
+    return lines
+
+
+def engineering(seen, cost, site=None):
+    lines = engineering_lines(seen, cost, site)
+    if not lines:
+        return ""
+    items = "".join(f"<li>{html.escape(line)}</li>" for line in lines)
+    return f"<section><h2>Numbers road engineers use</h2><ul>{items}</ul></section>"
+
+
+def limit_note(full):
+    """Say so when SAM's per-request object limit was reached: then the counts are a minimum. A third item holds
+    analyze's auto-mode notes, for concepts that filled it and were detected frame by frame instead."""
+    notes = full[2] if full and len(full) > 2 and full[2] else []
+    switched = (f'<p class="note">SAM video tracking keeps at most {sam.MAX_OBJECTS} objects per request. '
+                f'{html.escape("; ".join(notes))}.</p>' if notes else "")
+    if not full or not full[0]:
+        return switched
+    return switched + (f'<p class="note">In {full[0]} of {full[1]} tracking requests SAM reached its {sam.MAX_OBJECTS}-object '
+                       "limit, so some people or vehicles were not tracked: counts and near-misses here are a minimum.</p>")
+
+
+def tracked_by(full):
+    """The method's opening: SAM 3.1's tracks and Muse Spark's check only when `full`, analyze.py's SAM request counts
+    (events.json's sam_full_requests), says SAM made them; sample/'s made-up tracks have none. Never "every" person:
+    a full video request leaves some untracked (limit_note)."""
+    if not full:
+        return ("No SAM tracking run is recorded for these tracks (events.json counts no SAM requests), so neither "
+                "SAM 3.1 nor Muse Spark made or checked them. ")
+    return (f"SAM 3.1 tracked the pedestrians and vehicles it found, at most {sam.MAX_OBJECTS} objects per video "
+            "request (a note under the counts says when a request was full). Four points on the road turned pixels "
+            "into metres. Muse Spark looked at the person in each near-miss, most dangerous first, and removed tracks "
+            "that were not people; a card says when it did not look. ")
+
+
+def privacy_note(privacy):
+    """The page's count of blurred heads, when analyze had SAM image search find the people a full video request
+    for people missed on the published frames."""
+    if not privacy:
+        return ""
+    counts = html.escape(f"up to {privacy['heads_tracked']} heads a frame blurred from tracks + up to "
+                         f"{privacy['heads_found']} found by SAM image search")
+    return (f'<p class="note">Faces in the clips and the street photo: {counts} (a SAM video request for people was '
+            "full, so the published clips were searched image by image every 0.2 s, with boxes filled in between).</p>")
+
+
+def unmeasured(text, facts_text):
+    """Numbers in `text` that appear nowhere in the measured facts, then numbers in words and speeds in mph, which
+    code cannot check against them: a letter to an authority must not invent any."""
+    value = lambda n: float(n.replace(",", ""))
+    known = {value(n) for n in NUMBER.findall(facts_text)}
+    unchecked = dict.fromkeys(m[0] for pattern in (NUMBER_WORD, MPH) for m in pattern.finditer(text))
+    return sorted({n for n in NUMBER.findall(text) if value(n) not in known}, key=value) + list(unchecked)
+
+
+def owners(match, events):
+    """(field, card numbers) of a WITH_UNIT match: the shown events whose speed, PET or death risk it equals."""
+    field = UNIT_FIELD[match[2][0].lower()]
+    return field, [i for i, e in enumerate(events, 1) if e.get(field) == float(match[1].replace(",", ""))]
+
+
+def mixed(letter, worst):
+    """Sentences that put one near-miss's speed beside another's PET ("a car at 38 km/h passed 0.2 s from a child"
+    with 38 from #1 and 0.2 from #3). Only numbers that are some shown event's speed or PET count."""
+    out = []
+    for sentence in SENTENCE.split(letter):
+        found = {"vehicle_kmh": [], "pet_s": []}
+        for match in WITH_UNIT.finditer(sentence):
+            field, cards = owners(match, worst)
+            if cards and field in found:
+                found[field].append(set(cards))
+        speeds, pets = found.values()
+        # ponytail: only a sentence with one speed and one PET is paired; a list or a range ("0.0 s to 0.1 s at
+        # 11.3 km/h to 12.8 km/h", whose ends are not one event) is left to the judge
+        if len(speeds) == len(pets) == 1 and not speeds[0] & pets[0]:
+            out.append(sentence.strip())
+    return out
+
+
+def accusing(text):
+    """Sentences that say someone broke a law or rule ("illegal", "violated", "breach"). A video measures speeds and
+    gaps, not whether a limit was signed there (reg. 16(5) needs a sign), so code sends them back at no cost."""
+    return [s.strip() for s in SENTENCE.split(text) if ACCUSES.search(s)]
+
+
+CLOSEST = re.compile(r"\b(?<!2nd )(?<!3rd )(?<!second )(?<!third )(?<!next )(?:closest|nearest|shortest|tightest|smallest)\b",
+                     re.I)  # the closest, not "the 2nd closest"
+PERSON_FIRST = re.compile(r"\bafter (?:the|a) (?:person|pedestrian|walker)\b", re.I)  # one event's order, not a count
+VEHICLE_FIRST = re.compile(r"\bbefore (?:the|a) (?:person|pedestrian|walker)\b", re.I)
+EDGES_NAMED = re.compile(r"\bfirst and (?:the )?last\b|\bedge|\b(?:start|beginning) and (?:the )?end\b|\bboth ends\b",
+                         re.I)  # the sentence already says which gaps
+COUNTED = re.compile(r"\b\d+\s+(?:had|cases?|times?|events?|of them|were)\b", re.I)  # "0 had the vehicle before the person"
+CUT_SHORT = re.compile(rf"({NUMBER.pattern})\s+(?:such\s+)?gaps?\b[^.]*\bcut short", re.I)
+VIDEO_EDGES = 2  # only the first and the last gap of a recording can be cut short by its ends
+LARGEST = re.compile(r"\b(?<!2nd )(?<!second )(?:largest|longest|biggest|widest)\b", re.I)
+FASTEST = re.compile(r"\b(?<!2nd )(?<!second )(?:fastest|quickest|highest speed)\b", re.I)
+PERSON = r"(?:person|persons|pedestrians?|walkers?)"
+VEHICLE = r"(?:vehicles?|cars?|bus(?:es)?|vans?|motorcycles?|auto-rickshaws?|trucks?|lorr(?:y|ies))"
+
+
+def _arrived_first(a, b):
+    """A pattern for "`a` reached the spot before `b`" as letters word it: "a-first", "a arriving first", "a before
+    b", "b after a" ("the car passed 0.4 s after the person": the person was first)."""
+    return re.compile(rf"\b{a}[- ](?:(?!{b})\w+ ){{0,3}}?first\b|\b{a}\b[^,;]*?\bbefore (?:the |a )?{b}|"
+                      rf"\b{b}\b[^,;]*?\bafter (?:the |a )?{a}|\bafter (?:the|a) {a}", re.I)
+
+
+ARRIVAL = {"person_first": _arrived_first(PERSON, VEHICLE), "vehicle_first": _arrived_first(VEHICLE, PERSON),
+           "both_at_once": re.compile(r"\bboth\b[^,;]*\bonce\b|\bat once\b|\bsimultaneous|\bsame (?:moment|time)\b", re.I)}
+CLAUSE = re.compile(r"[,;:]|\band\b")
+TIER_COUNT = re.compile(r"\b(\d+)\s+(?:(serious) (?:near[- ]miss(?:es)?|events?|cases?|conflicts?)|(close pass)(?:es)?)\b"
+                        r"(?!\s+(?:had|involved|with|where|at|came|took)\b)", re.I)  # "2 serious near-misses", not
+# "2 serious near-misses had 0.2 s" (some of 3) nor "1 of the 2 serious"
+IN_ALL = re.compile(r"\bin (?:all|total)\b|\btotal of\b|\bonly\b", re.I)
+
+
+def _tier(sentence):
+    """The one tier a sentence speaks of ("serious" or "close pass"), or None when it names both or neither."""
+    low = sentence.lower()
+    named = [t for t in ("serious", "close pass") if t in low]
+    return named[0] if len(named) == 1 else None
+
+
+def _order_counts(sentence):
+    """(order key, n) for each clause that states one count of one order of arrival ("3 with vehicle before person",
+    "after the person in 2 cases", "0 at once"). Numbers with a unit (a speed, a time gap) are not counts."""
+    out = []
+    for clause in CLAUSE.split(WITH_UNIT.sub(" ", sentence)):
+        kinds = [k for k, pattern in ARRIVAL.items() if pattern.search(clause)]
+        counts = re.findall(r"(?<![\d.])\d{1,3}(?![\d.])", clause)  # "Rosén & Sander 2009" is no count
+        if len(kinds) == len(counts) == 1:
+            out.append((kinds[0], int(counts[0])))
+    return out
+
+
+def _order_slips(sentence, facts):
+    """Why a sentence's order of arrival is not what was measured: counts that differ (or, for one tier only, exceed
+    or add up to more than the tier's events), or one event's order the counts rule out."""
+    facts = {"both_at_once": 0, **facts}  # older facts count only person- and vehicle-first
+    if facts.get("person_first") is None or facts.get("vehicle_first") is None:
+        return []
+    total, stated, tier = sum(facts[k] for k in ARRIVAL), _order_counts(sentence), _tier(sentence)
+    tier_n = {"serious": facts.get("serious_near_misses"), "close pass": facts.get("close_passes")}.get(tier)
+    if stated and tier_n and tier_n < total:  # counts for one tier, which the measurements do not split
+        if sum(n for _, n in stated) > tier_n or any(n > facts[k] for k, n in stated):
+            return [f"the measurements count {tier_n} {tier} events and orders over all {total} events"]
+        return []
+    if wrong := dict.fromkeys(f"{facts[k]} {k.replace('_', '-')}" for k, n in stated if n != facts[k]):
+        return [f"the measurements count {', '.join(wrong)}"]
+    if stated or COUNTED.search(sentence):
+        return []
+    # ponytail: "passing 0.4 s after the person" when the counts mix orders (1 of 2 person-first) is unsupported too
+    # (adjudication said so for v4 566, v5 92/214/699), but train letters labelled clean say it, so it is left alone
+    return [f"no measured event had the {side} there first" for key, pattern, side in
+            (("person_first", PERSON_FIRST, "person"), ("vehicle_first", VEHICLE_FIRST, "vehicle"))
+            if pattern.search(sentence) and facts[key] == 0]
+
+
+def _extreme_slips(sentence, facts):
+    """A "closest" time gap above the smallest measured, a "largest" one below the largest near-miss gap (a sentence
+    with the longest gap between vehicles is about those gaps), a "fastest" speed below the fastest measured: each in
+    the tier the sentence names."""
+    worst, tier, out = facts.get("worst", []), _tier(sentence), []
+    shown = [e for e in worst if tier in (None, e.get("tier"))]
+    found = [(float(m[1].replace(",", "")), m[2][0].lower()) for m in WITH_UNIT.finditer(sentence)]
+    gaps, speeds = [n for n, u in found if u == "s"], [n for n, u in found if u == "k"]
+    pets = [e["pet_s"] for e in shown if e.get("pet_s") is not None]
+    kmh = [e["vehicle_kmh"] for e in shown if e.get("vehicle_kmh") is not None]
+    if CLOSEST.search(sentence) and gaps and pets and min(gaps) > min(pets):
+        out.append(f"the closest measured was {min(pets):g} s")
+    longest = facts.get("observed", {}).get("longest_gap_s")
+    if LARGEST.search(sentence) and gaps and pets and max(gaps) < max(pets) and longest not in gaps:
+        out.append(f"a near-miss measured {max(pets):g} s")
+    if FASTEST.search(sentence) and speeds and kmh and max(speeds) < max(kmh):
+        out.append(f"the fastest measured was {max(kmh):g} km/h")
+    return out
+
+
+def _count_slips(sentence, facts):
+    """A count of serious near-misses or close passes that is not the measured count. "1 serious event had a car at
+    28.4 km/h" may be one of several, so a count of 1 counts only when the sentence says it is all ("in total")."""
+    out = []
+    for m in TIER_COUNT.finditer(sentence):
+        key = "serious_near_misses" if m[2] else "close_passes"
+        if facts.get(key) is not None and int(m[1]) != facts[key] and (int(m[1]) != 1 or IN_ALL.search(sentence)):
+            out.append(f"the measurements count {facts[key]} {'serious near-misses' if m[2] else 'close passes'}")
+    return out
+
+
+def slips(letter, facts):
+    """(sentence, why) for a writer's own slips that code can check against the measurements: a "closest",
+    "largest" or "fastest" event that is not (in the tier the sentence names), counts of serious near-misses, close
+    passes or orders of arrival that differ from those measured, one event's order the counts rule out, and
+    more gaps "cut short" than a recording's two ends can cut."""
+    out = []
+    for sentence in SENTENCE.split(letter):
+        why = _extreme_slips(sentence, facts) + _count_slips(sentence, facts) + _order_slips(sentence, facts)
+        if (m := CUT_SHORT.search(sentence)) and float(m[1].replace(",", "")) > VIDEO_EDGES \
+                and not EDGES_NAMED.search(sentence):
+            why.append("only the first and last gap can be cut short by the video")
+        out += [(sentence.strip(), w) for w in why]
+    return out
+
+
+def retry_note(bad, crossed, problems, accused=(), slipped=()):
+    """Why the previous letter goes back, for the next try."""
+    reasons = ([f"Your previous letter used numbers that are not in the measurements: {', '.join(bad)}. Use only "
+                "numbers given above, written in digits, with speeds in km/h."] if bad else [])
+    reasons += [f'Your previous letter put one near-miss\'s speed beside another near-miss\'s time gap: "{s}". Keep '
+                "each near-miss's numbers together." for s in crossed]
+    reasons += [f'Your previous letter says someone broke a rule: "{s}". The video measures speeds and time gaps, '
+                "not whether a limit applied there: say what was measured." for s in accused]
+    reasons += [f'Your previous letter says "{s}", but {why}. Say only what was measured.' for s, why in slipped]
+    reasons += ([f"A reviewer found claims in your previous letter that the measurements do not support: "
+                 f"{' '.join(problems)} Fix them."] if problems else [])
+    return "\n\n" + " ".join(reasons)
+
+
+def number_pattern(known):
+    """A JSON-schema "pattern" for a string as written between its quotes: digits only as the numbers NUMBER finds in
+    `known`, each followed by a non-digit (so "2" then "0.6" never reads "20.6"), and no \\u escapes. Digits of every
+    script count, as in Python's \\d, so "۳0" (30) or ०-९ in a Hindi letter cannot slip through either."""
+    zeros = [c for c in range(0x80, sys.maxunicode + 1) if unicodedata.decimal(chr(c), -1) == 0]  # each 0 starts 0-9
+    non_ascii = "".join(f"\\U{a:08x}-\\U{b:08x}" for a, b in zip([0x80] + [z + 10 for z in zeros],
+                                                                   [z - 1 for z in zeros] + [sys.maxunicode]) if a <= b)
+
+    def char(banned=""):
+        """One character of a JSON string that is no digit and not in `banned`. Positive classes only: llama.cpp's
+        grammar rejects half a character whose range touches a negated class, so [^०-९] would also ban ि ी ु े ्."""
+        ascii_ok = "".join(f"\\x{c:02x}" for c in range(0x20, 0x7f) if chr(c) not in f'0123456789"\\{banned}')
+        return f"[{ascii_ok}]|[{non_ascii}]|{JSON_ESCAPE}"
+
+    numbers = "|".join(re.escape(n) for n in sorted(set(NUMBER.findall(known))))
+    if not numbers:
+        return f"^({char()})*$"
+    # No "<" straight after a number either: llama.cpp's grammar reads a special token such as "<s>" as its text, but
+    # the reply leaves it out, so "2<s>0.6" would arrive as "20.6" (seen on a local llama-server)
+    after = f"{char('.,<')}|[.,]({char('<')})"  # "27.3." ends a sentence; "27.3.5" is not 27.3
+    return f"^({char()}|({numbers})({after}))*(({numbers})[.,]?)?$"
+
+
+def plan_schema(known):
+    """The plan as a JSON schema whose strings follow number_pattern(known). llama-server turns it into a grammar that
+    still lets Glimmer think first; a bare GBNF "grammar" would bind from the first token and block its thinking."""
+    text = {"type": "string", "pattern": number_pattern(known)}
+    return {"type": "object", "properties": {k: text for k in PLAN_KEYS}, "required": list(PLAN_KEYS),
+            "additionalProperties": False}
+
+
+def ask_plan(prompt, measured, api_key, photo=None, tries=LETTER_TRIES, stated=()):
+    """The model's fix and letter, verified before use in two layers (Meta's verifiable-agents workshop): code
+    checks that every number was measured, then Muse Spark as a separate reviewer (LLM as judge) lists claims the
+    measurements do not support. An invalid reply or either objection goes back with the reason; after the last try
+    the letter is kept with what remains listed for a person to check before sending. Numbers are checked against
+    `measured` only, never the prompt (its wording would let "3.1" from "SAM 3.1" pass), plus `stated`, the
+    notes given to the writer, which both checks read labelled as stated by the principal, not measured. "tries"
+    counts the model's replies, for the pack's receipt."""
+    note, plan, bad, crossed, accused, problems = "", None, [], [], [], []
+    facts = json.loads(measured)
+    worst, measured = facts.get("worst", []), measured + stated_text(stated)
+    for attempt in range(tries):
+        try:
+            plan = model_plan(prompt + note, api_key, photo, measured)  # not the note: it quotes the bad numbers
+        except (OSError, http.client.HTTPException) as err:  # URLError, HTTPError, timeout: the server, not the reply
+            if plan is None:
+                raise  # nothing paid for yet: main says the letter failed
+            print(f"the letter model failed on try {attempt + 1}, the letter from try {attempt} is kept with its "
+                  f"points to check: {err}", file=sys.stderr)
+            tries = attempt
+            break
+        except ValueError as err:  # JSONDecodeError included
+            if attempt == tries - 1 and plan is None:
+                raise
+            note = f"\n\nYour previous output was invalid: {str(err)[:200]}. Reply with the JSON object only."
+            continue
+        bad = unmeasured(plan["letter"] + " " + plan["why"], measured)
+        crossed, accused = mixed(plan["letter"], worst), accusing(plan["letter"] + "\n" + plan["why"])
+        slip_notes = slips(plan["letter"], facts)
+        slipped = [s for s, _ in slip_notes]
+        judged = api_key or JUDGE_URL
+        coded = bad or crossed or accused or slipped  # code's objections first: the judge is asked only when code has none
+        problems = [] if coded or not judged else judge_problems(plan["letter"], measured, api_key)
+        if not coded and not problems:
+            return {**plan, "writer": WRITER, "tries": attempt + 1, **({"judged_by": judges(api_key)} if judged else {})}
+        if problems and set(problems) == {JUDGE_FAILED}:  # the judge failed, not the letter: keep this one, pay no more
+            tries = attempt + 1
+            break
+        note = retry_note(bad, crossed, [p for p in problems if p != JUDGE_FAILED], accused, slip_notes)
+    return {**plan, "writer": WRITER, "tries": tries, "unmeasured": bad, "mixed": crossed, "unsupported": problems,
+            "accuses": accused, "slips": slipped}
+
+
+def stated_text(notes):
+    """The notes given to the writer as the letter checks read them, after the measurements: labelled, never as
+    measured."""
+    return STATED + "\n\n".join(notes) if notes else ""
+
+
+def judges(api_key):
+    """The judges that run, by name: Muse Spark with a key, the JUDGE_MODEL_URL model with that URL."""
+    return " and ".join(([JUDGE] if api_key else []) + ([writer_label(JUDGE_URL, JUDGE_MODEL)] if JUDGE_URL else []))
+
+
+def judge_problems(letter, measured, api_key):
+    """Each judge, Muse Spark with a key and the JUDGE_MODEL_URL model with that URL, separate from the writer's call,
+    lists the letter's unsupported claims ([] if none). A reply it cannot read counts as one problem, so a broken judge
+    never passes a letter silently."""
+    prompt = JUDGE_PROMPT.format(facts=measured, letter=letter)
+    asks = (([lambda: spark_reply(prompt, None, api_key)] if api_key else [])
+            + ([lambda: open_judge_reply(prompt)] if JUDGE_URL else []))
+    found = [read_problems(judge_reply(ask)) for ask in asks]
+    return [p for problems in found for p in ([JUDGE_FAILED] if problems is None else problems)]
+
+
+def judge_reply(ask):
+    """One judge's reply text, or "" when its call failed (said on stderr): read_problems reads no list in it, so a
+    network blip or an HTTP 503 is one problem to check, never a pass and never the end of the paid letter."""
+    try:
+        return ask()
+    except JUDGE_ERRORS as err:
+        print(f"a judge failed, its review counts as not read: {str(err)[:200]}", file=sys.stderr)
+        return ""
+
+
+def read_problems(text):
+    match = re.search(r"\{.*\}", text, re.S)
+    try:
+        data = json.loads(match[0]) if match else None
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict) or not isinstance(data.get("problems"), list):
+        return None
+    return [str(p)[:300] for p in data["problems"] if isinstance(p, str) and p.strip()]
+
+
+# opt-in: JUDGE_VOTES=2 asks the JUDGE_MODEL_URL judge twice per letter, a problem counted only when both replies list
+# one, so a stray flag from a model sampling at temperature 1.0 must come up twice. Muse Spark is always asked once.
+JUDGE_VOTES = max(1, int(os.environ.get("JUDGE_VOTES") or 1))
+
+
+def vote(found):
+    """One verdict from several replies' read_problems: None if any reply could not be read (counted on its own,
+    never a pass), the first reply's problems when every reply lists some, else []."""
+    return None if None in found else found[0] if all(found) else []
+
+
+def open_judge_reply(prompt, votes=None):
+    """The JUDGE_MODEL_URL judge's reply as judge_problems reads it, asked `votes` (JUDGE_VOTES) times: their vote as
+    {"problems": [...]}, or "" when a reply could not be read. One vote gives what the one reply said."""
+    replies = [open_model_reply(prompt, None, PROBLEMS_SCHEMA, judge=True)[0] for _ in range(votes or JUDGE_VOTES)]
+    problems = vote([read_problems(text) for text in replies])
+    return "" if problems is None else json.dumps({"problems": problems})
+
+
+def model_plan(prompt, api_key, photo=None, known=None):
+    """One reply from the letter model, Muse Spark or (with LETTER_MODEL_URL) an open-weights model, parsed into
+    the plan. The blurred street photo, when there is one, lets the model see the street it is fixing. An
+    open-weights server can write digits only as numbers in `known` (default: the prompt)."""
+    image = "data:image/jpeg;base64," + base64.b64encode(photo.read_bytes()).decode() if photo else None
+    schema = plan_schema(known or prompt) if NUMBER_LOCK else PLAN_SCHEMA
+    text, server = open_model_reply(prompt, image, schema) if LETTER_URL else spark_run(prompt, image, api_key)
+    match = re.search(r"\{.*\}", text, re.S)
+    plan = json.loads(match[0], strict=False) if match else {}  # a letter may hold raw newlines
+    if not isinstance(plan, dict) or not all(isinstance(plan.get(k), str) and plan[k].strip() for k in PLAN_KEYS):
+        raise ValueError(f"the plan is incomplete: {text[:200]!r}")
+    if LETTER_URL and (stuck := unreadable(plan)):
+        raise ValueError(f"{', '.join(stuck)} is not readable text: {plan[stuck[0]][:80]!r}")
+    return {**plan, **server}
+
+
+def unreadable(plan):
+    """The plan's fields that are not readable text: no word of two letters, or long text that is one short piece
+    repeated. Gibberish holds no unmeasured number and no claim, so neither the number check nor a judge objects."""
+    def stuck(text):
+        raw = text.encode()
+        return (len(text) >= WORDLESS_CHARS and not re.search(r"[^\W\d_]{2,}", text)
+                or len(raw) >= REPEAT_CHECK_BYTES and len(zlib.compress(raw)) / len(raw) < MIN_TEXT_RATIO)
+    return [k for k in PLAN_KEYS if stuck(plan[k])]
+
+
+def spark_reply(prompt, image, api_key):
+    """Muse Spark's reply text (what a judge reads)."""
+    return spark_run(prompt, image, api_key)[0]
+
+
+def spark_run(prompt, image, api_key):
+    """Muse Spark's reply on the Meta API: the text, and its run record as openweights.reply gives one (the Responses
+    API usage and id, the wall seconds measured here), kept in plan.json and PROVENANCE."""
+    if not api_key:
+        raise ValueError("no MODEL_API_KEY for Muse Spark (or set LETTER_MODEL_URL for an open-weights model)")
+    content = [{"type": "input_text", "text": prompt}] + ([{"type": "input_image", "image_url": image}] if image else [])
+    body = json.dumps({"model": review.MODEL, "reasoning": {"effort": "low"}, "text": {"format": {"type": "json_object"}},
+                       "input": [{"role": "user", "content": content}]}).encode()
+    req = urllib.request.Request(sam.API_URL, data=body, headers={
+        "Authorization": f"Bearer {api_key}", "Content-Type": "application/json"})
+    started = time.monotonic()
+    with urllib.request.urlopen(req, timeout=TIMEOUT_S) as response:
+        reply = json.load(response)
+    text = "".join(c.get("text", "") for o in reply.get("output", []) if o.get("type") == "message"
+                   for c in o.get("content", []))
+    return text, {"usage": reply.get("usage"), "request_id": reply.get("id"),
+                  "wall_s": round(time.monotonic() - started, 1), "response_format": "json_object"}
+
+
+# Spark Open as judge on the public bench (31 Oct): 22/23 lies, 0/8 false alarms at "low" and at Fireworks' default,
+# for 739 vs 1,480 completion tokens a letter (GATES.md, "Spark Open judge effort"). The writer was not measured.
+JUDGE_EFFORT = "low"
+
+
+def open_model_reply(prompt, image, schema, judge=False):
+    """Chat completion from the letter's OpenAI-compatible server or, with `judge`, the JUDGE_MODEL_URL one, each read
+    at call time with its own model id and key (a key never crosses servers; a judge on the letter's own server uses
+    LETTER_MODEL_KEY when it has no key of its own), through openweights.reply: the text and its run record, kept in
+    plan.json."""
+    judge_key = JUDGE_KEY or (LETTER_KEY if JUDGE_URL == LETTER_URL else "")
+    url, model, key = (JUDGE_URL, JUDGE_MODEL, judge_key) if judge else (LETTER_URL, LETTER_MODEL, LETTER_KEY)
+    content = [{"type": "text", "text": prompt}] + ([{"type": "image_url", "image_url": {"url": image}}] if image else [])
+    return openweights.reply(url, model, openweights.server_key(url, key), content, schema,
+                             JUDGE_EFFORT if judge else None)
+
+
+def writer_note(plan):
+    """Who wrote the fix and letter. An open-weights model's time is measured, never a guess: llama-server's own
+    timings, else the wall time around the reply (Fireworks sends no timings)."""
+    seconds = run_seconds(plan) if LETTER_URL else None
+    if seconds is not None:
+        host = LETTER_HOST or openweights.provider(LETTER_URL)
+        return (f"{openweights.name(LETTER_MODEL)} wrote this in {seconds:.0f} s{f' on {host}' if host else ''} "
+                "(open weights).")
+    return f"Fix and letter written by {plan['writer']}." if plan.get("writer") else ""
+
+
+def run_seconds(plan):
+    timings, wall = plan.get("timings"), plan.get("wall_s")
+    if isinstance(timings, dict) and all(isinstance(timings.get(k), (int, float)) for k in ("prompt_ms", "predicted_ms")):
+        return (timings["prompt_ms"] + timings["predicted_ms"]) / 1000
+    return wall if isinstance(wall, (int, float)) else None
+
+
+def draw_fix(photo, instruction, api_key, out_path):
+    """Muse Image edit of the real street photo, saved untouched as out_path (.webp): converting it would drop Meta's
+    AI tag (IPTC trainedAlgorithmicMedia). Returns out_path."""
+    boundary = uuid.uuid4().hex
+    parts = [f'--{boundary}\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'.encode()
+             for k, v in (("model", IMAGE_MODEL), ("prompt", instruction))]
+    parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="image"; filename="street.jpg"\r\n'
+                 f"Content-Type: image/jpeg\r\n\r\n".encode() + photo.read_bytes() + b"\r\n")
+    req = urllib.request.Request(IMAGE_EDIT_URL, data=b"".join(parts) + f"--{boundary}--\r\n".encode(), headers={
+        "Authorization": f"Bearer {api_key}", "Content-Type": f"multipart/form-data; boundary={boundary}"})
+    with urllib.request.urlopen(req, timeout=TIMEOUT_S) as response:
+        reply = json.load(response)
+    data = reply.get("data") if isinstance(reply, dict) else None
+    if not (isinstance(data, list) and data and isinstance(data[0], dict) and data[0].get("b64_json")):
+        raise ValueError(f"Muse Image returned no image: {str(reply)[:200]}")
+    out_path.write_bytes(base64.b64decode(data[0]["b64_json"]))
+    return out_path
+
+
+def frame0_replies(clip, concept):
+    """The SAM replies analyze cached for the clip's first frame: the frame-by-frame one (crowd mode, auto mode after
+    it switched, or analyze's search for the people a full video reply missed), then the video one (part0/ for long
+    videos)."""
+    folder = clip.parent / "part0" if (clip.parent / "part0").is_dir() else clip.parent
+    return [f for f in (crowd.cache_dir(clip.parent, concept) / f"{0:06d}.sam.txt", sam.cache_path(folder, concept))
+            if f.exists()]
+
+
+def frame0_tracks(clip, concepts):
+    """Every track in the first-frame replies of `concepts`."""
+    return [t for c in concepts for f in frame0_replies(clip, c) for t in sam.parse(f.read_text()).values()]
+
+
+def photo_people(clip, person_concept="person"):
+    """Person tracks of the clip's first frame from every reply (frame0_replies): the heads the street photo blurs
+    and the people the fix picture keeps real. Without a person reply, or with only a full video one, it raises
+    rather than leave faces unblurred."""
+    replies, people = frame0_replies(clip, person_concept), frame0_tracks(clip, [person_concept])
+    if not replies:
+        raise ValueError(f"no person tracks for {clip}; not showing an unblurred street photo")
+    if replies[0].parent != crowd.cache_dir(clip.parent, person_concept) and len(people) >= sam.MAX_OBJECTS:
+        raise ValueError(f"SAM's video reply for people in {clip} is full and frame 0 was not searched image by image "
+                         "(run analyze.py on this folder again: it now searches frame 0 even with no near-misses); "
+                         "not showing a street photo with unblurred faces")
+    return people
+
+
+def street_photo(clip, out_path, person_concept="person", vehicles=()):
+    """First frame of the clip with every head (photo_people) blurred and every number plate under the plate mosaic
+    (render.plate_filters: the plates SAM 3.1 found on frame 0, cached by analyze.fetch_plates, else every vehicle near
+    enough for a readable plate); it is shown on the page and sent to Muse Image. No photo rather than unblurred
+    faces."""
+    people = photo_people(clip, person_concept)
+    size = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
+                           "-of", "csv=p=0", str(clip)], check=True, capture_output=True, text=True).stdout.strip()
+    frame_size = tuple(int(v) for v in size.split(","))
+    filters = ",".join(render.blur_filters(people, 0, 0, frame_size)
+                       + render.plate_filters(frame0_tracks(clip, vehicles), 0, 0, frame_size,
+                                              render.cached_plates(Path(clip).parent, 0, 0, frame_size))) or "null"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(clip), "-vf", filters, "-frames:v", "1", str(out_path)],
+                   check=True)
+    return out_path
+
+
+def article(word):
+    """`word` after "a" or "an", by its first letter: "an auto rickshaw", "a motorcycle"."""
+    return ("an " if word.lower().startswith(tuple("aeiou")) else "a ") + word
+
+
+def passed(e):
+    """Who the vehicle passed, by Spark's review: the road user and, escaped, "a ..." / "an ..."."""
+    verdict = e.get("review") or {}
+    road_user = (UNSURE if verdict.get("review_unclear") else
+                 verdict.get("road_user", "pedestrian (not reviewed by Spark)"))
+    road_user = review.unconfirmed_rider(verdict) or ("pedestrian" if road_user == "unclear" else road_user)
+    return road_user, html.escape(article(road_user))
+
+
+def video_tag(e):
+    """The card's player: not muted, as the clip carries the road's own sound (render.road_sound)."""
+    return f'<video src="{html.escape(e["clip"])}" controls loop playsinline></video>' if e.get("clip") else ""
+
+
+def card_title(i, e):
+    """Card #i's title, escaped: tier, vehicle, speed, gap and who was passed. Also the first screen's clip caption."""
+    return (f'#{i} &middot; {html.escape(e.get("tier", "serious"))} &middot; {html.escape(e["vehicle"].split("#")[0])} '
+            f'at {e["vehicle_kmh"]} km/h, {e["pet_s"]:.1f} s from {passed(e)[1]}')
+
+
+def first_clip(events):
+    """(card number, event) of the first shown near-miss with its own blurred clip, never clip.mp4; or None."""
+    return next(((i, e) for i, e in enumerate(events[:SHOWN_EVENTS], 1)
+                 if e.get("clip") and not UNSHAREABLE.fullmatch(e["clip"])), None)
+
+
+def tracked_card(i, e):
+    """Card #i on a page whose numbers are not measurements (pace.warning): the clip and when, without the speed,
+    PET, gap, tier, stopping strip or death risk."""
+    return (f'<article class="card" id="event-{i}">{video_tag(e)}\n<h3>#{i} &middot; tracked moment &middot; '
+            f'{html.escape(e["vehicle"].split("#")[0])} and {passed(e)[1]}</h3>\n'
+            f'<p class="note">At {e["t_person_s"]:.1f} s in the video.</p></article>')
+
+
+def event_card(i, e, fps, strip=""):
+    """Card #i, linkable as #event-i; data-t is the second of its clip when the first of the two reached the spot.
+    `strip` is overlay.strip()'s stopping strip for this card, if any."""
+    verdict, at30, at20 = e.get("review") or {}, e["with_limit"]["30"], e["with_limit"]["20"]
+    road_user = passed(e)[0]
+    moment_s = min(e["t_person_s"], e["t_vehicle_s"]) - render.window(e, fps)[0] / fps
+    return f"""<article class="card" id="event-{i}" data-t="{moment_s:.2f}">{overlay.strobe(e)}{overlay.clip(video_tag(e), e, strip)}
+<h3>{card_title(i, e)}</h3>
+<table><tr><th></th><th>Impact speed if hit</th><th>Adult death risk</th></tr>
+<tr><td>As driven</td><td>{e.get("impact_kmh", e["vehicle_kmh"])} km/h</td><td>{e["death_risk_pct"]}%</td></tr>
+<tr><td>30 km/h limit</td><td>{at30["impact_kmh"]} km/h</td><td>{at30["death_risk_pct"]}%</td></tr>
+<tr><td>20 km/h limit</td><td>{at20["impact_kmh"]} km/h</td><td>{at20["death_risk_pct"]}%</td></tr></table>
+<p class="note">At {e["t_person_s"]:.1f} s in the video. Gap {e["gap_m"]} m. {html.escape(road.moment_note(e))} {html.escape(verdict.get("reason", ""))}
+{html.escape(risk_caveat(road_user, e["vehicle"].split("#")[0]))}</p>
+{heard_line(e.get("heard"))}</article>"""
+
+
+def risk_caveat(road_user, vehicle):
+    """The death-risk curve is for adults hit by a car front; say so where this event is neither."""
+    notes = ["The curve is for adults, so this is not a child's risk."] if road_user == "child" else []
+    if vehicle != "car":
+        notes.append(f"It was measured for car fronts; for {article(vehicle)} it is only a rough guide.")
+    return " ".join(notes)
+
+
+def heard_line(heard):
+    """What Muse Wonder heard around the moment, e.g. 'brakes 0.4 s before, horn 0.2 s after'."""
+    if not heard:
+        return ""
+    parts = [f'{html.escape(s["sound"])} {abs(s["t_s"]):.1f} s {"before" if s["t_s"] < 0 else "after"}' for s in heard]
+    return f'<p class="note">Heard (Muse Wonder): {", ".join(parts)}.</p>'
+
+
+
+def map_section(events, site, ground=None, paths=None, measured=True):
+    """The map, drawn even with no near-miss: then it shows where people crossed (the desire lines). Not `measured`
+    (pace.warning): no near-miss legend, tiers or numbers."""
+    placed = any(e.get("where") for e in events)
+    trails = (f" Faint blue: where each person crossed, a point every {road.DESIRE_STEP_S:g} s." if paths else "")
+    legend = (" Filled dots: serious near-misses; rings: close passes." if measured else
+              " These are tracked moments, not near-misses (see the warning above).")
+    near = f" Blue: the pedestrian, red: the vehicle, 2 s either side.{legend}" if placed else ""
+    under = (" Under it, the street photo seen from above: the road surface is to scale, standing objects lean, and "
+             f"the {'dots' if placed else 'lines'} are measured positions." if ground else "")
+    lines = roadmap.desire_lines(paths, site)  # the counts, then IRC:103-2012's words, shown as a note
+    desire = "".join(f"<p>{html.escape(line)}</p>" for line in lines[:-1]) + "".join(
+        f'<p class="note">{html.escape(line)}</p>' for line in lines[-1:])
+    return (f"<section id=\"map\"><h2>{'Where it happened' if placed else 'Where people crossed'}</h2>"
+            f"{roadmap.svg(events, site['world_points'], SHOWN_EVENTS, ground, paths, measured)}<p class=\"note\">Seen from "
+            f"above, in metres on the road (grid every 5 m; dashed: the measured area).{trails}{near}{under}</p>"
+            f"{desire}</section>")
+
+
+def fix_section(plan, images):
+    if not plan:
+        return ""
+    head = f"""<section id="fix"><h2>Proposed fix: {html.escape(plan["fix"])}</h2><p>{html.escape(plan["why"])}</p>"""
+    if not images:
+        return head + "</section>"
+    return head + f"""
+<div class="pair"><figure><img src="{html.escape(images[0])}" alt="The street today"><figcaption>Today</figcaption></figure>
+<figure><img src="{html.escape(images[1])}" alt="The street with the fix, drawn by Muse Image"><span class="ai-label">{ailabel.LABEL}</span>
+<figcaption>{summary.AI_DRAWN}</figcaption></figure></div></section>"""
+
+
+def fix_instruction(plan):
+    """Muse Image's instruction: the model's, plus the IRC size when the fix is a raised crossing."""
+    return plan["image_prompt"] + (" " + RAISED_SPEC if RAISED.search(plan["fix"]) else "")
+
+
+def in_india(site):
+    return str(site.get("country", "")).upper() == "IN"
+
+
+def legal_section(site):
+    """For a site in India ("country": "IN"), why the authority can act: the Supreme Court's own sentences, each
+    linked to its page of the order, then the driving regulations' (gazette.rules). Paragraph 35.6 only when the
+    site's "city" is in Annexure 46."""
+    if not in_india(site):
+        return ""
+    city = str(site.get("city", "")).strip()
+    listed = city.casefold() in ANNEXURE_46
+    quotes = "".join(f'<blockquote>“{html.escape(text)}”<cite><a href="{ORDER_PDF}#page={page}">Paragraph {para}, '
+                     f"page {page}</a></cite></blockquote>"
+                     for para, page, text in [SCHOOL_ZONES] + ([SURVEY] if listed else []) + [GRIEVANCE])
+    annexure = (f'<p class="note">{html.escape(city)} is one of the 50 million-plus cities in Annexure 46 of MoRTH\'s '
+                "Road Accidents in India 2023.</p>" if listed else "")
+    return (f'<section id="law"><h2>Why the authority can act</h2>{quotes}{annexure}<p class="note">{html.escape(LEGAL_NOTE)}</p>'
+            f'<p class="note">Source: {html.escape(ORDER)} (<a href="{ORDER_PDF}">PDF</a>).</p>{gazette.rules(site)}</section>')
+
+
+def submitted(site):
+    """The site's "submitted" record, {to, channel, date, reference} all filled in, or None until the pack is filed."""
+    sent = site.get("submitted")
+    if sent is None:
+        return None
+    if not (isinstance(sent, dict) and all(isinstance(sent.get(k), str) and sent[k].strip() for k in FILED_KEYS)):
+        raise ValueError(f'the site\'s "submitted" needs {", ".join(FILED_KEYS)}, each filled in')
+    return sent
+
+
+def filed_line(site):
+    """Under the title once the pack is filed. Only "filed, reference X": whether anything is approved or fixed is
+    the authority's to say, and no resolution date is promised."""
+    sent = submitted(site)
+    if not sent:
+        return ""
+    to, channel, date, reference = (html.escape(sent[k].strip()) for k in FILED_KEYS)
+    return f'<p class="filed">Filed with {to} on {channel}, {date}: reference {reference}.</p>'
+
+
+def tct_section(mark=""):
+    """Where this pack sits in the school-zone Traffic Conflict Technique toolkit, and the step left after the fix:
+    `mark`, G7's pass mark (passmark.after_mark), in its own paragraph when there is one."""
+    step9 = (f"Step 9 comes after the fix is in place.</p><p>{html.escape(mark)}" if mark else
+             "Step 9 comes after the fix is in place: film the same dismissal from the same spot for as long, run "
+             "this pack again and compare.")
+    return ('<section><h2>Where this fits in a conflict study</h2><p class="note">This pack covers steps 5-7 (baseline '
+            f'counts, pre-intervention conflicts, analysis) of the CDC/FIA school-zone <a href="{TCT_TOOLKIT}">Traffic '
+            "Conflict Technique toolkit</a>, without the trained observers step 3 normally needs. Severity here is "
+            "post-encroachment time and the measured speed, not the toolkit's observer severity scales, so the two do "
+            f"not compare one to one. {step9}</p></section>")
+
+
+def pyramid(events, seen):
+    """This crossing's safety pyramid (Laureshyn, Svensson & Hydén 2010), not to scale: the people who crossed at the
+    base, those with a moving vehicle through their spot within CLOSE_PASS_S and within PET_MAX_S above them, and
+    collisions at the tip, which nothing here measures: the exact 95% bound says how many even 0 would leave possible.
+    The headline's own k and n, so none without its crosser list."""
+    if not seen.get("crossers"):
+        return ""
+    crossers = set(seen["crossers"])
+    n = len(crossers)
+    tiers = [("tip", f"Collisions: not measured. Even 0 in {n} crossings would still allow up to "
+                     f"{100 * share_range(0, n)[1]:.1f}% of crossings to end in one (exact 95% bound), so no recording "
+                     "can show a crossing is safe."),
+             ("serious", f"{people_hit(serious(events), crossers)} of {n} had a moving vehicle through their spot "
+                         f"within {road.PET_MAX_S:g} s"),
+             ("close", f"{people_hit(events, crossers)} of {n} within {road.CLOSE_PASS_S:g} s"),
+             ("base", f"{n} people crossed")]
+    rows = "".join(f'<i class="{kind}" style="width: {width}%"></i><span>{html.escape(text)}</span>'
+                   for (kind, text), width in zip(tiers, PYRAMID_WIDTHS))
+    return (f'<section><h2>The safety pyramid at this crossing</h2><div class="pyramid">{rows}</div><p class="note">Not '
+            "to scale. Near-misses happen far more often than collisions, so they can be counted now, before anyone is "
+            "hurt (the traffic-safety pyramid: Laureshyn, Svensson & Hydén 2010).</p></section>")
+
+
+def receipt_line(data, plan, images):
+    """What made this pack, said by code: the analysis run's wall-clock minutes and the SAM requests it sent (none:
+    every reply came from cache), the people Muse Spark looked at, the moments Muse Wonder listened to, the letter's
+    tries and the Muse Image picture, and the camera check (camera_note). Counts only: dollars are for SAM alone, in
+    the cost line."""
+    run, events = data.get("run") or {}, data.get("events", [])
+    sent = run.get("sam_requests")
+    parts = ([f"the analysis ran {run['minutes']:g} minutes and " + (
+        f"sent {sent} new SAM request{'' if sent == 1 else 's'}" if sent else
+        "took every SAM reply from cache, so it paid nothing new")] if run else [])
+    looked, heard = len({e["person"] for e in events if e.get("review")}), sum(e.get("heard") is not None for e in events)
+    reused = run.get("spark_reused") or 0  # same footage, same numbers: verdicts read from an earlier run's replies
+    again = (f" ({reused} of {run.get('spark_reviewed', '?')} verdicts reused from an earlier run: same crops, same "
+             "replies)" if reused else "")
+    parts += [f"Muse Spark looked at {looked} {'person' if looked == 1 else 'people'}{again}"] if looked else []
+    parts += [f"Muse Wonder listened around {heard} near-miss{'' if heard == 1 else 'es'}"] if heard else []
+    if plan and plan.get("tries"):
+        parts.append(f"{plan.get('writer') or 'the model'} wrote the letter in {plan['tries']} "
+                     f"tr{'y' if plan['tries'] == 1 else 'ies'}")
+    parts += ["Muse Image drew 1 picture"] if images else []
+    start_s = ((data.get("exposure") or {}).get("window_s") or [0])[0]
+    parts += [camera] if (camera := camera_note(data.get("camera"), start_s)) else []
+    return f"Receipt: {'; '.join(parts)}. Dollar costs on this page are for SAM only." if parts else ""
+
+
+def camera_note(camera, start_s=0):
+    """events.json's "camera" (filmcheck.steadiness on the analysed clip) for the receipt, with its clip seconds moved
+    to the recording's time (`start_s`: window_s's start); "" without one. A move says positions after it are off,
+    never that speeds or PETs are wrong; a check that stopped on a dark frame says so, not that the camera held."""
+    if not camera:
+        return ""
+    at = lambda key: filmcheck.clock(camera[key] + start_s)
+    width, notes = filmcheck.STEADY_WIDTH, []
+    if camera.get("moved"):
+        notes.append(f"the camera moved {max(map(abs, camera['dx_dy']))} px (of {width}) at {at('at_s')} into the "
+                     "recording, so positions after that are off")
+    elif camera.get("at_s") is not None:
+        notes.append(f"the largest camera shift was {camera['max_shift_px']} px (of {width}), at {at('at_s')}")
+    if "darker_pct" in camera:
+        notes.append(f"the picture was {camera['darker_pct']}% darker by {at('dark_at_s')}, where the camera check "
+                     "stopped")
+    return "; ".join(notes)
+
+
+def removed_note(events):
+    """The tracks the review removed, the same ones confirmed() and real_crossers() leave out: each track Muse Spark
+    removed, what Spark called it and its reason as review.public_reason shows it (never a crop); then any piece a
+    person ruled out by eye (analyze.py marks it by_eye), listed apart and without Spark's reason; "" when none was."""
+    removed = {}
+    for e in events:
+        if (e.get("review") or {}).get("is_person") is False:
+            removed.setdefault(e["person"], e["review"])
+    said = [f"track {pid}, {v['road_user']}" + (f' ("{why}")' if (why := review.public_reason(v.get("reason"))) else "")
+            for pid, v in removed.items() if not v.get("by_eye")]
+    eye = [f"track {pid}" for pid, v in removed.items() if v.get("by_eye")]
+    parts = ([f"Removed by Muse Spark: {len(said)} track{'' if len(said) == 1 else 's'} ({'; '.join(said)})."] if said else []) \
+        + ([f"Ruled out by eye: {', '.join(eye)} (see GATES.md)."] if eye else [])
+    return " ".join(parts + ["Spark can be wrong."]) if parts else ""
+
+
+def window_line(window, recording_s=None):
+    """Which minutes of the recording were analysed (window_s, kept in events.json's exposure) and that the page's
+    times count from its start; "" without one."""
+    if not window:
+        return ""
+    start, end = (f"{round(s / 60, 1):g}" for s in window)
+    whole = f"this {round(recording_s / 60, 1):g}-minute recording" if recording_s else "the recording"
+    return (f"Only minutes {start}-{end} of {whole} were analysed (seconds {window[0]:g}-{window[1]:g}); times on this "
+            f"page count from second {window[0]:g}. ")
+
+
+def hash_line(source_sha256, site, window=None, recording_s=None):
+    """Where the hashes are that show a changed file: the original video's (from analyze.py) and SHA256SUMS in the
+    shared folder; for a site in India, the evidence-law form that asks for them, which the school fills and signs.
+    The original is hashed whole, so window_line says which part of it was analysed."""
+    video = (f"The original video's SHA-256 is <code>{html.escape(source_sha256)}</code>. " if source_sha256 else "")
+    video += html.escape(window_line(window, recording_s))
+    law = (" In India, Part A of the certificate for electronic evidence in the Schedule to the Bharatiya Sakshya "
+           "Adhiniyam, 2023 (section 63(4)) asks for these hash values: the school fills and signs it."
+           if in_india(site) else "")
+    return (f'<p class="note">{video}{seal.SUMS} in the shared folder lists every shared file\'s SHA-256: '
+            f"<code>shasum -a 256 -c {seal.SUMS}</code> or <code>python3 pack.py --verify FOLDER</code> says if any "
+            f"changed.{html.escape(law)}</p>")
+
+
+def linked(text, events):
+    """`text` as HTML, each number with a unit that equals exactly one shown event's speed, PET or death risk linked
+    to that event's card. The raw text is split first and each piece escaped: escaping first would let the number
+    pattern match the 27 inside &#x27;."""
+    out, end = [], 0
+    for match in WITH_UNIT.finditer(text):
+        cards = owners(match, events)[1]
+        if len(cards) == 1:
+            out += [html.escape(text[end:match.start()]), f'<a class="clip" href="#event-{cards[0]}" data-clip="'
+                    f'{cards[0]}" title="Play clip {cards[0]}">{html.escape(match[0])}</a>']
+            end = match.end()
+    return "".join(out) + html.escape(text[end:])
+
+
+def letter_section(plan, events=(), measured="", signoff=None):
+    """The letter, editable in the browser, on its own printed sheet. A number that is one shown event's own links to
+    its clip ("see clip N" when printed); an edit re-checks every number against `measured` (and the principal's
+    notes) as it is typed. `signoff` (signoff.json) names who approved it while its sha256 still matches."""
+    if not plan:
+        return ""
+    paragraphs = "".join(f"<p>{linked(p, events)}</p>" for p in plan["letter"].split("\n") if p.strip())
+    blanks = placeholders(plan["letter"])
+    check = "".join(f'<p class="note">Check before sending: {html.escape(text)}</p>' for text in (
+        [f'these numbers are not in the measurements: {", ".join(plan["unmeasured"])}.'] if plan.get("unmeasured") else [])
+        + [f"this sentence mixes two near-misses: {s}" for s in plan.get("mixed", [])]
+        + [f"this sentence says someone broke a rule, which a video cannot show: {s}" for s in plan.get("accuses", [])]
+        + [f"the reviewer says: {p}" for p in plan.get("unsupported", [])]
+        + ([f"fill in {', '.join(blanks)} before signing."] if blanks else []))
+    sources = "the measurements" + (" and the notes given to the writer" if plan.get("notes") else "")
+    checked = (f"Every number was checked against {sources} by code, and the claims by {plan['judged_by']}."
+               if plan.get("judged_by") else f"Every number was checked against {sources} by code.")
+    clean = not (plan.get("unmeasured") or plan.get("mixed") or plan.get("unsupported") or plan.get("accuses")
+                 or blanks)
+    known = " ".join(sorted({n.replace(",", "") for n in NUMBER.findall(measured + stated_text(plan.get("notes")))}))
+    writer = f'<p class="note">{html.escape(note)}</p>' if (note := writer_note(plan)) else ""
+    return (f'<section class="letter-sheet" id="letter"><h2>Letter to the road authority</h2>{writer}<div class="letter" '
+            f'contenteditable="plaintext-only" spellcheck="false" role="textbox" aria-multiline="true" '
+            f'aria-label="Letter, editable" data-measured="{known}">{paragraphs}</div>{check}<p class="note ok" id="letter-check"'
+            f'{"" if clean else " hidden"}>{html.escape(checked) if clean else ""}</p>{hindi_section(plan)}'
+            f"{disclosure(plan, signoff)}"
+            f"{LETTER_SCRIPT}</section>")
+
+
+def hindi_section(plan):
+    """The Hindi copy under the English letter, on its own printed sheet, or why there is none (hindi.translate)."""
+    if plan.get("letter_hi"):
+        paragraphs = "".join(f"<p>{html.escape(p)}</p>" for p in plan["letter_hi"].split("\n") if p.strip())
+        by = html.escape(plan.get("writer") or "the letter's writer")
+        return (f'<div class="hindi-copy"><h3>Hindi copy, translated by {by}, numbers checked against the English '
+                f'letter</h3><div class="letter" lang="hi">{paragraphs}</div></div>')
+    if plan.get("letter_hi_failed"):
+        return f'<p class="note bad">No Hindi copy, send the English letter: {html.escape(plan["letter_hi_failed"])}.</p>'
+    return ""
+
+
+# the same three checks as unmeasured(), re-run in the browser on every edit, a linked number's click, and on paper
+# the letter first: moved to the top of the page while it prints (a flex `order` cuts lines across pages in WebKit)
+LETTER_SCRIPT = """<script>{  // a block, so its names never clash with another script on the page
+let sheet, after;
+addEventListener("beforeprint", () => {
+  sheet = document.querySelector(".letter-sheet"); after = sheet.nextSibling; document.body.prepend(sheet);
+});
+addEventListener("afterprint", () => sheet.parentNode.insertBefore(sheet, after));
+const letter = document.querySelector(".letter"), verdict = document.getElementById("letter-check");
+const known = new Set(letter.dataset.measured.split(" ").filter(Boolean).map(Number));
+const checks = [[new RegExp(%s, "g"), n => !known.has(Number(n.replaceAll(",", "")))],
+                [new RegExp(%s, "gi"), () => true], [new RegExp(%s, "gi"), () => true]];
+letter.addEventListener("input", () => {
+  const ranges = [], bad = [], walk = document.createTreeWalker(letter, NodeFilter.SHOW_TEXT);
+  for (let node; (node = walk.nextNode());)
+    for (const [pattern, flagged] of checks)
+      for (const m of node.data.matchAll(pattern)) if (flagged(m[0])) {
+        const range = new Range();
+        range.setStart(node, m.index); range.setEnd(node, m.index + m[0].length);
+        ranges.push(range); bad.push(m[0]);
+      }
+  if (window.Highlight) CSS.highlights.set("unmeasured", new Highlight(...ranges));
+  verdict.hidden = false;
+  verdict.className = bad.length ? "note bad" : "note ok";
+  verdict.textContent = "Edited here: numbers re-checked in your browser." +
+    (bad.length ? " Not in the measurements: " + [...new Set(bad)].join(", ") + "." : "");
+});
+document.addEventListener("click", event => {
+  const link = event.target.closest("a.clip"), card = link && document.querySelector(link.getAttribute("href"));
+  if (!card) return;
+  event.preventDefault();
+  card.scrollIntoView({behavior: "smooth", block: "center"});
+  const video = card.querySelector("video");
+  if (video) { video.currentTime = Number(card.dataset.t); video.play(); }
+});
+}</script>""" % (json.dumps(NUMBER.pattern), json.dumps(NUMBER_WORD.pattern), json.dumps(MPH.pattern))
+
+
+def disclosure(plan, signoff=None):
+    """Written by code after both checks, never inside plan["letter"] (the number check would read it): the letter
+    is an AI draft until a named person approves it, and Meta's AUP forbids passing outputs off as human-written.
+    signoff.json fills in the blank only while its sha256 is still the letter's."""
+    source = ("the measurements in this pack" + (" and the notes given to the writer" if plan.get("notes") else "")
+              + spoken_line(plan))
+    signed = is_signed(plan, signoff)
+    by = (f"{signoff['approved_by']}, {signoff['school']}, {signoff['date']} ({edits(plan)})" if signed
+          else "____ (name, role, date)")
+    stale = stale_line(signoff) if signoff and not signed else ""
+    return (f'{stale}<p class="disclosure">Drafted by {html.escape(plan.get("writer") or "an AI model")} from {source}. '
+            f"Read and approved by: {html.escape(by)}.</p>")
+
+
+def spoken_line(plan):
+    """How many of the notes given to the writer were spoken (--voice-notes) and transcribed, for the sign-off line."""
+    spoken, notes = len(plan.get("spoken_notes", [])), len(plan.get("notes", []))
+    if not spoken:
+        return ""
+    which = "spoken" if spoken == notes else f"{spoken} of {notes} spoken"
+    return f" ({which} and transcribed by {voice.NAME})"
+
+
+def stale_line(signoff):
+    return (f'<p class="note bad">Changed after sign-off by {html.escape(signoff["approved_by"])} on '
+            f'{html.escape(signoff["date"])}, not signed.</p>')
+
+
+def letter_status(site, plan, signoff):
+    """Where the letter stands, for the first screen: changed after its sign-off, filed, approved while the sign-off
+    is still the letter's, or a draft. A changed letter that was filed says both."""
+    if signoff and not is_signed(plan, signoff):
+        return stale_line(signoff) + filed_line(site)
+    if submitted(site):
+        return filed_line(site)
+    if signoff:
+        by = ", ".join(html.escape(signoff[k]) for k in ("approved_by", "school", "date"))
+        return f'<p class="note ok">Approved by {by}.</p>'
+    return '<p class="note">Draft, not yet approved.</p>'
+
+
+def is_signed(plan, signoff):
+    """signoff.json (read_signoff) approves this plan's letter: its letter_sha256 is still signed_sha's."""
+    return bool(plan and signoff) and signoff["letter_sha256"] == signed_sha(plan)
+
+
+def signed_sha(plan):
+    """What a sign-off approves: the letter's sha256, or with a Hindi copy the sha256 of both, so changing either one
+    reads as changed after sign-off."""
+    hi = plan.get("letter_hi")
+    return sha256(json.dumps([plan["letter"], hi], ensure_ascii=False) if hi else plan["letter"])
+
+
+def edits(plan):
+    """How much the notes given to the writer changed the AI draft, by sentence (difflib): "1 of 12 sentences
+    changed after the notes given to the writer". A sentence cut or added counts, out of the longer of the two
+    letters."""
+    if "draft_letter" not in plan:
+        return "as drafted, no notes"
+    draft, final = sentences(plan["draft_letter"]), sentences(plan["letter"])
+    kept = sum(b.size for b in difflib.SequenceMatcher(None, draft, final, autojunk=False).get_matching_blocks())
+    longer = max(len(draft), len(final))
+    return f"{longer - kept} of {longer} sentences changed after the notes given to the writer"
+
+
+def sentences(text):
+    return [s.strip() for s in SENTENCE.split(text) if s.strip()]
+
+
+def sha256(text):
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+STYLE = """
+:root { --bg: #fafaf7; --ink: #1d1d1b; --muted: #5f5f58; --line: #deded6; --surface: #fff; --accent: #b8321f;
+        --ok: #2e7d32; --warn: #9a5c00; --tint: #fbeae7; color-scheme: light; }
+@media screen and (prefers-color-scheme: dark) { :root { --bg: #161614; --ink: #ececE6; --muted: #a8a89f; --line: #34342f;
+        --surface: #1f1f1c; --accent: #ff7b6b; --ok: #7bd88f; --warn: #f0a830; --tint: #3a1d19; color-scheme: dark; } }
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0 auto; max-width: 920px; padding: 24px 16px 80px; background: var(--bg); color: var(--ink);
+       font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-text-size-adjust: 100%; }
+h1, h2, h3 { line-height: 1.2; text-wrap: balance; } h1 { font-size: clamp(1.5rem, 4.5vw, 2.1rem); margin: 4px 0 8px; }
+h2 { font-size: 1.4rem; margin: 48px 0 12px; padding-top: 16px; border-top: 1px solid var(--line); }
+h2 + .card { border-top: 0; padding-top: 4px; }
+h3 { font-size: 1.1rem; margin: 12px 0 8px; } p { margin: 0 0 12px; } .note { color: var(--muted); }
+.lead { font-size: 1.25rem; font-weight: 600; margin: 4px 0 0; max-width: 40em; }
+.card { border-top: 1px solid var(--line); padding: 20px 0; } video, img {display: block; max-width: 100%; width: 100%; border-radius: 6px;}
+table { border-collapse: collapse; width: 100%; margin: 8px 0 12px; font-variant-numeric: tabular-nums; }
+td, th { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+th { font-size: 0.85rem; font-weight: 600; color: var(--muted); } td:first-child { font-weight: 500; }
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; } @media (max-width: 600px) { .pair { grid-template-columns: 1fr; } }
+figure { margin: 0; position: relative; } figcaption { margin-top: 6px; }
+.letter { border-left: 3px solid var(--line); padding-left: 16px; }
+.letter-sheet .letter { background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
+                        padding: clamp(16px, 5vw, 40px); font: 1.02rem/1.6 Georgia, "Times New Roman", serif; }
+.ai-label { position: absolute; left: 8px; top: 8px; padding: 2px 8px; border-radius: 4px; background: #000c; color: #fff;
+            font-size: 0.8rem; }
+.disclosure { border: 1px dashed var(--muted); border-radius: 8px; padding: 12px 16px; background: var(--surface); }
+blockquote { margin: 16px 0; padding-left: 16px; border-left: 3px solid var(--accent); }
+cite { display: block; margin-top: 4px; font-style: normal; color: var(--muted); } a { color: inherit; text-underline-offset: 2px; }
+a:focus-visible, .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.letter:focus { outline: 2px solid var(--line); outline-offset: 6px; } .note.ok { color: var(--ok); }
+.note.bad { color: var(--accent); } ::highlight(unmeasured) { text-decoration: underline wavy #e5372a 2px; }
+.note.bad[role="alert"] { background: var(--tint); border-left: 4px solid var(--accent); padding: 10px 14px; border-radius: 4px; }
+.filed { font-weight: 600; } code { overflow-wrap: anywhere; } ul { padding-left: 1.2em; } li { margin-bottom: 6px; }
+.pyramid { display: grid; grid-template-columns: minmax(96px, 35%) 1fr; gap: 6px 12px; align-items: center; }
+.pyramid i { display: block; height: 28px; margin: 0 auto; background: var(--muted); print-color-adjust: exact; }
+.pyramid i.base { background: var(--line); } .pyramid i.serious { background: var(--accent); }
+.pyramid i.tip { box-sizing: border-box; background: none; border: 2px dashed var(--accent); }
+@media print { a.clip { text-decoration: none; } a.clip::after { content: " (see clip " attr(data-clip) ")"; }
+               .letter-sheet { break-before: page; break-after: page; } .hindi-copy { break-before: page; } }
+@media print { h2, h3 { break-after: avoid; } figure, table, blockquote, .pair { break-inside: avoid; }
+               .letter-sheet:first-child { break-before: auto; } }
+""" + (  # dark colours are for screens only (dark ink on white paper); on paper only the worst cards, so say so
+    f"@media print {{ article.card:nth-of-type(n+{PRINTED_CARDS + 1}) {{ display: none; }} "
+    + ", ".join(f'a.clip[data-clip="{i}"]::after' for i in range(PRINTED_CARDS + 1, SHOWN_EVENTS + 1))
+    + ' { content: " (clip " attr(data-clip) ", not printed)"; } }\n')
+
+
+def stats(events, seen, measured=True):
+    """The count tiles, and the other counts as one line. They always say how much was watched, so a quiet video
+    never reads as "safe": serious, close and crossings as tiles, then vehicles, minutes and the 85th-percentile speed.
+    Not `measured` (pace.warning), only what was watched, as tiles: its near-miss counts and speeds are not
+    measurements."""
+    n_serious, crossings = len(serious(events)), seen.get("crossings") or 0
+    watched = [(crossings, "pedestrian crossings watched"), (seen.get("vehicles", "?"), "moving vehicles"),
+               (summary.minutes(seen), "minutes of video")]
+    near = [(n_serious, f"serious near-misses (under {road.PET_MAX_S} s)", "serious"),
+            (len(events) - n_serious, f"close passes ({road.PET_MAX_S}-{road.CLOSE_PASS_S} s)", "close")]
+    speed = [(seen["speed_85th_kmh"], "km/h, 85% of vehicles at or below")] if seen.get("speed_85th_kmh") else []
+    tiles, line = ([*near, (*watched[0], "watched")], [*watched[1:], *speed]) if measured else (
+        [(*w, "watched") for w in watched], [])
+    return ("".join(f'<div class="{kind}"><b>{html.escape(str(v))}</b>{html.escape(label)}</div>'
+                    for v, label, kind in tiles), " · ".join(f"{v} {label}" for v, label in line))
+
+
+def lead(lines):
+    """The headline's first line under the title (its ranges and school-year line go under the pyramid)."""
+    return "".join(f'<p class="lead">{html.escape(line)}</p>' for line in lines[:1])
+
+
+def banner(walking, site):
+    """The warning that replaces the headline when the site file or the walking pace says the numbers are not
+    measurements (pace.warning), else ""."""
+    warning = pace.warning(walking, site)
+    return (f'<p class="lead note bad" role="alert"><b>Not measurements.</b> {html.escape(warning)} No letter was '
+            "asked for.</p>" if warning else "")
+
+
+def top(site, events, seen, plan, images, signoff, full, warning, lines):
+    """The first screen (summary.header). Under the pace warning only the warning and the watched counts; else the
+    headline's first line (of `lines`), the first shown near-miss's clip (or, with no clip, card #1's title linked to
+    its card), the counts and, with a letter, the ask."""
+    tiles, line = stats(events, seen, not warning)
+    shown = None if warning else first_clip(events)
+    video = summary.clip(*shown, card_title(*shown)) if shown else ""
+    worst = "" if warning or shown or not events else summary.worst(1, card_title(1, events[0]))  # no clip to caption
+    asked = (summary.ask(plan, images, is_signed(plan, signoff), letter_status(site, plan, signoff))
+             if plan and not warning else "")
+    return summary.header(site, seen, warning or lead(lines) + worst, video, tiles, line,
+                          limit_note(full), asked, "" if asked else filed_line(site))
+
+
+def page(site, events, seen, plan, images, fps, cost=None, full=None, privacy=None, signoff=None, receipt="",
+         source_sha256=None, timeline=None, ground=None, paths=None, case="", walking=None, recording_s=None,
+         removed=""):
+    warning = banner(walking, site)  # then the headline, pyramid, engineering numbers, barcode and card numbers go
+    lines = [] if warning else headline(events, seen, site)  # its ranges and school-year line go under the pyramid
+    ranges = "".join(f'<p class="note">{html.escape(line)}</p>' for line in lines[1:])
+    measured = "" if warning else (f"{pyramid(events, seen)}{ranges}\n{engineering(seen, cost, site)}"
+                                   f"{roadmap.gap_strip(timeline, events, SHOWN_EVENTS, full)}")
+    moments = "Tracked moments, not measurements (see the warning above)" if warning else "Worst moments"
+    cards = "\n".join(tracked_card(i + 1, e) if warning else
+                      event_card(i + 1, e, fps, overlay.strip(e, site, events[:SHOWN_EVENTS]))
+                      for i, e in enumerate(events[:SHOWN_EVENTS])) or (
+        f"<p>No conflicts under {road.CLOSE_PASS_S} s in these {html.escape(summary.minutes(seen))} minutes. "
+        "A short recording can miss rare events: record more school-run periods before drawing any conclusion.</p>")
+    method = (f"{tracked_by(full)}A near-miss is a pedestrian and a moving vehicle on the same spot (within "
+              f"{road.CONFLICT_RADIUS_M} m) less than {road.PET_MAX_S} s apart (post-encroachment time); "
+              f"{road.PET_MAX_S}-{road.CLOSE_PASS_S} s is reported as a close pass. "
+              f"Death risk: Rosén & Sander (2009), Accident Analysis & Prevention "
+              f"41(3):536-542, for adults hit by a car front; children are not covered by that study. Speed-limit rows "
+              f"replay the same moment with the vehicle no faster than the limit, a {road.REACTION_S} s reaction and "
+              f"{road.BRAKING_MPS2} m/s² braking. {site.get('calibration_note', '')}")
+    body = f"""{measured}
+{map_section(events, site, ground, paths, not warning)}<section id="clips"><h2>{moments}</h2>{cards}</section>{fix_section(plan, images)}{fixband.figure(images)}{legal_section(site)}
+{letter_section(plan, events[:SHOWN_EVENTS], facts(site, events, seen, paths), signoff)}{case}
+{tct_section("" if warning else passmark.after_mark(events, seen))}<section id="method"><h2>How this was measured</h2><p class="note">{html.escape(method)}</p>{privacy_note(privacy)}
+{f'<p class="note">{html.escape(receipt)}</p>' if receipt else ""}{f'<p class="note">{html.escape(removed)}</p>' if removed else ""}{hash_line(source_sha256, site, seen.get("window_s"), recording_s)}</section>"""
+    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Crossing Watch evidence</title>
+<style>{STYLE}{summary.STYLE}{roadmap.STYLE}{overlay.STYLE}</style></head><body>
+{top(site, events, seen, plan, images, signoff, full, warning, lines)}{summary.jump_bar(body)}{body}{overlay.SCRIPT}</body></html>"""
+
+
+def share(out_dir, page_html):
+    """out_dir/share/: the page and only the files it shows, for the GitHub release. Never the unblurred video or
+    the person crops, even if a page names one; the Muse Image .webp goes in untouched, AI tag and all."""
+    folder = out_dir / "share"
+    shutil.rmtree(folder, ignore_errors=True)
+    folder.mkdir()
+    for name in {html.unescape(n) for n in SHOWN_FILE.findall(page_html)}:
+        if Path(name).name == name and (out_dir / name).is_file() and not UNSHAREABLE.fullmatch(name):
+            shutil.copyfile(out_dir / name, folder / name)
+    (folder / "index.html").write_text(page_html)
+    return folder
+
+
+def clip_minutes(clip, fps):
+    frames = subprocess.run(["ffprobe", "-v", "error", "-count_packets", "-select_streams", "v:0", "-show_entries",
+                             "stream=nb_read_packets", "-of", "csv=p=0", str(clip)],
+                            check=True, capture_output=True, text=True).stdout
+    return int(frames) / fps / 60
+
+
+
+def optional_key():
+    """The Meta API key, or None: an open-weights letter model can run without one."""
+    try:
+        return sam.load_api_key()
+    except SystemExit:
+        return None
+
+def read_json(path):
+    """A JSON file an earlier run wrote, or None when it is missing or unreadable (said on stderr)."""
+    try:
+        return json.loads(path.read_text())
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError) as err:
+        print(f"{path} unreadable, ignored: {err}", file=sys.stderr)
+        return None
+
+
+def saved_plan(out_dir, prompt):
+    """plan.json when this same writer wrote it from this same prompt (the same measurements), else None: a re-run
+    reuses the paid-for letter, and never one written from other measurements."""
+    plan = read_json(out_dir / "plan.json")
+    if isinstance(plan, dict) and plan.get("prompt_sha256") == sha256(prompt) and plan.get("writer") == WRITER:
+        return plan
+    if plan is not None:
+        print("plan.json was written from other measurements or by another model: not reused", file=sys.stderr)
+    return None
+
+
+def new_plan(out_dir, prompt, measured, key, photo, revise=None, notes="", spoken=""):
+    """A new fix and letter, or `revise`'s letter revised by the notes given to the writer, saved to plan.json with
+    the sha256 of the prompt it came from. A revision also keeps every note so far (later checks read them as stated
+    by the principal) and the first AI draft, which the sign-off counts changed sentences against. `spoken`: the
+    sha256 of the audio `notes` were transcribed from (--voice-notes), kept in "spoken_notes" for the sign-off line."""
+    stated = revise.get("notes", []) + [notes] if revise else []
+    ask = prompt + REVISE.format(letter=revise["letter"], notes=notes) if revise else prompt
+    plan = {**ask_plan(ask, measured, key, photo, stated=stated), "prompt_sha256": sha256(prompt)}
+    if revise:
+        plan = {**plan, "notes": stated, "draft_letter": revise.get("draft_letter", revise["letter"])}
+        voiced = revise.get("spoken_notes", []) + ([{"audio_sha256": spoken, "model": voice.MODEL}] if spoken else [])
+        if voiced:
+            plan = {**plan, "spoken_notes": voiced}
+    write_plan(out_dir, plan)
+    return plan
+
+
+def with_hindi(out_dir, plan, api_key, signoff, signing):
+    """plan with its Hindi copy (site "hindi_copy": true), asked for once per letter and kept in plan.json:
+    "letter_hi" when hindi.translate found the English letter's numbers in it, else "letter_hi_failed" (the English
+    letter only). Never for a signed letter nor in the run that signs: the principal reads the copy before signing."""
+    if {"letter_hi", "letter_hi_failed"} & plan.keys():
+        return plan
+    if signing or is_signed(plan, signoff) or not (api_key or LETTER_URL):
+        print("no Hindi copy: it is made by the letter's writer (MODEL_API_KEY or LETTER_MODEL_URL) before the letter "
+              "is signed (run without --approved-by; a signed letter needs --new-letter)", file=sys.stderr)
+        return plan
+    ask = ((lambda prompt: open_model_reply(prompt, None, hindi.SCHEMA)[0]) if LETTER_URL
+           else lambda prompt: spark_reply(prompt, None, api_key))
+    try:
+        text, why = hindi.translate(plan["letter"], ask, NUMBER, NUMBER_WORD)
+    except (OSError, http.client.HTTPException) as err:
+        print(f"no Hindi copy this run (asked again next run), the English letter only: {err}", file=sys.stderr)
+        return plan
+    if why:
+        print(f"no Hindi copy, the English letter only: {why}", file=sys.stderr)
+    plan = {**plan, **({"letter_hi": text} if text else {"letter_hi_failed": why})}
+    # the same letter with its copy added: nothing to back up, and its provenance is unchanged
+    (out_dir / "plan.json").write_text(json.dumps(plan, indent=1, ensure_ascii=False))
+    return plan
+
+
+def write_plan(out_dir, plan):
+    """plan.json, the paid-for letter, after copying the letter it held to plan-<first 8 of its sha256>.json, so no
+    paid-for or signed letter is ever lost (signoff.json's letter_sha256 names its file); pack and the case agent both
+    write through here. Beside it, when the reply's run was measured (an open-weights server or Muse Spark), PROVENANCE:
+    the model id, host, request id, usage, wall seconds, the checks (letter_checks) and the letter's sha256 (never the
+    key)."""
+    path, old = out_dir / "plan.json", read_json(out_dir / "plan.json")
+    if isinstance(old, dict) and isinstance(old.get("letter"), str):
+        shutil.copyfile(path, out_dir / PLAN_BACKUP.format(sha8=signed_sha(old)[:8]))
+    path.write_text(json.dumps(plan, indent=1, ensure_ascii=False))
+    if "wall_s" in plan:
+        model, url = (LETTER_MODEL, LETTER_URL) if LETTER_URL else (review.MODEL, sam.API_URL)
+        record = {"model": model, "host": openweights.host(url), **{k: plan.get(k) for k in RUN_KEYS},
+                  "tries": plan.get("tries"), **letter_checks(plan), "letter_sha256": sha256(plan["letter"])}
+        (out_dir / PROVENANCE).write_text(json.dumps(record, indent=1))
+
+
+def letter_checks(plan):
+    """What the checks said, for PROVENANCE: on a letter that passed them, who judged it (None: no judge ran); on one
+    kept after the last try, ask_plan's lists of what was left (which judges ran then is not in the plan)."""
+    if "unmeasured" not in plan:
+        return {"judged_by": plan.get("judged_by")}
+    return {k: plan.get(k, []) for k in CHECK_KEYS}
+
+
+def placeholders(letter):
+    """The blanks a letter still holds ("[School name]", "[Date]", "____"), each once: a letter with any is a draft."""
+    return list(dict.fromkeys(PLACEHOLDER.findall(letter)))
+
+
+def check_signable(letter):
+    """Refuses (SystemExit, before anything is written or paid for) to sign a letter that still holds a blank."""
+    if blanks := placeholders(letter):
+        raise SystemExit(f"not signed: the letter still holds {', '.join(blanks)}. Give the real words in the "
+                         "notes given to the writer (pack.py --notes FILE, or agent.py --reject --notes \"...\"), "
+                         "read the revised letter, then sign it")
+
+
+def sign(out_dir, plan, approved_by, school):
+    """signoff.json: who read and approved plan.json's letter, the day, and the sha256 of its exact text. Never for a
+    letter that still holds a blank (check_signable): pack.py and agent.py --approve both sign through here."""
+    check_signable(plan["letter"])
+    record = {"approved_by": approved_by, "school": school, "date": datetime.date.today().isoformat(),
+              "letter_sha256": signed_sha(plan)}
+    (out_dir / "signoff.json").write_text(json.dumps(record, indent=1, ensure_ascii=False))
+    return record
+
+
+def read_signoff(out_dir):
+    """signoff.json, or None (the letter then shows as unsigned) when there is none or it is not a sign-off."""
+    record = read_json(out_dir / "signoff.json")
+    if record is None or isinstance(record, dict) and all(isinstance(record.get(k), str) for k in SIGNOFF_KEYS):
+        return record
+    print(f"signoff.json lacks {', '.join(SIGNOFF_KEYS)}: the letter shows as unsigned", file=sys.stderr)
+    return None
+
+
+def kept_letter(out_dir, signoff, untrusted, new_letter):
+    """Why a run that cannot reuse plan.json (saved_plan found none) must stop, or "": out_dir is agent.py's case,
+    whose letter only agent.py signs, or plan.json holds the letter signoff.json signed and --new-letter was not given.
+    A signed letter may already be filed, so it is never swapped silently."""
+    if (out_dir / "case" / "progress.json").exists():
+        return "this folder is agent.py's case: sign with agent.py --approve"
+    old = read_json(out_dir / "plan.json")
+    if new_letter or not (isinstance(old, dict) and isinstance(old.get("letter"), str) and is_signed(old, signoff)):
+        return ""
+    why = (untrusted.rstrip(".") if untrusted else f"another writer ({old.get('writer')}, now {WRITER})"
+           if old.get("writer") != WRITER else "other measurements")
+    return (f"plan.json holds the letter {signoff['approved_by']} signed on {signoff['date']}, and this run cannot "
+            f"reuse it: {why}. Nothing was written; add --new-letter to replace it (the signed letter is kept as "
+            f"{PLAN_BACKUP.format(sha8=signoff['letter_sha256'][:8])}).")
+
+
+def parse_args():
+    """The command line, the notes' text and (approved_by, school), refusing flags that cannot go together."""
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("out_dir", nargs="?")
+    parser.add_argument("site", nargs="?")
+    parser.add_argument("--verify", metavar="FOLDER", help=f"check a shared folder against its {seal.SUMS}: MATCH, "
+                        "CHANGED or MISSING per file (alone, without out_dir and site)")
+    parser.add_argument("--notes", metavar="FILE", help="the notes given to the writer on plan.json's letter: only the "
+                        "sentences they ask about change")
+    parser.add_argument("--voice-notes", metavar="AUDIO", help="the notes given to the writer, spoken into a phone "
+                        f"(m4a, opus, wav...): {voice.NAME} writes them down, and they revise the letter as --notes "
+                        "would")
+    parser.add_argument("--approved-by", default="", metavar="NAME",
+                        help='who read and approved plan.json\'s letter, e.g. "A. Rao, Principal" (with --school)')
+    parser.add_argument("--school", default="", help="the school that sends the letter")
+    parser.add_argument("--new-letter", action="store_true", help="replace a signed letter this run cannot reuse "
+                        f"(other measurements, another writer or a pace warning); the signed one is kept as "
+                        f"{PLAN_BACKUP.format(sha8='<sha>')}")
+    args = parser.parse_args()
+    if args.verify and (args.out_dir or args.notes or args.voice_notes or args.approved_by or args.school
+                        or args.new_letter):
+        parser.error("--verify FOLDER goes alone")
+    if not args.verify and not (args.out_dir and args.site):
+        parser.error("give out_dir and site (or --verify FOLDER)")
+    signer = (args.approved_by.strip(), args.school.strip())
+    if any(signer) and not all(signer):
+        parser.error("--approved-by and --school go together")
+    if args.notes and args.voice_notes:
+        parser.error("give the notes once: --notes FILE or --voice-notes AUDIO")
+    if all(signer) and (args.notes or args.voice_notes):
+        parser.error("sign after reading the revised letter: run --notes first, then --approved-by")
+    try:
+        notes = Path(args.notes).read_text().strip() if args.notes else ""
+    except OSError as err:
+        parser.error(f"cannot read the notes: {err}")
+    if args.notes and not notes:
+        parser.error(f"{args.notes} is empty")
+    return args, notes, signer
+
+
+def verify_folder(folder):
+    """--verify: each listed file's MATCH, CHANGED or MISSING; the exit status is 0 only when every one matches."""
+    try:
+        status = seal.verify(folder)
+    except (OSError, ValueError) as err:
+        sys.exit(f"pack.py --verify: {err}")
+    if not status:
+        sys.exit(f"pack.py --verify: {Path(folder) / seal.SUMS} lists no files")
+    print("\n".join(f"{state:8}{name}" for name, state in status.items()))
+    sys.exit(0 if set(status.values()) == {"MATCH"} else 1)
+
+
+def failure_line(plan, saved, notes, err):
+    """What a failed letter or picture left: "nothing was saved" only when there is no letter at all."""
+    if plan is None:
+        return f"letter failed, nothing was saved: the page shows the measurements only: {err}"
+    if notes and plan is saved:
+        return f"revising the letter failed: plan.json's letter is unchanged and shown: {err}"
+    return f"fix image failed: the letter is saved in plan.json and shown: {err}"
+
+
+def main():
+    args, notes, signer = parse_args()
+    if args.verify:
+        verify_folder(args.verify)
+    out_dir, site = Path(args.out_dir), json.loads(Path(args.site).read_text())
+    try:
+        submitted(site)
+    except ValueError as err:
+        sys.exit(f"pack.py: {err}")
+    data = json.loads((out_dir / "events.json").read_text())
+    events = confirmed(data["events"])
+    seen = real_crossers(data["events"],
+                         data.get("exposure") or {"minutes": round(clip_minutes(out_dir / "clip.mp4", data["fps"]), 1)})
+    paths = data.get("paths") or {}  # desire lines: with them a 0-event clip still gets its photo, fix and letter
+    measured = facts(site, events, seen, paths)
+    prompt = LETTER_PROMPT.format(facts=measured, language=site.get("letter_language", "English"))
+    untrusted = pace.warning(data.get("walking"), site)  # no letter (no paid call) from numbers not measured
+    saved = None if untrusted else saved_plan(out_dir, prompt)
+    if untrusted:
+        print(f"no letter or fix picture: {untrusted}", file=sys.stderr)
+    signoff = read_signoff(out_dir)
+    if not saved and (stop := kept_letter(out_dir, signoff, untrusted, args.new_letter)):
+        sys.exit(f"pack.py: {stop}")  # before any paid call and before index.html is written
+    if (notes or args.voice_notes or all(signer)) and not saved:
+        sys.exit("pack.py: --notes and --approved-by work on plan.json's letter from these same measurements, and "
+                 "there is none: run pack.py without them first, and have that letter read")
+    if all(signer):
+        check_signable(saved["letter"])  # before any paid picture
+    spoken = ""
+    if args.voice_notes:  # before any other paid call: an empty or failed transcript stops here
+        notes, spoken = voice.spoken_notes(args.voice_notes, out_dir, optional_key())
+        print(f"{voice.NAME} heard (saved as {voice.TRANSCRIPT.format(sha8=spoken[:8])}; if a word is wrong, "
+              f"correct that file and give it with --notes instead):\n{notes}\n", flush=True)
+    plan, images, ground = saved, None, None  # saved stays if a revision fails
+    if (events or paths) and not untrusted:
+        try:
+            photo = street_photo(out_dir / "clip.mp4", out_dir / "street.jpg", site.get("person", "person"),
+                                 site.get("vehicles", []))
+        except (ValueError, OSError, subprocess.CalledProcessError) as err:
+            print(f"no street photo: {err}", file=sys.stderr)
+            photo = None
+        ground = roadmap.ground(photo, site, events, out_dir, paths) if photo else None  # the street seen from above
+        try:
+            key = optional_key()
+            plan = (saved if saved and not notes else  # a re-run pays nothing
+                    new_plan(out_dir, prompt, measured, key, photo, saved if notes else None, notes, spoken))
+            if site.get("hindi_copy") is True:
+                plan = with_hindi(out_dir, plan, key, signoff, all(signer))
+            drawn = out_dir / fixband.PICTURE
+            if photo and saved and drawn.is_file() and fix_instruction(saved) == fix_instruction(plan):
+                muse = lambda image, words, path: drawn  # drawn for this same fix by an earlier run: no new call
+            else:  # Muse Image draws the fix in the measured band; without a key there is no street image
+                muse = (lambda image, words, path: draw_fix(image, words, key, path)) if photo and key else None
+            if muse:
+                images = fixband.draw(photo, plan["fix"], fix_instruction(plan), events, site,
+                                      photo_people(out_dir / "clip.mp4", site.get("person", "person")), muse, out_dir)
+        except (SystemExit, OSError, ValueError, KeyError, IndexError, TypeError, AttributeError,
+                http.client.HTTPException, subprocess.CalledProcessError) as err:
+            print(failure_line(plan, saved, notes, err), file=sys.stderr)
+    signoff = sign(out_dir, plan, *signer) if plan and all(signer) else signoff
+    page_html = page(site, events, seen, plan, images, data["fps"], data.get("cost"), data.get("sam_full_requests"),
+                     data.get("privacy"), signoff=signoff, receipt=receipt_line(data, plan, images),
+                     source_sha256=data.get("source_sha256"), timeline=data.get("timeline"), ground=ground,
+                     paths=paths, walking=data.get("walking"), recording_s=data.get("recording_s"),
+                     removed=removed_note(data["events"]))
+    (out_dir / "index.html").write_text(page_html)
+    seal.write_sums(share(out_dir, page_html))  # the only folder to publish, and its hashes
+    counts = ("not measurements, see the page's warning" if untrusted else
+              f"{len(serious(events))} serious, {len(events) - len(serious(events))} close passes")
+    print(f"wrote {out_dir / 'index.html'}: {counts}, fix: {plan['fix'] if plan else 'none'}")
+
+
+if __name__ == "__main__":
+    main()

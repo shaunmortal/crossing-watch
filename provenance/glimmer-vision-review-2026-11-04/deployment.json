@@ -1,0 +1,33 @@
+{
+ "what": "Fireworks on-demand deployment that served Muse Glimmer 30B for this test; record read back from the Fireworks API after deletion (account id removed)",
+ "deployment_id": "cw-glimmer-vision",
+ "state": "DELETED",
+ "createTime": "2026-11-03T20:01:08.801925Z",
+ "deleteTime": "2026-11-03T20:11:28.553965Z",
+ "updateTime": "2026-11-03T20:11:58.614967Z",
+ "expireTime": null,
+ "acceleratorType": "NVIDIA_H200_141GB",
+ "acceleratorCount": 1,
+ "precision": "BF16",
+ "baseModel": "accounts/fireworks/models/muse-glimmer-30b",
+ "deploymentShape": "accounts/fireworks/deploymentShapes/dkuwotf7/versions/vtcy28lv",
+ "minReplicaCount": 1,
+ "maxReplicaCount": 1,
+ "replicaCount": 0,
+ "timeline_utc": {
+  "create_requested": "2026-11-03T20:01:06Z",
+  "ready": "2026-11-03T20:04:47Z",
+  "smoke": "2026-11-03T20:04:50Z",
+  "set_A_start": "2026-11-03T20:04:50Z",
+  "set_B_start": "2026-11-03T20:06:32Z",
+  "runs_done": "2026-11-03T20:11:27Z",
+  "delete_requested": "2026-11-03T20:11:27Z",
+  "state_DELETING": "2026-11-03T20:11:29Z",
+  "state_DELETED_seen": "2026-11-03T20:12:00Z"
+ },
+ "after_delete_checks": {
+  "2026-11-03T20:12:00Z": "deployments list (SDK): []",
+  "2026-11-03T20:13:47Z": "GET deployment: state DELETED, replicaCount 0; deployments list: []; list with showDeleted: cw-glimmer-vision DELETED"
+ },
+ "price": "$8.00 per GPU-hour (H200 141 GB), billed per GPU-second, start-up not billed (fireworks.ai/pricing, read 4 Nov 2026)"
+}

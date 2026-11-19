@@ -1,0 +1,91 @@
+{
+ "what": "Muse Glimmer 30B LoRA SFT judge v2: a pre-registered 4-config sweep (GATES.md, Sat 31 Oct 2026) on Fireworks Serverless Training (fw-ai/cookbook 57968a2, muse_glimmer_starter), winner chosen on dev only, then the public bench read",
+ "base_model": "accounts/fireworks/models/muse-glimmer-30b",
+ "winner": "B",
+ "winner_model": "accounts/<fireworks-account>/models/muse-starter-sl-judge-v2-b",
+ "data": {
+  "file": "kaggle/glimmer-judge-train-v2.jsonl",
+  "sha256": "690e4f7479674ffa0e780de6596fe95b1470f001334af2fff91ad7a541b8c4f3",
+  "rows": 1831,
+  "train": "1,620 rows from 135 letters (Muse Spark Open 100 letters incl. v1's 50, Muse Spark via Meta API 50 in all, split by whole letters)",
+  "dev": "180 rows from 15 whole letters (8 Spark Open, 7 Spark)",
+  "public": "all 31 public-bench prompts, held out in every run",
+  "check": "replaying the starter's Random(0) shuffle holds out exactly dev + public; 0 rows share a 12-word span with the public bench",
+  "builder": "finetune_judge.py (commit bdce8cf), manifest kaggle/glimmer-judge-train-v2.manifest.json, split kaggle/glimmer-judge-train-v2.split.json"
+ },
+ "common_params": {
+  "seed": 0,
+  "max_seq_len": 3072,
+  "max_eval_tokens": 256,
+  "lora_alpha": 32,
+  "batch_size": 16,
+  "temperature": 0.0,
+  "votes": 1
+ },
+ "runs": {
+  "A": {
+   "lora_rank": 8,
+   "epochs": 1,
+   "learning_rate": 0.0001,
+   "steps": null,
+   "promoted_model": null,
+   "eval_tokens": null
+  },
+  "B": {
+   "lora_rank": 32,
+   "epochs": 1,
+   "learning_rate": 0.0001,
+   "steps": 102,
+   "promoted_model": "accounts/<fireworks-account>/models/muse-starter-sl-judge-v2-b",
+   "eval_tokens": {
+    "prompt_tokens": 562250,
+    "sampled_tokens": 59569,
+    "note": "billed separately from training at published per-token rates"
+   }
+  },
+  "C": {
+   "lora_rank": 8,
+   "epochs": 2,
+   "learning_rate": 0.0001,
+   "steps": 204,
+   "promoted_model": "accounts/<fireworks-account>/models/muse-starter-sl-judge-v2-c",
+   "eval_tokens": {
+    "prompt_tokens": 562250,
+    "sampled_tokens": 59430,
+    "note": "billed separately from training at published per-token rates"
+   }
+  },
+  "D": {
+   "lora_rank": 32,
+   "epochs": 2,
+   "learning_rate": 5e-05,
+   "steps": null,
+   "promoted_model": null,
+   "eval_tokens": null
+  }
+ },
+ "dev": {
+  "A": "101/105 lies, 0/75 clean flagged",
+  "B": "104/105, 0/75",
+  "C": "104/105, 0/75",
+  "D": "104/105, 0/75"
+ },
+ "public": {
+  "A": "21/23 lies, 0/8 clean flagged",
+  "B": "23/23, 0/8",
+  "C": "20/23, 0/8",
+  "D": "21/23, 0/8"
+ },
+ "scored_with": "pack.read_problems via provenance/glimmer-judge-lora-v2/score.py (an unreadable reply counts as not flagged; none were unreadable)",
+ "notes": [
+  "A's promotion failed (upper-case run id) and D's (Fireworks HTTP 500), after their evaluations; B's model is promoted",
+  "the in-session base column is not quoted: base replies hit the 256-token cap while reasoning",
+  "one vote, temperature 0; 23 lies and 8 clean letters is a small bench (Wilson 95%: 23/23 is 86-100%, 0/8 is 0-32%)"
+ ],
+ "cost": {
+  "training": "$0 (promotional LoRA SFT)",
+  "eval_sampling_usd_est": "about $1.4 per run, about $5.6 for 4 runs (562,250 prompt + about 59,500 sampled tokens a run at $1.96 / $4.88 per 1M)",
+  "letters_usd": "v1 $0.83; v2 new letters $2.23 (Spark Open $1.15, Spark $1.08)"
+ },
+ "deployment": "none created"
+}

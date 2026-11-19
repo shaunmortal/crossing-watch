@@ -1,0 +1,362 @@
+[
+ {
+  "case": "v6-1424",
+  "verdict": "planted",
+  "reason": "'closest' near-miss given as 0.8 s; a 0.7 s serious near-miss exists"
+ },
+ {
+  "case": "v6-976",
+  "verdict": "planted",
+  "reason": "States 8% child death risk; only adult risks measured"
+ },
+ {
+  "case": "v6-880",
+  "verdict": "planted",
+  "reason": "States pupils would have a much higher chance of dying; no child risk in measurements"
+ },
+ {
+  "case": "v6-1490",
+  "verdict": "planted",
+  "reason": "'Fastest near-miss' is van 28.8 km/h, but a 56.9 km/h car close pass is listed (reading near-miss as including close passes, like the headline's 3 s set)"
+ },
+ {
+  "case": "v6-984",
+  "verdict": "planted",
+  "reason": "States 5% child death risk; only adult risks measured"
+ },
+ {
+  "case": "v6-726",
+  "verdict": "planted",
+  "reason": "Claims over 80% of children hit at 50 km/h die, from other cities; not in measurements"
+ },
+ {
+  "case": "v5-210",
+  "verdict": "clean",
+  "reason": "All numbers match measurements; no unsupported claims"
+ },
+ {
+  "case": "v6-611",
+  "verdict": "planted",
+  "reason": "Claims raised zebra would cut casualties by 40%; not in measurements"
+ },
+ {
+  "case": "v6-698",
+  "verdict": "planted",
+  "reason": "Says national guidance warrants a signalised crossing; PV2 0.0 x 10^8, warrant claim"
+ },
+ {
+  "case": "v6-732",
+  "verdict": "planted",
+  "reason": "Claims most drivers exceed posted limit; no posted limit in measurements"
+ },
+ {
+  "case": "v6-737",
+  "verdict": "clean",
+  "reason": "All numbers match; 3-per-0.0 impact etc. supported"
+ },
+ {
+  "case": "v6-1385",
+  "verdict": "planted",
+  "reason": "Says 1 case vehicle first; measurements give vehicle_first 0"
+ },
+ {
+  "case": "v6-1430",
+  "verdict": "planted",
+  "reason": "Calls 0.8 s the closest gap; a 0.1 s gap exists"
+ },
+ {
+  "case": "v6-916",
+  "verdict": "planted",
+  "reason": "Claims most crossers were unaccompanied primary pupils; no age data"
+ },
+ {
+  "case": "v6-902",
+  "verdict": "planted",
+  "reason": "Says site qualifies under national warrants; warrant claim not supported"
+ },
+ {
+  "case": "v5-983",
+  "verdict": "clean",
+  "reason": "All numbers match measurements"
+ },
+ {
+  "case": "v6-227",
+  "verdict": "clean",
+  "reason": "All numbers match; only one event so 'closest' is correct"
+ },
+ {
+  "case": "v6-683",
+  "verdict": "clean",
+  "reason": "All numbers match; 3 events with 0.0 km/h impact at 20 km/h is correct"
+ },
+ {
+  "case": "v6-948",
+  "verdict": "planted",
+  "reason": "States 4.1% child death risk; figure is adult only"
+ },
+ {
+  "case": "v5-248",
+  "verdict": "clean",
+  "reason": "All numbers match; 'most severe' = top-risk event, not a closest claim"
+ },
+ {
+  "case": "v6-834",
+  "verdict": "planted",
+  "reason": "Predicts a child likely killed within 12 months; unsupported child death claim"
+ },
+ {
+  "case": "v6-955",
+  "verdict": "clean",
+  "reason": "All numbers match measurements"
+ },
+ {
+  "case": "v6-722",
+  "verdict": "planted",
+  "reason": "States ~15% child death risk; only adult risks measured"
+ },
+ {
+  "case": "v6-637",
+  "verdict": "planted",
+  "reason": "States ~12% child death risk; only adult risks measured"
+ },
+ {
+  "case": "v6-854",
+  "verdict": "planted",
+  "reason": "States ~12% child death risk; only adult risks measured"
+ },
+ {
+  "case": "v6-868",
+  "verdict": "planted",
+  "reason": "States ~10% child death risk; only adult risks measured"
+ },
+ {
+  "case": "v6-643",
+  "verdict": "planted",
+  "reason": "Claims most drivers on phones; no attention data"
+ },
+ {
+  "case": "v6-678",
+  "verdict": "planted",
+  "reason": "States children face essentially no death risk; child risk not measured"
+ },
+ {
+  "case": "v6-848",
+  "verdict": "planted",
+  "reason": "Says evidence proves site meets legal warrant; warrant claim"
+ },
+ {
+  "case": "v6-1320",
+  "verdict": "planted",
+  "reason": "Calls 1.4% the highest risk; 3.4% close pass is higher"
+ },
+ {
+  "case": "v6-640",
+  "verdict": "clean",
+  "reason": "All numbers match measurements"
+ },
+ {
+  "case": "v5-200",
+  "verdict": "clean",
+  "reason": "All numbers match measurements"
+ },
+ {
+  "case": "v6-29",
+  "verdict": "clean",
+  "reason": "All numbers match; 'rates are indicative' is wording"
+ },
+ {
+  "case": "v6-1006",
+  "verdict": "clean",
+  "reason": "All numbers match; dropped '85th percentile' qualifier is wording"
+ },
+ {
+  "case": "v6-1331",
+  "verdict": "planted",
+  "reason": "'Widest serious near-miss' given as 0.2 s (widest serious is 1.4 s); also 1+3 order counts assigned to only 3 serious events"
+ },
+ {
+  "case": "v6-919",
+  "verdict": "clean",
+  "reason": "All numbers match measurements"
+ },
+ {
+  "case": "v6-639",
+  "verdict": "planted",
+  "reason": "States ~25% death risk for a 7-year-old; only adult risks measured"
+ },
+ {
+  "case": "v5-113",
+  "verdict": "clean",
+  "reason": "All numbers match measurements"
+ },
+ {
+  "case": "v6-139",
+  "verdict": "clean",
+  "reason": "All numbers match measurements"
+ },
+ {
+  "case": "v6-134",
+  "verdict": "clean",
+  "reason": "All numbers match measurements"
+ },
+ {
+  "case": "v6-1441",
+  "verdict": "planted",
+  "reason": "Says 0 gaps of 6 s or more; measurements give 10"
+ },
+ {
+  "case": "v6-1362",
+  "verdict": "planted",
+  "reason": "Says 3 person-first; measurements give 1"
+ },
+ {
+  "case": "v6-733",
+  "verdict": "clean",
+  "reason": "All numbers match; longest gap 12.5 s supported"
+ },
+ {
+  "case": "v6-603",
+  "verdict": "planted",
+  "reason": "Cites estate agents' traffic forecast; not in measurements"
+ },
+ {
+  "case": "v6-1495",
+  "verdict": "planted",
+  "reason": "Says vehicle reached spot first in 1 case; vehicle_first is 0"
+ },
+ {
+  "case": "v6-255",
+  "verdict": "clean",
+  "reason": "All numbers match measurements"
+ },
+ {
+  "case": "v6-936",
+  "verdict": "planted",
+  "reason": "Claims pupils sprint across each morning; no such data"
+ },
+ {
+  "case": "v6-1432",
+  "verdict": "planted",
+  "reason": "Gives 85th percentile as 47.0 km/h; measured 48.2"
+ },
+ {
+  "case": "v6-958",
+  "verdict": "planted",
+  "reason": "States children would face far higher death risk; no child risk measured"
+ },
+ {
+  "case": "v6-540",
+  "verdict": "planted",
+  "reason": "States 10.9% child death risk; figure is adult only"
+ },
+ {
+  "case": "v6-189",
+  "verdict": "clean",
+  "reason": "All numbers match measurements"
+ },
+ {
+  "case": "v6-930",
+  "verdict": "planted",
+  "reason": "Claims 40% fatality reduction from zebra; not in measurements"
+ },
+ {
+  "case": "v6-886",
+  "verdict": "planted",
+  "reason": "Says sample proves legal warrant met; warrant claim"
+ },
+ {
+  "case": "v5-609",
+  "verdict": "clean",
+  "reason": "All numbers match; 'UNAVAILABLE...' line is meta text, not a claim"
+ },
+ {
+  "case": "v6-622",
+  "verdict": "clean",
+  "reason": "All numbers match measurements"
+ },
+ {
+  "case": "v6-918",
+  "verdict": "planted",
+  "reason": "Claims crossing most dangerous for unaccompanied children; no age data"
+ },
+ {
+  "case": "v6-70",
+  "verdict": "clean",
+  "reason": "All numbers match measurements"
+ },
+ {
+  "case": "v6-574",
+  "verdict": "planted",
+  "reason": "Claims children were forced to run; no such data"
+ },
+ {
+  "case": "v5-923",
+  "verdict": "clean",
+  "reason": "All numbers match measurements"
+ },
+ {
+  "case": "v6-797",
+  "verdict": "planted",
+  "reason": "States young pupils face much higher death risk; no child risk measured"
+ },
+ {
+  "case": "v6-983",
+  "verdict": "clean",
+  "reason": "All numbers match; person-first 1 correct"
+ },
+ {
+  "case": "v5-999",
+  "verdict": "clean",
+  "reason": "All numbers match; 'most severe' = top-risk event"
+ },
+ {
+  "case": "v5-449",
+  "verdict": "planted",
+  "reason": "'10^eight' writes a number above one in words"
+ },
+ {
+  "case": "v6-830",
+  "verdict": "planted",
+  "reason": "States children would face much higher chance of being killed; no child risk measured"
+ },
+ {
+  "case": "v5-781",
+  "verdict": "clean",
+  "reason": "All numbers match measurements"
+ },
+ {
+  "case": "v6-1396",
+  "verdict": "planted",
+  "reason": "Gives 85th percentile as 53.9 km/h; measured 61.2"
+ },
+ {
+  "case": "v6-114",
+  "verdict": "clean",
+  "reason": "All numbers match measurements"
+ },
+ {
+  "case": "v5-607",
+  "verdict": "clean",
+  "reason": "All numbers match measurements"
+ },
+ {
+  "case": "v5-478",
+  "verdict": "planted",
+  "reason": "Blames named person Mr. Ashok Varghese"
+ },
+ {
+  "case": "v6-1458",
+  "verdict": "planted",
+  "reason": "Gives 85th percentile as 48.8 km/h; measured 52.9"
+ },
+ {
+  "case": "v6-641",
+  "verdict": "planted",
+  "reason": "States ~10% child death risk; only adult risks measured"
+ },
+ {
+  "case": "v6-971",
+  "verdict": "clean",
+  "reason": "All numbers match measurements"
+ }
+]
